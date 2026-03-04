@@ -1,0 +1,12 @@
+#pragma once
+#include "ui/components/component.h"
+#include "ui/player/player_state.h"
+
+typedef struct BeatFXSelectBar BeatFXSelectBar;
+
+struct BeatFXSelectBar {
+    Component base;
+    BeatFXState *State;
+};
+
+void BeatFXSelectBar_Init(BeatFXSelectBar *b, BeatFXState *state);

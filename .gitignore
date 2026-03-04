@@ -1,0 +1,18 @@
+# Build artifacts
+*.exe
+*.o
+*.obj
+bin/
+build/
+
+# Raylib/Zig temp
+zig-cache/
+zig-out/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+Thumbs.db
+.DS_Store
