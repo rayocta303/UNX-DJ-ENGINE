@@ -164,6 +164,13 @@ int main(void) {
             double lenSec = ((double)audioEngine.Decks[0].TotalSamples / (double)CHANNELS) / (double)SAMPLE_RATE;
             app.deckA.TrackLengthMs = (uint32_t)(lenSec * 1000.0);
         }
+        if (audioEngine.Decks[1].PCMBuffer) {
+            double posSec = audioEngine.Decks[1].Position / (double)SAMPLE_RATE;
+            app.deckB.PositionMs = (uint32_t)(posSec * 1000.0);
+            
+            double lenSec = ((double)audioEngine.Decks[1].TotalSamples / (double)CHANNELS) / (double)SAMPLE_RATE;
+            app.deckB.TrackLengthMs = (uint32_t)(lenSec * 1000.0);
+        }
         
         if (IsKeyPressed(app.keyMap.toggleInfo)) {
             if (app.screen == ScreenInfo) app.screen = ScreenPlayer;
