@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "library/rekordbox_reader.h"
+
 typedef struct {
     char Name[64];
     char Path[256];
@@ -23,7 +25,14 @@ typedef struct {
     StorageDevice AvailableStorages[8];
     int StorageCount;
     StorageDevice *SelectedStorage;
+    RBDatabase *DB;
+
+    // Filtered view
+    RBTrack **TrackPointers;
+    int ActiveTrackCount;
 } BrowserState;
+
+void Browser_RefreshStorages(BrowserState *s);
 
 typedef struct {
     Component base;

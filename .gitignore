@@ -5,6 +5,9 @@
 bin/
 build/
 
+# Testing
+*test/
+
 # Raylib/Zig temp
 zig-cache/
 zig-out/

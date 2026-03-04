@@ -65,9 +65,7 @@ void App_Init(App *a) {
     memset(&a->browserState, 0, sizeof(BrowserState));
     a->browserState.IsActive = false;
     a->browserState.BrowseLevel = 3; // Source level
-    a->browserState.StorageCount = 1;
-    strcpy(a->browserState.AvailableStorages[0].Name, "USB DRIVE (D:)");
-    strcpy(a->browserState.AvailableStorages[0].Type, "USB");
+    Browser_RefreshStorages(&a->browserState);
 
     // Init Settings State
     memset(&a->settingsState, 0, sizeof(SettingsState));

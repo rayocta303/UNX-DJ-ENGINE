@@ -5,26 +5,91 @@
 #include <rlgl.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
-// Mock rekordbox data for display
-static const char* mock_tracks[] = {
-    "Late Night Drive", "Midnight City", "Sunrise Melodies", "Electric Dreams", 
-    "After Hours", "Shadow Dancer", "Neon Nights", "Golden Hour", 
-    "Urban Jungle", "Lost In Sound", "Velvet Sky", "Digital Mirage"
-};
-static const char* mock_artists[] = {
-    "Kavinsky", "M83", "Petit Biscuit", "Daft Punk", 
-    "Justice", "Gessafelstein", "Tame Impala", "Kygo", 
-    "Disclosure", "ZHU", "Flume", "Glass Animals"
-};
-static const int mock_track_count = 12;
-
-static const char* mock_playlists[] = {
-    "SUMMER HITS 2024", "DEEP HOUSE", "TECHNO VIBES", "CHILLOUT ZONE", "CLASSIC ANTHEMS"
-};
-static const int mock_playlist_count = 5;
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOGDI
+#define CloseWindow WinCloseWindow
+#define ShowCursor WinShowCursor
+#include <windows.h>
+#include <direct.h>
+#undef CloseWindow
+#undef ShowCursor
+#undef NOGDI
+#else
+#include <unistd.h>
+#endif
 
 static const char* categories[] = {"FILENAME", "FOLDER", "PLAYLIST", "TRACK", "SEARCH"};
+
+static void Browser_UpdateActiveTracks(BrowserState *s) {
+    if (!s->DB) {
+        s->ActiveTrackCount = 0;
+        return;
+    }
+
+    if (s->IsTagList) {
+        s->ActiveTrackCount = s->TagListCount;
+        for (int i = 0; i < s->TagListCount; i++) {
+            // Find track by ID
+            s->TrackPointers[i] = NULL;
+            for (uint32_t j = 0; j < s->DB->TrackCount; j++) {
+                if (s->DB->Tracks[j].ID == s->TagList[i]) {
+                    s->TrackPointers[i] = &s->DB->Tracks[j];
+                    break;
+                }
+            }
+        }
+    } else if (s->CurrentPlaylistIdx >= 0 && s->CurrentPlaylistIdx < (int)s->DB->PlaylistCount) {
+        RBPlaylist *pl = &s->DB->Playlists[s->CurrentPlaylistIdx];
+        s->ActiveTrackCount = pl->TrackCount;
+        for (uint32_t i = 0; i < pl->TrackCount; i++) {
+            uint32_t tid = pl->TrackIDs[i];
+            s->TrackPointers[i] = NULL;
+            // Map ID to pointer
+            for (uint32_t j = 0; j < s->DB->TrackCount; j++) {
+                if (s->DB->Tracks[j].ID == tid) {
+                    s->TrackPointers[i] = &s->DB->Tracks[j];
+                    break;
+                }
+            }
+        }
+    } else {
+        s->ActiveTrackCount = s->DB->TrackCount;
+        for (uint32_t i = 0; i < s->DB->TrackCount; i++) {
+            s->TrackPointers[i] = &s->DB->Tracks[i];
+        }
+    }
+}
+
+void Browser_RefreshStorages(BrowserState *s) {
+    s->StorageCount = 0;
+    
+    // 1. Check for testing storage
+    struct stat st;
+    if (stat("usb_test/PIONEER/rekordbox/export.pdb", &st) == 0) {
+        strcpy(s->AvailableStorages[s->StorageCount].Name, "Testing USB");
+        strcpy(s->AvailableStorages[s->StorageCount].Path, "usb_test");
+        strcpy(s->AvailableStorages[s->StorageCount].Type, "Testing");
+        s->StorageCount++;
+    }
+
+#ifdef _WIN32
+    // 2. Scan drive letters D..Z
+    for (char drive = 'D'; drive <= 'Z'; drive++) {
+        char path[32];
+        sprintf(path, "%c:/PIONEER/rekordbox/export.pdb", drive);
+        if (stat(path, &st) == 0) {
+            sprintf(s->AvailableStorages[s->StorageCount].Name, "USB (%c:)", drive);
+            sprintf(s->AvailableStorages[s->StorageCount].Path, "%c:/", drive);
+            strcpy(s->AvailableStorages[s->StorageCount].Type, "USB");
+            s->StorageCount++;
+            if (s->StorageCount >= 8) break;
+        }
+    }
+#endif
+}
 
 static int Browser_Update(Component *base) {
     BrowserRenderer *r = (BrowserRenderer *)base;
@@ -39,8 +104,8 @@ static int Browser_Update(Component *base) {
         totalItems = s->TagListCount;
     } else {
         switch (s->BrowseLevel) {
-            case 0: totalItems = mock_track_count; break;
-            case 1: totalItems = mock_playlist_count; break;
+            case 0: totalItems = s->ActiveTrackCount; break;
+            case 1: totalItems = s->DB ? s->DB->PlaylistCount : 0; break;
             case 2: totalItems = 5; break;
             case 3: totalItems = s->StorageCount; break;
         }
@@ -59,20 +124,57 @@ static int Browser_Update(Component *base) {
 
     if (IsKeyReleased(KEY_ENTER)) {
         if (s->BrowseLevel == 3) {
-            s->BrowseLevel = 2; // Source to Categories
-            s->CursorPos = s->ScrollOffset = 0;
+            int idx = s->ScrollOffset + s->CursorPos;
+            if (idx < s->StorageCount) {
+                s->SelectedStorage = &s->AvailableStorages[idx];
+                if (s->DB) RB_FreeDatabase(s->DB);
+                s->DB = RB_LoadDatabase(s->SelectedStorage->Path);
+                if (s->DB) {
+                    if (s->TrackPointers) free(s->TrackPointers);
+                    s->TrackPointers = (RBTrack**)malloc(s->DB->TrackCount * sizeof(RBTrack*));
+                }
+                
+                s->BrowseLevel = 2; // Source to Categories
+                s->CursorPos = s->ScrollOffset = 0;
+            }
         } else if (s->BrowseLevel == 2) {
-            if (s->CursorPos == 2) s->BrowseLevel = 1; // Categories to Playlists
-            else if (s->CursorPos == 3 || s->CursorPos == 0) s->BrowseLevel = 0; // Categories to Tracks
+            if (s->CursorPos == 2) { 
+                s->BrowseLevel = 1; // Categories to Playlists
+            } else if (s->CursorPos == 3 || s->CursorPos == 0) { 
+                s->BrowseLevel = 0; // Categories to Tracks
+                s->CurrentPlaylistIdx = -1;
+                Browser_UpdateActiveTracks(s);
+            }
             s->CursorPos = s->ScrollOffset = 0;
         } else if (s->BrowseLevel == 1) {
-            s->BrowseLevel = 0; // Playlists to Tracks
-            s->CursorPos = s->ScrollOffset = 0;
+            int idx = s->ScrollOffset + s->CursorPos;
+            if (s->DB && idx < (int)s->DB->PlaylistCount) {
+                s->CurrentPlaylistIdx = idx;
+                s->BrowseLevel = 0; // Playlists to Tracks
+                Browser_UpdateActiveTracks(s);
+                s->CursorPos = s->ScrollOffset = 0;
+            }
+        } else if (s->BrowseLevel == 0) {
+            // LOAD TRACK
+            int idx = s->ScrollOffset + s->CursorPos;
+            if (idx < s->ActiveTrackCount && s->TrackPointers[idx]) {
+                RBTrack *t = s->TrackPointers[idx];
+                printf("[BROWSER] Loading track: %s\n", t->Title);
+                
+                // Load analysis data (.DAT/.EXT)
+                if (s->SelectedStorage) {
+                    RB_LoadTrackData(t, s->SelectedStorage->Path);
+                    printf("[BROWSER] Loaded %d cues and beatgrid for %s\n", t->CueCount, t->Title);
+                }
+            }
         }
     }
 
     if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_ESCAPE)) {
-        if (s->BrowseLevel == 0) s->BrowseLevel = 2; // Simple back-to-categories
+        if (s->BrowseLevel == 0) {
+            if (s->CurrentPlaylistIdx >= 0) s->BrowseLevel = 1;
+            else s->BrowseLevel = 2;
+        }
         else if (s->BrowseLevel == 1) s->BrowseLevel = 2;
         else if (s->BrowseLevel == 2) s->BrowseLevel = 3;
         s->CursorPos = s->ScrollOffset = 0;
@@ -112,10 +214,17 @@ static void Browser_Draw(Component *base) {
     const char* titleText = "TRACKS";
     char countText[32] = "";
 
-    if (s->BrowseLevel == 1) { headerClr = ColorDGreen; titleText = "PLAYLIST"; sprintf(countText, "TOTAL %d", mock_playlist_count); }
+    if (s->BrowseLevel == 1) { 
+        headerClr = ColorDGreen; titleText = "PLAYLIST"; 
+        sprintf(countText, "TOTAL %d", s->DB ? s->DB->PlaylistCount : 0); 
+    }
     else if (s->BrowseLevel == 2) { headerClr = ColorOrange; titleText = "BROWSE"; }
-    else if (s->BrowseLevel == 3) { headerClr = ColorBlue; titleText = "SOURCE"; sprintf(countText, "TOTAL %d", s->StorageCount); }
-    else { sprintf(countText, "TOTAL %d", mock_track_count); }
+    else if (s->BrowseLevel == 3) { 
+        Browser_RefreshStorages(s); // Refresh on Source screen
+        headerClr = ColorBlue; titleText = "SOURCE"; 
+        sprintf(countText, "TOTAL %d", s->StorageCount); 
+    }
+    else { sprintf(countText, "TOTAL %d", s->DB ? s->DB->TrackCount : 0); }
 
     UIDrawText(titleText, faceSm, sidebarW + S(8), TOP_BAR_H - S(14), S(13), headerClr);
     if (countText[0]) {
@@ -137,13 +246,18 @@ static void Browser_Draw(Component *base) {
 
         switch (s->BrowseLevel) {
             case 0:
-                if (idx < mock_track_count) {
-                    title = mock_tracks[idx];
-                    artist = mock_artists[idx];
+                if (idx < s->ActiveTrackCount && s->TrackPointers[idx]) {
+                    RBTrack *t = s->TrackPointers[idx];
+                    title = t->Title;
+                    artist = t->Artist;
+                    static char bpmBuf[16];
+                    sprintf(bpmBuf, "%.1f", t->BPM);
+                    bpmText = bpmBuf;
+                    keyStr = t->Key;
                 }
                 break;
             case 1:
-                if (idx < mock_playlist_count) title = mock_playlists[idx];
+                if (s->DB && idx < s->DB->PlaylistCount) title = s->DB->Playlists[idx].Name;
                 break;
             case 2:
                 if (idx < 5) title = categories[idx];
@@ -186,16 +300,16 @@ static void Browser_Draw(Component *base) {
 
         // Storage icons
         if (s->BrowseLevel == 3 && idx < s->StorageCount) {
-             const char* icon = "\uf287"; // f287 usb
-             if (strcmp(s->AvailableStorages[idx].Type, "SD") == 0) icon = "\uf7c2"; // f7c2 sd-card
+             const char* icon = "\xef\xaa\x87"; // f287 usb (UTF-8)
+             if (strcmp(s->AvailableStorages[idx].Type, "SD") == 0) icon = "\xef\x9f\x82"; // f7c2 sd-card
              UIDrawText(icon, faceBrand, listX + S(11), ry + S(7), S(12), ColorWhite);
         }
     }
 
     // Scrollbar
     int maxItems = 0;
-    if (s->BrowseLevel == 0) maxItems = mock_track_count;
-    else if (s->BrowseLevel == 1) maxItems = mock_playlist_count;
+    if (s->BrowseLevel == 0) maxItems = s->ActiveTrackCount;
+    else if (s->BrowseLevel == 1) maxItems = s->DB ? s->DB->PlaylistCount : 0;
     else if (s->BrowseLevel == 2) maxItems = 5;
     else if (s->BrowseLevel == 3) maxItems = s->StorageCount;
 
