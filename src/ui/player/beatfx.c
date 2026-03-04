@@ -11,6 +11,7 @@ static int BeatFX_Update(Component *base) {
 
 static void BeatFX_Draw(Component *base) {
     BeatFXPanel *b = (BeatFXPanel *)base;
+    (void)b;
     float x = BEAT_FX_X;
     float y = TOP_BAR_H;
     float w = BEAT_FX_W;

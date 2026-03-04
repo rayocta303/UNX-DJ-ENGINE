@@ -17,5 +17,7 @@ typedef struct {
     KeyboardKey back;
 } KeyboardMapping;
 
+#include "audio/engine.h"
+
 KeyboardMapping GetDefaultMapping();
-void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2);
+void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2, AudioEngine *engine);

@@ -30,12 +30,13 @@ static void Player_Draw(Component *base) {
     p->StripB.base.Draw((Component*)&p->StripB);
 }
 
-void PlayerRenderer_Init(PlayerRenderer *r, DeckState *a, DeckState *b, BeatFXState *fx) {
+void PlayerRenderer_Init(PlayerRenderer *r, DeckState *a, DeckState *b, BeatFXState *fx, AudioEngine *audioPlugin) {
     r->base.Update = Player_Update;
     r->base.Draw = Player_Draw;
     r->DeckA = a;
     r->DeckB = b;
     r->FXState = fx;
+    r->AudioPlugin = audioPlugin;
 
     DeckInfoPanel_Init(&r->InfoA, 0, a);
     DeckInfoPanel_Init(&r->InfoB, 1, b);

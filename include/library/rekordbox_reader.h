@@ -43,7 +43,12 @@ typedef struct {
     // Analysis data
     RBCue* Cues;
     uint32_t CueCount;
-    RBBeatGrid* BeatGrid;
+    unsigned int BeatGrid[1024];
+    int BeatGridCount;
+    unsigned char StaticWaveform[1024];
+    int StaticWaveformLen;
+    unsigned char* DynamicWaveform;
+    int DynamicWaveformLen;
 } RBTrack;
 
 typedef struct {

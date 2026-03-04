@@ -1,3 +1,5 @@
+#include "audio/engine.h"
+#include "ui/player/player_state.h"
 #include "ui/browser/browser.h"
 #include "ui/components/theme.h"
 #include "ui/components/fonts.h"
@@ -63,6 +65,16 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
     }
 }
 
+void Browser_Back(BrowserState *s) {
+    if (s->IsTagList) {
+        s->IsTagList = false;
+    } else if (s->BrowseLevel < 3) {
+        s->BrowseLevel++;
+        s->CursorPos = s->ScrollOffset = 0;
+        Browser_UpdateActiveTracks(s);
+    }
+}
+
 void Browser_RefreshStorages(BrowserState *s) {
     s->StorageCount = 0;
     
@@ -111,18 +123,18 @@ static int Browser_Update(Component *base) {
         }
     }
 
-    if (IsKeyReleased(KEY_DOWN)) {
+    if (IsKeyPressed(KEY_DOWN)) {
         if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
             if (s->CursorPos < totalVisible - 1) s->CursorPos++;
             else s->ScrollOffset++;
         }
     }
-    if (IsKeyReleased(KEY_UP)) {
+    if (IsKeyPressed(KEY_UP)) {
         if (s->CursorPos > 0) s->CursorPos--;
         else if (s->ScrollOffset > 0) s->ScrollOffset--;
     }
 
-    if (IsKeyReleased(KEY_ENTER)) {
+    if (IsKeyPressed(KEY_ENTER)) {
         if (s->BrowseLevel == 3) {
             int idx = s->ScrollOffset + s->CursorPos;
             if (idx < s->StorageCount) {
@@ -154,17 +166,69 @@ static int Browser_Update(Component *base) {
                 Browser_UpdateActiveTracks(s);
                 s->CursorPos = s->ScrollOffset = 0;
             }
-        } else if (s->BrowseLevel == 0) {
-            // LOAD TRACK
-            int idx = s->ScrollOffset + s->CursorPos;
-            if (idx < s->ActiveTrackCount && s->TrackPointers[idx]) {
-                RBTrack *t = s->TrackPointers[idx];
-                printf("[BROWSER] Loading track: %s\n", t->Title);
+        }
+    }
+
+    if (IsKeyPressed(KEY_BACKSPACE)) {
+        Browser_Back(s);
+    }
+
+    int loadToDeck = -1;
+    if (IsKeyPressed(KEY_LEFT)) loadToDeck = 0;
+    if (IsKeyPressed(KEY_RIGHT)) loadToDeck = 1;
+
+    if (s->BrowseLevel == 0 && loadToDeck != -1) {
+        // LOAD TRACK
+        int idx = s->ScrollOffset + s->CursorPos;
+        if (idx < s->ActiveTrackCount && s->TrackPointers[idx]) {
+            RBTrack *t = s->TrackPointers[idx];
+            printf("[BROWSER] Loading track: %s to Deck %c\n", t->Title, loadToDeck == 0 ? 'A' : 'B');
+            
+            // Load analysis data (.DAT/.EXT)
+            if (s->SelectedStorage) {
+                RB_LoadTrackData(t, s->SelectedStorage->Path);
+                printf("[BROWSER] Loaded %d cues and beatgrid for %s\n", t->CueCount, t->Title);
                 
-                // Load analysis data (.DAT/.EXT)
-                if (s->SelectedStorage) {
-                    RB_LoadTrackData(t, s->SelectedStorage->Path);
-                    printf("[BROWSER] Loaded %d cues and beatgrid for %s\n", t->CueCount, t->Title);
+                if (s->AudioPlugin) {
+                    char fullPath[1024];
+                    const char* relPath = t->FilePath;
+                    if (relPath[0] == '/' || relPath[0] == '\\') relPath++;
+                    snprintf(fullPath, sizeof(fullPath), "%s/%s", s->SelectedStorage->Path, relPath);
+                    printf("[BROWSER] Audio Path: %s\n", fullPath);
+                    
+                    DeckAudio_LoadTrack(&s->AudioPlugin->Decks[loadToDeck], fullPath);
+                    // Do not auto-play, let user press Play/Pause
+                }
+                
+                struct DeckState *targetDeck = loadToDeck == 0 ? s->DeckA : s->DeckB;
+                if (targetDeck) {
+                    strcpy(targetDeck->TrackTitle, t->Title);
+                    strcpy(targetDeck->ArtistName, t->Artist);
+                    strcpy(targetDeck->TrackKey, t->Key);
+                    targetDeck->OriginalBPM = t->BPM;
+                    targetDeck->CurrentBPM = t->BPM;
+                    
+                    // Push analysis to UI
+                    if (targetDeck->LoadedTrack) {
+                        free(targetDeck->LoadedTrack);
+                    }
+                    targetDeck->LoadedTrack = malloc(sizeof(TrackState));
+                    memset(targetDeck->LoadedTrack, 0, sizeof(TrackState));
+                    
+                    // Copy Static Waveform
+                    targetDeck->LoadedTrack->StaticWaveformLen = t->StaticWaveformLen;
+                    int len = t->StaticWaveformLen > 1024 ? 1024 : t->StaticWaveformLen;
+                    memcpy(targetDeck->LoadedTrack->StaticWaveform, t->StaticWaveform, len);
+                    
+                    // Assign Dynamic Waveform Reference
+                    targetDeck->LoadedTrack->DynamicWaveform = t->DynamicWaveform;
+                    targetDeck->LoadedTrack->DynamicWaveformLen = t->DynamicWaveformLen;
+                    
+                    // Copy Beatgrid
+                    targetDeck->LoadedTrack->GridOffset = 0;
+                    for(int i=0; i<t->BeatGridCount && i<1024; i++) {
+                        targetDeck->LoadedTrack->BeatGrid[i] = t->BeatGrid[i];
+                    }
                 }
             }
         }
@@ -201,6 +265,9 @@ static void Browser_Draw(Component *base) {
     Font faceMd = UIFonts_GetFace(S(15));
     Font faceIcon = UIFonts_GetIcon(S(6));
     Font faceBrand = UIFonts_GetIconBrand(S(12));
+    (void)faceMd;
+    (void)faceIcon;
+    (void)faceBrand;
 
     // Vertical Sidebar text
     rlPushMatrix();
@@ -243,6 +310,7 @@ static void Browser_Draw(Component *base) {
         const char *bpmText = "124.0";
         const char *keyStr = "12A";
         bool isPlaying = false;
+        (void)isPlaying;
 
         switch (s->BrowseLevel) {
             case 0:

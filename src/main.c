@@ -40,6 +40,14 @@ typedef struct {
     KeyboardMapping keyMap;
 } App;
 
+AudioEngine *globalAudioEngine = NULL;
+
+void AudioProcessCallback(void *buffer, unsigned int frames) {
+    if (globalAudioEngine) {
+        AudioEngine_Process(globalAudioEngine, (float*)buffer, frames);
+    }
+}
+
 void App_Init(App *a) {
     a->screen = ScreenSplash;
     a->splashCounter = 120; // 2 seconds at 60 FPS
@@ -83,7 +91,7 @@ void App_Init(App *a) {
 
     // Init Components
     TopBar_Init(&a->topbar);
-    PlayerRenderer_Init(&a->player, &a->deckA, &a->deckB, &a->fxState);
+    PlayerRenderer_Init(&a->player, &a->deckA, &a->deckB, &a->fxState, NULL);
     BrowserRenderer_Init(&a->browser, &a->browserState);
     InfoRenderer_Init(&a->info, &a->infoState);
     SettingsRenderer_Init(&a->settings, &a->settingsState);
@@ -109,6 +117,22 @@ int main(void) {
     App app;
     App_Init(&app);
 
+    // Initialize Audio
+    InitAudioDevice();
+    SetAudioStreamBufferSizeDefault(1024);
+    
+    AudioEngine audioEngine;
+    AudioEngine_Init(&audioEngine);
+    app.browserState.AudioPlugin = (struct AudioEngine*)&audioEngine;
+    app.browserState.DeckA = (struct DeckState*)&app.deckA;
+    app.browserState.DeckB = (struct DeckState*)&app.deckB;
+    app.player.AudioPlugin = &audioEngine;
+
+    // Attach custom audio processor via a global wrapper pointer since raylib callback takes no context
+    globalAudioEngine = &audioEngine;
+    SetAudioStreamBufferSizeDefault(4096);
+    AttachAudioMixedProcessor(AudioProcessCallback);
+
     while (!WindowShouldClose()) {
         // Cache scale for this frame based on current window size
         UI_UpdateScale();
@@ -119,7 +143,7 @@ int main(void) {
             if (app.splashCounter <= 0) app.screen = ScreenPlayer;
         }
 
-        HandleKeyboardInputs(&app.keyMap, &app.deckA, &app.deckB);
+        HandleKeyboardInputs(&app.keyMap, &app.deckA, &app.deckB, &audioEngine);
 
         // Global UI navigation using keyMap
         if (IsKeyPressed(app.keyMap.toggleBrowser)) {
@@ -130,6 +154,15 @@ int main(void) {
                 app.screen = ScreenPlayer;
                 app.browserState.IsActive = false;
             }
+        }
+        
+        // --- Sync Audio Engine State to UI State ---
+        if (audioEngine.Decks[0].PCMBuffer) {
+            double posSec = audioEngine.Decks[0].Position / (double)SAMPLE_RATE;
+            app.deckA.PositionMs = (uint32_t)(posSec * 1000.0);
+            
+            double lenSec = ((double)audioEngine.Decks[0].TotalSamples / (double)CHANNELS) / (double)SAMPLE_RATE;
+            app.deckA.TrackLengthMs = (uint32_t)(lenSec * 1000.0);
         }
         
         if (IsKeyPressed(app.keyMap.toggleInfo)) {
@@ -144,15 +177,15 @@ int main(void) {
 
         // ESC / Back logic
         if (IsKeyPressed(app.keyMap.back)) {
-            if (app.screen != ScreenPlayer && app.screen != ScreenSplash) {
-                if (app.screen == ScreenBrowser) {
-                    if (app.browserState.BrowseLevel == 3) {
-                        app.screen = ScreenPlayer;
-                        app.browserState.IsActive = false;
-                    }
-                } else {
+            if (app.screen == ScreenBrowser) {
+                if (app.browserState.BrowseLevel == 3 && !app.browserState.IsTagList) {
                     app.screen = ScreenPlayer;
+                    app.browserState.IsActive = false;
+                } else {
+                    Browser_Back(&app.browserState);
                 }
+            } else if (app.screen != ScreenPlayer && app.screen != ScreenSplash) {
+                app.screen = ScreenPlayer;
             }
         }
 

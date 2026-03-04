@@ -27,10 +27,10 @@ KeyboardMapping GetDefaultMapping() {
     return m;
 }
 
-void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2) {
+void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2, AudioEngine *engine) {
     // Deck 1
     if (IsKeyPressed(m->playPause1)) {
-        // Toggle play state mock
+        if (engine) engine->Decks[0].IsPlaying = !engine->Decks[0].IsPlaying;
     }
     for (int i = 0; i < 5; i++) {
         if (IsKeyPressed(m->hotCues1[i])) {
@@ -40,7 +40,7 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2) {
 
     // Deck 2
     if (IsKeyPressed(m->playPause2)) {
-        // Toggle play state mock
+        if (engine) engine->Decks[1].IsPlaying = !engine->Decks[1].IsPlaying;
     }
     for (int i = 0; i < 5; i++) {
         if (IsKeyPressed(m->hotCues2[i])) {

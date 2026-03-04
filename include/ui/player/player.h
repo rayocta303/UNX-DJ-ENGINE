@@ -6,6 +6,7 @@
 #include "ui/player/beatfx.h"
 #include "ui/player/waveform.h"
 #include "ui/player/bottomstrip.h"
+#include "audio/engine.h"
 
 typedef struct PlayerRenderer PlayerRenderer;
 
@@ -14,6 +15,7 @@ struct PlayerRenderer {
     DeckState *DeckA;
     DeckState *DeckB;
     BeatFXState *FXState;
+    AudioEngine *AudioPlugin;
     
     DeckInfoPanel InfoA;
     DeckInfoPanel InfoB;
@@ -25,4 +27,4 @@ struct PlayerRenderer {
     BeatFXSelectBar FXBar;
 };
 
-void PlayerRenderer_Init(PlayerRenderer *r, DeckState *a, DeckState *b, BeatFXState *fx);
+void PlayerRenderer_Init(PlayerRenderer *r, DeckState *a, DeckState *b, BeatFXState *fx, AudioEngine *audioPlugin);

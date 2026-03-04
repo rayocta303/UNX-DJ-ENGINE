@@ -3,8 +3,8 @@
 #endif
 
 #include "library/rekordbox_reader.h"
-#include "rekordbox_pdb.h"
-#include "rekordbox_anlz.h"
+#include "../../lib/rekordbox-metadata/rekordbox_pdb.h"
+#include "../../lib/rekordbox-metadata/rekordbox_anlz.h"
 #include "kaitai/kaitaistream.h"
 #include <fstream>
 #include <vector>
@@ -170,10 +170,7 @@ extern "C" void RB_FreeDatabase(RBDatabase* db) {
     if (db->Tracks) {
         for (uint32_t i = 0; i < db->TrackCount; i++) {
             if (db->Tracks[i].Cues) delete[] db->Tracks[i].Cues;
-            if (db->Tracks[i].BeatGrid) {
-                if (db->Tracks[i].BeatGrid->Beats) delete[] db->Tracks[i].BeatGrid->Beats;
-                delete db->Tracks[i].BeatGrid;
-            }
+            if (db->Tracks[i].DynamicWaveform) delete[] db->Tracks[i].DynamicWaveform;
         }
         delete[] db->Tracks;
     }
@@ -198,21 +195,26 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
             auto tag = section->fourcc();
             if (tag == rekordbox_anlz_t::SECTION_TAGS_BEAT_GRID) {
                 auto bg = static_cast<rekordbox_anlz_t::beat_grid_tag_t*>(section->body());
-                if (!track->BeatGrid) {
-                    track->BeatGrid = new RBBeatGrid();
-                    track->BeatGrid->BeatCount = bg->num_beats();
-                    track->BeatGrid->Beats = new RBBeat[track->BeatGrid->BeatCount];
-                    for (uint32_t i = 0; i < bg->num_beats(); i++) {
-                        auto b = (*bg->beats())[i].get();
-                        track->BeatGrid->Beats[i].Time = b->time();
-                        track->BeatGrid->Beats[i].BPM = b->tempo();
-                        track->BeatGrid->Beats[i].BeatNumber = b->beat_number();
-                    }
+                track->BeatGridCount = bg->num_beats();
+                for (uint32_t i = 0; i < bg->num_beats() && i < 1024; i++) {
+                    auto b = (*bg->beats())[i].get();
+                    track->BeatGrid[i] = b->time();
                 }
             } else if (tag == rekordbox_anlz_t::SECTION_TAGS_CUES || tag == rekordbox_anlz_t::SECTION_TAGS_CUES_2) {
-                // We'll simplisticly handle cues here. Hot cues are usually in .EXT
-                // but memory cues are in .DAT.
-                // The structure for CUES and CUES_2 varies slightly but Kaitai helps.
+                // Simplisticly handle cues here
+            } else if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_PREVIEW) {
+                auto wp = static_cast<rekordbox_anlz_t::wave_preview_tag_t*>(section->body());
+                std::string data = wp->data();
+                track->StaticWaveformLen = data.length() > 1024 ? 1024 : data.length();
+                memcpy(track->StaticWaveform, data.data(), track->StaticWaveformLen);
+            } else if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_COLOR_SCROLL) {
+                auto wc = static_cast<rekordbox_anlz_t::wave_color_scroll_tag_t*>(section->body());
+                std::string data = wc->entries();
+                track->DynamicWaveformLen = data.length();
+                if (track->DynamicWaveformLen > 0) {
+                    track->DynamicWaveform = new unsigned char[track->DynamicWaveformLen];
+                    memcpy(track->DynamicWaveform, data.data(), track->DynamicWaveformLen);
+                }
             }
         }
     } catch (...) {}

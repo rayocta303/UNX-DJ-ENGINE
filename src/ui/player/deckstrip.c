@@ -214,8 +214,8 @@ static void DeckStrip_Draw(Component *base) {
     }
 
     float bpmTarget = 120.0f;
-    if (d->State->CurrentBPM) {
-        bpmTarget = d->State->CurrentBPM(d->State->bpmCtx);
+    if (d->State->CurrentBPM > 0.0f) {
+        bpmTarget = d->State->CurrentBPM;
     }
     int bpmWhole = (int)bpmTarget;
     int bpmFraction = (int)((bpmTarget - bpmWhole) * 10);
@@ -275,6 +275,43 @@ static void DeckStrip_Draw(Component *base) {
                     if (ampY > 0) DrawRectangle(px, wy + wh/2 - ampY/2, chunkW, ampY, (Color){210, 130, 20, 255});
                     if (ampW > 0) DrawRectangle(px, wy + wh/2 - ampW/2, chunkW, ampW, (Color){255, 250, 220, 255});
                 }
+            }
+        }
+        
+        // Playhead Position Line
+        if (totalMs > 0) {
+            float progX = wx + playedRatio * ww;
+            DrawRectangle(progX, wy, 2, wh, ColorRed);
+        }
+        
+        // HotCue Markers
+        if (totalMs > 0) {
+            Color hotCueColors[] = {
+                {0, 255, 0, 255}, {255, 0, 0, 255}, {255, 128, 0, 255}, {255, 255, 0, 255},
+                {0, 0, 255, 255}, {255, 0, 255, 255}, {0, 255, 255, 255}, {128, 0, 255, 255}
+            };
+            const char* hotCueLabels[] = {"A", "B", "C", "D", "E", "F", "G", "H"};
+            
+            for (int i=0; i < d->State->LoadedTrack->HotCuesCount; i++) {
+                HotCue *hc = &d->State->LoadedTrack->HotCues[i];
+                int hcIdx = hc->ID - 1;
+                if (hcIdx < 0 || hcIdx >= 8) continue;
+                
+                float hcRatio = (float)hc->Start / (float)totalMs;
+                if (hcRatio < 0 || hcRatio > 1) continue;
+                
+                float hcX = wx + hcRatio * ww;
+                Color clr = hotCueColors[hcIdx];
+                
+                // Thin vertical line
+                DrawLine(hcX, wy, hcX, wy + wh, clr);
+                
+                // Triangle flag at the top (simulated with a small rectangle for speed)
+                float hw = 4.0f;
+                DrawRectangle(hcX - hw/2, wy, hw, hw + 2, clr);
+                
+                // Letter label 
+                UIDrawText(hotCueLabels[hcIdx], faceXXS, hcX - hw/2 + S(0.5f), wy + hw + S(3), S(7), clr);
             }
         }
     }

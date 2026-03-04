@@ -30,9 +30,15 @@ typedef struct {
     // Filtered view
     RBTrack **TrackPointers;
     int ActiveTrackCount;
+    
+    // Core Engine Reference
+    struct AudioEngine *AudioPlugin;
+    struct DeckState *DeckA;
+    struct DeckState *DeckB;
 } BrowserState;
 
 void Browser_RefreshStorages(BrowserState *s);
+void Browser_Back(BrowserState *s);
 
 typedef struct {
     Component base;
