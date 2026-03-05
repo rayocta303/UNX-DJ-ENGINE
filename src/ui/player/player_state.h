@@ -53,4 +53,5 @@ typedef struct DeckState {
 typedef struct BeatFXState {
     int SelectedFX;
     int SelectedPad;
+    int SelectedChannel; // 0=Master, 1=Deck 1, 2=Deck 2
 } BeatFXState;

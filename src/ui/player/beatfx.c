@@ -5,7 +5,28 @@
 #include <stdio.h>
 
 static int BeatFX_Update(Component *base) {
-    (void)base;
+    BeatFXPanel *b = (BeatFXPanel *)base;
+    
+    float x = BEAT_FX_X;
+    float y = TOP_BAR_H;
+    float w = BEAT_FX_W;
+    
+    // Calculate CH SELECT hit box (following Draw logic)
+    float cy = y + S(4) + S(13) + S(22); // Label + FXSelect + Spacing
+    cy += S(10); // Spacing after "CH SELECT" label
+    
+    Rectangle chRect = { x + S(4), cy, w - S(8), S(14) };
+    
+    if (CheckCollisionPointRec(GetMousePosition(), chRect)) {
+        float wheel = GetMouseWheelMove();
+        if (wheel != 0) {
+            // Cycle through 0 (Master), 1 (Deck 1), 2 (Deck 2)
+            b->State->SelectedChannel -= (int)wheel;
+            if (b->State->SelectedChannel < 0) b->State->SelectedChannel = 2;
+            if (b->State->SelectedChannel > 2) b->State->SelectedChannel = 0;
+        }
+    }
+
     return 0;
 }
 
@@ -40,8 +61,10 @@ static void BeatFX_Draw(Component *base) {
     // 2. CH SELECT
     DrawCentredText("CH SELECT", faceXXS, x, w, cy, S(7), ColorShadow);
     cy += S(10);
+    
+    const char* chNames[] = { "MASTER", "DECK 1", "DECK 2" };
     DrawRectangle(x + S(4), cy, w - S(8), S(14), ColorBlue);
-    DrawCentredText("MASTER", faceSm, x + S(4), w - S(8), cy + S(2), S(9), ColorWhite);
+    DrawCentredText(chNames[b->State->SelectedChannel % 3], faceSm, x + S(4), w - S(8), cy + S(2), S(9), ColorWhite);
     cy += S(20);
 
     // 3. Black parameter container

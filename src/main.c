@@ -89,6 +89,9 @@ void App_Init(App *a) {
     strcpy(a->settingsState.Items[1].Options[0], "OFF");
     strcpy(a->settingsState.Items[1].Options[1], "ON");
     a->settingsState.Items[1].OptionsCount = 2;
+    
+    // Init FX State
+    memset(&a->fxState, 0, sizeof(BeatFXState));
 
     // Init Components
     TopBar_Init(&a->topbar);
