@@ -11,6 +11,7 @@ static int BeatFX_Update(Component *base) {
     float x = BEAT_FX_X;
     float y = TOP_BAR_H;
     float w = BEAT_FX_W;
+    float h = WAVE_AREA_H;
     
     // Calculate CH SELECT hit box (following Draw logic)
     float cy = y + S(4) + S(13) + S(22); // Label + FXSelect + Spacing
@@ -46,6 +47,20 @@ static int BeatFX_Update(Component *base) {
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                 b->State->ChannelDropdownOpen = true;
             }
+        }
+    }
+
+    // Tab Switching Logic
+    float tabY = y + h - S(18);
+    float tabW = (w - S(10)) / 2;
+    Rectangle statusTab = { x + S(4), tabY, tabW, S(14) };
+    Rectangle beatFxTab = { x + S(6) + tabW, tabY, tabW, S(14) };
+
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (CheckCollisionPointRec(mouse, statusTab)) {
+            b->State->ShowBeatFXTab = false;
+        } else if (CheckCollisionPointRec(mouse, beatFxTab)) {
+            b->State->ShowBeatFXTab = true;
         }
     }
 
@@ -140,15 +155,17 @@ static void BeatFX_Draw(Component *base) {
     // 5. STATUS / BEAT FX tabs
     float tabW = (w - S(10)) / 2;
     
-    // STATUS (Active mock)
-    DrawRectangle(x + S(4), cy, tabW, S(14), (Color){0x33, 0x33, 0x33, 0xFF});
+    // STATUS Tab
+    bool statusActive = !b->State->ShowBeatFXTab;
+    DrawRectangle(x + S(4), cy, tabW, S(14), statusActive ? (Color){0x33, 0x33, 0x33, 0xFF} : (Color){0x15, 0x15, 0x15, 0xFF});
     DrawRectangleLines(x + S(4), cy, tabW, S(14), ColorShadow);
-    DrawCentredText("STATUS", faceXXS, x + S(4), tabW, cy + S(3.5f), S(7), ColorWhite);
+    DrawCentredText("STATUS", faceXXS, x + S(4), tabW, cy + S(3.5f), S(7), statusActive ? ColorWhite : ColorShadow);
 
-    // BEAT FX (Inactive mock)
-    DrawRectangle(x + S(6) + tabW, cy, tabW, S(14), (Color){0x15, 0x15, 0x15, 0xFF});
+    // BEAT FX Tab
+    bool beatFxActive = b->State->ShowBeatFXTab;
+    DrawRectangle(x + S(6) + tabW, cy, tabW, S(14), beatFxActive ? (Color){0x33, 0x33, 0x33, 0xFF} : (Color){0x15, 0x15, 0x15, 0xFF});
     DrawRectangleLines(x + S(6) + tabW, cy, tabW, S(14), ColorShadow);
-    DrawCentredText("BEAT FX", faceXXS, x + S(6) + tabW, tabW, cy + S(3.5f), S(7), ColorShadow);
+    DrawCentredText("BEAT FX", faceXXS, x + S(6) + tabW, tabW, cy + S(3.5f), S(7), beatFxActive ? ColorWhite : ColorShadow);
 
     // --- OVERLAYS (Draw at bottom for highest Z-index) ---
     if (b->State->ChannelDropdownOpen) {
