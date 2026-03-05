@@ -7,7 +7,7 @@
 static int TopBar_Update(Component *base) {
     TopBar *t = (TopBar *)base;
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-        Vector2 mouse = GetMousePosition();
+        Vector2 mouse = UIGetMousePosition();
         if (mouse.y < TOP_BAR_H) {
             if (mouse.x >= t->btnBrowseX && mouse.x <= t->btnBrowseX + t->btnBrowseW) {
                 if (t->OnBrowse) t->OnBrowse(t->callbackCtx);

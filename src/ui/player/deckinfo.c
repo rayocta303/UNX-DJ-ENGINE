@@ -118,7 +118,7 @@ static void DeckInfo_Draw(Component *base) {
     // MASTER Button (Crown Icon Only)
     float msW = S(20);
     Rectangle msRect = { x, btnY, msW, btnH };
-    bool msClicked = CheckCollisionPointRec(GetMousePosition(), msRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    bool msClicked = CheckCollisionPointRec(UIGetMousePosition(), msRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
     if (msClicked) d->State->IsMaster = !d->State->IsMaster;
 
     Color msColor = d->State->IsMaster ? ColorOrange : ColorShadow;
@@ -136,7 +136,7 @@ static void DeckInfo_Draw(Component *base) {
     // MT Button
     float mtW = S(18);
     Rectangle mtRect = { x, btnY, mtW, btnH };
-    bool mtClicked = CheckCollisionPointRec(GetMousePosition(), mtRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    bool mtClicked = CheckCollisionPointRec(UIGetMousePosition(), mtRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
     if (mtClicked) d->State->MasterTempo = !d->State->MasterTempo;
     
     Color mtColor = d->State->MasterTempo ? ColorBlue : ColorShadow;
@@ -148,7 +148,7 @@ static void DeckInfo_Draw(Component *base) {
     // Vinyl Button
     float viW = S(32);
     Rectangle viRect = { x, btnY, viW, btnH };
-    bool viClicked = CheckCollisionPointRec(GetMousePosition(), viRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    bool viClicked = CheckCollisionPointRec(UIGetMousePosition(), viRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
     if (viClicked) d->State->VinylModeEnabled = !d->State->VinylModeEnabled;
 
     Color viColor = d->State->VinylModeEnabled ? ColorBlue : ColorShadow;

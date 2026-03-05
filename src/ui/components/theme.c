@@ -17,12 +17,22 @@ const Color ColorGray   = {0x55, 0x55, 0x55, 0xFF};
 
 
 float UI_CurrScale = 1.0f;
+float UI_OffsetX = 0.0f;
+float UI_OffsetY = 0.0f;
 bool UI_BoldEnabled = true;
 
 void UI_UpdateScale(void) {
     float scaleX = (float)GetScreenWidth() / REF_WIDTH;
     float scaleY = (float)GetScreenHeight() / REF_HEIGHT;
     UI_CurrScale = (scaleX < scaleY) ? scaleX : scaleY; // Keep 16:10 fit
+    
+    UI_OffsetX = (GetScreenWidth() - (REF_WIDTH * UI_CurrScale)) / 2.0f;
+    UI_OffsetY = (GetScreenHeight() - (REF_HEIGHT * UI_CurrScale)) / 2.0f;
+}
+
+Vector2 UIGetMousePosition(void) {
+    Vector2 m = GetMousePosition();
+    return (Vector2){ m.x - UI_OffsetX, m.y - UI_OffsetY };
 }
 
 float S(float v) {

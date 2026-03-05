@@ -57,4 +57,8 @@ int Si(int v);
 // Call once per frame if resizing is allowed
 void UI_UpdateScale(void);
 extern float UI_CurrScale;
+extern float UI_OffsetX;
+extern float UI_OffsetY;
 extern bool UI_BoldEnabled;
+
+Vector2 UIGetMousePosition(void);

@@ -9,7 +9,7 @@ static int Settings_Update(Component *base) {
     if (!r->State->IsActive) return 0;
 
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-        Vector2 mouse = GetMousePosition();
+        Vector2 mouse = UIGetMousePosition();
         float divY = SCREEN_HEIGHT - 28.0f;
 
         if (mouse.x >= 30 && mouse.x <= 110 && mouse.y >= divY + 4 && mouse.y <= divY + 22) {

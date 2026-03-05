@@ -6,6 +6,7 @@
 
 static int BeatFX_Update(Component *base) {
     BeatFXPanel *b = (BeatFXPanel *)base;
+    Vector2 mouse = UIGetMousePosition();
     
     float x = BEAT_FX_X;
     float y = TOP_BAR_H;
@@ -16,14 +17,35 @@ static int BeatFX_Update(Component *base) {
     cy += S(10); // Spacing after "CH SELECT" label
     
     Rectangle chRect = { x + S(4), cy, w - S(8), S(14) };
+    bool hovered = CheckCollisionPointRec(mouse, chRect);
     
-    if (CheckCollisionPointRec(GetMousePosition(), chRect)) {
-        float wheel = GetMouseWheelMove();
-        if (wheel != 0) {
-            // Cycle through 0 (Master), 1 (Deck 1), 2 (Deck 2)
-            b->State->SelectedChannel -= (int)wheel;
-            if (b->State->SelectedChannel < 0) b->State->SelectedChannel = 2;
-            if (b->State->SelectedChannel > 2) b->State->SelectedChannel = 0;
+    if (b->State->ChannelDropdownOpen) {
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            float dy = cy + S(14);
+            for (int i = 0; i < 3; i++) {
+                Rectangle optRect = { x + S(4), dy, w - S(8), S(14) };
+                if (CheckCollisionPointRec(mouse, optRect)) {
+                    b->State->SelectedChannel = i;
+                    break;
+                }
+                dy += S(14);
+            }
+            b->State->ChannelDropdownOpen = false;
+        }
+    } else {
+        if (hovered) {
+            float wheel = GetMouseWheelMove();
+            if (wheel != 0) {
+                // Cycle through 0 (Master), 1 (Deck 1), 2 (Deck 2)
+                int next = b->State->SelectedChannel - (int)wheel;
+                if (next < 0) next = 2;
+                if (next > 2) next = 0;
+                b->State->SelectedChannel = next;
+            }
+            
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                b->State->ChannelDropdownOpen = true;
+            }
         }
     }
 
@@ -65,6 +87,24 @@ static void BeatFX_Draw(Component *base) {
     const char* chNames[] = { "MASTER", "DECK 1", "DECK 2" };
     DrawRectangle(x + S(4), cy, w - S(8), S(14), ColorBlue);
     DrawCentredText(chNames[b->State->SelectedChannel % 3], faceSm, x + S(4), w - S(8), cy + S(2), S(9), ColorWhite);
+    
+    // Dropdown arrow
+    DrawTriangle((Vector2){x + w - S(12), cy + S(5)}, (Vector2){x + w - S(8), cy + S(5)}, (Vector2){x + w - S(10), cy + S(9)}, ColorWhite);
+
+    if (b->State->ChannelDropdownOpen) {
+        float dy = cy + S(14);
+        for (int i = 0; i < 3; i++) {
+            Rectangle optRect = { x + S(4), dy, w - S(8), S(14) };
+            Color bg = (b->State->SelectedChannel == i) ? ColorBlue : ColorDark3;
+            if (CheckCollisionPointRec(UIGetMousePosition(), optRect)) bg = ColorGray;
+            
+            DrawRectangleRec(optRect, bg);
+            DrawRectangleLinesEx(optRect, 1, ColorDark1);
+            DrawCentredText(chNames[i], faceSm, optRect.x, optRect.width, optRect.y + S(2), S(9), ColorWhite);
+            dy += S(14);
+        }
+    }
+
     cy += S(20);
 
     // 3. Black parameter container

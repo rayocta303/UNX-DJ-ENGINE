@@ -286,15 +286,9 @@ int main(void) {
         BeginDrawing();
         ClearBackground(BLACK);
 
-        // Calculate centering offset
-        float drawW = REF_WIDTH * UI_CurrScale;
-        float drawH = REF_HEIGHT * UI_CurrScale;
-        float offsetX = (GetScreenWidth() - drawW) / 2.0f;
-        float offsetY = (GetScreenHeight() - drawH) / 2.0f;
-
         // Apply global offset for all UI drawing
         rlPushMatrix();
-        rlTranslatef(offsetX, offsetY, 0);
+        rlTranslatef(UI_OffsetX, UI_OffsetY, 0);
 
         switch (app.screen) {
             case ScreenSplash: app.splash.base.Draw((Component*)&app.splash); break;

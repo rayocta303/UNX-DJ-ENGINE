@@ -32,7 +32,7 @@ static int Waveform_Update(Component *base) {
     float wfLeft = SIDE_PANEL_W;
     float wfRight = BEAT_FX_X;
 
-    Vector2 mouse = GetMousePosition();
+    Vector2 mouse = UIGetMousePosition();
     bool inWaveform = (mouse.x >= wfLeft && mouse.x <= wfRight && mouse.y >= wfY && mouse.y <= wfY + waveH);
 
     // Zoom & Jog Interaction Logic
@@ -118,18 +118,24 @@ static void Waveform_Draw(Component *base) {
     float prevPX   = -100.0f; // Far left initialization
 
     if (dynData != NULL && r->dynWfmFrames > 0) {
-        for (float screenX = 0; screenX <= wfW + 1; screenX++) {
-            int xInt = (int)screenX;
-            int dataX = (int)((double)(srcX0 + xInt) * (double)effectiveZoom * (double)r->dataDensity);
+        // Pre-calculate constants for the loop
+        double baseDataPos = elapsedHalfFrames * (double)r->dataDensity;
+        double zoomStep = (double)effectiveZoom * (double)r->dataDensity;
+        float centerOffset = wfW / 2.0f;
+        
+        // Anti-flicker: Use stable fractional sampling
+        for (float screenX = 0; screenX <= wfW + 1; screenX += 1.0f) {
+            double dataPos = baseDataPos + (double)(screenX - centerOffset) * zoomStep;
+            int dataIndex = (int)dataPos;
 
-            if (dataX >= 0 && dataX < r->dynWfmFrames) {
-                // Average 11 frames for even smoother, more liquid shape
+            if (dataIndex >= 0 && dataIndex < r->dynWfmFrames) {
+                // Average window for smooth liquid shape
                 int sumAmp = 0;
                 int sumColor = 0;
                 int count = 0;
                 
                 int loopSpan = aggZoom > 11 ? aggZoom : 11;
-                int startK = dataX - (loopSpan / 2);
+                int startK = dataIndex - (loopSpan / 2);
                 
                 for (int j = 0; j < loopSpan; j++) {
                     int chkX = startK + j;
@@ -141,75 +147,49 @@ static void Waveform_Draw(Component *base) {
                 }
 
                 int amplitude = (count > 0) ? (sumAmp / count) : 0;
-                int colorIdx = (count > 0) ? (sumColor / count) : (dynData[dataX] >> 5);
+                int colorIdx = (count > 0) ? (sumColor / count) : (dynData[dataIndex] >> 5);
 
-                // --- Waveform 3-Band (Preset) Calibration Parameters ---
-                // Anda bisa merubah parameter di bawah ini untuk kalibrasi visual sendiri:
-                
-                // 1. Palet Warna (Pioneer DJ Standard)
-                Color colorBass = (Color){0, 100, 255, 255};   // Biru Terang (Dasar)
-                Color colorMid  = (Color){150, 95, 20, 255};   // Coklat/Emas (Tengah)
-                Color colorHigh = (Color){255, 250, 230, 255}; // Putih/Krem (Puncak)
-                
-                // 2. Skala Vertikal (Berapa tinggi waveform mengisi area deck)
+                // --- Calibration Parameters ---
                 float vertScale = 1.9f; 
-
-                // 3. Rasio Layer (Seberapa besar layer Mid & High muncul relatif terhadap Bass)
                 float bAmp = (float)amplitude * vertScale;
-                float mAmp = 0;
-                float hAmp = 0;
+                float mAmp = 0, hAmp = 0;
 
-                // Logika pemisahan frekuensi berdasarkan 'colorIdx' Rekordbox (0-7)
-                if (colorIdx >= 6) {        // Frekuensi Tinggi (Cymbal, Hi-hat, Vocal High)
-                    mAmp = bAmp * 0.85f;    // Mid mengisi 85% area biru
-                    hAmp = bAmp * 0.60f;    // High mengisi 60% area biru (Inti Putih)
-                } else if (colorIdx >= 3) { // Frekuensi Menengah (Snare, Melodi, Vocal)
-                    mAmp = bAmp * 0.75f;    // Mid mengisi 75% area biru
-                    hAmp = bAmp * 0.20f;    // High muncul tipis (20%)
-                } else {                    // Frekuensi Rendah (Kick, Sub-Bass)
-                    mAmp = bAmp * 0.40f;    // Mid sangat sedikit (40%)
-                    hAmp = bAmp * 0.05f;    // High hampir tidak ada
-                }
+                // Frequency splitting
+                if (colorIdx >= 6) { mAmp = bAmp * 0.85f; hAmp = bAmp * 0.60f; }
+                else if (colorIdx >= 3) { mAmp = bAmp * 0.75f; hAmp = bAmp * 0.20f; }
+                else { mAmp = bAmp * 0.40f; hAmp = bAmp * 0.05f; }
 
-                // 4. Clamping (Agar tidak keluar dari batas area visual)
                 if (bAmp > waveCenter - 1.0f) bAmp = waveCenter - 1.0f;
                 if (mAmp > bAmp) mAmp = bAmp * 0.9f;
                 if (hAmp > mAmp) hAmp = mAmp * 0.8f;
 
-                // --- Rendering Loop (Continuous Shape) ---
-                float px = wfLeft + screenX - fracX;
+                float px = wfLeft + screenX;
 
                 if (px >= wfLeft - 2.0f && px <= wfRight + 2.0f) {
                     if (prevPX > -90.0f) {
-                        // CCW Order in Y-Down: (P1, P3, P2) & (P1, P4, P3)
-                        
-                        // 1. Bass (Blue)
+                        Color colorBass = {0, 100, 255, 255};
+                        Color colorMid  = {150, 95, 20, 255};
+                        Color colorHigh = {255, 250, 230, 255};
+
+                        // Bass
                         DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevBAmp}, (Vector2){px, wfY + waveCenter + bAmp}, (Vector2){px, wfY + waveCenter - bAmp}, colorBass);
                         DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevBAmp}, (Vector2){prevPX, wfY + waveCenter + prevBAmp}, (Vector2){px, wfY + waveCenter + bAmp}, colorBass);
                         
-                        // 2. Mid (Brown)
+                        // Mid
                         if (mAmp > 0 || prevMAmp > 0) {
                             DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevMAmp}, (Vector2){px, wfY + waveCenter + mAmp}, (Vector2){px, wfY + waveCenter - mAmp}, colorMid);
                             DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevMAmp}, (Vector2){prevPX, wfY + waveCenter + prevMAmp}, (Vector2){px, wfY + waveCenter + mAmp}, colorMid);
                         }
 
-                        // 3. High (White)
+                        // High
                         if (hAmp > 0 || prevHAmp > 0) {
                             DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevHAmp}, (Vector2){px, wfY + waveCenter + hAmp}, (Vector2){px, wfY + waveCenter - hAmp}, colorHigh);
                             DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevHAmp}, (Vector2){prevPX, wfY + waveCenter + prevHAmp}, (Vector2){px, wfY + waveCenter + hAmp}, colorHigh);
                         }
                     } else {
-                        // First pixel fallback
-                        DrawRectangleV((Vector2){px, wfY + waveCenter - bAmp}, (Vector2){1, bAmp * 2}, colorBass);
-                        if (mAmp > 0) DrawRectangleV((Vector2){px, wfY + waveCenter - mAmp}, (Vector2){1, mAmp * 2}, colorMid);
-                        if (hAmp > 0) DrawRectangleV((Vector2){px, wfY + waveCenter - hAmp}, (Vector2){1, hAmp * 2}, colorHigh);
+                        DrawRectangleV((Vector2){px, wfY + waveCenter - bAmp}, (Vector2){1, bAmp * 2}, (Color){0, 100, 255, 255});
                     }
-
-                    // Update previous values for next column
-                    prevBAmp = bAmp;
-                    prevMAmp = mAmp;
-                    prevHAmp = hAmp;
-                    prevPX   = px;
+                    prevBAmp = bAmp; prevMAmp = mAmp; prevHAmp = hAmp; prevPX = px;
                 }
             }
         }
