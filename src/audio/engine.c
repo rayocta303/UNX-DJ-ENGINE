@@ -100,8 +100,22 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
     deck->IsPlaying = (fabs(deck->OutlinedRate) > 0.001);
 }
 
-// Linear interpolation resampling directly from PCM Buffer into output
-// Based heavily on Mixxx's EngineBufferScaleLinear logic
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+// Cubic Hermite interpolation (4-point) for high-fidelity resampling
+// Inspired by Mixxx/MusicDSP: clear highs and smooth bass.
+static inline float hermite4(float frac_pos, float xm1, float x0, float x1, float x2) {
+    const float c = (x1 - xm1) * 0.5f;
+    const float v = x0 - x1;
+    const float w = c + v;
+    const float a = w + v + (x2 - x0) * 0.5f;
+    const float b_neg = w + a;
+    return ((((a * frac_pos) - b_neg) * frac_pos + c) * frac_pos + x0);
+}
+
+// Resampling directly from PCM Buffer into output
 static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int framesToProcess) {
     if (!deck->PCMBuffer || deck->TotalSamples == 0) return;
 
@@ -118,6 +132,7 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int framesT
     for (int i = 0; i < framesToProcess; i++) {
         double readPos = deck->Position;
         float mtWeight = 1.0f;
+        // MT is active if Key Lock is ON, not scratching, motor is running, and speed is not precisely 1.0
         bool mtActive = deck->MasterTempoActive && !deck->IsTouching && deck->IsMotorOn && fabs(rate - 1.0) > 0.005;
 
         if (mtActive) {
@@ -125,10 +140,17 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int framesT
             deck->MTOffset += (1.0 - rate);
             deck->MTSampleCount++;
             
-            if (deck->MTSampleCount > 768) {
-                mtWeight = 1.0f - (float)(deck->MTSampleCount - 768) / 256.0f;
+            // Grain boundaries: 4096 samples total, 512 samples crossfade
+            const int GRAIN_SIZE = 4096;
+            const int XFADE_SIZE = 512;
+            const int START_XFADE = GRAIN_SIZE - XFADE_SIZE;
+
+            if (deck->MTSampleCount > START_XFADE) {
+                float t = (float)(deck->MTSampleCount - START_XFADE) / (float)XFADE_SIZE;
+                // Sine window for constant-power crossfade: sin(t * PI/2)
+                mtWeight = cosf(t * (float)M_PI * 0.5f); 
             }
-            if (deck->MTSampleCount >= 1024) {
+            if (deck->MTSampleCount >= GRAIN_SIZE) {
                 deck->MTSampleCount = 0;
                 deck->MTOffset = 0;
             }
@@ -137,23 +159,29 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int framesT
         float l_sample = 0.0f;
         float r_sample = 0.0f;
 
-        // --- Helper for interpolation ---
-        #define INTERP_SAMPLES(pos, l, r) { \
+        // --- Helper for 4-point Hermite interpolation ---
+        #define INTERP_SAMPLES_HI(pos, l, r) { \
             int sf = (int)floor(pos); \
-            int idx = sf * CHANNELS; \
             float fr = (float)(pos - floor(pos)); \
-            if (idx >= 0 && idx + 3 < deck->TotalSamples) { \
+            l = 0; r = 0; \
+            if (sf >= 1 && (sf * 2) + 5 < deck->TotalSamples) { \
+                int idx = sf * 2; \
+                l = hermite4(fr, deck->PCMBuffer[idx-2], deck->PCMBuffer[idx], deck->PCMBuffer[idx+2], deck->PCMBuffer[idx+4]); \
+                r = hermite4(fr, deck->PCMBuffer[idx-1], deck->PCMBuffer[idx+1], deck->PCMBuffer[idx+3], deck->PCMBuffer[idx+5]); \
+            } else if (sf >= 0 && (sf * 2) + 1 < deck->TotalSamples) { \
+                /* Fallback to linear at track start/end boundaries */ \
+                int idx = sf * 2; \
                 l = deck->PCMBuffer[idx] + fr * (deck->PCMBuffer[idx + 2] - deck->PCMBuffer[idx]); \
                 r = deck->PCMBuffer[idx + 1] + fr * (deck->PCMBuffer[idx + 3] - deck->PCMBuffer[idx + 1]); \
             } \
         }
 
-        INTERP_SAMPLES(readPos, l_sample, r_sample);
+        INTERP_SAMPLES_HI(readPos, l_sample, r_sample);
 
         // If MT is active and in crossfade zone, mix in the secondary grain
         if (mtActive && mtWeight < 1.0f) {
             float l2 = 0.0f, r2 = 0.0f;
-            INTERP_SAMPLES(deck->Position, l2, r2); // Reset grain starts at deck->Position
+            INTERP_SAMPLES_HI(deck->Position, l2, r2); 
             l_sample = l_sample * mtWeight + l2 * (1.0f - mtWeight);
             r_sample = r_sample * mtWeight + r2 * (1.0f - mtWeight);
         }
