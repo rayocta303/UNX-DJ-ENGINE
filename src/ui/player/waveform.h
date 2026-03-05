@@ -8,6 +8,7 @@ struct WaveformRenderer {
     Component base;
     int ID;
     DeckState *State;
+    TrackState *cachedTrack;
     int dynWfmFrames;
     float lastMouseX;
 };

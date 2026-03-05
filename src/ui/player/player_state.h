@@ -15,6 +15,8 @@ typedef struct TrackState {
     int DynamicWaveformLen;
     HotCue HotCues[8];
     int HotCuesCount;
+    HotCue Cues[32]; // Memory Cues
+    int CuesCount;
 } TrackState;
 
 typedef struct DeckState {
@@ -31,12 +33,15 @@ typedef struct DeckState {
     bool IsMaster;
     bool IsScratching;
     float ScratchSpeed;
+    double ScratchDelta; // Pending scratch movement from UI (half-frames)
     
     TrackState *LoadedTrack;
     
+    double Position; // Native half-frames (150Hz) for scrolling
     long long PositionMs;
     long long TrackLengthMs;
 
+    int ZoomScale; // Native Pioneer zoom (1-32)
     float CurrentBPM;
     float OriginalBPM; // Added OriginalBPM missing from struct
 

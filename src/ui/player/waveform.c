@@ -7,6 +7,16 @@
 static int Waveform_Update(Component *base) {
     WaveformRenderer *r = (WaveformRenderer *)base;
 
+    // Refresh dynamic frame count when track changes
+    if (r->State->LoadedTrack != r->cachedTrack) {
+        r->cachedTrack = r->State->LoadedTrack;
+        if (r->cachedTrack) {
+            r->dynWfmFrames = r->cachedTrack->DynamicWaveformLen;
+        } else {
+            r->dynWfmFrames = 480;
+        }
+    }
+
     float waveH = WAVE_AREA_H / 2.0f;
     float wfY = TOP_BAR_H + (r->ID * waveH);
     float wfLeft = SIDE_PANEL_W;
@@ -17,9 +27,11 @@ static int Waveform_Update(Component *base) {
 
     // Zoom Logic
     if (inWaveform) {
-        float wy = GetMouseWheelMove();
-        if (wy != 0.0f) {
-            // Placeholder: Handle wheel zoom change
+        float wheel = GetMouseWheelMove();
+        if (wheel != 0.0f) {
+            r->State->ZoomScale -= (int)wheel;
+            if (r->State->ZoomScale < 1) r->State->ZoomScale = 1;
+            if (r->State->ZoomScale > 32) r->State->ZoomScale = 32;
         }
 
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -30,20 +42,16 @@ static int Waveform_Update(Component *base) {
             r->lastMouseX = mouse.x;
 
             float pitchRatio = 1.0f + (r->State->TempoPercent / 100.0f);
-            float effectiveZoom = 4.0f * pitchRatio; // hardcoded zoom 4
+            float effectiveZoom = (float)r->State->ZoomScale * pitchRatio;
             
             float moveHF = -dx * effectiveZoom;
-            (void)moveHF;
-            // Send to audio engine later
+            r->State->ScratchDelta += (double)moveHF;
+            r->State->IsScratching = true;
         } else {
             r->State->IsScratching = false;
         }
     } else {
         r->State->IsScratching = false;
-    }
-
-    if (r->State->LoadedTrack != NULL) {
-        r->dynWfmFrames = r->State->LoadedTrack->DynamicWaveformLen;
     }
 
     return 0;
@@ -60,18 +68,19 @@ static void Waveform_Draw(Component *base) {
 
     DrawRectangle(wfLeft, wfY, wfW, waveH, ColorBlack);
 
-    if (r->State->LoadedTrack == NULL || r->State->LoadedTrack->DynamicWaveformLen == 0) {
+    if (r->State->LoadedTrack == NULL) {
         return;
     }
 
     float playheadX = wfLeft + wfW / 2.0f;
     float pitchRatio = 1.0f + (r->State->TempoPercent / 100.0f);
-    float effectiveZoom = 4.0f * pitchRatio; // Hardcoded ZoomScale = 4
+    float effectiveZoom = (float)r->State->ZoomScale * pitchRatio;
+    if (effectiveZoom < 0.1f) effectiveZoom = 0.1f;
 
-    double elapsedHalfFrames = (double)r->State->PositionMs * 0.15;
+    double elapsedHalfFrames = r->State->Position;
 
-    int iPixel = (int)(elapsedHalfFrames / effectiveZoom);
-    float fracX = (float)((elapsedHalfFrames / effectiveZoom) - iPixel);
+    int iPixel = (int)(elapsedHalfFrames / (double)effectiveZoom);
+    float fracX = (float)((elapsedHalfFrames / (double)effectiveZoom) - (double)iPixel);
 
     int srcX0 = iPixel - (int)(wfW / 2.0f);
     unsigned char *dynData = r->State->LoadedTrack->DynamicWaveform;
@@ -80,76 +89,120 @@ static void Waveform_Draw(Component *base) {
     int aggZoom = (int)effectiveZoom;
     if (aggZoom < 1) aggZoom = 1;
 
-    for (float screenX = 0; screenX <= wfW + 1; screenX++) {
-        int dataX = (int)((srcX0 + (int)screenX) * effectiveZoom);
+    if (dynData != NULL && r->dynWfmFrames > 0) {
+        for (float screenX = 0; screenX <= wfW + 1; screenX++) {
+            int xInt = (int)screenX;
+            int dataX = (int)((double)(srcX0 + xInt) * (double)effectiveZoom);
 
-        if (dataX >= 0 && dataX < r->dynWfmFrames) {
-            int amplitude = dynData[dataX] & 0x1F;
-            int colorIdx = dynData[dataX] >> 5;
+            if (dataX >= 0 && dataX < r->dynWfmFrames) {
+                int amplitude = dynData[dataX] & 0x1F;
+                int colorIdx = dynData[dataX] >> 5;
 
-            if (aggZoom > 1) {
-                for (int j = 0; j < aggZoom - 1; j++) {
-                    int chkX = dataX + j + 1;
-                    if (chkX >= 0 && chkX < r->dynWfmFrames) {
-                        int ampChk = dynData[chkX] & 0x1F;
-                        if (ampChk > amplitude) {
-                            amplitude = ampChk;
-                            if (amplitude > 13) colorIdx = dynData[chkX] >> 5;
+                if (aggZoom > 1) {
+                    for (int j = 0; j < aggZoom - 1; j++) {
+                        int chkX = dataX + j + 1;
+                        if (chkX >= 0 && chkX < r->dynWfmFrames) {
+                            int ampChk = dynData[chkX] & 0x1F;
+                            if (ampChk > amplitude) {
+                                amplitude = ampChk;
+                                if (amplitude > 13) colorIdx = dynData[chkX] >> 5;
+                            }
                         }
                     }
                 }
-            }
 
-            if (amplitude > (int)waveCenter - 1) amplitude = (int)waveCenter - 1;
+                if (amplitude > (int)waveCenter - 1) amplitude = (int)waveCenter - 1;
 
-            float ampB = 0, ampY = 0, ampW = 0;
-            if (colorIdx >= 6) {
-                ampW = (float)amplitude;
-            } else if (colorIdx >= 3) {
-                ampY = (float)amplitude;
-                ampW = (float)amplitude * 0.5f;
-            } else {
-                ampB = (float)amplitude;
-                ampY = (float)amplitude * 0.7f;
-                ampW = (float)amplitude * 0.35f;
-            }
+                float ampB = 0, ampY = 0, ampW = 0;
+                if (colorIdx >= 6) {
+                    ampW = (float)amplitude;
+                } else if (colorIdx >= 3) {
+                    ampY = (float)amplitude;
+                    ampW = (float)amplitude * 0.5f;
+                } else {
+                    ampB = (float)amplitude;
+                    ampY = (float)amplitude * 0.7f;
+                    ampW = (float)amplitude * 0.35f;
+                }
 
-            float px = wfLeft + screenX - fracX;
+                float px = wfLeft + screenX - fracX;
 
-            if (px >= wfLeft && px <= wfRight) {
-                if (ampB > 0) DrawLine(px, wfY + waveCenter - ampB, px, wfY + waveCenter + ampB, (Color){0, 90, 255, 255});
-                if (ampY > 0) DrawLine(px, wfY + waveCenter - ampY, px, wfY + waveCenter + ampY, (Color){210, 130, 20, 255});
-                if (ampW > 0) DrawLine(px, wfY + waveCenter - ampW, px, wfY + waveCenter + ampW, (Color){255, 250, 220, 255});
+                if (px >= wfLeft && px <= wfRight) {
+                    if (ampB > 0) DrawRectangleV((Vector2){px, wfY + waveCenter - ampB}, (Vector2){1, ampB * 2}, (Color){0, 90, 255, 255});
+                    if (ampY > 0) DrawRectangleV((Vector2){px, wfY + waveCenter - ampY}, (Vector2){1, ampY * 2}, (Color){210, 130, 20, 255});
+                    if (ampW > 0) DrawRectangleV((Vector2){px, wfY + waveCenter - ampW}, (Vector2){1, ampW * 2}, (Color){255, 250, 220, 255});
+                }
             }
         }
     }
 
     // Beat Grid
-    for (int i=0; i < 1024; i++) {
-        unsigned int originalMs = r->State->LoadedTrack->BeatGrid[i];
-        if (originalMs == 0xFFFFFFFF || originalMs == 0) break;
+    if (r->State->LoadedTrack != NULL) {
+        for (int i=0; i < 1024; i++) {
+            unsigned int originalMs = r->State->LoadedTrack->BeatGrid[i];
+            if (originalMs == 0xFFFFFFFF || originalMs == 0) break;
 
-        double beatPosHF = (double)originalMs * 0.15;
-        float px = (float)((beatPosHF - elapsedHalfFrames) / effectiveZoom);
-        float bx = playheadX + px;
+            double beatPosHF = (double)originalMs * 0.15;
+            float px = (float)((beatPosHF - elapsedHalfFrames) / (double)effectiveZoom);
+            float bx = playheadX + px;
 
-        if (bx >= wfLeft && bx <= wfRight) {
-            Color clr = (Color){255, 255, 255, 80}; 
-            float w = 1.0f;
+            if (bx >= wfLeft && bx <= wfRight) {
+                Color clr = (Color){255, 255, 255, 50}; 
+                float tw = 1.0f;
 
-            int downbeatTarget = (1 - r->State->LoadedTrack->GridOffset) & 3;
-            if (i % 4 == downbeatTarget) {
-                clr = (Color){255, 0, 0, 80}; 
-                w = 2.0f;
+                int downbeatTarget = (1 - r->State->LoadedTrack->GridOffset) & 3;
+                if (i % 4 == downbeatTarget) {
+                    clr = (Color){255, 0, 0, 100}; 
+                    tw = 2.0f;
+                }
+
+                float segmentH = waveH * 0.12f;
+                DrawRectangleV((Vector2){bx - (tw/2.0f), wfY}, (Vector2){tw, segmentH}, clr);
+                DrawRectangleV((Vector2){bx - (tw/2.0f), wfY + waveH - segmentH}, (Vector2){tw, segmentH}, clr);
             }
-
-            DrawRectangle(bx - (w/2.0f), wfY, w, waveH, clr);
         }
     }
 
-    DrawLine(playheadX, wfY, playheadX, wfY + waveH, ColorRed);
+    // HotCue Markers
+    Color hcColors[] = {
+        {0, 255, 0, 255}, {255, 0, 0, 255}, {255, 128, 0, 255}, {255, 255, 0, 255},
+        {0, 0, 255, 255}, {255, 0, 255, 255}, {0, 255, 255, 255}, {128, 0, 255, 255}
+    };
+    const char* hcLabels[] = {"A", "B", "C", "D", "E", "F", "G", "H"};
+
+    // 1. Draw Memory Cues (white lines)
+    for (int i=0; i < r->State->LoadedTrack->CuesCount; i++) {
+        HotCue *mc = &r->State->LoadedTrack->Cues[i];
+        double mcHF = (double)mc->Start * 0.15;
+        float hx = playheadX + (float)((mcHF - elapsedHalfFrames) / (double)effectiveZoom);
+        if (hx >= wfLeft && hx <= wfRight) {
+            DrawLineEx((Vector2){hx, wfY}, (Vector2){hx, wfY + waveH}, 1.2f, ColorWhite);
+        }
+    }
+
+    // 2. Draw HotCues (flags)
+    for (int i = 0; i < r->State->LoadedTrack->HotCuesCount; i++) {
+        HotCue *hc = &r->State->LoadedTrack->HotCues[i];
+        int hcIdx = hc->ID - 1;
+        if (hcIdx < 0 || hcIdx >= 8) continue;
+
+        double hcHF = (double)hc->Start * 0.15;
+        float hx = playheadX + (float)((hcHF - elapsedHalfFrames) / (double)effectiveZoom);
+
+        if (hx >= wfLeft && hx <= wfRight) {
+            Color clr = hcColors[hcIdx];
+            DrawLineEx((Vector2){hx, wfY}, (Vector2){hx, wfY + waveH}, 1.5f, clr);
+
+            // Flag
+            float fw = S(14);
+            DrawRectangle(hx, wfY, fw, fw, clr);
+            UIDrawText(hcLabels[hcIdx], UIFonts_GetFace(S(10)), hx + S(3), wfY + S(1), S(10), ColorWhite);
+        }
+    }
+
+    DrawLineEx((Vector2){playheadX, wfY}, (Vector2){playheadX, wfY + waveH}, 1.5f, ColorRed);
     if (r->ID == 0) {
-        DrawLine(wfLeft, wfY + waveH - 1, wfLeft + wfW, wfY + waveH - 1, ColorDark1);
+        DrawLineEx((Vector2){wfLeft, wfY + waveH - 1}, (Vector2){wfLeft + wfW, wfY + waveH - 1}, 1.5f, ColorDark1);
     }
 }
 
@@ -158,6 +211,7 @@ void WaveformRenderer_Init(WaveformRenderer *r, int id, DeckState *state) {
     r->base.Draw = Waveform_Draw;
     r->ID = id;
     r->State = state;
+    r->cachedTrack = NULL;
     r->dynWfmFrames = 480;
     r->lastMouseX = 0;
 }

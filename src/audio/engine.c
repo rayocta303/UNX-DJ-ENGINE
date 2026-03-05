@@ -22,8 +22,10 @@ void AudioEngine_Init(AudioEngine *engine) {
 
 void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
     if (deck->PCMBuffer) {
-        free(deck->PCMBuffer);
-        deck->PCMBuffer = NULL;
+        float *oldBuf = deck->PCMBuffer;
+        deck->PCMBuffer = NULL; // Stop audio thread first
+        deck->TotalSamples = 0;
+        free(oldBuf);
     }
     deck->TotalSamples = 0;
     deck->Position = 0;

@@ -201,15 +201,64 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
                     track->BeatGrid[i] = b->time();
                 }
             } else if (tag == rekordbox_anlz_t::SECTION_TAGS_CUES || tag == rekordbox_anlz_t::SECTION_TAGS_CUES_2) {
-                // Simplisticly handle cues here
+                std::vector<RBCue> found;
+                if (tag == rekordbox_anlz_t::SECTION_TAGS_CUES) {
+                    auto ct = static_cast<rekordbox_anlz_t::cue_tag_t*>(section->body());
+                    for (auto& entry : *ct->cues()) {
+                        RBCue rc = {0};
+                        rc.Time = entry->time();
+                        rc.ID = (uint16_t)entry->hot_cue();
+                        rc.Type = (uint16_t)entry->type();
+                        found.push_back(rc);
+                    }
+                } else {
+                    auto ct = static_cast<rekordbox_anlz_t::cue_extended_tag_t*>(section->body());
+                    for (auto& entry : *ct->cues()) {
+                        RBCue rc = {0};
+                        rc.Time = entry->time();
+                        rc.ID = (uint16_t)entry->hot_cue();
+                        rc.Type = (uint16_t)entry->type();
+                        std::string comment = entry->comment();
+                        strncpy(rc.Comment, comment.c_str(), 63);
+                        found.push_back(rc);
+                    }
+                }
+
+                for (auto& f : found) {
+                    bool exists = false;
+                    for (uint32_t i=0; i<track->CueCount; i++) {
+                        if (track->Cues[i].Time == f.Time && track->Cues[i].ID == f.ID) {
+                            exists = true; 
+                            break;
+                        }
+                    }
+                    if (!exists) {
+                        RBCue* next = new RBCue[track->CueCount + 1];
+                        if (track->Cues) {
+                            memcpy(next, track->Cues, sizeof(RBCue) * track->CueCount);
+                            delete[] track->Cues;
+                        }
+                        next[track->CueCount] = f;
+                        track->Cues = next;
+                        track->CueCount++;
+                    }
+                }
             } else if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_PREVIEW) {
                 auto wp = static_cast<rekordbox_anlz_t::wave_preview_tag_t*>(section->body());
                 std::string data = wp->data();
                 track->StaticWaveformLen = data.length() > 1024 ? 1024 : data.length();
                 memcpy(track->StaticWaveform, data.data(), track->StaticWaveformLen);
-            } else if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_COLOR_SCROLL) {
-                auto wc = static_cast<rekordbox_anlz_t::wave_color_scroll_tag_t*>(section->body());
-                std::string data = wc->entries();
+            } else if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_COLOR_SCROLL || tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_3BAND_SCROLL) {
+                std::string data;
+                if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_COLOR_SCROLL) {
+                    auto wc = static_cast<rekordbox_anlz_t::wave_color_scroll_tag_t*>(section->body());
+                    data = wc->entries();
+                } else {
+                    auto w3 = static_cast<rekordbox_anlz_t::wave_3band_scroll_tag_t*>(section->body());
+                    data = w3->entries();
+                }
+                
+                if (track->DynamicWaveform) delete[] track->DynamicWaveform;
                 track->DynamicWaveformLen = data.length();
                 if (track->DynamicWaveformLen > 0) {
                     track->DynamicWaveform = new unsigned char[track->DynamicWaveformLen];

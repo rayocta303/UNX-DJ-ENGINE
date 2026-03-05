@@ -85,7 +85,7 @@ static void Settings_Draw(Component *base) {
         Color rowClr = ColorWhite;
 
         if (selected) {
-            UIDrawText("\xe2\x96\xba", faceXS, S(6), ry + S(6), S(9), ColorOrange); // ►
+            UIDrawText("\xe2\x96\xba", faceXS, S(6), ry + S(6), S(9), ColorOrange); // â–º
         }
 
         UIDrawText(item->Label, faceMd, S(24), ry + S(6), S(13), rowClr);
@@ -96,8 +96,8 @@ static void Settings_Draw(Component *base) {
         UIDrawText(valStr, faceMd, SCREEN_WIDTH - Si(120), ry + S(6), S(13), ColorOrange);
 
         if (selected && item->OptionsCount > 1) {
-            UIDrawText("\xe2\x97\x84", faceXS, SCREEN_WIDTH - Si(150), ry + S(6), S(9), ColorShadow); // ◄
-            UIDrawText("\xe2\x96\xba", faceXS, SCREEN_WIDTH - Si(15), ry + S(6), S(9), ColorShadow);  // ►
+            UIDrawText("\xe2\x97\x84", faceXS, SCREEN_WIDTH - Si(150), ry + S(6), S(9), ColorShadow); // â—„
+            UIDrawText("\xe2\x96\xba", faceXS, SCREEN_WIDTH - Si(15), ry + S(6), S(9), ColorShadow);  // â–º
         }
     }
 

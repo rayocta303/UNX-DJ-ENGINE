@@ -1,6 +1,6 @@
 #pragma once
 
-#include <raylib.h>
+#include "raylib.h"
 #include <stdbool.h>
 
 void DrawTopBar(int remainMin, int remainSec, int clockMin, int clockSec, bool showInfo);

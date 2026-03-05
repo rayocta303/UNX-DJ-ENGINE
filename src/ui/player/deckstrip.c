@@ -283,6 +283,18 @@ static void DeckStrip_Draw(Component *base) {
             float progX = wx + playedRatio * ww;
             DrawRectangle(progX, wy, 2, wh, ColorRed);
         }
+
+        // Memory Cue Markers
+        if (totalMs > 0) {
+            for (int i=0; i < d->State->LoadedTrack->CuesCount; i++) {
+                HotCue *mc = &d->State->LoadedTrack->Cues[i];
+                float mcRatio = (float)mc->Start / (float)totalMs;
+                if (mcRatio >= 0 && mcRatio <= 1) {
+                    float mcX = wx + mcRatio * ww;
+                    DrawLine(mcX, wy, mcX, wy + wh, ColorWhite);
+                }
+            }
+        }
         
         // HotCue Markers
         if (totalMs > 0) {
@@ -306,12 +318,12 @@ static void DeckStrip_Draw(Component *base) {
                 // Thin vertical line
                 DrawLine(hcX, wy, hcX, wy + wh, clr);
                 
-                // Triangle flag at the top (simulated with a small rectangle for speed)
+                // Triangle flag at the top
                 float hw = 4.0f;
                 DrawRectangle(hcX - hw/2, wy, hw, hw + 2, clr);
                 
                 // Letter label 
-                UIDrawText(hotCueLabels[hcIdx], faceXXS, hcX - hw/2 + S(0.5f), wy + hw + S(3), S(7), clr);
+                UIDrawText(hotCueLabels[hcIdx], UIFonts_GetFace(S(7)), hcX - hw/2 + S(0.5f), wy + hw + S(3), S(7), clr);
             }
         }
     }

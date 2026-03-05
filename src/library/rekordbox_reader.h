@@ -11,7 +11,7 @@ extern "C" {
 typedef struct {
     uint32_t Time; // ms
     uint16_t ID;   // 1-8 for HotCue, 0 for Memory
-    uint16_t Type; // 1=Loop, 2=Cue
+    uint16_t Type; // 1=Memory, 2=Loop
     uint32_t LoopTime; 
     char Comment[64];
 } RBCue;

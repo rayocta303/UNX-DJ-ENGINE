@@ -1,5 +1,5 @@
-#include <raylib.h>
-#include <rlgl.h>
+#include "raylib.h"
+#include "rlgl.h"
 #include <string.h>
 #include <stdio.h>
 #include "ui/components/theme.h"
@@ -156,19 +156,37 @@ int main(void) {
             }
         }
         
+        // --- Sync UI Scratching back to Audio Engine ---
+        if (app.deckA.ScratchDelta != 0) {
+            DeckAudio_Scratch(&audioEngine.Decks[0], app.deckA.ScratchDelta * 294.0);
+            app.deckA.ScratchDelta = 0;
+        }
+        if (app.deckB.ScratchDelta != 0) {
+            DeckAudio_Scratch(&audioEngine.Decks[1], app.deckB.ScratchDelta * 294.0);
+            app.deckB.ScratchDelta = 0;
+        }
+
         // --- Sync Audio Engine State to UI State ---
         if (audioEngine.Decks[0].PCMBuffer) {
-            double posSec = audioEngine.Decks[0].Position / (double)SAMPLE_RATE;
+            double playheadPos = audioEngine.Decks[0].Position;
+            app.deckA.Position = (playheadPos * 150.0) / 44100.0;
+            app.deckA.IsScratching = audioEngine.Decks[0].IsScratching;
+            
+            double posSec = playheadPos / 44100.0;
             app.deckA.PositionMs = (uint32_t)(posSec * 1000.0);
             
-            double lenSec = ((double)audioEngine.Decks[0].TotalSamples / (double)CHANNELS) / (double)SAMPLE_RATE;
+            double lenSec = ((double)audioEngine.Decks[0].TotalSamples / (double)CHANNELS) / 44100.0;
             app.deckA.TrackLengthMs = (uint32_t)(lenSec * 1000.0);
         }
         if (audioEngine.Decks[1].PCMBuffer) {
-            double posSec = audioEngine.Decks[1].Position / (double)SAMPLE_RATE;
+            double playheadPos = audioEngine.Decks[1].Position;
+            app.deckB.Position = (playheadPos * 150.0) / 44100.0;
+            app.deckB.IsScratching = audioEngine.Decks[1].IsScratching;
+            
+            double posSec = playheadPos / 44100.0;
             app.deckB.PositionMs = (uint32_t)(posSec * 1000.0);
             
-            double lenSec = ((double)audioEngine.Decks[1].TotalSamples / (double)CHANNELS) / (double)SAMPLE_RATE;
+            double lenSec = ((double)audioEngine.Decks[1].TotalSamples / (double)CHANNELS) / 44100.0;
             app.deckB.TrackLengthMs = (uint32_t)(lenSec * 1000.0);
         }
         

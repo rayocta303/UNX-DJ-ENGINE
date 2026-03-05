@@ -4,7 +4,7 @@
 #include "ui/components/theme.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
-#include <rlgl.h>
+#include "rlgl.h"
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -208,26 +208,53 @@ static int Browser_Update(Component *base) {
                     targetDeck->OriginalBPM = t->BPM;
                     targetDeck->CurrentBPM = t->BPM;
                     
-                    // Push analysis to UI
-                    if (targetDeck->LoadedTrack) {
-                        free(targetDeck->LoadedTrack);
-                    }
-                    targetDeck->LoadedTrack = malloc(sizeof(TrackState));
-                    memset(targetDeck->LoadedTrack, 0, sizeof(TrackState));
-                    
-                    // Copy Static Waveform
-                    targetDeck->LoadedTrack->StaticWaveformLen = t->StaticWaveformLen;
-                    int len = t->StaticWaveformLen > 1024 ? 1024 : t->StaticWaveformLen;
-                    memcpy(targetDeck->LoadedTrack->StaticWaveform, t->StaticWaveform, len);
-                    
-                    // Assign Dynamic Waveform Reference
-                    targetDeck->LoadedTrack->DynamicWaveform = t->DynamicWaveform;
-                    targetDeck->LoadedTrack->DynamicWaveformLen = t->DynamicWaveformLen;
-                    
-                    // Copy Beatgrid
-                    targetDeck->LoadedTrack->GridOffset = 0;
-                    for(int i=0; i<t->BeatGridCount && i<1024; i++) {
-                        targetDeck->LoadedTrack->BeatGrid[i] = t->BeatGrid[i];
+                    // Safe re-allocation for UI thread stability
+                    TrackState *newTrack = (TrackState*)malloc(sizeof(TrackState));
+                    if (!newTrack) {
+                        printf("[BROWSER] Error: Failed to allocate TrackState\n");
+                    } else {
+                        memset(newTrack, 0, sizeof(TrackState));
+                        
+                        // Copy Static Waveform
+                        newTrack->StaticWaveformLen = t->StaticWaveformLen;
+                        int copyLen = t->StaticWaveformLen > 1024 ? 1024 : t->StaticWaveformLen;
+                        memcpy(newTrack->StaticWaveform, t->StaticWaveform, copyLen);
+                        
+                        // Assign Dynamic Waveform Reference
+                        newTrack->DynamicWaveform = t->DynamicWaveform;
+                        newTrack->DynamicWaveformLen = t->DynamicWaveformLen;
+                        
+                        // Copy Beatgrid
+                        newTrack->GridOffset = 0;
+                        for(int i=0; i<t->BeatGridCount && i<1024; i++) {
+                            newTrack->BeatGrid[i] = t->BeatGrid[i];
+                        }
+
+                        // Copy Cues
+                        for(uint32_t i=0; i<t->CueCount; i++) {
+                            if (t->Cues[i].ID >= 1 && t->Cues[i].ID <= 8) {
+                                if (newTrack->HotCuesCount < 8) {
+                                    newTrack->HotCues[newTrack->HotCuesCount].ID = t->Cues[i].ID;
+                                    newTrack->HotCues[newTrack->HotCuesCount].Start = t->Cues[i].Time;
+                                    newTrack->HotCuesCount++;
+                                }
+                            } else if (t->Cues[i].ID == 0) {
+                                if (newTrack->CuesCount < 32) {
+                                    newTrack->Cues[newTrack->CuesCount].ID = 0;
+                                    newTrack->Cues[newTrack->CuesCount].Start = t->Cues[i].Time;
+                                    newTrack->CuesCount++;
+                                }
+                            }
+                        }
+
+                        // Atomic-like swap
+                        TrackState *oldTrack = targetDeck->LoadedTrack;
+                        targetDeck->LoadedTrack = newTrack;
+                        if (oldTrack) free(oldTrack);
+                        
+                        // Reset playhead for new track
+                        targetDeck->Position = 0;
+                        targetDeck->PositionMs = 0;
                     }
                 }
             }

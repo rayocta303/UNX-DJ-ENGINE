@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ui/components/component.h"
-#include <raylib.h>
+#include "raylib.h"
 
 typedef struct SplashRenderer SplashRenderer;
 

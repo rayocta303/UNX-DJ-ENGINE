@@ -1,5 +1,5 @@
 #include "input/keyboard.h"
-#include <raylib.h>
+#include "raylib.h"
 
 KeyboardMapping GetDefaultMapping() {
     KeyboardMapping m = {0};

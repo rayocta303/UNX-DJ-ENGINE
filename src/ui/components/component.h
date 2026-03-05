@@ -1,6 +1,6 @@
 #pragma once
 
-#include <raylib.h>
+#include "raylib.h"
 #include <stdbool.h>
 
 // Component is the base interface every screen or panel must implement.
