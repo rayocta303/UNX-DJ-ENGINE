@@ -123,21 +123,25 @@ static void Waveform_Draw(Component *base) {
             int dataX = (int)((double)(srcX0 + xInt) * (double)effectiveZoom * (double)r->dataDensity);
 
             if (dataX >= 0 && dataX < r->dynWfmFrames) {
-                int amplitude = dynData[dataX] & 0x1F;
-                int colorIdx = dynData[dataX] >> 5;
-
-                if (aggZoom > 1) {
-                    for (int j = 0; j < aggZoom - 1; j++) {
-                        int chkX = dataX + j + 1;
-                        if (chkX >= 0 && chkX < r->dynWfmFrames) {
-                            int ampChk = dynData[chkX] & 0x1F;
-                            if (ampChk > amplitude) {
-                                amplitude = ampChk;
-                                if (amplitude > 13) colorIdx = dynData[chkX] >> 5;
-                            }
-                        }
+                // Average 11 frames for even smoother, more liquid shape
+                int sumAmp = 0;
+                int sumColor = 0;
+                int count = 0;
+                
+                int loopSpan = aggZoom > 11 ? aggZoom : 11;
+                int startK = dataX - (loopSpan / 2);
+                
+                for (int j = 0; j < loopSpan; j++) {
+                    int chkX = startK + j;
+                    if (chkX >= 0 && chkX < r->dynWfmFrames) {
+                        sumAmp += (dynData[chkX] & 0x1F);
+                        sumColor += (dynData[chkX] >> 5);
+                        count++;
                     }
                 }
+
+                int amplitude = (count > 0) ? (sumAmp / count) : 0;
+                int colorIdx = (count > 0) ? (sumColor / count) : (dynData[dataX] >> 5);
 
                 // --- Waveform 3-Band (Preset) Calibration Parameters ---
                 // Anda bisa merubah parameter di bawah ini untuk kalibrasi visual sendiri:
