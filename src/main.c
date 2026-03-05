@@ -96,7 +96,7 @@ void App_Init(App *a) {
     BrowserRenderer_Init(&a->browser, &a->browserState);
     InfoRenderer_Init(&a->info, &a->infoState);
     SettingsRenderer_Init(&a->settings, &a->settingsState);
-    SplashRenderer_Init(&a->splash);
+    SplashRenderer_Init(&a->splash, &a->splashCounter);
     a->keyMap = GetDefaultMapping();
 }
 

@@ -4,6 +4,8 @@
 #include "ui/components/helpers.h"
 #include <stdio.h>
 
+static Texture2D crownTex = {0};
+
 static int DeckInfo_Update(Component *base) {
     (void)base;
     return 0;
@@ -11,6 +13,14 @@ static int DeckInfo_Update(Component *base) {
 
 static void DeckInfo_Draw(Component *base) {
     DeckInfoPanel *d = (DeckInfoPanel *)base;
+    
+    if (crownTex.id == 0) {
+        Image img = LoadImage("assets/icons/crown.png");
+        ImageResize(&img, (int)S(9), (int)S(9));
+        crownTex = LoadTextureFromImage(img);
+        UnloadImage(img);
+        SetTextureFilter(crownTex, TEXTURE_FILTER_BILINEAR);
+    }
     
     float deckInfoW = SIDE_PANEL_W;
     float deckInfoH = (SCREEN_HEIGHT - TOP_BAR_H - FX_BAR_H - DECK_STR_H) / 2.0f;
@@ -46,13 +56,13 @@ static void DeckInfo_Draw(Component *base) {
 
     // 1. Source Row
     float sourceY = contentY + (rowH - S(10)) / 2.0f;
-    UIDrawText("\xef\xaa\x87", iconBrand, S(margin), sourceY, S(10), ColorWhite); // f287 usb
+    UIDrawText("\uf287", iconBrand, S(margin), sourceY, S(10), ColorWhite); // uf287 usb
     UIDrawText(d->State->SourceName, faceXS, S(margin + 16), sourceY - S(1), S(8.5f), ColorWhite);
 
     // 2. Key Row
     float keyY = contentY + rowH + (rowH - S(10)) / 2.0f;
     DrawRectangleLines(S(margin), keyY, S(14), S(10), ColorShadow);
-    UIDrawText("\xe2\x99\xad#", faceXXS, S(margin + 2), keyY + S(1), S(7.5f), ColorShadow); // flat sharp
+    UIDrawText("\uf7c2", faceXXS, S(margin + 2), keyY + S(1), S(7.5f), ColorShadow); // flat sharp
     
     const char* keyStr = "---";
     if (d->State->LoadedTrack != NULL) {
@@ -112,7 +122,13 @@ static void DeckInfo_Draw(Component *base) {
 
     Color msColor = d->State->IsMaster ? ColorOrange : ColorShadow;
     DrawRectangleRounded(msRect, 0.2f, 4, msColor);
-    UIDrawText("MASTER", faceXXS, msRect.x + S(3), msRect.y + S(2), S(7.5f), d->State->IsMaster ? ColorBlack : ColorWhite);
+    
+    Color iconColor = d->State->IsMaster ? ColorBlack : ColorWhite;
+    Vector2 iconPos = {
+        msRect.x + (msRect.width - crownTex.width) / 2.0f,
+        msRect.y + (msRect.height - crownTex.height) / 2.0f
+    };
+    DrawTextureEx(crownTex, iconPos, 0.0f, 1.0f, iconColor);
 
     // MT Button
     Rectangle mtRect = { S(margin) + btnW + btnS, btnY, btnW, btnH };
