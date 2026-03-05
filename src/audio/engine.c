@@ -165,6 +165,14 @@ void DeckAudio_Scratch(DeckAudioState *deck, double delta) {
     deck->ScratchSpeed = delta * 0.4;
 }
 
+void DeckAudio_JumpToMs(DeckAudioState *deck, uint32_t ms) {
+    deck->Position = (double)ms * (44100.0 / 1000.0);
+    if (deck->Position < 0) deck->Position = 0;
+    if (deck->Position * CHANNELS >= (double)deck->TotalSamples) {
+        deck->Position = (double)(deck->TotalSamples / CHANNELS) - 1.0;
+    }
+}
+
 void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch) {
     deck->TargetPitch = pitch;
     deck->Pitch = pitch; // Assume instant update for now unless we need the TRIM smoother

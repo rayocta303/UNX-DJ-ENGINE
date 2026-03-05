@@ -59,6 +59,7 @@ void DeckAudio_Play(DeckAudioState *deck);
 void DeckAudio_Pause(DeckAudioState *deck);
 // Called when jog wheel is moved during touch
 void DeckAudio_Scratch(DeckAudioState *deck, double delta); 
+void DeckAudio_JumpToMs(DeckAudioState *deck, uint32_t ms);
 void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch);
 
 #ifdef __cplusplus

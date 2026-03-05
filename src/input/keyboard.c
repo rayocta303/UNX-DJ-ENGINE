@@ -34,7 +34,15 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2, Audi
     }
     for (int i = 0; i < 5; i++) {
         if (IsKeyPressed(m->hotCues1[i])) {
-            // Handle hot cue mock
+            int targetID = i + 1; // 1, 2, 3, 4, 5
+            if (d1->LoadedTrack) {
+                for (int j = 0; j < d1->LoadedTrack->HotCuesCount; j++) {
+                    if (d1->LoadedTrack->HotCues[j].ID == targetID) {
+                        DeckAudio_JumpToMs(&engine->Decks[0], d1->LoadedTrack->HotCues[j].Start);
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -44,7 +52,15 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2, Audi
     }
     for (int i = 0; i < 5; i++) {
         if (IsKeyPressed(m->hotCues2[i])) {
-            // Handle hot cue mock
+            int targetID = i + 1; // Mapping 6,7,8,9,0 keys to HotCues 1,2,3,4,5
+            if (d2->LoadedTrack) {
+                for (int j = 0; j < d2->LoadedTrack->HotCuesCount; j++) {
+                    if (d2->LoadedTrack->HotCues[j].ID == targetID) {
+                        DeckAudio_JumpToMs(&engine->Decks[1], d2->LoadedTrack->HotCues[j].Start);
+                        break;
+                    }
+                }
+            }
         }
     }
 }
