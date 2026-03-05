@@ -30,6 +30,7 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
         free(oldBuf);
     }
     deck->IsPlaying = false;
+    deck->SampleRate = 44100;
     deck->IsMotorOn = false;
     deck->IsTouching = false;
     deck->VinylModeEnabled = true; // Default to Vinyl
@@ -49,6 +50,7 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
         // Successfully loaded
         deck->PCMBuffer = info.buffer; // info.buffer is allocated by malloc internally in minimp3
         deck->TotalSamples = info.samples;
+        deck->SampleRate = info.hz;
         
         // If mono, we should duplicate to stereo, but assuming Rekordbox tracks are mostly stereo
         // We'll leave it as is for now, but realistically we should resample/rechannel here

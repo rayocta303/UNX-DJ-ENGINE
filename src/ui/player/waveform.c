@@ -12,8 +12,18 @@ static int Waveform_Update(Component *base) {
         r->cachedTrack = r->State->LoadedTrack;
         if (r->cachedTrack) {
             r->dynWfmFrames = r->cachedTrack->DynamicWaveformLen;
+            
+            // Calculate data density: how many data frames exist per UI frame (150Hz)
+            // UI_Total_Frames = TrackLengthMs * 0.15
+            float totalUIFrames = (float)r->State->TrackLengthMs * 0.15f;
+            if (totalUIFrames > 0) {
+                r->dataDensity = (float)r->dynWfmFrames / totalUIFrames;
+            } else {
+                r->dataDensity = 1.0f;
+            }
         } else {
             r->dynWfmFrames = 480;
+            r->dataDensity = 1.0f;
         }
     }
 
@@ -82,8 +92,7 @@ static void Waveform_Draw(Component *base) {
     }
 
     float playheadX = wfLeft + wfW / 2.0f;
-    float pitchRatio = 1.0f + (r->State->TempoPercent / 100.0f);
-    float effectiveZoom = (float)r->State->ZoomScale * pitchRatio;
+    float effectiveZoom = (float)r->State->ZoomScale;
     if (effectiveZoom < 0.1f) effectiveZoom = 0.1f;
 
     double elapsedHalfFrames = r->State->Position;
@@ -97,13 +106,13 @@ static void Waveform_Draw(Component *base) {
     unsigned char *dynData = r->State->LoadedTrack->DynamicWaveform;
     float waveCenter = waveH / 2.0f;
 
-    int aggZoom = (int)effectiveZoom;
+    int aggZoom = (int)(effectiveZoom * r->dataDensity);
     if (aggZoom < 1) aggZoom = 1;
 
     if (dynData != NULL && r->dynWfmFrames > 0) {
         for (float screenX = 0; screenX <= wfW + 1; screenX++) {
             int xInt = (int)screenX;
-            int dataX = (int)((double)(srcX0 + xInt) * (double)effectiveZoom);
+            int dataX = (int)((double)(srcX0 + xInt) * (double)effectiveZoom * (double)r->dataDensity);
 
             if (dataX >= 0 && dataX < r->dynWfmFrames) {
                 int amplitude = dynData[dataX] & 0x1F;
@@ -122,18 +131,20 @@ static void Waveform_Draw(Component *base) {
                     }
                 }
 
-                if (amplitude > (int)waveCenter - 1) amplitude = (int)waveCenter - 1;
+                float vertScale = 1.8f;
+                float scaledAmp = (float)amplitude * vertScale;
+                if (scaledAmp > waveCenter - 1.0f) scaledAmp = waveCenter - 1.0f;
 
                 float ampB = 0, ampY = 0, ampW = 0;
                 if (colorIdx >= 6) {
-                    ampW = (float)amplitude;
+                    ampW = scaledAmp;
                 } else if (colorIdx >= 3) {
-                    ampY = (float)amplitude;
-                    ampW = (float)amplitude * 0.5f;
+                    ampY = scaledAmp;
+                    ampW = scaledAmp * 0.5f;
                 } else {
-                    ampB = (float)amplitude;
-                    ampY = (float)amplitude * 0.7f;
-                    ampW = (float)amplitude * 0.35f;
+                    ampB = scaledAmp;
+                    ampY = scaledAmp * 0.7f;
+                    ampW = scaledAmp * 0.35f;
                 }
 
                 float px = wfLeft + screenX - fracX;

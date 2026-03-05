@@ -144,6 +144,14 @@ int main(void) {
             if (app.splashCounter <= 0) app.screen = ScreenPlayer;
         }
 
+        // Exclusive Master Logic
+        static bool lastMasterA = false;
+        static bool lastMasterB = false;
+        if (app.deckA.IsMaster && !lastMasterA) app.deckB.IsMaster = false;
+        if (app.deckB.IsMaster && !lastMasterB) app.deckA.IsMaster = false;
+        lastMasterA = app.deckA.IsMaster;
+        lastMasterB = app.deckB.IsMaster;
+
         HandleKeyboardInputs(&app.keyMap, &app.deckA, &app.deckB, &audioEngine);
 
         // Global UI navigation using keyMap
@@ -174,8 +182,12 @@ int main(void) {
         if (app.deckA.IsTouching) {
             double dt = GetFrameTime();
             if (dt < 0.001) dt = 0.016; 
-            double samplesInFrame = 44100.0 * dt;
-            double instantaneousRate = (app.deckA.ScratchDelta * 294.0) / samplesInFrame;
+            double srA = (double)audioEngine.Decks[0].SampleRate;
+            if (srA < 8000) srA = 44100.0;
+
+            double framesInFrame = srA * dt;
+            // ScratchDelta is in 150Hz frames. Convert to PCM frames for comparison.
+            double instantaneousRate = (app.deckA.ScratchDelta * (srA / 150.0)) / (framesInFrame);
             
             audioEngine.Decks[0].ScratchSpeed = instantaneousRate;
             app.deckA.ScratchDelta = 0;
@@ -190,8 +202,11 @@ int main(void) {
         if (app.deckB.IsTouching) {
             double dt = GetFrameTime();
             if (dt < 0.001) dt = 0.016; 
-            double samplesInFrame = 44100.0 * dt;
-            double instantaneousRate = (app.deckB.ScratchDelta * 294.0) / samplesInFrame;
+            double srB = (double)audioEngine.Decks[1].SampleRate;
+            if (srB < 8000) srB = 44100.0;
+
+            double framesInFrame = srB * dt;
+            double instantaneousRate = (app.deckB.ScratchDelta * (srB / 150.0)) / framesInFrame;
 
             audioEngine.Decks[1].ScratchSpeed = instantaneousRate;
             app.deckB.ScratchDelta = 0;
@@ -201,27 +216,34 @@ int main(void) {
 
         // --- Sync Audio Engine State to UI State ---
         if (audioEngine.Decks[0].PCMBuffer) {
-            double playheadPos = audioEngine.Decks[0].Position;
-            app.deckA.Position = (playheadPos * 150.0) / 44100.0;
+            // Position is already frame-based (L+R pair = 1 frame)
+            double playheadFrames = audioEngine.Decks[0].Position;
+            double srA = (double)audioEngine.Decks[0].SampleRate;
+            if (srA < 8000) srA = 44100.0;
+
+            app.deckA.Position = (playheadFrames * 150.0) / srA;
             app.deckA.IsTouching = audioEngine.Decks[0].IsTouching;
             app.deckA.IsPlaying = audioEngine.Decks[0].IsPlaying;
             
-            double posSec = playheadPos / 44100.0;
+            double posSec = playheadFrames / srA;
             app.deckA.PositionMs = (uint32_t)(posSec * 1000.0);
             
-            double lenSec = ((double)audioEngine.Decks[0].TotalSamples / (double)CHANNELS) / 44100.0;
+            double lenSec = ((double)audioEngine.Decks[0].TotalSamples / (double)CHANNELS) / srA;
             app.deckA.TrackLengthMs = (uint32_t)(lenSec * 1000.0);
         }
         if (audioEngine.Decks[1].PCMBuffer) {
-            double playheadPos = audioEngine.Decks[1].Position;
-            app.deckB.Position = (playheadPos * 150.0) / 44100.0;
+            double playheadFrames = audioEngine.Decks[1].Position;
+            double srB = (double)audioEngine.Decks[1].SampleRate;
+            if (srB < 8000) srB = 44100.0;
+
+            app.deckB.Position = (playheadFrames * 150.0) / srB;
             app.deckB.IsTouching = audioEngine.Decks[1].IsTouching;
             app.deckB.IsPlaying = audioEngine.Decks[1].IsPlaying;
             
-            double posSec = playheadPos / 44100.0;
+            double posSec = playheadFrames / srB;
             app.deckB.PositionMs = (uint32_t)(posSec * 1000.0);
             
-            double lenSec = ((double)audioEngine.Decks[1].TotalSamples / (double)CHANNELS) / 44100.0;
+            double lenSec = ((double)audioEngine.Decks[1].TotalSamples / (double)CHANNELS) / srB;
             app.deckB.TrackLengthMs = (uint32_t)(lenSec * 1000.0);
         }
         

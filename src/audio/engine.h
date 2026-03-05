@@ -12,8 +12,8 @@ extern "C" {
 #define CHANNELS 2
 #define MAX_DECKS 2
 
-// 1 half-frame = 1/150 s at 44.1kHz = 294 samples
-#define SAMPLES_PER_HALF_FRAME 294 
+// 1 frame = 1/150 s at 44.1kHz = 294 samples (High-Res Waveform Rate)
+#define SAMPLES_PER_FRAME 294 
 
 typedef enum {
     CHANGE_SPEED_NO_CHANGE = 0,
@@ -24,6 +24,7 @@ typedef enum {
 typedef struct DeckAudioState {
     float *PCMBuffer;           // Full track audio decoded (interleaved L/R)
     uint32_t TotalSamples;      // Total samples in buffer
+    uint32_t SampleRate;        // Original sample rate (e.g. 44100, 48000)
     
     // Core playback state (from XDJ-X firmware concept)
     double Position;            // Read head position (exact fractional sample index)
