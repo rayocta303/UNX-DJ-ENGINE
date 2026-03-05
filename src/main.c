@@ -58,11 +58,17 @@ void App_Init(App *a) {
     a->deckA.PositionMs = 0;
     a->deckA.TrackLengthMs = 0;
     a->deckA.IsMaster = true;
+    a->deckA.VinylModeEnabled = true;
+    a->deckA.MasterTempo = false;
+    a->deckA.ZoomScale = 16;
 
     memset(&a->deckB, 0, sizeof(DeckState));
     strcpy(a->deckB.SourceName, "USB1");
     a->deckB.PositionMs = 0;
     a->deckB.TrackLengthMs = 0;
+    a->deckB.VinylModeEnabled = true;
+    a->deckB.MasterTempo = false;
+    a->deckB.ZoomScale = 16;
 
     // Init Browser State
     memset(&a->browserState, 0, sizeof(BrowserState));
@@ -147,44 +153,57 @@ int main(void) {
                 app.browserState.IsActive = true;
             } else if (app.screen == ScreenBrowser) {
                 app.screen = ScreenPlayer;
-                app.browserState.IsActive = false;
+                app.browserState.IsActive = !app.browserState.IsActive;
             }
         }
+
+        // Tempo Calculation (10000 = 100%)
+        float realPitchA = 1.0f + (app.deckA.TempoPercent / 100.0f);
+        audioEngine.Decks[0].Pitch = (uint16_t)(realPitchA * 10000.0f);
+        app.deckA.CurrentBPM = app.deckA.OriginalBPM * realPitchA;
+
+        float realPitchB = 1.0f + (app.deckB.TempoPercent / 100.0f);
+        audioEngine.Decks[1].Pitch = (uint16_t)(realPitchB * 10000.0f);
+        app.deckB.CurrentBPM = app.deckB.OriginalBPM * realPitchB;
         
-        // --- Sync UI Scratching back to Audio Engine ---
+        // --- Sync UI Scratching/Modes back to Audio Engine ---
         // Deck A
-        if (app.deckA.IsScratching != audioEngine.Decks[0].IsScratching) {
-            DeckAudio_SetScratch(&audioEngine.Decks[0], app.deckA.IsScratching);
+        if (app.deckA.IsTouching != audioEngine.Decks[0].IsTouching) {
+            DeckAudio_SetScratch(&audioEngine.Decks[0], app.deckA.IsTouching);
         }
-        if (app.deckA.IsScratching) {
+        if (app.deckA.IsTouching) {
             double dt = GetFrameTime();
-            if (dt < 0.001) dt = 0.016; // Safety
+            if (dt < 0.001) dt = 0.016; 
             double samplesInFrame = 44100.0 * dt;
             double instantaneousRate = (app.deckA.ScratchDelta * 294.0) / samplesInFrame;
             
             audioEngine.Decks[0].ScratchSpeed = instantaneousRate;
             app.deckA.ScratchDelta = 0;
         }
+        audioEngine.Decks[0].VinylModeEnabled = app.deckA.VinylModeEnabled;
+        audioEngine.Decks[0].MasterTempoActive = app.deckA.MasterTempo;
 
         // Deck B
-        if (app.deckB.IsScratching != audioEngine.Decks[1].IsScratching) {
-            DeckAudio_SetScratch(&audioEngine.Decks[1], app.deckB.IsScratching);
+        if (app.deckB.IsTouching != audioEngine.Decks[1].IsTouching) {
+            DeckAudio_SetScratch(&audioEngine.Decks[1], app.deckB.IsTouching);
         }
-        if (app.deckB.IsScratching) {
+        if (app.deckB.IsTouching) {
             double dt = GetFrameTime();
-            if (dt < 0.001) dt = 0.016; // Safety
+            if (dt < 0.001) dt = 0.016; 
             double samplesInFrame = 44100.0 * dt;
             double instantaneousRate = (app.deckB.ScratchDelta * 294.0) / samplesInFrame;
 
             audioEngine.Decks[1].ScratchSpeed = instantaneousRate;
             app.deckB.ScratchDelta = 0;
         }
+        audioEngine.Decks[1].VinylModeEnabled = app.deckB.VinylModeEnabled;
+        audioEngine.Decks[1].MasterTempoActive = app.deckB.MasterTempo;
 
         // --- Sync Audio Engine State to UI State ---
         if (audioEngine.Decks[0].PCMBuffer) {
             double playheadPos = audioEngine.Decks[0].Position;
             app.deckA.Position = (playheadPos * 150.0) / 44100.0;
-            app.deckA.IsScratching = audioEngine.Decks[0].IsScratching;
+            app.deckA.IsTouching = audioEngine.Decks[0].IsTouching;
             app.deckA.IsPlaying = audioEngine.Decks[0].IsPlaying;
             
             double posSec = playheadPos / 44100.0;
@@ -196,7 +215,7 @@ int main(void) {
         if (audioEngine.Decks[1].PCMBuffer) {
             double playheadPos = audioEngine.Decks[1].Position;
             app.deckB.Position = (playheadPos * 150.0) / 44100.0;
-            app.deckB.IsScratching = audioEngine.Decks[1].IsScratching;
+            app.deckB.IsTouching = audioEngine.Decks[1].IsTouching;
             app.deckB.IsPlaying = audioEngine.Decks[1].IsPlaying;
             
             double posSec = playheadPos / 44100.0;

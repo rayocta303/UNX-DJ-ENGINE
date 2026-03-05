@@ -33,7 +33,8 @@ typedef struct DeckAudioState {
     uint16_t Pitch;             // 10000 = 100% pitch
     uint16_t TargetPitch;       // Where the fader is currently set
     double ScratchSpeed;        // Inertia value for vinyl mode
-    bool IsScratching;          // User is actively touching jog
+    bool IsTouching;            // User is actively touching jog (renamed)
+    bool VinylModeEnabled;      // Vinyl vs CDJ mode
     bool IsPlaying;             // Deck is in play mode (logical)
     bool IsMotorOn;             // Platter motor state (physical)
     bool IsReverse;             // Reverse playback active
@@ -44,6 +45,10 @@ typedef struct DeckAudioState {
     float BaseRate;             // Determined by pitch slider
     float OutlinedRate;         // Final calculated rate including scratch offsets
     bool MasterTempoActive;     // Key lock
+    
+    // OLA (Master Tempo) State
+    double MTOffset;
+    int MTSampleCount;
 
     float Trim;
 } DeckAudioState;

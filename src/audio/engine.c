@@ -29,12 +29,14 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
         deck->TotalSamples = 0;
         free(oldBuf);
     }
-    deck->TotalSamples = 0;
-    deck->Position = 0;
     deck->IsPlaying = false;
     deck->IsMotorOn = false;
+    deck->IsTouching = false;
+    deck->VinylModeEnabled = true; // Default to Vinyl
     deck->OutlinedRate = 0;
     deck->ScratchSpeed = 0;
+    deck->MTOffset = 0;
+    deck->MTSampleCount = 0;
 
     if (!filePath || strlen(filePath) == 0) return;
 
@@ -64,12 +66,18 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
     double targetRate = 0.0;
     float accel = 0.08f; 
 
-    if (deck->IsScratching) {
-        // Hand is on the platter. Follow mouse speed exactly.
-        targetRate = deck->ScratchSpeed;
-        accel = 1.0f; // Instant "sticky" follow
+    if (deck->IsTouching) {
+        if (deck->VinylModeEnabled) {
+            // Vinyl Mode + Touch: Follow hand (Scratch)
+            targetRate = deck->ScratchSpeed;
+            accel = 1.0f; 
+        } else {
+            // CDJ Mode + Touch: Nudge (BaseRate + Nudge Offset)
+            targetRate = deck->BaseRate + deck->ScratchSpeed;
+            accel = 0.4f; // Nudge is slightly smoothed
+        }
     } else {
-        // Hand is off.
+        // Hand is off
         if (deck->IsMotorOn) {
             targetRate = deck->BaseRate;
             accel = 0.12f; // Motor startup
@@ -108,28 +116,46 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int framesT
 
     // We process frame by frame
     for (int i = 0; i < framesToProcess; i++) {
-        double currentFrame = deck->Position;
-        
-        // Integer frame index points
-        int currentFrameFloor = (int)floor(currentFrame);
-        int sampleIndex = currentFrameFloor * CHANNELS;
+        double readPos = deck->Position;
+        float mtWeight = 1.0f;
+        bool mtActive = deck->MasterTempoActive && !deck->IsTouching && deck->IsMotorOn && fabs(rate - 1.0) > 0.005;
 
-        float frac = (float)(currentFrame - floor(currentFrame));
+        if (mtActive) {
+            readPos = deck->Position + deck->MTOffset;
+            deck->MTOffset += (1.0 - rate);
+            deck->MTSampleCount++;
+            
+            if (deck->MTSampleCount > 768) {
+                mtWeight = 1.0f - (float)(deck->MTSampleCount - 768) / 256.0f;
+            }
+            if (deck->MTSampleCount >= 1024) {
+                deck->MTSampleCount = 0;
+                deck->MTOffset = 0;
+            }
+        }
 
         float l_sample = 0.0f;
         float r_sample = 0.0f;
 
-        // Ensure we are within bounds
-        if (sampleIndex >= 0 && sampleIndex + CHANNELS + 1 < deck->TotalSamples) {
-            float floor_l = deck->PCMBuffer[sampleIndex];
-            float floor_r = deck->PCMBuffer[sampleIndex + 1];
+        // --- Helper for interpolation ---
+        #define INTERP_SAMPLES(pos, l, r) { \
+            int sf = (int)floor(pos); \
+            int idx = sf * CHANNELS; \
+            float fr = (float)(pos - floor(pos)); \
+            if (idx >= 0 && idx + 3 < deck->TotalSamples) { \
+                l = deck->PCMBuffer[idx] + fr * (deck->PCMBuffer[idx + 2] - deck->PCMBuffer[idx]); \
+                r = deck->PCMBuffer[idx + 1] + fr * (deck->PCMBuffer[idx + 3] - deck->PCMBuffer[idx + 1]); \
+            } \
+        }
 
-            float ceil_l = deck->PCMBuffer[sampleIndex + 2];
-            float ceil_r = deck->PCMBuffer[sampleIndex + 3];
+        INTERP_SAMPLES(readPos, l_sample, r_sample);
 
-            // Linear interpolation
-            l_sample = floor_l + frac * (ceil_l - floor_l);
-            r_sample = floor_r + frac * (ceil_r - floor_r);
+        // If MT is active and in crossfade zone, mix in the secondary grain
+        if (mtActive && mtWeight < 1.0f) {
+            float l2 = 0.0f, r2 = 0.0f;
+            INTERP_SAMPLES(deck->Position, l2, r2); // Reset grain starts at deck->Position
+            l_sample = l_sample * mtWeight + l2 * (1.0f - mtWeight);
+            r_sample = r_sample * mtWeight + r2 * (1.0f - mtWeight);
         }
 
         // Apply Trim Volume
@@ -176,18 +202,16 @@ void DeckAudio_SetPlaying(DeckAudioState *deck, bool playing) {
 
 // ScratchSpeed is driven by UI delta to match mouse movement
 void DeckAudio_Scratch(DeckAudioState *deck, double rate) {
-    deck->IsScratching = true;
+    deck->IsTouching = true;
     deck->ScratchSpeed = rate;
 }
 
-void DeckAudio_SetScratch(DeckAudioState *deck, bool scratching) {
-    if (scratching && !deck->IsScratching) {
-        // Touch start: set initial speed to current speed for seamless transition
+void DeckAudio_SetScratch(DeckAudioState *deck, bool touching) {
+    if (touching && !deck->IsTouching) {
+        // Touch start
         deck->ScratchSpeed = deck->OutlinedRate;
-    } else if (!scratching && deck->IsScratching) {
-        // Release: maintenance the last scratch speed for inertia glide
-    }
-    deck->IsScratching = scratching;
+    } 
+    deck->IsTouching = touching;
 }
 
 void DeckAudio_JumpToMs(DeckAudioState *deck, uint32_t ms) {

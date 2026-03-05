@@ -31,7 +31,8 @@ typedef struct DeckState {
     int TempoRange; // 0=6%, 1=10%, 2=16%, 3=WIDE
     float TempoPercent;
     bool IsMaster;
-    bool IsScratching;
+    bool IsTouching;   // Renamed from IsScratching to be more general
+    bool VinylModeEnabled; 
     bool IsPlaying;
     float ScratchSpeed;
     double ScratchDelta; // Pending scratch movement from UI (half-frames)

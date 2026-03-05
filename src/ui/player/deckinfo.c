@@ -98,6 +98,29 @@ static void DeckInfo_Draw(Component *base) {
 
     UIDrawText(barsVal, faceSm, S(margin), barsY, S(10), barsColor);
     UIDrawText("Bars", faceXXS, S(margin + 32), barsY + S(2.5f), S(7.5f), barsColor);
+
+    // 4. Buttons Row (MT, Vinyl, etc)
+    float btnY = contentY + rowH * 3.0f + (rowH - S(10)) / 2.0f;
+    float btnW = S(35);
+    float btnH = S(11);
+    
+    // MT Button
+    Rectangle mtRect = { S(margin), btnY, btnW, btnH };
+    bool mtClicked = CheckCollisionPointRec(GetMousePosition(), mtRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    if (mtClicked) d->State->MasterTempo = !d->State->MasterTempo;
+    
+    Color mtColor = d->State->MasterTempo ? ColorBlue : ColorShadow;
+    DrawRectangleRounded(mtRect, 0.2f, 4, mtColor);
+    UIDrawText("MT", faceXXS, mtRect.x + S(11), mtRect.y + S(2), S(7.5f), ColorWhite);
+
+    // Vinyl Button
+    Rectangle viRect = { S(margin) + btnW + S(5), btnY, btnW, btnH };
+    bool viClicked = CheckCollisionPointRec(GetMousePosition(), viRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    if (viClicked) d->State->VinylModeEnabled = !d->State->VinylModeEnabled;
+
+    Color viColor = d->State->VinylModeEnabled ? ColorBlue : ColorShadow;
+    DrawRectangleRounded(viRect, 0.2f, 4, viColor);
+    UIDrawText(d->State->VinylModeEnabled ? "VINYL" : "CDJ", faceXXS, viRect.x + (d->State->VinylModeEnabled ? S(6) : S(8)), viRect.y + S(2), S(7.5f), ColorWhite);
 }
 
 void DeckInfoPanel_Init(DeckInfoPanel *p, int id, DeckState *state) {

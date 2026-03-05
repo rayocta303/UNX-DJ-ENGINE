@@ -36,11 +36,11 @@ static int Waveform_Update(Component *base) {
     }
 
     if (inWaveform && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        r->State->IsScratching = true;
+        r->State->IsTouching = true;
         r->lastMouseX = mouse.x;
     } 
     
-    if (r->State->IsScratching) {
+    if (r->State->IsTouching) {
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             float dx = mouse.x - r->lastMouseX;
             r->lastMouseX = mouse.x;
@@ -49,9 +49,17 @@ static int Waveform_Update(Component *base) {
             float effectiveZoom = (float)r->State->ZoomScale * pitchRatio;
             
             float moveHF = -dx * effectiveZoom;
-            r->State->ScratchDelta += (double)moveHF;
+            
+            if (r->State->VinylModeEnabled) {
+                // Scratching logic (follows hand)
+                r->State->ScratchDelta += (double)moveHF;
+            } else {
+                // CDJ Nudge logic (Pitch bend)
+                // Scaling 1.0 is too sensitive for nudge, let's use a factor
+                r->State->ScratchDelta += (double)(moveHF * 0.5); 
+            }
         } else {
-            r->State->IsScratching = false;
+            r->State->IsTouching = false;
         }
     }
 
@@ -79,6 +87,8 @@ static void Waveform_Draw(Component *base) {
     if (effectiveZoom < 0.1f) effectiveZoom = 0.1f;
 
     double elapsedHalfFrames = r->State->Position;
+
+
 
     int iPixel = (int)(elapsedHalfFrames / (double)effectiveZoom);
     float fracX = (float)((elapsedHalfFrames / (double)effectiveZoom) - (double)iPixel);
