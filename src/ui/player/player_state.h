@@ -43,7 +43,7 @@ typedef struct DeckState {
     long long PositionMs;
     long long TrackLengthMs;
 
-    int ZoomScale; // Native Pioneer zoom (1-32)
+    float ZoomScale; // Native Pioneer zoom (1-32, now float for precision)
     float CurrentBPM;
     float OriginalBPM; // Added OriginalBPM missing from struct
 
