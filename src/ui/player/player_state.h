@@ -34,8 +34,8 @@ typedef struct DeckState {
     bool IsTouching;   // Renamed from IsScratching to be more general
     bool VinylModeEnabled; 
     bool IsPlaying;
-    float ScratchSpeed;
-    double ScratchDelta; // Pending scratch movement from UI (half-frames)
+    float JogRate;
+    double JogDelta; // Pending jog/touch movement from UI (half-frames)
     
     TrackState *LoadedTrack;
     

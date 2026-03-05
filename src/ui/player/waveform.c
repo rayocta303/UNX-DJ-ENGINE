@@ -35,7 +35,7 @@ static int Waveform_Update(Component *base) {
     Vector2 mouse = GetMousePosition();
     bool inWaveform = (mouse.x >= wfLeft && mouse.x <= wfRight && mouse.y >= wfY && mouse.y <= wfY + waveH);
 
-    // Zoom & Scratch Logic
+    // Zoom & Jog Interaction Logic
     if (inWaveform) {
         float wheel = GetMouseWheelMove();
         if (wheel != 0.0f) {
@@ -61,12 +61,12 @@ static int Waveform_Update(Component *base) {
             float moveHF = -dx * effectiveZoom;
             
             if (r->State->VinylModeEnabled) {
-                // Scratching logic (follows hand)
-                r->State->ScratchDelta += (double)moveHF;
+                // Vinyl Mode (Scratch) movement (follows hand)
+                r->State->JogDelta += (double)moveHF;
             } else {
                 // CDJ Nudge logic (Pitch bend)
                 // Scaling 1.0 is too sensitive for nudge, let's use a factor
-                r->State->ScratchDelta += (double)(moveHF * 0.5); 
+                r->State->JogDelta += (double)(moveHF * 0.5); 
             }
         } else {
             r->State->IsTouching = false;

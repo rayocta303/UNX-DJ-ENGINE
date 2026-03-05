@@ -35,7 +35,7 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
     deck->IsTouching = false;
     deck->VinylModeEnabled = true; // Default to Vinyl
     deck->OutlinedRate = 0;
-    deck->ScratchSpeed = 0;
+    deck->JogRate = 0;
     deck->MTOffset = 0;
     deck->MTSampleCount = 0;
 
@@ -64,18 +64,18 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
     // 1. Determine Logical Base Rate (Target speed if motor is at 100%)
     deck->BaseRate = (float)deck->Pitch / 10000.0f;
 
-    // 2. Determine Local Target Rate based on Motor/Scratch state
+    // 2. Determine Local Target Rate based on Motor/Jog state
     double targetRate = 0.0;
     float accel = 0.08f; 
 
     if (deck->IsTouching) {
         if (deck->VinylModeEnabled) {
-            // Vinyl Mode + Touch: Follow hand (Scratch)
-            targetRate = deck->ScratchSpeed;
+            // Vinyl Mode + Touch: Follow hand (Jog/Scratch)
+            targetRate = deck->JogRate;
             accel = 1.0f; 
         } else {
-            // CDJ Mode + Touch: Nudge (BaseRate + Nudge Offset)
-            targetRate = deck->BaseRate + deck->ScratchSpeed;
+            // CDJ Nudge: Offset original speed
+            targetRate = deck->BaseRate + deck->JogRate;
             accel = 0.4f; // Nudge is slightly smoothed
         }
     } else {
@@ -230,18 +230,17 @@ void DeckAudio_SetPlaying(DeckAudioState *deck, bool playing) {
     deck->IsMotorOn = playing;
 }
 
-// ScratchSpeed is driven by UI delta to match mouse movement
-void DeckAudio_Scratch(DeckAudioState *deck, double rate) {
-    deck->IsTouching = true;
-    deck->ScratchSpeed = rate;
+// JogRate is driven by UI delta to match mouse movement
+void DeckAudio_SetJogRate(DeckAudioState *deck, double rate) {
+    if (!deck->IsTouching) return;
+    deck->JogRate = rate;
 }
 
-void DeckAudio_SetScratch(DeckAudioState *deck, bool touching) {
-    if (touching && !deck->IsTouching) {
-        // Touch start
-        deck->ScratchSpeed = deck->OutlinedRate;
-    } 
+void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching) {
     deck->IsTouching = touching;
+    if (!touching) {
+        deck->JogRate = deck->OutlinedRate;
+    }
 }
 
 void DeckAudio_JumpToMs(DeckAudioState *deck, uint32_t ms) {

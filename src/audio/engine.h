@@ -33,7 +33,7 @@ typedef struct DeckAudioState {
     // Physics and Scratch
     uint16_t Pitch;             // 10000 = 100% pitch
     uint16_t TargetPitch;       // Where the fader is currently set
-    double ScratchSpeed;        // Inertia value for vinyl mode
+    double JogRate;             // Inertia value for vinyl mode
     bool IsTouching;            // User is actively touching jog (renamed)
     bool VinylModeEnabled;      // Vinyl vs CDJ mode
     bool IsPlaying;             // Deck is in play mode (logical)
@@ -66,8 +66,8 @@ void DeckAudio_Play(DeckAudioState *deck);
 void DeckAudio_Pause(DeckAudioState *deck);
 void DeckAudio_SetPlaying(DeckAudioState *deck, bool playing);
 // Called when jog wheel is moved during touch
-void DeckAudio_Scratch(DeckAudioState *deck, double delta); 
-void DeckAudio_SetScratch(DeckAudioState *deck, bool scratching);
+void DeckAudio_SetJogRate(DeckAudioState *deck, double delta); 
+void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching);
 void DeckAudio_JumpToMs(DeckAudioState *deck, uint32_t ms);
 void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch);
 

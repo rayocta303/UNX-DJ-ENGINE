@@ -174,10 +174,10 @@ int main(void) {
         audioEngine.Decks[1].Pitch = (uint16_t)(realPitchB * 10000.0f);
         app.deckB.CurrentBPM = app.deckB.OriginalBPM * realPitchB;
         
-        // --- Sync UI Scratching/Modes back to Audio Engine ---
+        // --- Sync UI Jog/Modes back to Audio Engine ---
         // Deck A
         if (app.deckA.IsTouching != audioEngine.Decks[0].IsTouching) {
-            DeckAudio_SetScratch(&audioEngine.Decks[0], app.deckA.IsTouching);
+            DeckAudio_SetJogTouch(&audioEngine.Decks[0], app.deckA.IsTouching);
         }
         if (app.deckA.IsTouching) {
             double dt = GetFrameTime();
@@ -186,18 +186,18 @@ int main(void) {
             if (srA < 8000) srA = 44100.0;
 
             double framesInFrame = srA * dt;
-            // ScratchDelta is in 150Hz frames. Convert to PCM frames for comparison.
-            double instantaneousRate = (app.deckA.ScratchDelta * (srA / 150.0)) / (framesInFrame);
+            // JogDelta is in 150Hz frames. Convert to PCM frames for comparison.
+            double instantaneousRate = (app.deckA.JogDelta * (srA / 150.0)) / (framesInFrame);
             
-            audioEngine.Decks[0].ScratchSpeed = instantaneousRate;
-            app.deckA.ScratchDelta = 0;
+            audioEngine.Decks[0].JogRate = instantaneousRate;
+            app.deckA.JogDelta = 0;
         }
         audioEngine.Decks[0].VinylModeEnabled = app.deckA.VinylModeEnabled;
         audioEngine.Decks[0].MasterTempoActive = app.deckA.MasterTempo;
 
         // Deck B
         if (app.deckB.IsTouching != audioEngine.Decks[1].IsTouching) {
-            DeckAudio_SetScratch(&audioEngine.Decks[1], app.deckB.IsTouching);
+            DeckAudio_SetJogTouch(&audioEngine.Decks[1], app.deckB.IsTouching);
         }
         if (app.deckB.IsTouching) {
             double dt = GetFrameTime();
@@ -206,10 +206,10 @@ int main(void) {
             if (srB < 8000) srB = 44100.0;
 
             double framesInFrame = srB * dt;
-            double instantaneousRate = (app.deckB.ScratchDelta * (srB / 150.0)) / framesInFrame;
+            double instantaneousRate = (app.deckB.JogDelta * (srB / 150.0)) / framesInFrame;
 
-            audioEngine.Decks[1].ScratchSpeed = instantaneousRate;
-            app.deckB.ScratchDelta = 0;
+            audioEngine.Decks[1].JogRate = instantaneousRate;
+            app.deckB.JogDelta = 0;
         }
         audioEngine.Decks[1].VinylModeEnabled = app.deckB.VinylModeEnabled;
         audioEngine.Decks[1].MasterTempoActive = app.deckB.MasterTempo;
