@@ -166,11 +166,11 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int framesT
             int sf = (int)floor(pos); \
             float fr = (float)(pos - floor(pos)); \
             l = 0; r = 0; \
-            if (sf >= 1 && (sf * 2) + 5 < deck->TotalSamples) { \
+            if (sf >= 1 && (uint32_t)((sf * 2) + 5) < deck->TotalSamples) { \
                 int idx = sf * 2; \
                 l = hermite4(fr, deck->PCMBuffer[idx-2], deck->PCMBuffer[idx], deck->PCMBuffer[idx+2], deck->PCMBuffer[idx+4]); \
                 r = hermite4(fr, deck->PCMBuffer[idx-1], deck->PCMBuffer[idx+1], deck->PCMBuffer[idx+3], deck->PCMBuffer[idx+5]); \
-            } else if (sf >= 0 && (sf * 2) + 1 < deck->TotalSamples) { \
+            } else if (sf >= 0 && (uint32_t)((sf * 2) + 1) < deck->TotalSamples) { \
                 /* Fallback to linear at track start/end boundaries */ \
                 int idx = sf * 2; \
                 l = deck->PCMBuffer[idx] + fr * (deck->PCMBuffer[idx + 2] - deck->PCMBuffer[idx]); \
@@ -228,6 +228,12 @@ void DeckAudio_Pause(DeckAudioState *deck) {
 
 void DeckAudio_SetPlaying(DeckAudioState *deck, bool playing) {
     deck->IsMotorOn = playing;
+}
+
+void DeckAudio_InstantPlay(DeckAudioState *deck) {
+    deck->IsMotorOn = true;
+    deck->BaseRate = (float)deck->Pitch / 10000.0f;
+    deck->OutlinedRate = deck->BaseRate;
 }
 
 // JogRate is driven by UI delta to match mouse movement

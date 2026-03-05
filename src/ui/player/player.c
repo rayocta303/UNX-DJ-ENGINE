@@ -52,5 +52,5 @@ void PlayerRenderer_Init(PlayerRenderer *r, DeckState *a, DeckState *b, BeatFXSt
     WaveformRenderer_Init(&r->WaveB, 1, b);
     
     BeatFXPanel_Init(&r->BeatFX, fx);
-    BeatFXSelectBar_Init(&r->FXBar, fx, a, b);
+    BeatFXSelectBar_Init(&r->FXBar, fx, a, b, r->AudioPlugin);
 }

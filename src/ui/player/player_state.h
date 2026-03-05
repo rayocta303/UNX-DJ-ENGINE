@@ -4,6 +4,7 @@
 typedef struct HotCue {
     unsigned int Start; // ms
     unsigned int ID;
+    unsigned char Color[3]; // RGB
 } HotCue;
 
 typedef struct TrackState {

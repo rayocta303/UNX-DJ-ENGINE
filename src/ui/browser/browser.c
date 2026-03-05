@@ -236,12 +236,18 @@ static int Browser_Update(Component *base) {
                                 if (newTrack->HotCuesCount < 8) {
                                     newTrack->HotCues[newTrack->HotCuesCount].ID = t->Cues[i].ID;
                                     newTrack->HotCues[newTrack->HotCuesCount].Start = t->Cues[i].Time;
+                                    newTrack->HotCues[newTrack->HotCuesCount].Color[0] = t->Cues[i].Color[0];
+                                    newTrack->HotCues[newTrack->HotCuesCount].Color[1] = t->Cues[i].Color[1];
+                                    newTrack->HotCues[newTrack->HotCuesCount].Color[2] = t->Cues[i].Color[2];
                                     newTrack->HotCuesCount++;
                                 }
                             } else if (t->Cues[i].ID == 0) {
                                 if (newTrack->CuesCount < 32) {
                                     newTrack->Cues[newTrack->CuesCount].ID = 0;
                                     newTrack->Cues[newTrack->CuesCount].Start = t->Cues[i].Time;
+                                    newTrack->Cues[newTrack->CuesCount].Color[0] = t->Cues[i].Color[0];
+                                    newTrack->Cues[newTrack->CuesCount].Color[1] = t->Cues[i].Color[1];
+                                    newTrack->Cues[newTrack->CuesCount].Color[2] = t->Cues[i].Color[2];
                                     newTrack->CuesCount++;
                                 }
                             }
@@ -352,7 +358,7 @@ static void Browser_Draw(Component *base) {
                 }
                 break;
             case 1:
-                if (s->DB && idx < s->DB->PlaylistCount) title = s->DB->Playlists[idx].Name;
+                if (s->DB && idx >= 0 && (uint32_t)idx < s->DB->PlaylistCount) title = s->DB->Playlists[idx].Name;
                 break;
             case 2:
                 if (idx < 5) title = categories[idx];

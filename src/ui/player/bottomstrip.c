@@ -10,7 +10,46 @@ static const char* XPadLabels[] = {"1/8", "1/4", "1/2", "3/4", "1", "2"};
 static const int XPadLabelsCount = 6;
 
 static int BottomStrip_Update(Component *base) {
-    (void)base;
+    BeatFXSelectBar *b = (BeatFXSelectBar *)base;
+    if (b->State->ShowBeatFXTab) return 0; // Only handle in STATUS mode
+
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        Vector2 mouse = UIGetMousePosition();
+        float barY = TOP_BAR_H + WAVE_AREA_H;
+        float barH = FX_BAR_H;
+        float halfW = SCREEN_WIDTH / 2.0f;
+        
+        DeckState *decks[2] = { b->DeckA, b->DeckB };
+        float deckW = halfW;
+        float gridY = barY + S(11);
+        float cellW = (deckW - S(8)) / 4.0f;
+        float cellH = (barH - S(14)) / 2.0f;
+        
+        for (int d = 0; d < 2; d++) {
+            DeckState *ds = decks[d];
+            float dx = d * deckW;
+            
+            for (int i = 0; i < 8; i++) {
+                int row = i / 4;
+                int col = i % 4;
+                float cx = dx + S(4) + col * cellW;
+                float cy = gridY + row * cellH;
+                
+                Rectangle cellRect = { cx + S(1), cy + S(1), cellW - S(2), cellH - S(2) };
+                if (CheckCollisionPointRec(mouse, cellRect)) {
+                    if (ds && ds->LoadedTrack && b->AudioPlugin) {
+                        for (int h = 0; h < ds->LoadedTrack->HotCuesCount; h++) {
+                            if (ds->LoadedTrack->HotCues[h].ID == (unsigned int)(i + 1)) {
+                                DeckAudio_JumpToMs(&b->AudioPlugin->Decks[d], ds->LoadedTrack->HotCues[h].Start);
+                                DeckAudio_InstantPlay(&b->AudioPlugin->Decks[d]);
+                                return 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
     return 0;
 }
 
@@ -58,6 +97,10 @@ static void BottomStrip_Draw(Component *base) {
                 Color cueColor = ColorDark1;
                 
                 if (ds && ds->LoadedTrack) {
+                    Color hcColors[8] = {
+                        {0, 255, 0, 255}, {255, 0, 0, 255}, {255, 128, 0, 255}, {255, 255, 0, 255},
+                        {0, 0, 255, 255}, {255, 0, 255, 255}, {0, 255, 255, 255}, {128, 0, 255, 255}
+                    };
                     for (int h = 0; h < ds->LoadedTrack->HotCuesCount; h++) {
                         if (ds->LoadedTrack->HotCues[h].ID == (unsigned int)(i + 1)) {
                             unsigned int ms = ds->LoadedTrack->HotCues[h].Start;
@@ -67,7 +110,16 @@ static void BottomStrip_Draw(Component *base) {
                             int frm = (ms % 1000) / 10;
                             sprintf(timeStr, "%02d:%02d.%02d", min, sec, frm);
                             hasCue = true;
-                            cueColor = (d == 0) ? ColorOrange : ColorBlue;
+                            
+                            unsigned char cR = ds->LoadedTrack->HotCues[h].Color[0];
+                            unsigned char cG = ds->LoadedTrack->HotCues[h].Color[1];
+                            unsigned char cB = ds->LoadedTrack->HotCues[h].Color[2];
+                            
+                            if (cR == 0 && cG == 0 && cB == 0) {
+                                cueColor = hcColors[i % 8];
+                            } else {
+                                cueColor = (Color){ cR, cG, cB, 255 };
+                            }
                             break;
                         }
                     }
@@ -140,10 +192,11 @@ static void BottomStrip_Draw(Component *base) {
     }
 }
 
-void BeatFXSelectBar_Init(BeatFXSelectBar *b, BeatFXState *state, DeckState *deckA, DeckState *deckB) {
+void BeatFXSelectBar_Init(BeatFXSelectBar *b, BeatFXState *state, DeckState *deckA, DeckState *deckB, AudioEngine *audioPlugin) {
     b->base.Update = BottomStrip_Update;
     b->base.Draw = BottomStrip_Draw;
     b->State = state;
     b->DeckA = deckA;
     b->DeckB = deckB;
+    b->AudioPlugin = audioPlugin;
 }

@@ -95,10 +95,6 @@ static void Waveform_Draw(Component *base) {
 
     double elapsedHalfFrames = r->State->Position;
 
-    int iPixel = (int)(elapsedHalfFrames / (double)effectiveZoom);
-    float fracX = (float)((elapsedHalfFrames / (double)effectiveZoom) - (double)iPixel);
-
-    int srcX0 = iPixel - (int)(wfW / 2.0f);
     unsigned char *dynData = r->State->LoadedTrack->DynamicWaveform;
     float waveCenter = waveH / 2.0f;
 
@@ -252,6 +248,14 @@ static void Waveform_Draw(Component *base) {
 
         if (hx >= wfLeft && hx <= wfRight) {
             Color clr = hcColors[hcIdx];
+            
+            unsigned char cR = hc->Color[0];
+            unsigned char cG = hc->Color[1];
+            unsigned char cB = hc->Color[2];
+            if (cR != 0 || cG != 0 || cB != 0) {
+                clr = (Color){ cR, cG, cB, 255 };
+            }
+            
             DrawLineEx((Vector2){hx, wfY}, (Vector2){hx, wfY + waveH}, 1.5f, clr);
 
             // Flag

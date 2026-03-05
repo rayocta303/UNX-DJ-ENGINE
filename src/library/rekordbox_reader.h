@@ -14,6 +14,7 @@ typedef struct {
     uint16_t Type; // 1=Memory, 2=Loop
     uint32_t LoopTime; 
     char Comment[64];
+    unsigned char Color[3]; // RGB
 } RBCue;
 
 typedef struct {

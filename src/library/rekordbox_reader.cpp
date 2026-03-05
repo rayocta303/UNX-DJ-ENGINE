@@ -97,7 +97,8 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
                                 }
                                 case rekordbox_pdb_t::PAGE_TYPE_TRACKS: {
                                     auto r = static_cast<rekordbox_pdb_t::track_row_t*>(body);
-                                    RBTrack t = {0};
+                                    RBTrack t;
+                                    memset(&t, 0, sizeof(RBTrack));
                                     t.ID = r->id();
                                     strncpy(t.Title, RB_GetString(r->title()).c_str(), 255);
                                     strncpy(t.FilePath, RB_GetString(r->file_path()).c_str(), 511);
@@ -117,7 +118,8 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
                                 }
                                 case rekordbox_pdb_t::PAGE_TYPE_PLAYLIST_TREE: {
                                     auto r = static_cast<rekordbox_pdb_t::playlist_tree_row_t*>(body);
-                                    RBPlaylist pl = {0};
+                                    RBPlaylist pl;
+                                    memset(&pl, 0, sizeof(RBPlaylist));
                                     pl.ID = r->id();
                                     strncpy(pl.Name, RB_GetString(r->name()).c_str(), 255);
                                     rbPlaylists.push_back(pl);
@@ -205,7 +207,8 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
                 if (tag == rekordbox_anlz_t::SECTION_TAGS_CUES) {
                     auto ct = static_cast<rekordbox_anlz_t::cue_tag_t*>(section->body());
                     for (auto& entry : *ct->cues()) {
-                        RBCue rc = {0};
+                        RBCue rc;
+                        memset(&rc, 0, sizeof(RBCue));
                         rc.Time = entry->time();
                         rc.ID = (uint16_t)entry->hot_cue();
                         rc.Type = (uint16_t)entry->type();
@@ -214,12 +217,20 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
                 } else {
                     auto ct = static_cast<rekordbox_anlz_t::cue_extended_tag_t*>(section->body());
                     for (auto& entry : *ct->cues()) {
-                        RBCue rc = {0};
+                        RBCue rc;
+                        memset(&rc, 0, sizeof(RBCue));
                         rc.Time = entry->time();
                         rc.ID = (uint16_t)entry->hot_cue();
                         rc.Type = (uint16_t)entry->type();
                         std::string comment = entry->comment();
                         strncpy(rc.Comment, comment.c_str(), 63);
+                        
+                        if (!entry->_is_null_color_red()) {
+                            rc.Color[0] = entry->color_red();
+                            rc.Color[1] = entry->color_green();
+                            rc.Color[2] = entry->color_blue();
+                        }
+                        
                         found.push_back(rc);
                     }
                 }
