@@ -90,22 +90,10 @@ static void BeatFX_Draw(Component *base) {
     
     // Dropdown arrow
     DrawTriangle((Vector2){x + w - S(12), cy + S(5)}, (Vector2){x + w - S(8), cy + S(5)}, (Vector2){x + w - S(10), cy + S(9)}, ColorWhite);
-
-    if (b->State->ChannelDropdownOpen) {
-        float dy = cy + S(14);
-        for (int i = 0; i < 3; i++) {
-            Rectangle optRect = { x + S(4), dy, w - S(8), S(14) };
-            Color bg = (b->State->SelectedChannel == i) ? ColorBlue : ColorDark3;
-            if (CheckCollisionPointRec(UIGetMousePosition(), optRect)) bg = ColorGray;
-            
-            DrawRectangleRec(optRect, bg);
-            DrawRectangleLinesEx(optRect, 1, ColorDark1);
-            DrawCentredText(chNames[i], faceSm, optRect.x, optRect.width, optRect.y + S(2), S(9), ColorWhite);
-            dy += S(14);
-        }
-    }
-
+    
+    float dropdownY = cy; // Save for later drawing overlay
     cy += S(20);
+
 
     // 3. Black parameter container
     float containerH = S(56);
@@ -161,6 +149,23 @@ static void BeatFX_Draw(Component *base) {
     DrawRectangle(x + S(6) + tabW, cy, tabW, S(14), (Color){0x15, 0x15, 0x15, 0xFF});
     DrawRectangleLines(x + S(6) + tabW, cy, tabW, S(14), ColorShadow);
     DrawCentredText("BEAT FX", faceXXS, x + S(6) + tabW, tabW, cy + S(3.5f), S(7), ColorShadow);
+
+    // --- OVERLAYS (Draw at bottom for highest Z-index) ---
+    if (b->State->ChannelDropdownOpen) {
+        const char* chNames[] = { "MASTER", "DECK 1", "DECK 2" };
+        float dy = dropdownY + S(14);
+        Vector2 mouse = UIGetMousePosition();
+        for (int i = 0; i < 3; i++) {
+            Rectangle optRect = { x + S(4), dy, w - S(8), S(14) };
+            Color bg = (b->State->SelectedChannel == i) ? ColorBlue : ColorDark3;
+            if (CheckCollisionPointRec(mouse, optRect)) bg = ColorGray;
+            
+            DrawRectangleRec(optRect, bg);
+            DrawRectangleLinesEx(optRect, 1, ColorDark1);
+            DrawCentredText(chNames[i], faceSm, optRect.x, optRect.width, optRect.y + S(2), S(9), ColorWhite);
+            dy += S(14);
+        }
+    }
 }
 
 void BeatFXPanel_Init(BeatFXPanel *b, BeatFXState *state) {

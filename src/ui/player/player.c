@@ -7,6 +7,10 @@ static int Player_Update(Component *base) {
     PlayerRenderer *p = (PlayerRenderer *)base;
     p->WaveA.base.Update((Component*)&p->WaveA);
     p->WaveB.base.Update((Component*)&p->WaveB);
+    p->InfoA.base.Update((Component*)&p->InfoA);
+    p->InfoB.base.Update((Component*)&p->InfoB);
+    p->BeatFX.base.Update((Component*)&p->BeatFX);
+    p->FXBar.base.Update((Component*)&p->FXBar);
     p->StripA.base.Update((Component*)&p->StripA);
     p->StripB.base.Update((Component*)&p->StripB);
     return 0;

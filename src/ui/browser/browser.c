@@ -395,8 +395,8 @@ static void Browser_Draw(Component *base) {
 
         // Storage icons
         if (s->BrowseLevel == 3 && idx < s->StorageCount) {
-             const char* icon = "\xef\xaa\x87"; // f287 usb (UTF-8)
-             if (strcmp(s->AvailableStorages[idx].Type, "SD") == 0) icon = "\xef\x9f\x82"; // f7c2 sd-card
+             const char* icon = "\uf287"; // uf287 usb (UTF-8)
+             if (strcmp(s->AvailableStorages[idx].Type, "SD") == 0) icon = "\uf7c2"; // uf7c2 sd-card
              UIDrawText(icon, faceBrand, listX + S(11), ry + S(7), S(12), ColorWhite);
         }
     }
