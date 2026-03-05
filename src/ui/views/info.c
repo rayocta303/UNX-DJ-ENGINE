@@ -38,7 +38,8 @@ static void Info_Draw(Component *base) {
     Font iconFace = UIFonts_GetIcon(14);
 
     for (int deckIdx = 0; deckIdx < 2; deckIdx++) {
-        float halfH = (SCREEN_HEIGHT - TOP_BAR_H) / 2.0f;
+        float availableH = SCREEN_HEIGHT - TOP_BAR_H - DECK_STR_H;
+        float halfH = availableH / 2.0f;
         float offsetY = deckIdx * halfH;
         float baseY = TOP_BAR_H + offsetY;
 

@@ -32,6 +32,8 @@ typedef struct {
     SettingsState settingsState;
 
     TopBar topbar;
+    DeckStrip stripA;
+    DeckStrip stripB;
     PlayerRenderer player;
     BrowserRenderer browser;
     InfoRenderer info;
@@ -95,6 +97,8 @@ void App_Init(App *a) {
 
     // Init Components
     TopBar_Init(&a->topbar);
+    DeckStrip_Init(&a->stripA, 0, &a->deckA);
+    DeckStrip_Init(&a->stripB, 1, &a->deckB);
     PlayerRenderer_Init(&a->player, &a->deckA, &a->deckB, &a->fxState, NULL);
     BrowserRenderer_Init(&a->browser, &a->browserState);
     InfoRenderer_Init(&a->info, &a->infoState);
@@ -281,7 +285,11 @@ int main(void) {
         if (app.screen == ScreenInfo) app.info.base.Update((Component*)&app.info);
         if (app.screen == ScreenSettings) app.settings.base.Update((Component*)&app.settings);
         
-        app.topbar.base.Update((Component*)&app.topbar);
+        if (app.screen != ScreenSplash) {
+            app.stripA.base.Update((Component*)&app.stripA);
+            app.stripB.base.Update((Component*)&app.stripB);
+            app.topbar.base.Update((Component*)&app.topbar);
+        }
 
         BeginDrawing();
         ClearBackground(BLACK);
@@ -300,8 +308,10 @@ int main(void) {
         }
 
         if (app.screen != ScreenSplash) {
+            app.stripA.base.Draw((Component*)&app.stripA);
+            app.stripB.base.Draw((Component*)&app.stripB);
             app.topbar.base.Draw((Component*)&app.topbar);
-            DrawText("SPACE: Browser | I: Info | TAB: Settings", 10, REF_HEIGHT * UI_CurrScale - 20, 10, GRAY);
+            DrawText("SPACE: Browser | I: Info | TAB: Settings", 10, Si(REF_HEIGHT) - 20, 10, GRAY);
         }
 
         rlPopMatrix();

@@ -20,7 +20,7 @@
 
 // Layout zones (tuned for 640x400 to match reference)
 #define TOP_BAR_H       S(20.0f)
-#define SIDE_PANEL_W    S(115.0f)
+#define SIDE_PANEL_W    S(110.0f)
 #define BEAT_FX_W       SIDE_PANEL_W
 #define BEAT_FX_X       (SCREEN_WIDTH - SIDE_PANEL_W)
 #define FX_BAR_H        S(44.0f)

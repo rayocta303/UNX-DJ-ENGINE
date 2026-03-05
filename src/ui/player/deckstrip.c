@@ -3,6 +3,7 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include <stdio.h>
+#include <string.h>
 
 static void drawLeftBadgeColumn(DeckStrip *d, float x, float y, float h) {
     float lColW = S(40);
@@ -141,9 +142,15 @@ static void DeckStrip_Draw(Component *base) {
 
     char title[150] = "No Track";
     if (d->State->TrackTitle[0] != '\0') {
-        sprintf(title, "\xe2\x99\xaa %s", d->State->TrackTitle); // music note
+        strncpy(title, d->State->TrackTitle, sizeof(title)-1);
+        
+        // Draw music note icon separately using icon font
+        Font iconFace = UIFonts_GetIcon(S(9));
+        UIDrawText("\xef\x80\x81", iconFace, mx, y + S(2), S(9), ColorWhite); // f001 music note
+        UIDrawText(title, faceSm, mx + S(12), y + S(2), S(9), ColorWhite);
+    } else {
+        UIDrawText(title, faceSm, mx, y + S(2), S(9), ColorWhite);
     }
-    UIDrawText(title, faceSm, mx, y + S(2), S(9), ColorWhite);
 
     float midY = y + titleBgH + S(4);
     float badgeX = mx;
@@ -160,7 +167,7 @@ static void DeckStrip_Draw(Component *base) {
     DrawCentredText("MT", faceXXS, badgeX, badgeW, midY + S(26.5f), S(7), mtClr);
 
     float timeX = mx + badgeW + S(8);
-    DrawCentredText("\xe2\x80\xa2 REMAIN / TIME", faceXXS, timeX, S(80), midY, S(7), ColorShadow);
+    DrawCentredText("REMAIN / TIME", faceXXS, timeX, S(80), midY, S(7), ColorShadow);
 
     long long playedMs = d->State->PositionMs;
     int minutes = (playedMs / 1000) / 60;

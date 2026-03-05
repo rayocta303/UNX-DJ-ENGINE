@@ -25,6 +25,14 @@ void UIFonts_Init(void) {
     int count = 0;
     for (int i = 32; i < 127; i++) codepoints[count++] = i;
     for (int i = 0xF000; i <= 0xF8FF; i++) codepoints[count++] = i;
+    
+    // UI Symbols (Stars, Triangles, etc)
+    codepoints[count++] = 0x2605; // solid star
+    codepoints[count++] = 0x2606; // empty star
+    codepoints[count++] = 0x25BA; // right triangle
+    codepoints[count++] = 0x25C4; // left triangle
+    codepoints[count++] = 0x266A; // eighth note
+    codepoints[count++] = 0x2022; // bullet
 
     // Font Awesome 5 Solid
     iconSolid = LoadFontEx("assets/fonts/otfs/Font Awesome 5 Free-Solid-900.otf", 64, codepoints, count);

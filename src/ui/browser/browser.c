@@ -286,12 +286,13 @@ static void Browser_Draw(Component *base) {
 
     if (!s->IsActive) return;
 
-    DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ColorBlack);
+    float viewH = SCREEN_HEIGHT - DECK_STR_H;
+    DrawRectangle(0, 0, SCREEN_WIDTH, viewH, ColorBlack);
 
     // Sidebar
-    float sidebarW = S(38);
-    DrawRectangle(0, TOP_BAR_H, sidebarW, SCREEN_HEIGHT - TOP_BAR_H, ColorDark2);
-    DrawLine(sidebarW, TOP_BAR_H, sidebarW, SCREEN_HEIGHT, ColorDark1);
+    float sidebarW = S(40);
+    DrawRectangle(0, TOP_BAR_H, sidebarW, viewH - TOP_BAR_H, ColorDark2);
+    DrawLine(sidebarW, TOP_BAR_H, sidebarW, viewH, ColorDark1);
 
     Font faceXS = UIFonts_GetFace(S(10));
     Font faceSm = UIFonts_GetFace(S(13));
@@ -415,7 +416,7 @@ static void Browser_Draw(Component *base) {
     else if (s->BrowseLevel == 3) maxItems = s->StorageCount;
 
     if (maxItems > 9) {
-        float listAreaH = SCREEN_HEIGHT - TOP_BAR_H;
+        float listAreaH = SCREEN_HEIGHT - TOP_BAR_H - DECK_STR_H;
         float thumbH = (9.0f / maxItems) * listAreaH;
         if (thumbH < S(10)) thumbH = S(10);
         float thumbY = TOP_BAR_H + ((float)s->ScrollOffset / maxItems) * listAreaH;

@@ -11,8 +11,6 @@ static int Player_Update(Component *base) {
     p->InfoB.base.Update((Component*)&p->InfoB);
     p->BeatFX.base.Update((Component*)&p->BeatFX);
     p->FXBar.base.Update((Component*)&p->FXBar);
-    p->StripA.base.Update((Component*)&p->StripA);
-    p->StripB.base.Update((Component*)&p->StripB);
     return 0;
 }
 
@@ -29,9 +27,6 @@ static void Player_Draw(Component *base) {
     
     p->BeatFX.base.Draw((Component*)&p->BeatFX);
     p->FXBar.base.Draw((Component*)&p->FXBar);
-    
-    p->StripA.base.Draw((Component*)&p->StripA);
-    p->StripB.base.Draw((Component*)&p->StripB);
 }
 
 void PlayerRenderer_Init(PlayerRenderer *r, DeckState *a, DeckState *b, BeatFXState *fx, AudioEngine *audioPlugin) {
@@ -44,9 +39,6 @@ void PlayerRenderer_Init(PlayerRenderer *r, DeckState *a, DeckState *b, BeatFXSt
 
     DeckInfoPanel_Init(&r->InfoA, 0, a);
     DeckInfoPanel_Init(&r->InfoB, 1, b);
-    
-    DeckStrip_Init(&r->StripA, 0, a);
-    DeckStrip_Init(&r->StripB, 1, b);
     
     WaveformRenderer_Init(&r->WaveA, 0, a);
     WaveformRenderer_Init(&r->WaveB, 1, b);

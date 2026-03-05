@@ -19,8 +19,6 @@ struct PlayerRenderer {
     
     DeckInfoPanel InfoA;
     DeckInfoPanel InfoB;
-    DeckStrip StripA;
-    DeckStrip StripB;
     WaveformRenderer WaveA;
     WaveformRenderer WaveB;
     BeatFXPanel BeatFX;
