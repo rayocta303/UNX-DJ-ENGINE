@@ -30,7 +30,7 @@ KeyboardMapping GetDefaultMapping() {
 void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2, AudioEngine *engine) {
     // Deck 1
     if (IsKeyPressed(m->playPause1)) {
-        if (engine) engine->Decks[0].IsPlaying = !engine->Decks[0].IsPlaying;
+        if (engine) DeckAudio_SetPlaying(&engine->Decks[0], !engine->Decks[0].IsMotorOn);
     }
     for (int i = 0; i < 5; i++) {
         if (IsKeyPressed(m->hotCues1[i])) {
@@ -48,7 +48,7 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2, Audi
 
     // Deck 2
     if (IsKeyPressed(m->playPause2)) {
-        if (engine) engine->Decks[1].IsPlaying = !engine->Decks[1].IsPlaying;
+        if (engine) DeckAudio_SetPlaying(&engine->Decks[1], !engine->Decks[1].IsMotorOn);
     }
     for (int i = 0; i < 5; i++) {
         if (IsKeyPressed(m->hotCues2[i])) {

@@ -32,6 +32,7 @@ typedef struct DeckState {
     float TempoPercent;
     bool IsMaster;
     bool IsScratching;
+    bool IsPlaying;
     float ScratchSpeed;
     double ScratchDelta; // Pending scratch movement from UI (half-frames)
     

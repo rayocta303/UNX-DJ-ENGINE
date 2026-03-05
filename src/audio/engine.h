@@ -34,7 +34,8 @@ typedef struct DeckAudioState {
     uint16_t TargetPitch;       // Where the fader is currently set
     double ScratchSpeed;        // Inertia value for vinyl mode
     bool IsScratching;          // User is actively touching jog
-    bool IsPlaying;             // Deck is in play mode
+    bool IsPlaying;             // Deck is in play mode (logical)
+    bool IsMotorOn;             // Platter motor state (physical)
     bool IsReverse;             // Reverse playback active
     
     SpeedChangeState SpeedState; // Need ramp up/down
@@ -57,8 +58,10 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames);
 void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath);
 void DeckAudio_Play(DeckAudioState *deck);
 void DeckAudio_Pause(DeckAudioState *deck);
+void DeckAudio_SetPlaying(DeckAudioState *deck, bool playing);
 // Called when jog wheel is moved during touch
 void DeckAudio_Scratch(DeckAudioState *deck, double delta); 
+void DeckAudio_SetScratch(DeckAudioState *deck, bool scratching);
 void DeckAudio_JumpToMs(DeckAudioState *deck, uint32_t ms);
 void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch);
 

@@ -25,7 +25,7 @@ static int Waveform_Update(Component *base) {
     Vector2 mouse = GetMousePosition();
     bool inWaveform = (mouse.x >= wfLeft && mouse.x <= wfRight && mouse.y >= wfY && mouse.y <= wfY + waveH);
 
-    // Zoom Logic
+    // Zoom & Scratch Logic
     if (inWaveform) {
         float wheel = GetMouseWheelMove();
         if (wheel != 0.0f) {
@@ -33,11 +33,15 @@ static int Waveform_Update(Component *base) {
             if (r->State->ZoomScale < 1) r->State->ZoomScale = 1;
             if (r->State->ZoomScale > 32) r->State->ZoomScale = 32;
         }
+    }
 
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            r->State->IsScratching = true;
-            r->lastMouseX = mouse.x;
-        } else if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && r->State->IsScratching) {
+    if (inWaveform && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        r->State->IsScratching = true;
+        r->lastMouseX = mouse.x;
+    } 
+    
+    if (r->State->IsScratching) {
+        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             float dx = mouse.x - r->lastMouseX;
             r->lastMouseX = mouse.x;
 
@@ -46,12 +50,9 @@ static int Waveform_Update(Component *base) {
             
             float moveHF = -dx * effectiveZoom;
             r->State->ScratchDelta += (double)moveHF;
-            r->State->IsScratching = true;
         } else {
             r->State->IsScratching = false;
         }
-    } else {
-        r->State->IsScratching = false;
     }
 
     return 0;

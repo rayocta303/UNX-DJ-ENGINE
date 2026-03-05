@@ -14,9 +14,11 @@ void AudioEngine_Init(AudioEngine *engine) {
 
     for (int i=0; i<MAX_DECKS; i++) {
         engine->Decks[i].BaseRate = 1.0f;
-        engine->Decks[i].OutlinedRate = 1.0f;
+        engine->Decks[i].OutlinedRate = 0.0f; // Motor is off initially
         engine->Decks[i].Pitch = 10000;
         engine->Decks[i].Trim = 1.0f;
+        engine->Decks[i].IsMotorOn = false;
+        engine->Decks[i].IsPlaying = false;
     }
 }
 
@@ -30,6 +32,9 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
     deck->TotalSamples = 0;
     deck->Position = 0;
     deck->IsPlaying = false;
+    deck->IsMotorOn = false;
+    deck->OutlinedRate = 0;
+    deck->ScratchSpeed = 0;
 
     if (!filePath || strlen(filePath) == 0) return;
 
@@ -52,29 +57,39 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
 }
 
 static void ProcessDeckPhysics(DeckAudioState *deck) {
-    if (deck->IsPlaying) {
-        // Simple trim update logic placeholder
-        // Convert integer pitch to floating rate
-        // 10000 = 100% -> BaseRate 1.0
-        deck->BaseRate = (float)deck->Pitch / 10000.0f;
-    } else {
-        deck->BaseRate = 0.0f;
-    }
+    // 1. Determine Logical Base Rate (Target speed if motor is at 100%)
+    deck->BaseRate = (float)deck->Pitch / 10000.0f;
 
-    // Handle scratch inertia
+    // 2. Determine Local Target Rate based on Motor/Scratch state
+    double targetRate = 0.0;
+    float accel = 0.08f; 
+
     if (deck->IsScratching) {
-        // User is holding jog. ScratchSpeed is populated externally per-frame.
-        deck->OutlinedRate = deck->ScratchSpeed;
+        // Hand is on the platter. Follow mouse speed exactly.
+        targetRate = deck->ScratchSpeed;
+        accel = 1.0f; // Instant "sticky" follow
     } else {
-        // Vinyl Glide / Release logic down to BaseRate
-        deck->ScratchSpeed += (deck->BaseRate - deck->ScratchSpeed) * 0.12f;
-        deck->OutlinedRate = deck->ScratchSpeed;
-        
-        if (fabs(deck->ScratchSpeed - deck->BaseRate) < 0.02f) {
-            deck->ScratchSpeed = deck->BaseRate;
-            deck->OutlinedRate = deck->BaseRate; // Done braking/starting
+        // Hand is off.
+        if (deck->IsMotorOn) {
+            targetRate = deck->BaseRate;
+            accel = 0.12f; // Motor startup
+        } else {
+            targetRate = 0.0;
+            accel = 0.015f; // Platter braking (slow glide to stop)
         }
     }
+
+    // 3. Glide OutlinedRate towards targetRate
+    if (deck->OutlinedRate != targetRate) {
+        double diff = targetRate - deck->OutlinedRate;
+        deck->OutlinedRate += diff * accel;
+
+        if (fabs(diff) < 0.001) {
+            deck->OutlinedRate = targetRate;
+        }
+    }
+
+    deck->IsPlaying = (fabs(deck->OutlinedRate) > 0.001);
 }
 
 // Linear interpolation resampling directly from PCM Buffer into output
@@ -148,21 +163,31 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
 }
 
 void DeckAudio_Play(DeckAudioState *deck) {
-    deck->IsPlaying = true;
+    deck->IsMotorOn = true;
 }
 
 void DeckAudio_Pause(DeckAudioState *deck) {
-    deck->IsPlaying = false;
+    deck->IsMotorOn = false;
 }
 
-// Delta arrives from UI dragging the waveform or jog wheel
-void DeckAudio_Scratch(DeckAudioState *deck, double delta) {
+void DeckAudio_SetPlaying(DeckAudioState *deck, bool playing) {
+    deck->IsMotorOn = playing;
+}
+
+// ScratchSpeed is driven by UI delta to match mouse movement
+void DeckAudio_Scratch(DeckAudioState *deck, double rate) {
     deck->IsScratching = true;
-    deck->Position += delta;
-    if (deck->Position < 0) deck->Position = 0;
-    
-    // Convert position dx to a relative speed for inertia
-    deck->ScratchSpeed = delta * 0.4;
+    deck->ScratchSpeed = rate;
+}
+
+void DeckAudio_SetScratch(DeckAudioState *deck, bool scratching) {
+    if (scratching && !deck->IsScratching) {
+        // Touch start: set initial speed to current speed for seamless transition
+        deck->ScratchSpeed = deck->OutlinedRate;
+    } else if (!scratching && deck->IsScratching) {
+        // Release: maintenance the last scratch speed for inertia glide
+    }
+    deck->IsScratching = scratching;
 }
 
 void DeckAudio_JumpToMs(DeckAudioState *deck, uint32_t ms) {

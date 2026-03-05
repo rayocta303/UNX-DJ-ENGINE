@@ -55,19 +55,14 @@ void App_Init(App *a) {
     // Init Deck States
     memset(&a->deckA, 0, sizeof(DeckState));
     strcpy(a->deckA.SourceName, "USB1");
-    strcpy(a->deckA.TrackTitle, "Test Track A");
-    strcpy(a->deckA.TrackKey, "Am");
-    a->deckA.TrackNumber = 1;
-    a->deckA.PositionMs = 65000;
-    a->deckA.TrackLengthMs = 300000;
+    a->deckA.PositionMs = 0;
+    a->deckA.TrackLengthMs = 0;
     a->deckA.IsMaster = true;
 
     memset(&a->deckB, 0, sizeof(DeckState));
     strcpy(a->deckB.SourceName, "USB1");
-    strcpy(a->deckB.TrackTitle, "Test Track B");
-    a->deckB.TrackNumber = 2;
     a->deckB.PositionMs = 0;
-    a->deckB.TrackLengthMs = 240000;
+    a->deckB.TrackLengthMs = 0;
 
     // Init Browser State
     memset(&a->browserState, 0, sizeof(BrowserState));
@@ -157,12 +152,31 @@ int main(void) {
         }
         
         // --- Sync UI Scratching back to Audio Engine ---
-        if (app.deckA.ScratchDelta != 0) {
-            DeckAudio_Scratch(&audioEngine.Decks[0], app.deckA.ScratchDelta * 294.0);
+        // Deck A
+        if (app.deckA.IsScratching != audioEngine.Decks[0].IsScratching) {
+            DeckAudio_SetScratch(&audioEngine.Decks[0], app.deckA.IsScratching);
+        }
+        if (app.deckA.IsScratching) {
+            double dt = GetFrameTime();
+            if (dt < 0.001) dt = 0.016; // Safety
+            double samplesInFrame = 44100.0 * dt;
+            double instantaneousRate = (app.deckA.ScratchDelta * 294.0) / samplesInFrame;
+            
+            audioEngine.Decks[0].ScratchSpeed = instantaneousRate;
             app.deckA.ScratchDelta = 0;
         }
-        if (app.deckB.ScratchDelta != 0) {
-            DeckAudio_Scratch(&audioEngine.Decks[1], app.deckB.ScratchDelta * 294.0);
+
+        // Deck B
+        if (app.deckB.IsScratching != audioEngine.Decks[1].IsScratching) {
+            DeckAudio_SetScratch(&audioEngine.Decks[1], app.deckB.IsScratching);
+        }
+        if (app.deckB.IsScratching) {
+            double dt = GetFrameTime();
+            if (dt < 0.001) dt = 0.016; // Safety
+            double samplesInFrame = 44100.0 * dt;
+            double instantaneousRate = (app.deckB.ScratchDelta * 294.0) / samplesInFrame;
+
+            audioEngine.Decks[1].ScratchSpeed = instantaneousRate;
             app.deckB.ScratchDelta = 0;
         }
 
@@ -171,6 +185,7 @@ int main(void) {
             double playheadPos = audioEngine.Decks[0].Position;
             app.deckA.Position = (playheadPos * 150.0) / 44100.0;
             app.deckA.IsScratching = audioEngine.Decks[0].IsScratching;
+            app.deckA.IsPlaying = audioEngine.Decks[0].IsPlaying;
             
             double posSec = playheadPos / 44100.0;
             app.deckA.PositionMs = (uint32_t)(posSec * 1000.0);
@@ -182,6 +197,7 @@ int main(void) {
             double playheadPos = audioEngine.Decks[1].Position;
             app.deckB.Position = (playheadPos * 150.0) / 44100.0;
             app.deckB.IsScratching = audioEngine.Decks[1].IsScratching;
+            app.deckB.IsPlaying = audioEngine.Decks[1].IsPlaying;
             
             double posSec = playheadPos / 44100.0;
             app.deckB.PositionMs = (uint32_t)(posSec * 1000.0);
