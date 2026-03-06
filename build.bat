@@ -25,6 +25,31 @@ echo Building C files...
 %CC% %CFLAGS% -c src/input/keyboard.c -o src/input/keyboard.o
 %CC% %CFLAGS% -c src/ui/browser/browser.c -o src/ui/browser/browser.o
 
+%CC% %CFLAGS% -c src/audio/fx/dsp_utils.c -o src/audio/fx/dsp_utils.o
+%CC% %CFLAGS% -c src/audio/fx/colorfx/space.c -o src/audio/fx/colorfx/space.o
+%CC% %CFLAGS% -c src/audio/fx/colorfx/dub_echo.c -o src/audio/fx/colorfx/dub_echo.o
+%CC% %CFLAGS% -c src/audio/fx/colorfx/sweep.c -o src/audio/fx/colorfx/sweep.o
+%CC% %CFLAGS% -c src/audio/fx/colorfx/noise.c -o src/audio/fx/colorfx/noise.o
+%CC% %CFLAGS% -c src/audio/fx/colorfx/crush.c -o src/audio/fx/colorfx/crush.o
+%CC% %CFLAGS% -c src/audio/fx/colorfx/filter.c -o src/audio/fx/colorfx/filter.o
+%CC% %CFLAGS% -c src/audio/fx/colorfx/colorfx_manager.c -o src/audio/fx/colorfx/colorfx_manager.o
+
+%CC% %CFLAGS% -c src/audio/fx/beatfx/delay.c -o src/audio/fx/beatfx/delay.o
+%CC% %CFLAGS% -c src/audio/fx/beatfx/echo.c -o src/audio/fx/beatfx/echo.o
+%CC% %CFLAGS% -c src/audio/fx/beatfx/pingpong.c -o src/audio/fx/beatfx/pingpong.o
+%CC% %CFLAGS% -c src/audio/fx/beatfx/spiral.c -o src/audio/fx/beatfx/spiral.o
+%CC% %CFLAGS% -c src/audio/fx/beatfx/roll.c -o src/audio/fx/beatfx/roll.o
+%CC% %CFLAGS% -c src/audio/fx/beatfx/sliproll.c -o src/audio/fx/beatfx/sliproll.o
+%CC% %CFLAGS% -c src/audio/fx/beatfx/reverb.c -o src/audio/fx/beatfx/reverb.o
+%CC% %CFLAGS% -c src/audio/fx/beatfx/helix.c -o src/audio/fx/beatfx/helix.o
+%CC% %CFLAGS% -c src/audio/fx/beatfx/flanger.c -o src/audio/fx/beatfx/flanger.o
+%CC% %CFLAGS% -c src/audio/fx/beatfx/phaser.c -o src/audio/fx/beatfx/phaser.o
+%CC% %CFLAGS% -c src/audio/fx/beatfx/bfilter.c -o src/audio/fx/beatfx/bfilter.o
+%CC% %CFLAGS% -c src/audio/fx/beatfx/trans.c -o src/audio/fx/beatfx/trans.o
+%CC% %CFLAGS% -c src/audio/fx/beatfx/pitch.c -o src/audio/fx/beatfx/pitch.o
+%CC% %CFLAGS% -c src/audio/fx/beatfx/vinylbrake.c -o src/audio/fx/beatfx/vinylbrake.o
+%CC% %CFLAGS% -c src/audio/fx/beatfx/beatfx_manager.c -o src/audio/fx/beatfx/beatfx_manager.o
+
 echo Building C++ files...
 %CXX% %CXXFLAGS% -c lib/kaitai/kaitai/kaitaistream.cpp -o lib/kaitai/kaitai/kaitaistream.o
 %CXX% %CXXFLAGS% -c lib/rekordbox-metadata/rekordbox_anlz.cpp -o lib/rekordbox-metadata/rekordbox_anlz.o
@@ -32,6 +57,6 @@ echo Building C++ files...
 %CXX% %CXXFLAGS% -c src/library/rekordbox_reader.cpp -o src/library/rekordbox_reader.o
 
 echo Linking...
-%CXX% %CXXFLAGS% src/main.o src/ui/components/theme.o src/ui/components/fonts.o src/ui/components/helpers.o src/ui/views/topbar.o src/ui/views/info.o src/ui/views/splash.o src/ui/views/settings.o src/ui/player/bottomstrip.o src/ui/player/beatfx.o src/ui/player/deckinfo.o src/ui/player/deckstrip.o src/ui/player/waveform.o src/ui/player/player.o src/audio/engine.o src/input/keyboard.o src/ui/browser/browser.o lib/kaitai/kaitai/kaitaistream.o lib/rekordbox-metadata/rekordbox_anlz.o lib/rekordbox-metadata/rekordbox_pdb.o src/library/rekordbox_reader.o %LDFLAGS% -o xdjunx.exe
+%CXX% %CXXFLAGS% src/main.o src/ui/components/theme.o src/ui/components/fonts.o src/ui/components/helpers.o src/ui/views/topbar.o src/ui/views/info.o src/ui/views/splash.o src/ui/views/settings.o src/ui/player/bottomstrip.o src/ui/player/beatfx.o src/ui/player/deckinfo.o src/ui/player/deckstrip.o src/ui/player/waveform.o src/ui/player/player.o src/audio/engine.o src/audio/fx/dsp_utils.o src/audio/fx/colorfx/space.o src/audio/fx/colorfx/dub_echo.o src/audio/fx/colorfx/sweep.o src/audio/fx/colorfx/noise.o src/audio/fx/colorfx/crush.o src/audio/fx/colorfx/filter.o src/audio/fx/colorfx/colorfx_manager.o src/audio/fx/beatfx/delay.o src/audio/fx/beatfx/echo.o src/audio/fx/beatfx/pingpong.o src/audio/fx/beatfx/spiral.o src/audio/fx/beatfx/roll.o src/audio/fx/beatfx/sliproll.o src/audio/fx/beatfx/reverb.o src/audio/fx/beatfx/helix.o src/audio/fx/beatfx/flanger.o src/audio/fx/beatfx/phaser.o src/audio/fx/beatfx/bfilter.o src/audio/fx/beatfx/trans.o src/audio/fx/beatfx/pitch.o src/audio/fx/beatfx/vinylbrake.o src/audio/fx/beatfx/beatfx_manager.o src/input/keyboard.o src/ui/browser/browser.o lib/kaitai/kaitai/kaitaistream.o lib/rekordbox-metadata/rekordbox_anlz.o lib/rekordbox-metadata/rekordbox_pdb.o src/library/rekordbox_reader.o %LDFLAGS% -o xdjunx.exe
 
 echo Done.

@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "fx/colorfx/colorfx_manager.h"
+#include "fx/beatfx/beatfx_manager.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -66,11 +69,14 @@ typedef struct DeckAudioState {
     BiquadState EqLowStateL, EqLowStateR;
     BiquadState EqMidStateL, EqMidStateR;
     BiquadState EqHighStateL, EqHighStateR;
-} DeckAudioState;
 
+    // Sound Color FX
+    ColorFXManager ColorFX;
+} DeckAudioState;
 
 typedef struct AudioEngine {
     DeckAudioState Decks[MAX_DECKS];
+    BeatFXManager BeatFX;
 } AudioEngine;
 
 void AudioEngine_Init(AudioEngine *engine);
