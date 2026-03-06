@@ -11,42 +11,78 @@ static const int XPadLabelsCount = 6;
 
 static int BottomStrip_Update(Component *base) {
     BeatFXSelectBar *b = (BeatFXSelectBar *)base;
-    if (b->State->ShowBeatFXTab) return 0; // Only handle in STATUS mode
+    Vector2 mouse = UIGetMousePosition();
+    float barY = TOP_BAR_H + WAVE_AREA_H;
+    float barH = FX_BAR_H;
+    float halfW = SCREEN_WIDTH / 2.0f;
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        Vector2 mouse = UIGetMousePosition();
-        float barY = TOP_BAR_H + WAVE_AREA_H;
-        float barH = FX_BAR_H;
-        float halfW = SCREEN_WIDTH / 2.0f;
-        
-        DeckState *decks[2] = { b->DeckA, b->DeckB };
-        float deckW = halfW;
-        float gridY = barY + S(11);
-        float cellW = (deckW - S(8)) / 4.0f;
-        float cellH = (barH - S(14)) / 2.0f;
-        
-        for (int d = 0; d < 2; d++) {
-            DeckState *ds = decks[d];
-            float dx = d * deckW;
+    if (!b->State->ShowBeatFXTab) {
+        // --- STATUS MODE: Hot Cue Grid ---
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            DeckState *decks[2] = { b->DeckA, b->DeckB };
+            float deckW = halfW;
+            float gridY = barY + S(11);
+            float cellW = (deckW - S(8)) / 4.0f;
+            float cellH = (barH - S(14)) / 2.0f;
             
-            for (int i = 0; i < 8; i++) {
-                int row = i / 4;
-                int col = i % 4;
-                float cx = dx + S(4) + col * cellW;
-                float cy = gridY + row * cellH;
+            for (int d = 0; d < 2; d++) {
+                DeckState *ds = decks[d];
+                float dx = d * deckW;
                 
-                Rectangle cellRect = { cx + S(1), cy + S(1), cellW - S(2), cellH - S(2) };
-                if (CheckCollisionPointRec(mouse, cellRect)) {
-                    if (ds && ds->LoadedTrack && b->AudioPlugin) {
-                        for (int h = 0; h < ds->LoadedTrack->HotCuesCount; h++) {
-                            if (ds->LoadedTrack->HotCues[h].ID == (unsigned int)(i + 1)) {
-                                DeckAudio_JumpToMs(&b->AudioPlugin->Decks[d], ds->LoadedTrack->HotCues[h].Start);
-                                DeckAudio_InstantPlay(&b->AudioPlugin->Decks[d]);
-                                return 1;
+                for (int i = 0; i < 8; i++) {
+                    int row = i / 4;
+                    int col = i % 4;
+                    float cx = dx + S(4) + col * cellW;
+                    float cy = gridY + row * cellH;
+                    
+                    Rectangle cellRect = { cx + S(1), cy + S(1), cellW - S(2), cellH - S(2) };
+                    if (CheckCollisionPointRec(mouse, cellRect)) {
+                        if (ds && ds->LoadedTrack && b->AudioPlugin) {
+                            for (int h = 0; h < ds->LoadedTrack->HotCuesCount; h++) {
+                                if (ds->LoadedTrack->HotCues[h].ID == (unsigned int)(i + 1)) {
+                                    DeckAudio_JumpToMs(&b->AudioPlugin->Decks[d], ds->LoadedTrack->HotCues[h].Start);
+                                    DeckAudio_InstantPlay(&b->AudioPlugin->Decks[d]);
+                                    return 1;
+                                }
                             }
                         }
                     }
                 }
+            }
+        }
+    } else {
+        // --- BEAT FX MODE: FX Select & X-PAD ---
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            float btnY = barY + S(13);
+            float btnH = S(23);
+
+            // FX Select
+            float trashW = S(22);
+            float gap = S(2);
+            float fxBtnW = (halfW - trashW - S(4) - (FXNamesCount - 1) * gap) / FXNamesCount;
+            float cx = S(2);
+
+            for (int i = 0; i < FXNamesCount; i++) {
+                Rectangle fxRect = { cx, btnY, fxBtnW, btnH };
+                if (CheckCollisionPointRec(mouse, fxRect)) {
+                    b->State->SelectedFX = i;
+                    return 1;
+                }
+                cx += fxBtnW + gap;
+            }
+
+            // X-PAD
+            cx = halfW + S(2);
+            float padAreaW = halfW - S(4);
+            float padBtnW = padAreaW / XPadLabelsCount;
+
+            for (int i = 0; i < XPadLabelsCount; i++) {
+                Rectangle padRect = { cx, btnY, padBtnW - 1, btnH };
+                if (CheckCollisionPointRec(mouse, padRect)) {
+                    b->State->SelectedPad = i;
+                    return 1;
+                }
+                cx += padBtnW;
             }
         }
     }

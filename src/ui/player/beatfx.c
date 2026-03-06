@@ -95,10 +95,11 @@ static void BeatFX_Draw(Component *base) {
     cy += S(13);
 
     // 1. FX Name Select
-    const char* name = "DELAY"; // Mock state for now
+    static const char* FXNames[] = {"DELAY", "ECHO", "SPIRAL", "REVERB", "TRANS", "FLANGER", "PITCH", "ROLL"};
+    const char* fxName = FXNames[b->State->SelectedFX % 8];
     DrawRectangle(x + S(4), cy, w - S(8), S(18), ColorBlack);
     DrawRectangleLines(x + S(4), cy, w - S(8), S(18), ColorDark1);
-    DrawCentredText(name, faceLg, x + S(4), w - S(8), cy + S(3), S(12), ColorWhite);
+    DrawCentredText(fxName, faceLg, x + S(4), w - S(8), cy + S(3), S(12), ColorWhite);
     cy += S(22);
 
     // 2. CH SELECT
@@ -128,30 +129,44 @@ static void BeatFX_Draw(Component *base) {
         DrawLine(lx, ly, lx + w - S(8), ly, (Color){0x20, 0x20, 0x20, 0xFF});
     }
 
-    // BPM Sync Logic
-    float currentBpm = 120.0f;
+    // BPM & Beat FX Sync Logic
+    float masterBpm = 120.0f;
     if (b->DeckA->IsMaster) {
-        currentBpm = b->DeckA->CurrentBPM;
+        masterBpm = b->DeckA->CurrentBPM;
     } else if (b->DeckB->IsMaster) {
-        currentBpm = b->DeckB->CurrentBPM;
+        masterBpm = b->DeckB->CurrentBPM;
     } else {
-        // Fallback to Deck A if no master (optional)
-        currentBpm = b->DeckA->CurrentBPM;
+        masterBpm = b->DeckA->CurrentBPM;
     }
 
+    // DSP DJ Logic: X-PAD Ratios
+    static const float XPadRatios[] = {0.125f, 0.25f, 0.5f, 0.75f, 1.0f, 2.0f};
+    static const char* XPadLabels[] = {"1/8", "1/4", "1/2", "3/4", "1", "2"};
+    
+    int padIdx = b->State->SelectedPad;
+    if (padIdx < 0) padIdx = 4; // Default to "1"
+    if (padIdx >= 6) padIdx = 5; 
+    
+    float ratio = XPadRatios[padIdx];
+    float fxBpm = masterBpm / ratio; // Kecepatan (LFO) = BPM / ratio
+    float fxMs = (60000.0f / masterBpm) * ratio; // Waktu (ms) = (60000/BPM) * ratio
+
+    // Draw Calculated BPM
     char bpmStr[16];
-    sprintf(bpmStr, "%.1f", currentBpm);
+    sprintf(bpmStr, "%.1f", fxBpm);
     UIDrawText(bpmStr, faceMd, x + S(8), cy + S(2), S(10), ColorWhite);
     UIDrawText("BPM", faceXXS, x + w - S(26), cy + S(4), S(7), ColorShadow);
     cy += rowH;
 
-    // msec
-    UIDrawText("500", faceSm, x + S(8), cy + S(2), S(9), ColorWhite);
+    // msec display
+    char msStr[16];
+    sprintf(msStr, "%.0f", fxMs);
+    UIDrawText(msStr, faceSm, x + S(8), cy + S(2), S(9), ColorWhite);
     UIDrawText("msec", faceXXS, x + w - S(26), cy + S(3), S(7), ColorShadow);
     cy += rowH;
 
-    // BEAT
-    UIDrawText("1", faceSm, x + S(8), cy + S(2), S(9), ColorWhite);
+    // BEAT display
+    UIDrawText(XPadLabels[padIdx], faceSm, x + S(8), cy + S(2), S(9), ColorWhite);
     UIDrawText("BEAT", faceXXS, x + w - S(26), cy + S(3), S(7), ColorShadow);
     cy += rowH;
 
