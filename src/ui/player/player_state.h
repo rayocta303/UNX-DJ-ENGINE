@@ -57,4 +57,5 @@ typedef struct BeatFXState {
     int SelectedChannel; // 0=Master, 1=Deck 1, 2=Deck 2
     bool ChannelDropdownOpen;
     bool ShowBeatFXTab; // false = STATUS, true = BEAT FX
+    bool IsFXOn;
 } BeatFXState;

@@ -50,7 +50,13 @@ static int BeatFX_Update(Component *base) {
         }
     }
 
-    // Tab Switching Logic
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (CheckCollisionPointRec(mouse, b->FXButton)) {
+            b->State->IsFXOn = !b->State->IsFXOn;
+        }
+    }
+
+    // 4. Tab Switching Logic
     float tabY = y + h - S(18);
     float tabW = (w - S(10)) / 2;
     Rectangle statusTab = { x + S(4), tabY, tabW, S(14) };
@@ -122,8 +128,20 @@ static void BeatFX_Draw(Component *base) {
         DrawLine(lx, ly, lx + w - S(8), ly, (Color){0x20, 0x20, 0x20, 0xFF});
     }
 
-    // BPM
-    UIDrawText("120.0", faceMd, x + S(8), cy + S(2), S(10), ColorWhite);
+    // BPM Sync Logic
+    float currentBpm = 120.0f;
+    if (b->DeckA->IsMaster) {
+        currentBpm = b->DeckA->CurrentBPM;
+    } else if (b->DeckB->IsMaster) {
+        currentBpm = b->DeckB->CurrentBPM;
+    } else {
+        // Fallback to Deck A if no master (optional)
+        currentBpm = b->DeckA->CurrentBPM;
+    }
+
+    char bpmStr[16];
+    sprintf(bpmStr, "%.1f", currentBpm);
+    UIDrawText(bpmStr, faceMd, x + S(8), cy + S(2), S(10), ColorWhite);
     UIDrawText("BPM", faceXXS, x + w - S(26), cy + S(4), S(7), ColorShadow);
     cy += rowH;
 
@@ -140,6 +158,21 @@ static void BeatFX_Draw(Component *base) {
     // QUANTIZE
     DrawCentredText("QUANTIZE", faceXXS, x + S(4), w - S(8), cy + S(3), S(7), ColorShadow);
     cy += rowH + S(12);
+
+    // 3.5 FX ON / OFF Toggle
+    float btnH = S(16);
+    float btnW = w - S(8); 
+    
+    b->FXButton = (Rectangle){ x + S(4), cy, btnW, btnH };
+
+    Color btnColor = b->State->IsFXOn ? ColorOrange : ColorDark2;
+    DrawRectangleRec(b->FXButton, btnColor);
+    DrawRectangleLinesEx(b->FXButton, 1, b->State->IsFXOn ? ColorWhite : ColorShadow);
+    
+    const char* fxBtnText = b->State->IsFXOn ? "BEAT FX ON" : "BEAT FX OFF";
+    DrawCentredText(fxBtnText, faceXXS, b->FXButton.x, b->FXButton.width, b->FXButton.y + S(4.5f), S(7), ColorWhite);
+    
+    cy += btnH + S(12);
 
     // 4. ZOOM / GRID
     float halfB = (w - S(12)) / 2;
@@ -185,8 +218,11 @@ static void BeatFX_Draw(Component *base) {
     }
 }
 
-void BeatFXPanel_Init(BeatFXPanel *b, BeatFXState *state) {
+void BeatFXPanel_Init(BeatFXPanel *b, BeatFXState *state, DeckState *deckA, DeckState *deckB) {
     b->base.Update = BeatFX_Update;
     b->base.Draw = BeatFX_Draw;
     b->State = state;
+    b->DeckA = deckA;
+    b->DeckB = deckB;
+    b->FXButton = (Rectangle){0};
 }

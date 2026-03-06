@@ -1,12 +1,14 @@
 # Build artifacts
-*.exe
+# *.exe
 *.o
 *.obj
+build_log.txt
+build_out.txt
 bin/
 build/
 
 # Testing
-*test/
+# *test/
 
 # Raylib/Zig temp
 zig-cache/
@@ -15,6 +17,7 @@ zig-out/
 # IDE files
 .vscode/
 .idea/
+*.code-workspace
 
 # OS files
 Thumbs.db

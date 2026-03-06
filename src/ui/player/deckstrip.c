@@ -240,15 +240,15 @@ static void DeckStrip_Draw(Component *base) {
     UIDrawText(bpmMain, faceBPM, combinedX, bpmValY, S(20), ColorOrange);
     UIDrawText(bpmDec, faceMd, combinedX + wBmain, bpmValY + S(3.5f), S(11), ColorOrange);
 
-    // Static Waveform rendering (mocked)
+    // Static Waveform rendering
     if (d->State->LoadedTrack != NULL) {
-        float wx = badgeX + S(44);
-        float ww = stripW - (wx - x) - S(12);
+        float wx = lColX + lColW + S(4);
+        float ww = stripW - lColW - S(10); 
         float wy = TOP_BAR_H + WAVE_AREA_H + FX_BAR_H + DECK_STR_H - S(28);
         float wh = S(20);
 
-        DrawRectangle(wx - S(2), wy - S(2), ww + S(4), wh + S(4), ColorDark3);
-        DrawRectangleLines(wx - S(2), wy - S(2), ww + S(4), wh + S(4), ColorDark1);
+        DrawRectangle(wx, wy, ww, wh, ColorDark3);
+        DrawRectangleLines(wx, wy, ww, wh, ColorDark1);
 
         float totalMs = d->State->TrackLengthMs;
         float playedRatio = 0;
