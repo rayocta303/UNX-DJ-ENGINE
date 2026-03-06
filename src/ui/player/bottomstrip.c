@@ -4,8 +4,9 @@
 #include "ui/components/helpers.h"
 #include <stdio.h>
 
-static const char* FXNames[] = {"DELAY", "ECHO", "SPIRAL", "REVERB", "TRANS", "FLANGER", "PITCH", "ROLL"};
-static const int FXNamesCount = 8;
+static const char* FXNames[] = {"REVERB", "ECHO", "DELAY", "FLANGER"};
+static const int FXEnumMap[] = {4, 1, 0, 7}; // BEATFX_REVERB, BEATFX_ECHO, BEATFX_DELAY, BEATFX_FLANGER
+static const int FXNamesCount = 4;
 static const char* XPadLabels[] = {"1/8", "1/4", "1/2", "3/4", "1", "2"};
 static const int XPadLabelsCount = 6;
 
@@ -65,7 +66,7 @@ static int BottomStrip_Update(Component *base) {
             for (int i = 0; i < FXNamesCount; i++) {
                 Rectangle fxRect = { cx, btnY, fxBtnW, btnH };
                 if (CheckCollisionPointRec(mouse, fxRect)) {
-                    b->State->SelectedFX = i;
+                    b->State->SelectedFX = FXEnumMap[i];
                     return 1;
                 }
                 cx += fxBtnW + gap;
@@ -208,7 +209,7 @@ static void BottomStrip_Draw(Component *base) {
         float cx = S(2);
 
         for (int i = 0; i < FXNamesCount; i++) {
-            bool active = (i == b->State->SelectedFX);
+            bool active = (FXEnumMap[i] == b->State->SelectedFX);
             Color bg = {0x22, 0x22, 0x22, 0xFF};
             Color border = ColorDark1;
             Color txtClr = ColorPaper;

@@ -4,6 +4,13 @@
 #include "ui/components/helpers.h"
 #include <stdio.h>
 
+static const char* AllFXNames[] = {
+    "DELAY", "ECHO", "PING PONG", "SPIRAL", "REVERB", "TRANS", 
+    "FILTER", "FLANGER", "PHASER", "PITCH", "SLIP ROLL", "ROLL", 
+    "VINYL BRAKE", "HELIX"
+};
+#define ALL_FX_COUNT 14
+
 static int BeatFX_Update(Component *base) {
     BeatFXPanel *b = (BeatFXPanel *)base;
     Vector2 mouse = UIGetMousePosition();
@@ -13,14 +20,32 @@ static int BeatFX_Update(Component *base) {
     float w = BEAT_FX_W;
     float h = WAVE_AREA_H;
     
+    // Calculate FX Label and Select hit box
+    float fxSelectY = y + S(4) + S(13); // Label + Spacing
+    Rectangle fxSelectRect = { x + S(4), fxSelectY, w - S(8), S(18) };
+    bool fxHovered = CheckCollisionPointRec(mouse, fxSelectRect);
+
     // Calculate CH SELECT hit box (following Draw logic)
-    float cy = y + S(4) + S(13) + S(22); // Label + FXSelect + Spacing
+    float cy = fxSelectY + S(18) + S(22); // FXSelect + Spacing
     cy += S(10); // Spacing after "CH SELECT" label
     
     Rectangle chRect = { x + S(4), cy, w - S(8), S(14) };
-    bool hovered = CheckCollisionPointRec(mouse, chRect);
+    bool chHovered = CheckCollisionPointRec(mouse, chRect);
     
-    if (b->State->ChannelDropdownOpen) {
+    if (b->State->FXDropdownOpen) {
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            float dy = fxSelectY + S(18);
+            for (int i = 0; i < ALL_FX_COUNT; i++) {
+                Rectangle optRect = { x + S(4), dy, w - S(8), S(14) };
+                if (CheckCollisionPointRec(mouse, optRect)) {
+                    b->State->SelectedFX = i;
+                    break;
+                }
+                dy += S(14);
+            }
+            b->State->FXDropdownOpen = false;
+        }
+    } else if (b->State->ChannelDropdownOpen) {
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             float dy = cy + S(14);
             for (int i = 0; i < 3; i++) {
@@ -34,7 +59,12 @@ static int BeatFX_Update(Component *base) {
             b->State->ChannelDropdownOpen = false;
         }
     } else {
-        if (hovered) {
+        if (fxHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            // Cycle on scroll can be added later if needed
+            b->State->FXDropdownOpen = true;
+        }
+    
+        if (chHovered) {
             float wheel = GetMouseWheelMove();
             if (wheel != 0) {
                 // Cycle through 0 (Master), 1 (Deck 1), 2 (Deck 2)
@@ -95,11 +125,14 @@ static void BeatFX_Draw(Component *base) {
     cy += S(13);
 
     // 1. FX Name Select
-    static const char* FXNames[] = {"DELAY", "ECHO", "SPIRAL", "REVERB", "TRANS", "FLANGER", "PITCH", "ROLL"};
-    const char* fxName = FXNames[b->State->SelectedFX % 8];
+    const char* fxName = AllFXNames[b->State->SelectedFX % ALL_FX_COUNT];
     DrawRectangle(x + S(4), cy, w - S(8), S(18), ColorBlack);
     DrawRectangleLines(x + S(4), cy, w - S(8), S(18), ColorDark1);
     DrawCentredText(fxName, faceLg, x + S(4), w - S(8), cy + S(3), S(12), ColorWhite);
+    DrawTriangle((Vector2){x + w - S(14), cy + S(7)}, (Vector2){x + w - S(8), cy + S(7)}, (Vector2){x + w - S(11), cy + S(12)}, ColorWhite);
+    
+    float fxDropdownY = cy + S(18); // Save for later drawing overlay
+    
     cy += S(22);
 
     // 2. CH SELECT
@@ -236,10 +269,22 @@ static void BeatFX_Draw(Component *base) {
     DrawCentredText("BEAT FX", faceXXS, x + S(6) + tabW, tabW, cy + S(3.5f), S(7), beatFxActive ? ColorWhite : ColorShadow);
 
     // --- OVERLAYS (Draw at bottom for highest Z-index) ---
-    if (b->State->ChannelDropdownOpen) {
+    Vector2 mouse = UIGetMousePosition();
+    if (b->State->FXDropdownOpen) {
+        float dy = fxDropdownY;
+        for (int i = 0; i < ALL_FX_COUNT; i++) {
+            Rectangle optRect = { x + S(4), dy, w - S(8), S(14) };
+            Color bg = (b->State->SelectedFX == i) ? ColorBlue : ColorDark3;
+            if (CheckCollisionPointRec(mouse, optRect)) bg = ColorGray;
+            
+            DrawRectangleRec(optRect, bg);
+            DrawRectangleLinesEx(optRect, 1, ColorDark1);
+            DrawCentredText(AllFXNames[i], faceSm, optRect.x, optRect.width, optRect.y + S(2), S(9), ColorWhite);
+            dy += S(14);
+        }
+    } else if (b->State->ChannelDropdownOpen) {
         const char* chNames[] = { "MASTER", "DECK 1", "DECK 2" };
         float dy = dropdownY + S(14);
-        Vector2 mouse = UIGetMousePosition();
         for (int i = 0; i < 3; i++) {
             Rectangle optRect = { x + S(4), dy, w - S(8), S(14) };
             Color bg = (b->State->SelectedChannel == i) ? ColorBlue : ColorDark3;

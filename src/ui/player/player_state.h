@@ -56,6 +56,7 @@ typedef struct BeatFXState {
     int SelectedPad;
     int SelectedChannel; // 0=Master, 1=Deck 1, 2=Deck 2
     bool ChannelDropdownOpen;
+    bool FXDropdownOpen;
     bool ShowBeatFXTab; // false = STATUS, true = BEAT FX
     bool IsFXOn;
     float XPadScrubValue; // -1.0 to 1.0 for Reverb LPF/HPF and Flanger Sweep
