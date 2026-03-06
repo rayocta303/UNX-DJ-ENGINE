@@ -26,7 +26,7 @@ static int BeatFX_Update(Component *base) {
     bool fxHovered = CheckCollisionPointRec(mouse, fxSelectRect);
 
     // Calculate CH SELECT hit box (following Draw logic)
-    float cy = fxSelectY + S(18) + S(22); // FXSelect + Spacing
+    float cy = fxSelectY + S(22); // FXSelect + Spacing
     cy += S(10); // Spacing after "CH SELECT" label
     
     Rectangle chRect = { x + S(4), cy, w - S(8), S(14) };
