@@ -103,7 +103,8 @@ static void Waveform_Draw(Component *base) {
 
     // --- Boundary Setup ---
     // Scissor everything to prevent rendering outside deck area
-    BeginScissorMode((int)wfLeft, (int)wfY, (int)wfW, (int)waveH);
+    // BeginScissorMode expects raw screen coordinates, so we must add the UI offset
+    BeginScissorMode((int)(wfLeft + UI_OffsetX), (int)(wfY + UI_OffsetY), (int)wfW, (int)waveH);
 
     DrawRectangle(wfLeft, wfY, wfW, waveH, ColorBlack);
 
