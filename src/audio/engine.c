@@ -12,11 +12,19 @@
 void AudioEngine_Init(AudioEngine *engine) {
     memset(engine, 0, sizeof(AudioEngine));
 
-    for (int i=0; i<MAX_DECKS; i++) {
         engine->Decks[i].BaseRate = 1.0f;
         engine->Decks[i].OutlinedRate = 0.0f; // Motor is off initially
         engine->Decks[i].Pitch = 10000;
         engine->Decks[i].Trim = 1.0f;
+        engine->Decks[i].EqLow = 0.5f;
+        engine->Decks[i].EqMid = 0.5f;
+        engine->Decks[i].EqHigh = 0.5f;
+        memset(&engine->Decks[i].EqLowStateL, 0, sizeof(BiquadState));
+        memset(&engine->Decks[i].EqLowStateR, 0, sizeof(BiquadState));
+        memset(&engine->Decks[i].EqMidStateL, 0, sizeof(BiquadState));
+        memset(&engine->Decks[i].EqMidStateR, 0, sizeof(BiquadState));
+        memset(&engine->Decks[i].EqHighStateL, 0, sizeof(BiquadState));
+        memset(&engine->Decks[i].EqHighStateR, 0, sizeof(BiquadState));
         engine->Decks[i].IsMotorOn = false;
         engine->Decks[i].IsPlaying = false;
     }
@@ -117,6 +125,41 @@ static inline float hermite4(float frac_pos, float xm1, float x0, float x1, floa
     return ((((a * frac_pos) - b_neg) * frac_pos + c) * frac_pos + x0);
 }
 
+// Simple Biquad Filter implementation for EQ (Isolator style)
+// Processes a single sample through a biquad filter
+static inline float processBiquad(float in, float b0, float b1, float b2, float a1, float a2, BiquadState *state) {
+    float out = b0 * in + b1 * state->x1 + b2 * state->x2 - a1 * state->y1 - a2 * state->y2;
+    state->x2 = state->x1;
+    state->x1 = in;
+    state->y2 = state->y1;
+    state->y1 = out;
+    return out;
+}
+
+// Calculate biquad coefficients for a Linkwitz-Riley crossover (used for DJ Isolators)
+// Type: 0 = Lowpass, 1 = Highpass
+static void calcCrossoverCoeffs(int type, float freq, float sampleRate, float *b0, float *b1, float *b2, float *a1, float *a2) {
+    float omega = 2.0f * (float)M_PI * freq / sampleRate;
+    float sn = sinf(omega);
+    float cs = cosf(omega);
+    float alpha = sn / (2.0f * 0.707f); // Q = 0.707 (Butterworth squared -> LR)
+
+    float a0 = 1.0f + alpha;
+    
+    if (type == 0) { // Lowpass
+        *b0 = (1.0f - cs) / 2.0f / a0;
+        *b1 = (1.0f - cs) / a0;
+        *b2 = (1.0f - cs) / 2.0f / a0;
+    } else { // Highpass
+        *b0 = (1.0f + cs) / 2.0f / a0;
+        *b1 = -(1.0f + cs) / a0;
+        *b2 = (1.0f + cs) / 2.0f / a0;
+    }
+    
+    *a1 = -2.0f * cs / a0;
+    *a2 = (1.0f - alpha) / a0;
+}
+
 // Resampling directly from PCM Buffer into output
 static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int framesToProcess) {
     if (!deck->PCMBuffer || deck->TotalSamples == 0) return;
@@ -129,6 +172,28 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int framesT
     }
 
     if (rate == 0.0) return;
+
+    // --- EQ Coefficient Setup ---
+    // Crossover frequencies (typical DJ mixer: Low/Mid split at 250Hz, Mid/High split at 2500Hz)
+    float b0_lp1, b1_lp1, b2_lp1, a1_lp1, a2_lp1; // Low band (LPF @ 250Hz)
+    float b0_hp1, b1_hp1, b2_hp1, a1_hp1, a2_hp1; // Mid band lower (HPF @ 250Hz)
+    float b0_lp2, b1_lp2, b2_lp2, a1_lp2, a2_lp2; // Mid band upper (LPF @ 2500Hz)
+    float b0_hp2, b1_hp2, b2_hp2, a1_hp2, a2_hp2; // High band (HPF @ 2500Hz)
+
+    calcCrossoverCoeffs(0, 250.0f, deck->SampleRate, &b0_lp1, &b1_lp1, &b2_lp1, &a1_lp1, &a2_lp1);
+    calcCrossoverCoeffs(1, 250.0f, deck->SampleRate, &b0_hp1, &b1_hp1, &b2_hp1, &a1_hp1, &a2_hp1);
+    calcCrossoverCoeffs(0, 2500.0f, deck->SampleRate, &b0_lp2, &b1_lp2, &b2_lp2, &a1_lp2, &a2_lp2);
+    calcCrossoverCoeffs(1, 2500.0f, deck->SampleRate, &b0_hp2, &b1_hp2, &b2_hp2, &a1_hp2, &a2_hp2);
+
+    // Map 0.0-1.0 knob range to gain: 0.5 is 1x (0dB), 0.0 is 0x (-inf dB), 1.0 is ~3x (+9dB)
+    float gainLow = (deck->EqLow < 0.5f) ? (deck->EqLow * 2.0f) : (1.0f + (deck->EqLow - 0.5f) * 4.0f);
+    float gainMid = (deck->EqMid < 0.5f) ? (deck->EqMid * 2.0f) : (1.0f + (deck->EqMid - 0.5f) * 4.0f);
+    float gainHigh = (deck->EqHigh < 0.5f) ? (deck->EqHigh * 2.0f) : (1.0f + (deck->EqHigh - 0.5f) * 4.0f);
+    
+    // Smooth kill curves: square the gain for sharper drop-off when turning down
+    if (gainLow < 1.0f) gainLow *= gainLow;
+    if (gainMid < 1.0f) gainMid *= gainMid;
+    if (gainHigh < 1.0f) gainHigh *= gainHigh;
 
     // We process frame by frame
     for (int i = 0; i < framesToProcess; i++) {
@@ -191,6 +256,26 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int framesT
         // Apply Trim Volume
         l_sample *= deck->Trim;
         r_sample *= deck->Trim;
+
+        // --- Apply EQ (Isolator Mode) ---
+        // Right now we approximate the 3 bands. 
+        // 1. Extract Low band
+        float lowL = processBiquad(l_sample, b0_lp1, b1_lp1, b2_lp1, a1_lp1, a2_lp1, &deck->EqLowStateL);
+        float lowR = processBiquad(r_sample, b0_lp1, b1_lp1, b2_lp1, a1_lp1, a2_lp1, &deck->EqLowStateR);
+        
+        // 2. Extract High band
+        float highL = processBiquad(l_sample, b0_hp2, b1_hp2, b2_hp2, a1_hp2, a2_hp2, &deck->EqHighStateL);
+        float highR = processBiquad(r_sample, b0_hp2, b1_hp2, b2_hp2, a1_hp2, a2_hp2, &deck->EqHighStateR);
+        
+        // 3. Extract Mid band (Original - Low - High)
+        // This is a phase-accurate way to extract mids if crossovers are perfectly aligned,
+        // preventing phase cancellation weirdness when knobs are at 12 o'clock.
+        float midL = l_sample - lowL - highL;
+        float midR = r_sample - lowR - highR;
+
+        // Apply Gains and mix back
+        l_sample = (lowL * gainLow) + (midL * gainMid) + (highL * gainHigh);
+        r_sample = (lowR * gainLow) + (midR * gainMid) + (highR * gainHigh);
 
         // Mix into output buffer
         outBuffer[i * CHANNELS] += l_sample;

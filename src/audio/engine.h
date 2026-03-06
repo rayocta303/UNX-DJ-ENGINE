@@ -21,6 +21,11 @@ typedef enum {
     CHANGE_SPEED_NEED_DOWN = 2
 } SpeedChangeState;
 
+typedef struct BiquadState {
+    float x1, x2;
+    float y1, y2;
+} BiquadState;
+
 typedef struct DeckAudioState {
     float *PCMBuffer;           // Full track audio decoded (interleaved L/R)
     uint32_t TotalSamples;      // Total samples in buffer
@@ -52,7 +57,17 @@ typedef struct DeckAudioState {
     int MTSampleCount;
 
     float Trim;
+
+    // EQ State (3-Band)
+    float EqLow;   // 0.0 to 1.0 (default 0.5)
+    float EqMid;   // 0.0 to 1.0 (default 0.5)
+    float EqHigh;  // 0.0 to 1.0 (default 0.5)
+    
+    BiquadState EqLowStateL, EqLowStateR;
+    BiquadState EqMidStateL, EqMidStateR;
+    BiquadState EqHighStateL, EqHighStateR;
 } DeckAudioState;
+
 
 typedef struct AudioEngine {
     DeckAudioState Decks[MAX_DECKS];
