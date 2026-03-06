@@ -204,30 +204,8 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int frames,
     // We process frame by frame
     for (int i = 0; i < frames; i++) {
         double readPos = deck->Position;
-        float mtWeight = 1.0f;
         // MT is active if Key Lock is ON, not scratching, motor is running, and speed is not precisely 1.0
         bool mtActive = deck->MasterTempoActive && !deck->IsTouching && deck->IsMotorOn && fabs(rate - 1.0) > 0.005;
-
-        if (mtActive) {
-            readPos = deck->Position + deck->MTOffset;
-            deck->MTOffset += (1.0 - rate);
-            deck->MTSampleCount++;
-            
-            // Grain boundaries: 4096 samples total, 512 samples crossfade
-            const int GRAIN_SIZE = 4096;
-            const int XFADE_SIZE = 512;
-            const int START_XFADE = GRAIN_SIZE - XFADE_SIZE;
-
-            if (deck->MTSampleCount > START_XFADE) {
-                float t = (float)(deck->MTSampleCount - START_XFADE) / (float)XFADE_SIZE;
-                // Sine window for constant-power crossfade: sin(t * PI/2)
-                mtWeight = cosf(t * (float)M_PI * 0.5f); 
-            }
-            if (deck->MTSampleCount >= GRAIN_SIZE) {
-                deck->MTSampleCount = 0;
-                deck->MTOffset = 0;
-            }
-        }
 
         float l_sample = 0.0f;
         float r_sample = 0.0f;
@@ -249,14 +227,50 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int frames,
             } \
         }
 
-        INTERP_SAMPLES_HI(readPos, l_sample, r_sample);
-
-        // If MT is active and in crossfade zone, mix in the secondary grain
-        if (mtActive && mtWeight < 1.0f) {
-            float l2 = 0.0f, r2 = 0.0f;
-            INTERP_SAMPLES_HI(deck->Position, l2, r2); 
-            l_sample = l_sample * mtWeight + l2 * (1.0f - mtWeight);
-            r_sample = r_sample * mtWeight + r2 * (1.0f - mtWeight);
+        if (mtActive) {
+            deck->MTOffset += (1.0 - rate);
+            
+            // High-resolution OLA: continuous 50% overlap with Hanning windows
+            // deck->MTOffset accumulates drift in source samples.
+            // Using a period of 4096.0 samples (approx 92ms at 44.1kHz)
+            double period = 4096.0; 
+            double drift = deck->MTOffset;
+            
+            // Grain 0 phase
+            double shift0 = fmod(drift, period);
+            if (shift0 < 0) shift0 += period;
+            
+            // Grain 1 phase (offset by 180 degrees)
+            double shift1 = fmod(drift + period * 0.5, period);
+            if (shift1 < 0) shift1 += period;
+            
+            // Center shifts to [-period/2, period/2]
+            shift0 -= period * 0.5;
+            shift1 -= period * 0.5;
+            
+            // Calculate 1.0x continuous read positions
+            double readPos0 = deck->Position + shift0;
+            double readPos1 = deck->Position + shift1;
+            
+            // Calculate Hanning window weights (which sum perfectly to 1.0)
+            double w0 = 0.5 * (1.0 + cos(2.0 * M_PI * shift0 / period));
+            double w1 = 0.5 * (1.0 + cos(2.0 * M_PI * shift1 / period));
+            
+            // Boundary safeguards
+            if (readPos0 < 0) readPos0 = 0;
+            if (readPos1 < 0) readPos1 = 0;
+            
+            float l0 = 0.0f, r0 = 0.0f, l1 = 0.0f, r1 = 0.0f;
+            INTERP_SAMPLES_HI(readPos0, l0, r0);
+            INTERP_SAMPLES_HI(readPos1, l1, r1);
+            
+            // Mix grains seamlessly
+            l_sample = (float)(l0 * w0 + l1 * w1);
+            r_sample = (float)(r0 * w0 + r1 * w1);
+        } else {
+            deck->MTOffset = 0.0;
+            if (readPos < 0) readPos = 0;
+            INTERP_SAMPLES_HI(readPos, l_sample, r_sample);
         }
 
         // Apply Trim Volume
