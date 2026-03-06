@@ -58,4 +58,6 @@ typedef struct BeatFXState {
     bool ChannelDropdownOpen;
     bool ShowBeatFXTab; // false = STATUS, true = BEAT FX
     bool IsFXOn;
+    float XPadScrubValue; // -1.0 to 1.0 for Reverb LPF/HPF and Flanger Sweep
+    bool IsXPadScrubbing; // True when holding the scrub line
 } BeatFXState;

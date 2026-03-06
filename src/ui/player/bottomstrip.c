@@ -52,10 +52,10 @@ static int BottomStrip_Update(Component *base) {
         }
     } else {
         // --- BEAT FX MODE: FX Select & X-PAD ---
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            float btnY = barY + S(13);
-            float btnH = S(23);
+        float btnY = barY + S(13);
+        float btnH = S(23);
 
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             // FX Select
             float trashW = S(22);
             float gap = S(2);
@@ -70,19 +70,40 @@ static int BottomStrip_Update(Component *base) {
                 }
                 cx += fxBtnW + gap;
             }
+        }
 
-            // X-PAD
-            cx = halfW + S(2);
-            float padAreaW = halfW - S(4);
-            float padBtnW = padAreaW / XPadLabelsCount;
+        // X-PAD
+        float cx = halfW + S(2);
+        float padAreaW = halfW - S(4);
+        bool isScrubMode = (b->State->SelectedFX == 3 || b->State->SelectedFX == 5); // 3=REVERB, 5=FLANGER
 
-            for (int i = 0; i < XPadLabelsCount; i++) {
-                Rectangle padRect = { cx, btnY, padBtnW - 1, btnH };
-                if (CheckCollisionPointRec(mouse, padRect)) {
-                    b->State->SelectedPad = i;
-                    return 1;
+        if (isScrubMode) {
+            Rectangle scrubArea = { cx, btnY, padAreaW, btnH };
+            if (CheckCollisionPointRec(mouse, scrubArea) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                b->State->IsXPadScrubbing = true;
+            }
+            if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+                b->State->IsXPadScrubbing = false;
+            }
+            if (b->State->IsXPadScrubbing) {
+                float val = (mouse.x - cx) / padAreaW; // 0.0 to 1.0
+                b->State->XPadScrubValue = (val * 2.0f) - 1.0f; // -1.0 to 1.0
+                if (b->State->XPadScrubValue < -1.0f) b->State->XPadScrubValue = -1.0f;
+                if (b->State->XPadScrubValue > 1.0f) b->State->XPadScrubValue = 1.0f;
+                return 1;
+            }
+        } else {
+            b->State->IsXPadScrubbing = false;
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                float padBtnW = padAreaW / XPadLabelsCount;
+                for (int i = 0; i < XPadLabelsCount; i++) {
+                    Rectangle padRect = { cx, btnY, padBtnW - 1, btnH };
+                    if (CheckCollisionPointRec(mouse, padRect)) {
+                        b->State->SelectedPad = i;
+                        return 1;
+                    }
+                    cx += padBtnW;
                 }
-                cx += padBtnW;
             }
         }
     }
@@ -208,22 +229,51 @@ static void BottomStrip_Draw(Component *base) {
 
         cx = halfW + S(2);
         float padAreaW = halfW - S(4);
-        float padBtnW = padAreaW / XPadLabelsCount;
+        bool isScrubMode = (b->State->SelectedFX == 3 || b->State->SelectedFX == 5);
 
-        for (int i = 0; i < XPadLabelsCount; i++) {
-            bool active = (i == b->State->SelectedPad);
-            Color bg = {0x22, 0x22, 0x22, 0xFF};
-            Color border = ColorDark1;
-            Color txtClr = ColorPaper;
-            if (active) {
-                bg = (Color){0x60, 0x60, 0x60, 0xFF};
-                border = ColorPaper;
-                txtClr = ColorWhite;
+        if (isScrubMode) {
+            // Draw outer scrub box
+            DrawRectangle(cx, btnY, padAreaW, btnH, (Color){0x1A, 0x1A, 0x1A, 0xFF});
+            DrawRectangleLines(cx, btnY, padAreaW, btnH, ColorDark1);
+
+            // Draw center tick
+            float midX = cx + padAreaW / 2.0f;
+            DrawLine(midX, btnY, midX, btnY + btnH, ColorDark3);
+
+            // Draw active blue bar if scrubbing
+            if (b->State->IsXPadScrubbing) {
+                float valX = midX + (b->State->XPadScrubValue * (padAreaW / 2.0f));
+                
+                Color fillClr = (Color){0, 110, 255, 180}; 
+                if (b->State->XPadScrubValue < 0.0f) {
+                    DrawRectangle(valX, btnY + 1, midX - valX, btnH - 2, fillClr);
+                } else {
+                    DrawRectangle(midX, btnY + 1, valX - midX, btnH - 2, fillClr);
+                }
             }
-            DrawRectangle(cx, btnY, padBtnW - 1, btnH, bg);
-            DrawRectangleLines(cx, btnY, padBtnW - 1, btnH, border);
-            DrawCentredText(XPadLabels[i], faceSm, cx, padBtnW - 1, btnY + S(6.5f), S(8), txtClr);
-            cx += padBtnW;
+
+            // Draw Arrows
+            DrawCentredText("<", faceSm, cx, S(20), btnY + S(6.5f), S(8), (Color){0, 110, 255, 255});
+            DrawCentredText(">", faceSm, cx + padAreaW - S(20), S(20), btnY + S(6.5f), S(8), (Color){0, 110, 255, 255});
+
+        } else {
+            float padBtnW = padAreaW / XPadLabelsCount;
+
+            for (int i = 0; i < XPadLabelsCount; i++) {
+                bool active = (i == b->State->SelectedPad);
+                Color bg = {0x22, 0x22, 0x22, 0xFF};
+                Color border = ColorDark1;
+                Color txtClr = ColorPaper;
+                if (active) {
+                    bg = (Color){0x60, 0x60, 0x60, 0xFF};
+                    border = ColorPaper;
+                    txtClr = ColorWhite;
+                }
+                DrawRectangle(cx, btnY, padBtnW - 1, btnH, bg);
+                DrawRectangleLines(cx, btnY, padBtnW - 1, btnH, border);
+                DrawCentredText(XPadLabels[i], faceSm, cx, padBtnW - 1, btnY + S(6.5f), S(8), txtClr);
+                cx += padBtnW;
+            }
         }
     }
 }

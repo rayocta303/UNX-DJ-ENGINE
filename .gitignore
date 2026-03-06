@@ -1,6 +1,6 @@
 # Build artifacts
-*.exe
-*.pdb
+# *.exe
+# *.pdb
 *.o
 *.obj
 build_log.txt

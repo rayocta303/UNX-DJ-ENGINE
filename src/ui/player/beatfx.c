@@ -166,8 +166,28 @@ static void BeatFX_Draw(Component *base) {
     cy += rowH;
 
     // BEAT display
-    UIDrawText(XPadLabels[padIdx], faceSm, x + S(8), cy + S(2), S(9), ColorWhite);
-    UIDrawText("BEAT", faceXXS, x + w - S(26), cy + S(3), S(7), ColorShadow);
+    int selFX = b->State->SelectedFX;
+    if ((selFX == 3 || selFX == 5) && b->State->IsXPadScrubbing) {
+        float scrubVal = b->State->XPadScrubValue;
+        if (selFX == 3) { // REVERB
+            if (scrubVal < -0.05f) {
+                UIDrawText("LPF", faceSm, x + S(8), cy + S(2), S(9), ColorOrange);
+            } else if (scrubVal > 0.05f) {
+                UIDrawText("HPF", faceSm, x + S(8), cy + S(2), S(9), ColorOrange);
+            } else {
+                UIDrawText("OFF", faceSm, x + S(8), cy + S(2), S(9), ColorWhite);
+            }
+            UIDrawText("FILTER", faceXXS, x + w - S(32), cy + S(3), S(7), ColorWhite);
+        } else { // FLANGER
+            char ptStr[16];
+            sprintf(ptStr, "%+.0f%%", scrubVal * 100.0f); 
+            UIDrawText(ptStr, faceSm, x + S(8), cy + S(2), S(9), ColorOrange);
+            UIDrawText("PITCH", faceXXS, x + w - S(30), cy + S(3), S(7), ColorWhite);
+        }
+    } else {
+        UIDrawText(XPadLabels[padIdx], faceSm, x + S(8), cy + S(2), S(9), ColorWhite);
+        UIDrawText("BEAT", faceXXS, x + w - S(26), cy + S(3), S(7), ColorShadow);
+    }
     cy += rowH;
 
     // QUANTIZE
