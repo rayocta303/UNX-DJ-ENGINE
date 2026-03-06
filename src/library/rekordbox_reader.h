@@ -18,6 +18,13 @@ typedef struct {
 } RBCue;
 
 typedef struct {
+    uint16_t Index;        // Phrase absolute number
+    uint16_t Beat;         // Starting beat number
+    char Kind[32];         // String representation (Up, Down, Chorus, Intro)
+    int KindID;            // Enum mapping
+} RBPhrase;
+
+typedef struct {
     uint32_t Time; // ms
     uint16_t BPM;  // BPM * 100
     uint16_t BeatNumber; 
@@ -44,6 +51,8 @@ typedef struct {
     // Analysis data
     RBCue* Cues;
     uint32_t CueCount;
+    RBPhrase* Phrases;
+    uint32_t PhraseCount;
     unsigned int BeatGrid[1024];
     int BeatGridCount;
     unsigned char StaticWaveform[1024];

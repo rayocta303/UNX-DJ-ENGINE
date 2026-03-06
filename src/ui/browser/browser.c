@@ -205,6 +205,16 @@ static int Browser_Update(Component *base) {
                     strcpy(targetDeck->TrackTitle, t->Title);
                     strcpy(targetDeck->ArtistName, t->Artist);
                     strcpy(targetDeck->TrackKey, t->Key);
+
+                    // Setup Artwork Path
+                    if (t->ArtworkPath[0] != '\0') {
+                        const char *artRel = t->ArtworkPath;
+                        if (artRel[0] == '/' || artRel[0] == '\\') artRel++;
+                        snprintf(targetDeck->ArtworkPath, sizeof(targetDeck->ArtworkPath), "%s/%s", s->SelectedStorage->Path, artRel);
+                    } else {
+                        targetDeck->ArtworkPath[0] = '\0';
+                    }
+
                     targetDeck->OriginalBPM = t->BPM;
                     targetDeck->CurrentBPM = t->BPM;
                     
@@ -250,6 +260,18 @@ static int Browser_Update(Component *base) {
                                     newTrack->Cues[newTrack->CuesCount].Color[2] = t->Cues[i].Color[2];
                                     newTrack->CuesCount++;
                                 }
+                            }
+                        }
+
+                        // Copy Phrases
+                        newTrack->PhraseCount = 0;
+                        if (t->Phrases && t->PhraseCount > 0) {
+                            for (uint32_t i = 0; i < t->PhraseCount && i < 64; i++) {
+                                newTrack->Phrases[i].Index = t->Phrases[i].Index;
+                                newTrack->Phrases[i].Beat = t->Phrases[i].Beat;
+                                newTrack->Phrases[i].KindID = t->Phrases[i].KindID;
+                                strcpy(newTrack->Phrases[i].Kind, t->Phrases[i].Kind);
+                                newTrack->PhraseCount++;
                             }
                         }
 

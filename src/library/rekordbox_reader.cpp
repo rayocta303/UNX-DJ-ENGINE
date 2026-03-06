@@ -172,6 +172,7 @@ extern "C" void RB_FreeDatabase(RBDatabase* db) {
     if (db->Tracks) {
         for (uint32_t i = 0; i < db->TrackCount; i++) {
             if (db->Tracks[i].Cues) delete[] db->Tracks[i].Cues;
+            if (db->Tracks[i].Phrases) delete[] db->Tracks[i].Phrases;
             if (db->Tracks[i].DynamicWaveform) delete[] db->Tracks[i].DynamicWaveform;
         }
         delete[] db->Tracks;
@@ -274,6 +275,62 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
                 if (track->DynamicWaveformLen > 0) {
                     track->DynamicWaveform = new unsigned char[track->DynamicWaveformLen];
                     memcpy(track->DynamicWaveform, data.data(), track->DynamicWaveformLen);
+                }
+            } else if (tag == rekordbox_anlz_t::SECTION_TAGS_SONG_STRUCTURE) {
+                auto ss = static_cast<rekordbox_anlz_t::song_structure_tag_t*>(section->body());
+                if (ss && ss->body() && ss->body()->entries()) {
+                    auto entries = ss->body()->entries();
+                    if (!track->Phrases) {
+                        track->PhraseCount = entries->size();
+                        track->Phrases = new RBPhrase[track->PhraseCount];
+                        for (size_t i = 0; i < track->PhraseCount; i++) {
+                            auto entry = (*entries)[i].get();
+                            track->Phrases[i].Index = entry->index();
+                            track->Phrases[i].Beat = entry->beat();
+                            track->Phrases[i].KindID = 0;
+                            strcpy(track->Phrases[i].Kind, "Unknown");
+                            
+                            auto kind = entry->kind();
+                            if (auto kh = dynamic_cast<rekordbox_anlz_t::phrase_high_t*>(kind)) {
+                                track->Phrases[i].KindID = kh->id();
+                                switch (kh->id()) {
+                                    case rekordbox_anlz_t::MOOD_HIGH_PHRASE_INTRO: strcpy(track->Phrases[i].Kind, "Intro"); break;
+                                    case rekordbox_anlz_t::MOOD_HIGH_PHRASE_UP: strcpy(track->Phrases[i].Kind, "Up"); break;
+                                    case rekordbox_anlz_t::MOOD_HIGH_PHRASE_DOWN: strcpy(track->Phrases[i].Kind, "Down"); break;
+                                    case rekordbox_anlz_t::MOOD_HIGH_PHRASE_CHORUS: strcpy(track->Phrases[i].Kind, "Chorus"); break;
+                                    case rekordbox_anlz_t::MOOD_HIGH_PHRASE_OUTRO: strcpy(track->Phrases[i].Kind, "Outro"); break;
+                                }
+                            } else if (auto km = dynamic_cast<rekordbox_anlz_t::phrase_mid_t*>(kind)) {
+                                track->Phrases[i].KindID = km->id();
+                                switch (km->id()) {
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_INTRO: strcpy(track->Phrases[i].Kind, "Intro"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_1: strcpy(track->Phrases[i].Kind, "Verse 1"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_2: strcpy(track->Phrases[i].Kind, "Verse 2"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_3: strcpy(track->Phrases[i].Kind, "Verse 3"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_4: strcpy(track->Phrases[i].Kind, "Verse 4"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_5: strcpy(track->Phrases[i].Kind, "Verse 5"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_6: strcpy(track->Phrases[i].Kind, "Verse 6"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_BRIDGE: strcpy(track->Phrases[i].Kind, "Bridge"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_CHORUS: strcpy(track->Phrases[i].Kind, "Chorus"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_OUTRO: strcpy(track->Phrases[i].Kind, "Outro"); break;
+                                }
+                            } else if (auto kl = dynamic_cast<rekordbox_anlz_t::phrase_low_t*>(kind)) {
+                                track->Phrases[i].KindID = kl->id();
+                                switch(kl->id()) {
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_INTRO: strcpy(track->Phrases[i].Kind, "Intro"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_1: strcpy(track->Phrases[i].Kind, "Verse 1"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_1B: strcpy(track->Phrases[i].Kind, "Verse 1B"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_1C: strcpy(track->Phrases[i].Kind, "Verse 1C"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_2: strcpy(track->Phrases[i].Kind, "Verse 2"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_2B: strcpy(track->Phrases[i].Kind, "Verse 2B"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_2C: strcpy(track->Phrases[i].Kind, "Verse 2C"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_BRIDGE: strcpy(track->Phrases[i].Kind, "Bridge"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_CHORUS: strcpy(track->Phrases[i].Kind, "Chorus"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_OUTRO: strcpy(track->Phrases[i].Kind, "Outro"); break;
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -18,6 +18,14 @@ typedef struct TrackState {
     int HotCuesCount;
     HotCue Cues[32]; // Memory Cues
     int CuesCount;
+    
+    struct {
+        int Index;
+        int Beat;
+        char Kind[32];
+        int KindID;
+    } Phrases[64];
+    int PhraseCount;
 } TrackState;
 
 typedef struct DeckState {
@@ -26,6 +34,7 @@ typedef struct DeckState {
     char TrackTitle[128];
     char ArtistName[128];
     char TrackKey[16];
+    char ArtworkPath[512];
     int TrackNumber;
     bool QuantizeEnabled;
     bool MasterTempo;
