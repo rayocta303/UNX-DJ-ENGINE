@@ -200,7 +200,7 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int frames,
     if (gainHigh < 1.0f) gainHigh *= gainHigh;
 
     // We process frame by frame
-    for (int i = 0; i < framesToProcess; i++) {
+    for (int i = 0; i < frames; i++) {
         double readPos = deck->Position;
         float mtWeight = 1.0f;
         // MT is active if Key Lock is ON, not scratching, motor is running, and speed is not precisely 1.0
