@@ -1,5 +1,6 @@
 #pragma once
 #include <stdbool.h>
+#include "library/rekordbox_reader.h"
 
 typedef struct HotCue {
     unsigned int Start; // ms
@@ -8,7 +9,7 @@ typedef struct HotCue {
 } HotCue;
 
 typedef struct TrackState {
-    unsigned int BeatGrid[1024]; 
+    RBBeat BeatGrid[1024]; 
     unsigned int GridOffset;
     int BeatGridCount;
     unsigned char StaticWaveform[1024]; 

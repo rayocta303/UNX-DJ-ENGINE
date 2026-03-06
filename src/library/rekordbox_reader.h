@@ -53,7 +53,7 @@ typedef struct {
     uint32_t CueCount;
     RBPhrase* Phrases;
     uint32_t PhraseCount;
-    unsigned int BeatGrid[1024];
+    RBBeat BeatGrid[1024];
     int BeatGridCount;
     unsigned char StaticWaveform[1024];
     int StaticWaveformLen;

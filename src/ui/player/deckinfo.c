@@ -80,24 +80,25 @@ static void DeckInfo_Draw(Component *base) {
         int beatIdx = -1;
 
         for (int i = 0; i < 1024; i++) {
-            unsigned int bMs = d->State->LoadedTrack->BeatGrid[i];
+            unsigned int bMs = d->State->LoadedTrack->BeatGrid[i].Time;
             if (bMs == 0 || bMs == 0xFFFFFFFF) break;
             if (bMs <= posMs) beatIdx = i;
             else break;
         }
 
         if (beatIdx >= 0) {
-            int downbeatTarget = (1 - (int)d->State->LoadedTrack->GridOffset) & 3;
-            int offsetIdx = beatIdx - downbeatTarget;
+            int currentBeat = d->State->LoadedTrack->BeatGrid[beatIdx].BeatNumber;
             
-            int currentBar, currentBeat;
-            if (offsetIdx >= 0) {
-                currentBar = (offsetIdx / 4) + 1;
-                currentBeat = (offsetIdx % 4) + 1;
-            } else {
-                currentBar = 0;
-                currentBeat = 4 + offsetIdx + 1;
+            // To figure out currentBar efficiently: Count how many "Beat 1"s we've encountered
+            int currentBar = 0;
+            for (int i = 0; i <= beatIdx; i++) {
+                if (d->State->LoadedTrack->BeatGrid[i].BeatNumber == 1) {
+                    currentBar++;
+                }
             }
+            // If we somehow didn't hit a 1 yet, fallback to 1 (e.g., intro before first bar, not strictly necessary, but helpful)
+            if (currentBar == 0) currentBar = 1;
+            
             sprintf(barsVal, "%02d.%d", currentBar, currentBeat);
         } else {
             sprintf(barsVal, "01.1");

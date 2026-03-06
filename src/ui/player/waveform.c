@@ -197,7 +197,8 @@ static void Waveform_Draw(Component *base) {
     // Beat Grid
     if (r->State->LoadedTrack != NULL) {
         for (int i=0; i < 1024; i++) {
-            unsigned int originalMs = r->State->LoadedTrack->BeatGrid[i];
+            unsigned int originalMs = r->State->LoadedTrack->BeatGrid[i].Time;
+            uint16_t beatNum = r->State->LoadedTrack->BeatGrid[i].BeatNumber;
             if (originalMs == 0xFFFFFFFF || originalMs == 0) break;
 
             double beatPosHF = (double)originalMs * 0.15;
@@ -208,8 +209,7 @@ static void Waveform_Draw(Component *base) {
                 Color clr = (Color){255, 255, 255, 50}; 
                 float tw = 1.0f;
 
-                int downbeatTarget = (1 - r->State->LoadedTrack->GridOffset) & 3;
-                if (i % 4 == downbeatTarget) {
+                if (beatNum == 1) {
                     clr = (Color){255, 0, 0, 100}; 
                     tw = 2.0f;
                 }

@@ -295,7 +295,7 @@ static int Browser_Update(Component *base) {
                         } else if (newTrack->HotCuesCount > 0) {
                             firstMs = newTrack->HotCues[0].Start;
                         } else if (t->BeatGridCount > 0) {
-                            firstMs = newTrack->BeatGrid[0];
+                            firstMs = newTrack->BeatGrid[0].Time;
                         }
 
                         targetDeck->PositionMs = firstMs;

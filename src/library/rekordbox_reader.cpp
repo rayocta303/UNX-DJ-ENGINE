@@ -201,7 +201,9 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
                 track->BeatGridCount = bg->num_beats();
                 for (uint32_t i = 0; i < bg->num_beats() && i < 1024; i++) {
                     auto b = (*bg->beats())[i].get();
-                    track->BeatGrid[i] = b->time();
+                    track->BeatGrid[i].Time = b->time();
+                    track->BeatGrid[i].BPM = b->tempo();
+                    track->BeatGrid[i].BeatNumber = b->beat_number();
                 }
             } else if (tag == rekordbox_anlz_t::SECTION_TAGS_CUES || tag == rekordbox_anlz_t::SECTION_TAGS_CUES_2) {
                 std::vector<RBCue> found;
