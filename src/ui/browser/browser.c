@@ -236,7 +236,8 @@ static int Browser_Update(Component *base) {
                         
                         // Copy Beatgrid
                         newTrack->GridOffset = 0;
-                        for(int i=0; i<t->BeatGridCount && i<1024; i++) {
+                        newTrack->BeatGridCount = t->BeatGridCount > 1024 ? 1024 : t->BeatGridCount;
+                        for(int i=0; i<newTrack->BeatGridCount; i++) {
                             newTrack->BeatGrid[i] = t->BeatGrid[i];
                         }
 

@@ -2,6 +2,7 @@
 #include "ui/components/theme.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
+#include "logic/quantize.h"
 #include <stdio.h>
 
 static const char* AllFXNames[] = {
@@ -79,6 +80,14 @@ static int BeatFX_Update(Component *base) {
             }
         }
     }
+    
+    // 3. Black parameter container hitboxes
+    float containerY = cy + S(20);
+    float rowH = S(56) / 4.0f;
+    Rectangle qRect = { x + S(4), containerY + 3 * rowH, w - S(8), rowH };
+    if (CheckCollisionPointRec(mouse, qRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        b->State->Quantize = !b->State->Quantize;
+    }
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         if (CheckCollisionPointRec(mouse, b->FXButton)) {
@@ -139,14 +148,16 @@ static void BeatFX_Draw(Component *base) {
     DrawCentredText("CH SELECT", faceXXS, x, w, cy, S(7), ColorShadow);
     cy += S(10);
     
-    const char* chNames[] = { "MASTER", "DECK 1", "DECK 2" };
-    DrawRectangle(x + S(4), cy, w - S(8), S(14), ColorBlue);
-    DrawCentredText(chNames[b->State->SelectedChannel % 3], faceSm, x + S(4), w - S(8), cy + S(2), S(9), ColorWhite);
+    const char* chName = "MASTER";
+    if (b->State->SelectedChannel == 1) chName = "DECK 1";
+    if (b->State->SelectedChannel == 2) chName = "DECK 2";
     
-    // Dropdown arrow
-    DrawTriangle((Vector2){x + w - S(12), cy + S(5)}, (Vector2){x + w - S(8), cy + S(5)}, (Vector2){x + w - S(10), cy + S(9)}, ColorWhite);
+    DrawRectangle(x + S(4), cy, w - S(8), S(14), ColorDark3);
+    DrawRectangleLines(x + S(4), cy, w - S(8), S(14), ColorDark1);
+    DrawCentredText(chName, faceSm, x + S(4), w - S(8), cy + S(2), S(9), ColorWhite);
+    DrawTriangle((Vector2){x + w - S(12), cy + S(5)}, (Vector2){x + w - S(6), cy + S(5)}, (Vector2){x + w - S(9), cy + S(10)}, ColorWhite);
     
-    float dropdownY = cy; // Save for later drawing overlay
+    float dropdownY = cy; // Save for drawing overlay
     cy += S(20);
 
 
@@ -164,10 +175,13 @@ static void BeatFX_Draw(Component *base) {
 
     // BPM & Beat FX Sync Logic
     float masterBpm = 120.0f;
+    DeckState *masterDeck = b->DeckA;
     if (b->DeckA->IsMaster) {
         masterBpm = b->DeckA->CurrentBPM;
+        masterDeck = b->DeckA;
     } else if (b->DeckB->IsMaster) {
         masterBpm = b->DeckB->CurrentBPM;
+        masterDeck = b->DeckB;
     } else {
         masterBpm = b->DeckA->CurrentBPM;
     }
@@ -186,7 +200,14 @@ static void BeatFX_Draw(Component *base) {
     
     if (masterBpm > 0.0f) {
         fxBpm = masterBpm / ratio; // Kecepatan (LFO) = BPM / ratio
-        fxMs = (60000.0f / masterBpm) * ratio; // Waktu (ms) = (60000/BPM) * ratio
+        
+        if (b->State->Quantize && masterDeck && masterDeck->LoadedTrack) {
+            float qMs = Quantize_GetBeatFXLengthMs(masterDeck->LoadedTrack, ratio);
+            if (qMs > 0.0f) fxMs = qMs;
+            else fxMs = (60000.0f / masterBpm) * ratio; // Fallback
+        } else {
+            fxMs = (60000.0f / masterBpm) * ratio; // Waktu (ms) = (60000/BPM) * ratio
+        }
     }
 
     // Draw Calculated BPM
@@ -229,7 +250,7 @@ static void BeatFX_Draw(Component *base) {
     cy += rowH;
 
     // QUANTIZE
-    DrawCentredText("QUANTIZE", faceXXS, x + S(4), w - S(8), cy + S(3), S(7), ColorShadow);
+    DrawCentredText("QUANTIZE", faceXXS, x + S(4), w - S(8), cy + S(3), S(7), b->State->Quantize ? ColorRed : ColorShadow);
     cy += rowH + S(12);
 
     // 3.5 FX ON / OFF Toggle

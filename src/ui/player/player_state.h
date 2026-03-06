@@ -10,6 +10,7 @@ typedef struct HotCue {
 typedef struct TrackState {
     unsigned int BeatGrid[1024]; 
     unsigned int GridOffset;
+    int BeatGridCount;
     unsigned char StaticWaveform[1024]; 
     int StaticWaveformLen;
     unsigned char *DynamicWaveform;
@@ -70,4 +71,5 @@ typedef struct BeatFXState {
     bool IsFXOn;
     float XPadScrubValue; // -1.0 to 1.0 for Reverb LPF/HPF and Flanger Sweep
     bool IsXPadScrubbing; // True when holding the scrub line
+    bool Quantize;
 } BeatFXState;

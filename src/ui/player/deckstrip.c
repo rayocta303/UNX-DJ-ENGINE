@@ -79,9 +79,14 @@ static int DeckStrip_Update(Component *base) {
     Vector2 mouse = GetMousePosition();
     bool isHoverTempoArea = (mouse.x >= tempoX && mouse.x <= bpmX + bpmBoxW && mouse.y >= midY && mouse.y <= midY + S(28));
     bool isHoverMT = (mouse.x >= mtX && mouse.x <= mtX + mtW && mouse.y >= mtY && mouse.y <= mtY + mtH);
+    bool isHoverQuantize = (mouse.x >= x && mouse.x <= x + lColW && mouse.y >= y + S(68) && mouse.y <= y + S(88));
 
     if (isHoverMT && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
         d->State->MasterTempo = !d->State->MasterTempo;
+    }
+
+    if (isHoverQuantize && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+        d->State->QuantizeEnabled = !d->State->QuantizeEnabled;
     }
 
     if (isHoverTempoArea) {

@@ -1,6 +1,8 @@
 #include "input/keyboard.h"
 #include "raylib.h"
 
+#include "logic/quantize.h"
+
 KeyboardMapping GetDefaultMapping() {
     KeyboardMapping m = {0};
     m.playPause1 = KEY_Z;
@@ -38,7 +40,13 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2, Audi
             if (d1->LoadedTrack) {
                 for (int j = 0; j < d1->LoadedTrack->HotCuesCount; j++) {
                     if (d1->LoadedTrack->HotCues[j].ID == (unsigned int)targetID) {
-                        DeckAudio_JumpToMs(&engine->Decks[0], d1->LoadedTrack->HotCues[j].Start);
+                        uint32_t targetMs = d1->LoadedTrack->HotCues[j].Start;
+                        if (d1->QuantizeEnabled) {
+                            int32_t err = Quantize_GetPhaseErrorMs(d1->LoadedTrack, d1->PositionMs);
+                            if ((int32_t)targetMs + err < 0) targetMs = 0;
+                            else targetMs = (uint32_t)((int32_t)targetMs + err);
+                        }
+                        DeckAudio_JumpToMs(&engine->Decks[0], targetMs);
                         DeckAudio_InstantPlay(&engine->Decks[0]);
                         break;
                     }
@@ -57,7 +65,13 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2, Audi
             if (d2->LoadedTrack) {
                 for (int j = 0; j < d2->LoadedTrack->HotCuesCount; j++) {
                     if (d2->LoadedTrack->HotCues[j].ID == (unsigned int)targetID) {
-                        DeckAudio_JumpToMs(&engine->Decks[1], d2->LoadedTrack->HotCues[j].Start);
+                        uint32_t targetMs = d2->LoadedTrack->HotCues[j].Start;
+                        if (d2->QuantizeEnabled) {
+                            int32_t err = Quantize_GetPhaseErrorMs(d2->LoadedTrack, d2->PositionMs);
+                            if ((int32_t)targetMs + err < 0) targetMs = 0;
+                            else targetMs = (uint32_t)((int32_t)targetMs + err);
+                        }
+                        DeckAudio_JumpToMs(&engine->Decks[1], targetMs);
                         DeckAudio_InstantPlay(&engine->Decks[1]);
                         break;
                     }

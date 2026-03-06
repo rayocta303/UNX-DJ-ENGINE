@@ -2,6 +2,7 @@
 #include "ui/components/theme.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
+#include "logic/quantize.h"
 #include <stdio.h>
 
 static const char* FXNames[] = {"REVERB", "ECHO", "DELAY", "FLANGER"};
@@ -41,7 +42,13 @@ static int BottomStrip_Update(Component *base) {
                         if (ds && ds->LoadedTrack && b->AudioPlugin) {
                             for (int h = 0; h < ds->LoadedTrack->HotCuesCount; h++) {
                                 if (ds->LoadedTrack->HotCues[h].ID == (unsigned int)(i + 1)) {
-                                    DeckAudio_JumpToMs(&b->AudioPlugin->Decks[d], ds->LoadedTrack->HotCues[h].Start);
+                                    uint32_t targetMs = ds->LoadedTrack->HotCues[h].Start;
+                                    if (ds->QuantizeEnabled) {
+                                        int32_t err = Quantize_GetPhaseErrorMs(ds->LoadedTrack, ds->PositionMs);
+                                        if ((int32_t)targetMs + err < 0) targetMs = 0;
+                                        else targetMs = (uint32_t)((int32_t)targetMs + err);
+                                    }
+                                    DeckAudio_JumpToMs(&b->AudioPlugin->Decks[d], targetMs);
                                     DeckAudio_InstantPlay(&b->AudioPlugin->Decks[d]);
                                     return 1;
                                 }
