@@ -181,19 +181,24 @@ static void BeatFX_Draw(Component *base) {
     if (padIdx >= 6) padIdx = 5; 
     
     float ratio = XPadRatios[padIdx];
-    float fxBpm = masterBpm / ratio; // Kecepatan (LFO) = BPM / ratio
-    float fxMs = (60000.0f / masterBpm) * ratio; // Waktu (ms) = (60000/BPM) * ratio
+    float fxBpm = 0.0f;
+    float fxMs = 0.0f;
+    
+    if (masterBpm > 0.0f) {
+        fxBpm = masterBpm / ratio; // Kecepatan (LFO) = BPM / ratio
+        fxMs = (60000.0f / masterBpm) * ratio; // Waktu (ms) = (60000/BPM) * ratio
+    }
 
     // Draw Calculated BPM
-    char bpmStr[16];
-    sprintf(bpmStr, "%.1f", fxBpm);
+    char bpmStr[16] = "--.-";
+    if (masterBpm > 0.0f) sprintf(bpmStr, "%.1f", fxBpm);
     UIDrawText(bpmStr, faceMd, x + S(8), cy + S(2), S(10), ColorWhite);
     UIDrawText("BPM", faceXXS, x + w - S(26), cy + S(4), S(7), ColorShadow);
     cy += rowH;
 
     // msec display
-    char msStr[16];
-    sprintf(msStr, "%.0f", fxMs);
+    char msStr[16] = "---";
+    if (masterBpm > 0.0f) sprintf(msStr, "%.0f", fxMs);
     UIDrawText(msStr, faceSm, x + S(8), cy + S(2), S(9), ColorWhite);
     UIDrawText("msec", faceXXS, x + w - S(26), cy + S(3), S(7), ColorShadow);
     cy += rowH;

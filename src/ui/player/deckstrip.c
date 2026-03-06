@@ -220,16 +220,17 @@ static void DeckStrip_Draw(Component *base) {
         DrawCentredText("MASTER", faceXXS, masterX, masterW, bpmBoxY + S(1), S(7), ColorBlack);
     }
 
-    float bpmTarget = 120.0f;
-    if (d->State->CurrentBPM > 0.0f) {
-        bpmTarget = d->State->CurrentBPM;
-    }
-    int bpmWhole = (int)bpmTarget;
-    int bpmFraction = (int)((bpmTarget - bpmWhole) * 10);
+    char bpmMain[16] = "--";
+    char bpmDec[16] = ".-";
 
-    char bpmMain[16], bpmDec[16];
-    sprintf(bpmMain, "%d", bpmWhole);
-    sprintf(bpmDec, ".%d", bpmFraction);
+    if (d->State->CurrentBPM > 0.0f) {
+        float bpmTarget = d->State->CurrentBPM;
+        int bpmWhole = (int)bpmTarget;
+        int bpmFraction = (int)((bpmTarget - bpmWhole) * 10);
+
+        sprintf(bpmMain, "%d", bpmWhole);
+        sprintf(bpmDec, ".%d", bpmFraction);
+    }
 
     float wBmain = MeasureTextEx(faceBPM, bpmMain, S(20), 1).x;
     float wBdec = MeasureTextEx(faceMd, bpmDec, S(11), 1).x;
