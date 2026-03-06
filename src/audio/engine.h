@@ -48,6 +48,11 @@ typedef struct DeckAudioState {
     bool IsMotorOn;             // Platter motor state (physical)
     bool IsReverse;             // Reverse playback active
     
+    // Exact beat quantize buffering
+    uint32_t QueuedJumpMs;
+    uint32_t QueuedWaitSamples;
+    bool HasQueuedJump;
+    
     SpeedChangeState SpeedState; // Need ramp up/down
     
     // Mixxx EngineBufferScaleLinear state
@@ -91,6 +96,7 @@ void DeckAudio_InstantPlay(DeckAudioState *deck); // Start without vinyl ramp
 void DeckAudio_SetJogRate(DeckAudioState *deck, double delta); 
 void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching);
 void DeckAudio_JumpToMs(DeckAudioState *deck, uint32_t ms);
+void DeckAudio_QueueJumpMs(DeckAudioState *deck, uint32_t targetMs, uint32_t waitMs);
 void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch);
 
 #ifdef __cplusplus

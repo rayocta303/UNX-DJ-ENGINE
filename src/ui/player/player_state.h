@@ -39,9 +39,16 @@ typedef struct DeckState {
     char ArtworkPath[512];
     int TrackNumber;
     bool QuantizeEnabled;
+    int SyncMode; // 0=OFF, 1=BPM, 2=BEAT
     bool MasterTempo;
     int TempoRange; // 0=6%, 1=10%, 2=16%, 3=WIDE
     float TempoPercent;
+    
+    // Hardware integration
+    float HardwarePitchPercent;
+    bool PitchTakeoverActive;
+    float TargetTakeoverPercent;
+    
     bool IsMaster;
     bool IsTouching;   // Renamed from IsScratching to be more general
     bool VinylModeEnabled; 

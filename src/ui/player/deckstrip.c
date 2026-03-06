@@ -76,10 +76,15 @@ static int DeckStrip_Update(Component *base) {
     float mtW = S(40);
     float mtH = S(9);
 
+    float bpmBoxH = S(28);
+    float syncY = midY + bpmBoxH + S(2);
+    float syncH = S(12);
+
     Vector2 mouse = GetMousePosition();
     bool isHoverTempoArea = (mouse.x >= tempoX && mouse.x <= bpmX + bpmBoxW && mouse.y >= midY && mouse.y <= midY + S(28));
     bool isHoverMT = (mouse.x >= mtX && mouse.x <= mtX + mtW && mouse.y >= mtY && mouse.y <= mtY + mtH);
     bool isHoverQuantize = (mouse.x >= x && mouse.x <= x + lColW && mouse.y >= y + S(68) && mouse.y <= y + S(88));
+    bool isHoverSync = (mouse.x >= bpmX && mouse.x <= bpmX + bpmBoxW && mouse.y >= syncY && mouse.y <= syncY + syncH);
 
     if (isHoverMT && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
         d->State->MasterTempo = !d->State->MasterTempo;
@@ -87,6 +92,10 @@ static int DeckStrip_Update(Component *base) {
 
     if (isHoverQuantize && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
         d->State->QuantizeEnabled = !d->State->QuantizeEnabled;
+    }
+
+    if (isHoverSync && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+        d->State->SyncMode = (d->State->SyncMode + 1) % 2;
     }
 
     if (isHoverTempoArea) {
@@ -245,6 +254,20 @@ static void DeckStrip_Draw(Component *base) {
 
     UIDrawText(bpmMain, faceBPM, combinedX, bpmValY, S(20), ColorOrange);
     UIDrawText(bpmDec, faceMd, combinedX + wBmain, bpmValY + S(3.5f), S(11), ColorOrange);
+
+    // Sync Button
+    float syncY = bpmBoxY + bpmBoxH + S(2);
+    float syncH = S(12);
+    
+    Color syncColor = ColorShadow;
+    const char *syncText = "SYNC";
+    if (d->State->SyncMode == 1) {
+        syncColor = ColorOrange;
+        syncText = "BPM";
+    }
+
+    DrawRectangleLines(bpmX, syncY, bpmBoxW, syncH, syncColor);
+    DrawCentredText(syncText, faceXXS, bpmX, bpmBoxW, syncY + S(2.5f), S(7), syncColor);
 
     // Static Waveform rendering
     if (d->State->LoadedTrack != NULL) {

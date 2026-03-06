@@ -11,6 +11,7 @@
 #include "ui/player/player.h"
 #include "ui/browser/browser.h"
 #include "input/keyboard.h"
+#include "logic/sync.h"
 
 typedef enum {
     ScreenPlayer,
@@ -180,6 +181,10 @@ int main(void) {
         float realPitchB = 1.0f + (app.deckB.TempoPercent / 100.0f);
         audioEngine.Decks[1].Pitch = (uint16_t)(realPitchB * 10000.0f);
         app.deckB.CurrentBPM = app.deckB.OriginalBPM * realPitchB;
+        
+        // --- Sync Control Logic ---
+        Sync_Update(&app.deckA, &app.deckB, &audioEngine);
+        
         
         // --- Sync UI Jog/Modes back to Audio Engine ---
         // Deck A

@@ -168,6 +168,22 @@ static void calcCrossoverCoeffs(int type, float freq, float sampleRate, float *b
 static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int frames, AudioEngine *engine, int deckIndex) {
     if (!deck->PCMBuffer) return;
 
+    // Handle Quantize Buffering Logic
+    if (deck->HasQueuedJump) {
+        if (deck->QueuedWaitSamples >= (uint32_t)frames) {
+            deck->QueuedWaitSamples -= frames;
+        } else {
+            // Trigger exact jump & play once wait is depleted
+            DeckAudio_JumpToMs(deck, deck->QueuedJumpMs);
+            deck->IsMotorOn = true;
+            deck->BaseRate = (float)deck->Pitch / 10000.0f;
+            deck->OutlinedRate = deck->BaseRate;
+            
+            deck->HasQueuedJump = false;
+            deck->QueuedWaitSamples = 0;
+        }
+    }
+
     ProcessDeckPhysics(deck);
 
     if (!deck->IsPlaying) return;
@@ -392,4 +408,11 @@ void DeckAudio_JumpToMs(DeckAudioState *deck, uint32_t ms) {
 void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch) {
     deck->TargetPitch = pitch;
     deck->Pitch = pitch; // Assume instant update for now unless we need the TRIM smoother
+}
+
+void DeckAudio_QueueJumpMs(DeckAudioState *deck, uint32_t targetMs, uint32_t waitMs) {
+    deck->QueuedJumpMs = targetMs;
+    // Translate waitMs to purely audio sample frames to be processed later
+    deck->QueuedWaitSamples = (uint32_t)((double)waitMs * (44100.0 / 1000.0));
+    deck->HasQueuedJump = true;
 }

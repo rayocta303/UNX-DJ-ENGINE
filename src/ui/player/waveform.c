@@ -2,7 +2,9 @@
 #include "ui/components/theme.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
+#include "logic/quantize.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 static int Waveform_Update(Component *base) {
     WaveformRenderer *r = (WaveformRenderer *)base;
@@ -272,13 +274,54 @@ static void Waveform_Draw(Component *base) {
     }
     
     EndScissorMode();
+    
+    // --- Phase Meter UI ---
+    // Drawn above the main waveform block
+    if (r->State->LoadedTrack && r->OtherDeck && r->OtherDeck->LoadedTrack) {
+        float pmY = wfY + S(4);
+        float pmW = S(160);
+        float pmX = wfLeft + (wfW / 2.0f) - (pmW / 2.0f);
+        float pmH = S(8);
+        
+        // Background track
+        DrawRectangleLines(pmX, pmY, pmW, pmH, ColorShadow);
+        DrawLine(pmX + pmW / 2, pmY, pmX + pmW / 2, pmY + pmH, ColorOrange); // Center mark
+        
+        // Calculate offset
+        int32_t myPhase = Quantize_GetPhaseErrorMs(r->State->LoadedTrack, r->State->PositionMs);
+        int32_t otherPhase = Quantize_GetPhaseErrorMs(r->OtherDeck->LoadedTrack, r->OtherDeck->PositionMs);
+        
+        // Difference: positive means I am ahead of the other deck
+        int32_t phaseDiff = myPhase - otherPhase;
+        
+        // Max displayable drift in ms: let's say 200ms is full scale (edge of meter)
+        float maxDrift = 150.0f;
+        float driftRatio = (float)phaseDiff / maxDrift;
+        if (driftRatio > 1.0f) driftRatio = 1.0f;
+        if (driftRatio < -1.0f) driftRatio = -1.0f;
+        
+        // Size of the block itself
+        float blockW = S(16);
+        
+        // Depending on Sync mode, Pioneer phase meters behavior:
+        // A single active block usually represents the current deck's phase position relative to the master.
+        // We will render a block that moves relative to the center.
+        float blockX = (pmX + pmW / 2) + (driftRatio * (pmW / 2.0f)) - (blockW / 2.0f);
+        
+        Color blockColor = ColorWhite;
+        if (r->State->IsMaster) blockColor = ColorOrange;
+        else if (r->State->SyncMode == 2 && abs(phaseDiff) < 5) blockColor = (Color){0, 255, 255, 255}; // Locked
+        
+        DrawRectangle(blockX, pmY + S(1), blockW, pmH - S(2), blockColor);
+    }
 }
 
-void WaveformRenderer_Init(WaveformRenderer *r, int id, DeckState *state) {
+void WaveformRenderer_Init(WaveformRenderer *r, int id, DeckState *state, DeckState *otherDeck) {
     r->base.Update = Waveform_Update;
     r->base.Draw = Waveform_Draw;
     r->ID = id;
     r->State = state;
+    r->OtherDeck = otherDeck;
     r->cachedTrack = NULL;
     r->dynWfmFrames = 480;
     r->lastMouseX = 0;
