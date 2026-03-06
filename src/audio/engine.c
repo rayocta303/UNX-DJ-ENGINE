@@ -166,9 +166,11 @@ static void calcCrossoverCoeffs(int type, float freq, float sampleRate, float *b
 
 // Resampling directly from PCM
 static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int frames, AudioEngine *engine, int deckIndex) {
-    if (!deck->PCMBuffer || !deck->IsPlaying) return;
+    if (!deck->PCMBuffer) return;
 
     ProcessDeckPhysics(deck);
+
+    if (!deck->IsPlaying) return;
 
     double rate = deck->OutlinedRate;
     if (deck->IsReverse) {
