@@ -283,19 +283,28 @@ static int Browser_Update(Component *base) {
                         // Reset playhead for new track
                         targetDeck->Position = 0;
                         targetDeck->PositionMs = 0;
+                        if (targetDeck->IsPlaying) {
+                            targetDeck->IsPlaying = false;
+                        }
 
-                        // Auto-Cue: Jump to first memory cue if available
+                        // Auto-Cue: Jump to first memory cue, hot cue, or beat grid
+                        uint32_t firstMs = 0;
                         if (newTrack->CuesCount > 0) {
-                            uint32_t firstCueMs = newTrack->Cues[0].Start;
-                            targetDeck->PositionMs = firstCueMs;
-                            if (s->AudioPlugin) {
-                                DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck], firstCueMs);
-                                
-                                // Sync back the generated fractional frame position right away for the UI
-                                double sr = (double)s->AudioPlugin->Decks[loadToDeck].SampleRate;
-                                if (sr < 8000) sr = 44100.0;
-                                targetDeck->Position = (s->AudioPlugin->Decks[loadToDeck].Position * 150.0) / sr;
-                            }
+                            firstMs = newTrack->Cues[0].Start;
+                        } else if (newTrack->HotCuesCount > 0) {
+                            firstMs = newTrack->HotCues[0].Start;
+                        } else if (t->BeatGridCount > 0) {
+                            firstMs = newTrack->BeatGrid[0];
+                        }
+
+                        targetDeck->PositionMs = firstMs;
+                        if (s->AudioPlugin) {
+                            DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck], firstMs);
+                            
+                            // Sync back the generated fractional frame position right away for the UI
+                            double sr = (double)s->AudioPlugin->Decks[loadToDeck].SampleRate;
+                            if (sr < 8000) sr = 44100.0;
+                            targetDeck->Position = (s->AudioPlugin->Decks[loadToDeck].Position * 150.0) / sr;
                         }
                     }
                 }
