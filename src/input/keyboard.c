@@ -36,8 +36,13 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2, Audi
         if (engine) {
             bool starting = !engine->Decks[0].IsMotorOn;
             DeckAudio_SetPlaying(&engine->Decks[0], starting);
-            if (starting && d1->SyncMode == 2 && !d1->IsMaster) {
-                Sync_RequestPhaseSnap(d1, d2, engine);
+            if (starting) {
+                if (d1->SyncMode == 2 && !d1->IsMaster) {
+                    Sync_RequestPhaseSnap(d1, d2, engine);
+                }
+            } else {
+                // Revert to BPM sync on stop to avoid snapping during motor brake
+                if (d1->SyncMode == 2) d1->SyncMode = 1;
             }
         }
     }
@@ -67,8 +72,13 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2, Audi
         if (engine) {
             bool starting = !engine->Decks[1].IsMotorOn;
             DeckAudio_SetPlaying(&engine->Decks[1], starting);
-            if (starting && d2->SyncMode == 2 && !d2->IsMaster) {
-                Sync_RequestPhaseSnap(d2, d1, engine);
+            if (starting) {
+                if (d2->SyncMode == 2 && !d2->IsMaster) {
+                    Sync_RequestPhaseSnap(d2, d1, engine);
+                }
+            } else {
+                // Revert to BPM sync on stop to avoid snapping during motor brake
+                if (d2->SyncMode == 2) d2->SyncMode = 1;
             }
         }
     }

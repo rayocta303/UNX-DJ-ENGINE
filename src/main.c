@@ -154,9 +154,30 @@ int main(void) {
             if (app.splashCounter <= 0) app.screen = ScreenPlayer;
         }
 
-        // Exclusive Master Logic
+        // Exclusive Master Logic & Auto Takeover
         static bool lastMasterA = false;
         static bool lastMasterB = false;
+        static int lastSyncA = 0;
+        static int lastSyncB = 0;
+
+        // Auto Assign Master: If Sync is turned ON and No deck is master
+        bool noMaster = !app.deckA.IsMaster && !app.deckB.IsMaster;
+        if (noMaster) {
+            if (app.deckA.SyncMode > 0 && lastSyncA == 0) app.deckB.IsMaster = true;
+            else if (app.deckB.SyncMode > 0 && lastSyncB == 0) app.deckA.IsMaster = true;
+        }
+        lastSyncA = app.deckA.SyncMode;
+        lastSyncB = app.deckB.SyncMode;
+
+        // Auto Takeover: If Master stops, other deck becomes Master if playing
+        if (app.deckA.IsMaster && !app.deckA.IsPlaying && app.deckB.IsPlaying) {
+            app.deckA.IsMaster = false;
+            app.deckB.IsMaster = true;
+        } else if (app.deckB.IsMaster && !app.deckB.IsPlaying && app.deckA.IsPlaying) {
+            app.deckB.IsMaster = false;
+            app.deckA.IsMaster = true;
+        }
+
         if (app.deckA.IsMaster && !lastMasterA) app.deckB.IsMaster = false;
         if (app.deckB.IsMaster && !lastMasterB) app.deckA.IsMaster = false;
         lastMasterA = app.deckA.IsMaster;
@@ -198,6 +219,11 @@ int main(void) {
             if (released && app.deckA.SyncMode == 2 && !app.deckA.IsMaster) {
                 Sync_RequestPhaseSnap(&app.deckA, &app.deckB, &audioEngine);
             }
+
+            // Immediately switch to BPM sync on touch if was in BEAT sync
+            if (app.deckA.IsTouching && app.deckA.SyncMode == 2) {
+                app.deckA.SyncMode = 1;
+            }
         }
         if (app.deckA.IsTouching) {
             double dt = GetFrameTime();
@@ -223,6 +249,11 @@ int main(void) {
             // Phase Snap on release if Beat Sync is ON
             if (released && app.deckB.SyncMode == 2 && !app.deckB.IsMaster) {
                 Sync_RequestPhaseSnap(&app.deckB, &app.deckA, &audioEngine);
+            }
+
+            // Immediately switch to BPM sync on touch if was in BEAT sync
+            if (app.deckB.IsTouching && app.deckB.SyncMode == 2) {
+                app.deckB.SyncMode = 1;
             }
         }
         if (app.deckB.IsTouching) {
