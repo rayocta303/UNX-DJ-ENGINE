@@ -95,7 +95,7 @@ static int DeckStrip_Update(Component *base) {
     }
 
     if (isHoverSync && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-        d->State->SyncMode = (d->State->SyncMode + 1) % 2;
+        d->State->SyncMode = (d->State->SyncMode + 1) % 3;
     }
 
     if (isHoverTempoArea) {
@@ -264,6 +264,9 @@ static void DeckStrip_Draw(Component *base) {
     if (d->State->SyncMode == 1) {
         syncColor = ColorOrange;
         syncText = "BPM";
+    } else if (d->State->SyncMode == 2) {
+        syncColor = ColorOrange;
+        syncText = "BEAT";
     }
 
     DrawRectangleLines(bpmX, syncY, bpmBoxW, syncH, syncColor);

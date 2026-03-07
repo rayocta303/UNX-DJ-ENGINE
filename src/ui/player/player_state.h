@@ -66,6 +66,7 @@ typedef struct DeckState {
     float CurrentBPM;
     float OriginalBPM; // Added OriginalBPM missing from struct
 
+    float LastPhaseAdjustment; // For Phase (Beat) Sync proportional control
     void *bpmCtx;
 } DeckState;
 

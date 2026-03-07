@@ -7,6 +7,7 @@ extern "C" {
 #endif
 
 void Sync_Update(DeckState *deckA, DeckState *deckB, AudioEngine *audioEngine);
+void Sync_RequestPhaseSnap(DeckState *follower, DeckState *master, AudioEngine *audioEngine);
 void DeckState_SetHardwarePitch(DeckState *deck, float hardwarePercent);
 
 #ifdef __cplusplus

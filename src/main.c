@@ -57,6 +57,7 @@ void App_Init(App *a) {
 
     // Init Deck States
     memset(&a->deckA, 0, sizeof(DeckState));
+    a->deckA.ID = 0;
     strcpy(a->deckA.SourceName, "USB1");
     a->deckA.PositionMs = 0;
     a->deckA.TrackLengthMs = 0;
@@ -66,6 +67,7 @@ void App_Init(App *a) {
     a->deckA.ZoomScale = 16;
 
     memset(&a->deckB, 0, sizeof(DeckState));
+    a->deckB.ID = 1;
     strcpy(a->deckB.SourceName, "USB1");
     a->deckB.PositionMs = 0;
     a->deckB.TrackLengthMs = 0;
@@ -189,7 +191,13 @@ int main(void) {
         // --- Sync UI Jog/Modes back to Audio Engine ---
         // Deck A
         if (app.deckA.IsTouching != audioEngine.Decks[0].IsTouching) {
+            bool released = !app.deckA.IsTouching && audioEngine.Decks[0].IsTouching;
             DeckAudio_SetJogTouch(&audioEngine.Decks[0], app.deckA.IsTouching);
+            
+            // Phase Snap on release if Beat Sync is ON
+            if (released && app.deckA.SyncMode == 2 && !app.deckA.IsMaster) {
+                Sync_RequestPhaseSnap(&app.deckA, &app.deckB, &audioEngine);
+            }
         }
         if (app.deckA.IsTouching) {
             double dt = GetFrameTime();
@@ -209,7 +217,13 @@ int main(void) {
 
         // Deck B
         if (app.deckB.IsTouching != audioEngine.Decks[1].IsTouching) {
+            bool released = !app.deckB.IsTouching && audioEngine.Decks[1].IsTouching;
             DeckAudio_SetJogTouch(&audioEngine.Decks[1], app.deckB.IsTouching);
+            
+            // Phase Snap on release if Beat Sync is ON
+            if (released && app.deckB.SyncMode == 2 && !app.deckB.IsMaster) {
+                Sync_RequestPhaseSnap(&app.deckB, &app.deckA, &audioEngine);
+            }
         }
         if (app.deckB.IsTouching) {
             double dt = GetFrameTime();

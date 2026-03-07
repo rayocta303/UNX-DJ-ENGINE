@@ -2,6 +2,7 @@
 #include "raylib.h"
 
 #include "logic/quantize.h"
+#include "logic/sync.h"
 
 KeyboardMapping GetDefaultMapping() {
     KeyboardMapping m = {0};
@@ -32,7 +33,13 @@ KeyboardMapping GetDefaultMapping() {
 void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2, AudioEngine *engine) {
     // Deck 1
     if (IsKeyPressed(m->playPause1)) {
-        if (engine) DeckAudio_SetPlaying(&engine->Decks[0], !engine->Decks[0].IsMotorOn);
+        if (engine) {
+            bool starting = !engine->Decks[0].IsMotorOn;
+            DeckAudio_SetPlaying(&engine->Decks[0], starting);
+            if (starting && d1->SyncMode == 2 && !d1->IsMaster) {
+                Sync_RequestPhaseSnap(d1, d2, engine);
+            }
+        }
     }
     for (int i = 0; i < 5; i++) {
         if (IsKeyPressed(m->hotCues1[i])) {
@@ -57,7 +64,13 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2, Audi
 
     // Deck 2
     if (IsKeyPressed(m->playPause2)) {
-        if (engine) DeckAudio_SetPlaying(&engine->Decks[1], !engine->Decks[1].IsMotorOn);
+        if (engine) {
+            bool starting = !engine->Decks[1].IsMotorOn;
+            DeckAudio_SetPlaying(&engine->Decks[1], starting);
+            if (starting && d2->SyncMode == 2 && !d2->IsMaster) {
+                Sync_RequestPhaseSnap(d2, d1, engine);
+            }
+        }
     }
     for (int i = 0; i < 5; i++) {
         if (IsKeyPressed(m->hotCues2[i])) {
