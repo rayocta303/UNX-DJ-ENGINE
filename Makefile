@@ -45,6 +45,7 @@ SRC_C = src/main.c \
         src/ui/browser/browser.c \
         src/logic/quantize.c \
         src/logic/sync.c \
+        src/logic/settings_io.c \
         src/audio/fx/dsp_utils.c \
         $(wildcard src/audio/fx/colorfx/*.c) \
         $(wildcard src/audio/fx/beatfx/*.c)

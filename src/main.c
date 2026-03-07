@@ -12,6 +12,7 @@
 #include "ui/browser/browser.h"
 #include "input/keyboard.h"
 #include "logic/sync.h"
+#include "logic/settings_io.h"
 
 typedef enum {
     ScreenPlayer,
@@ -51,6 +52,37 @@ void AudioProcessCallback(void *buffer, unsigned int frames) {
     }
 }
 
+void OnSettingsApply(void *ctx) {
+    App *a = (App*)ctx;
+    
+    // Sync UI items back to deck states
+    int styleIdx = a->settingsState.Items[2].Current;
+    a->deckA.Waveform.Style = (WaveformStyle)styleIdx;
+    a->deckB.Waveform.Style = (WaveformStyle)styleIdx;
+    
+    float gainMap[] = { 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f };
+    a->deckA.Waveform.GainLow = gainMap[a->settingsState.Items[3].Current];
+    a->deckA.Waveform.GainMid = gainMap[a->settingsState.Items[4].Current];
+    a->deckA.Waveform.GainHigh = gainMap[a->settingsState.Items[5].Current];
+    
+    a->deckB.Waveform = a->deckA.Waveform;
+    
+    a->deckA.Waveform.LoadLock = (a->settingsState.Items[1].Current == 1);
+    a->deckA.Waveform.VinylStartMs = a->settingsState.Items[6].Value;
+    a->deckA.Waveform.VinylStopMs = a->settingsState.Items[7].Value;
+    a->deckB.Waveform = a->deckA.Waveform;
+
+    printf("[SETTINGS] Applied Style: %d, Gains: L%.2f M%.2f H%.2f, Start: %.0f, Stop: %.0f, Lock: %d\n", 
+           a->deckA.Waveform.Style, a->deckA.Waveform.GainLow, 
+           a->deckA.Waveform.GainMid, a->deckA.Waveform.GainHigh,
+           a->deckA.Waveform.VinylStartMs, a->deckA.Waveform.VinylStopMs,
+           a->deckA.Waveform.LoadLock);
+
+    Settings_Save(a->deckA.Waveform, a->deckB.Waveform);
+    a->screen = ScreenPlayer;
+    a->settingsState.IsActive = false;
+}
+
 void App_Init(App *a) {
     a->screen = ScreenSplash;
     a->splashCounter = 120; // 2 seconds at 60 FPS
@@ -84,7 +116,8 @@ void App_Init(App *a) {
     // Init Settings State
     memset(&a->settingsState, 0, sizeof(SettingsState));
     a->settingsState.IsActive = false;
-    a->settingsState.ItemsCount = 4;
+    a->settingsState.ItemsCount = 8;
+    
     strcpy(a->settingsState.Items[0].Label, "PLAY MODE");
     strcpy(a->settingsState.Items[0].Options[0], "CONTINUE");
     strcpy(a->settingsState.Items[0].Options[1], "SINGLE");
@@ -94,7 +127,62 @@ void App_Init(App *a) {
     strcpy(a->settingsState.Items[1].Options[0], "OFF");
     strcpy(a->settingsState.Items[1].Options[1], "ON");
     a->settingsState.Items[1].OptionsCount = 2;
+
+    // Load persisted settings
+    Settings_Load(&a->deckA.Waveform, &a->deckB.Waveform);
+
+    strcpy(a->settingsState.Items[2].Label, "WFM STYLE");
+    strcpy(a->settingsState.Items[2].Options[0], "BLUE");
+    strcpy(a->settingsState.Items[2].Options[1], "RGB");
+    strcpy(a->settingsState.Items[2].Options[2], "3-BAND");
+    a->settingsState.Items[2].OptionsCount = 3;
+    a->settingsState.Items[2].Current = a->deckA.Waveform.Style;
+
+    const char* gLabels[] = { "0.5x", "0.75x", "1.0x", "1.25x", "1.5x", "2.0x" };
+    float gValues[] = { 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f };
     
+    strcpy(a->settingsState.Items[3].Label, "WFM LOW GAIN");
+    for (int i=0; i<6; i++) {
+        strcpy(a->settingsState.Items[3].Options[i], gLabels[i]);
+        if (a->deckA.Waveform.GainLow == gValues[i]) a->settingsState.Items[3].Current = i;
+    }
+    a->settingsState.Items[3].OptionsCount = 6;
+
+    strcpy(a->settingsState.Items[4].Label, "WFM MID GAIN");
+    for (int i=0; i<6; i++) {
+        strcpy(a->settingsState.Items[4].Options[i], gLabels[i]);
+        if (a->deckA.Waveform.GainMid == gValues[i]) a->settingsState.Items[4].Current = i;
+    }
+    a->settingsState.Items[4].OptionsCount = 6;
+
+    strcpy(a->settingsState.Items[5].Label, "WFM HIGH GAIN");
+    for (int i=0; i<6; i++) {
+        strcpy(a->settingsState.Items[5].Options[i], gLabels[i]);
+        if (a->deckA.Waveform.GainHigh == gValues[i]) a->settingsState.Items[5].Current = i;
+    }
+    a->settingsState.Items[5].OptionsCount = 6;
+    
+    strcpy(a->settingsState.Items[6].Label, "JOG START TIME");
+    a->settingsState.Items[6].Type = SETTING_TYPE_KNOB;
+    a->settingsState.Items[6].Min = 0;
+    a->settingsState.Items[6].Max = 2000;
+    a->settingsState.Items[6].Value = a->deckA.Waveform.VinylStartMs;
+    strcpy(a->settingsState.Items[6].Unit, "ms");
+
+    strcpy(a->settingsState.Items[7].Label, "JOG RELEASE TIME");
+    a->settingsState.Items[7].Type = SETTING_TYPE_KNOB;
+    a->settingsState.Items[7].Min = 0;
+    a->settingsState.Items[7].Max = 2000;
+    a->settingsState.Items[7].Value = a->deckA.Waveform.VinylStopMs;
+    strcpy(a->settingsState.Items[7].Unit, "ms");
+    
+    // Set Load Lock current opt
+    a->settingsState.Items[1].Current = a->deckA.Waveform.LoadLock ? 1 : 0;
+    
+    // Init Info State
+    memset(&a->infoState, 0, sizeof(InfoState));
+    a->infoState.IsActive = false;
+
     // Init FX State
     memset(&a->fxState, 0, sizeof(BeatFXState));
 
@@ -106,6 +194,9 @@ void App_Init(App *a) {
     BrowserRenderer_Init(&a->browser, &a->browserState);
     InfoRenderer_Init(&a->info, &a->infoState);
     SettingsRenderer_Init(&a->settings, &a->settingsState);
+    a->settings.OnApply = OnSettingsApply;
+    a->settings.OnClose = OnSettingsApply;
+    a->settings.callbackCtx = a;
     SplashRenderer_Init(&a->splash, &a->splashCounter);
     a->keyMap = GetDefaultMapping();
 }
@@ -271,6 +362,18 @@ int main(void) {
         audioEngine.Decks[1].VinylModeEnabled = app.deckB.VinylModeEnabled;
         audioEngine.Decks[1].MasterTempoActive = app.deckB.MasterTempo;
 
+        // Apply Vinyl Start/Stop Physics
+        for (int i=0; i<2; i++) {
+            DeckState *ds = (i == 0) ? &app.deckA : &app.deckB;
+            // Accel calculation: approximate 4096 samples per block logic
+            // Assuming 44100Hz, a 1024 sample block is ~23ms.
+            // If StartMs is 500ms, we need approx 500/23 = 21 steps.
+            // accel = 1.0 / 21 = 0.047
+            float blockMs = 23.2f; // approximate at 1024 frames @ 44.1k
+            audioEngine.Decks[i].VinylStartAccel = blockMs / (ds->Waveform.VinylStartMs + 1.0f);
+            audioEngine.Decks[i].VinylStopAccel = blockMs / (ds->Waveform.VinylStopMs + 1.0f);
+        }
+
         // --- Sync Audio Engine State to UI State ---
         if (audioEngine.Decks[0].PCMBuffer) {
             // Position is already frame-based (L+R pair = 1 frame)
@@ -305,13 +408,36 @@ int main(void) {
         }
         
         if (IsKeyPressed(app.keyMap.toggleInfo)) {
-            if (app.screen == ScreenInfo) app.screen = ScreenPlayer;
-            else app.screen = ScreenInfo;
+            if (app.screen == ScreenInfo) {
+                app.screen = ScreenPlayer;
+                app.infoState.IsActive = false;
+            } else {
+                app.screen = ScreenInfo;
+                app.infoState.IsActive = true;
+                
+                // Sync Info State from Decks
+                for (int i=0; i<2; i++) {
+                    DeckState *ds = (i == 0) ? &app.deckA : &app.deckB;
+                    InfoTrack *it = &app.infoState.Tracks[i];
+                    strcpy(it->Title, ds->TrackTitle);
+                    strcpy(it->Artist, ds->ArtistName);
+                    it->BPM = ds->OriginalBPM;
+                    strcpy(it->Key, ds->TrackKey);
+                    it->Duration = ds->TrackLengthMs / 1000;
+                    strcpy(it->Source, ds->SourceName);
+                    // Add more if available...
+                }
+            }
         }
 
         if (IsKeyPressed(app.keyMap.toggleSettings)) {
-            if (app.screen == ScreenSettings) app.screen = ScreenPlayer;
-            else app.screen = ScreenSettings;
+            if (app.screen == ScreenSettings) {
+                app.screen = ScreenPlayer;
+                app.settingsState.IsActive = false;
+            } else {
+                app.screen = ScreenSettings;
+                app.settingsState.IsActive = true;
+            }
         }
 
         // ESC / Back logic
@@ -325,6 +451,9 @@ int main(void) {
                 }
             } else if (app.screen != ScreenPlayer && app.screen != ScreenSplash) {
                 app.screen = ScreenPlayer;
+                app.browserState.IsActive = false;
+                app.infoState.IsActive = false;
+                app.settingsState.IsActive = false;
             }
         }
 

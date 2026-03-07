@@ -180,6 +180,12 @@ static int Browser_Update(Component *base) {
 
     if (s->BrowseLevel == 0 && loadToDeck != -1) {
         // LOAD TRACK
+        struct DeckState *targetDeck = loadToDeck == 0 ? s->DeckA : s->DeckB;
+        if (targetDeck && targetDeck->Waveform.LoadLock && targetDeck->IsPlaying) {
+            printf("[BROWSER] LOAD LOCKED: Deck %c is playing\n", loadToDeck == 0 ? 'A' : 'B');
+            return 0; // Prevent load
+        }
+
         int idx = s->ScrollOffset + s->CursorPos;
         if (idx < s->ActiveTrackCount && s->TrackPointers[idx]) {
             RBTrack *t = s->TrackPointers[idx];

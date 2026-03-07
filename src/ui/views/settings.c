@@ -10,12 +10,19 @@ static int Settings_Update(Component *base) {
 
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
         Vector2 mouse = UIGetMousePosition();
-        float divY = SCREEN_HEIGHT - 28.0f;
+        float divY = SCREEN_HEIGHT - S(28.0f);
 
-        if (mouse.x >= 30 && mouse.x <= 110 && mouse.y >= divY + 4 && mouse.y <= divY + 22) {
-            if (r->OnClose) r->OnClose(r->callbackCtx);
+        // Buttons in Reference Space (using Si to convert mouse to ref or scaled to scaled)
+        // Actually UIGetMousePosition returns reference-like space (offset subtracted) 
+        // but it's not divided by scale. So we should compare against scaled values.
+        
+        // APPLY Button: DrawRectangle(S(30), divY + S(4), S(80), S(18), ...)
+        if (mouse.x >= S(30) && mouse.x <= S(110) && mouse.y >= divY + S(4) && mouse.y <= divY + S(22)) {
+            if (r->OnApply) r->OnApply(r->callbackCtx);
+            else if (r->OnClose) r->OnClose(r->callbackCtx);
         }
-        if (mouse.x >= SCREEN_WIDTH - 110 && mouse.x <= SCREEN_WIDTH - 30 && mouse.y >= divY + 4 && mouse.y <= divY + 22) {
+        // CANCEL Button: DrawRectangle(SCREEN_WIDTH - S(110), divY + S(4), S(80), S(18), ...)
+        if (mouse.x >= SCREEN_WIDTH - S(110) && mouse.x <= SCREEN_WIDTH - S(30) && mouse.y >= divY + S(4) && mouse.y <= divY + S(22)) {
             if (r->OnClose) r->OnClose(r->callbackCtx);
         }
     }
@@ -39,18 +46,34 @@ static int Settings_Update(Component *base) {
     int idx = r->State->Scroll + r->State->CursorPos;
     if (idx < r->State->ItemsCount) {
         SettingItem *item = &r->State->Items[idx];
-        if (IsKeyPressed(KEY_LEFT)) {
-            if (item->Current > 0) item->Current--;
-            else item->Current = item->OptionsCount - 1;
-        }
-        if (IsKeyPressed(KEY_RIGHT)) {
-            if (item->Current < item->OptionsCount - 1) item->Current++;
-            else item->Current = 0;
+        if (item->Type == SETTING_TYPE_LIST) {
+            if (IsKeyPressed(KEY_LEFT)) {
+                if (item->Current > 0) item->Current--;
+                else item->Current = item->OptionsCount - 1;
+            }
+            if (IsKeyPressed(KEY_RIGHT)) {
+                if (item->Current < item->OptionsCount - 1) item->Current++;
+                else item->Current = 0;
+            }
+        } else if (item->Type == SETTING_TYPE_KNOB) {
+            float step = (item->Max - item->Min) / 20.0f; // 5% steps
+            if (IsKeyDown(KEY_LEFT)) {
+                item->Value -= step * GetFrameTime() * 10.0f;
+                if (item->Value < item->Min) item->Value = item->Min;
+            }
+            if (IsKeyDown(KEY_RIGHT)) {
+                item->Value += step * GetFrameTime() * 10.0f;
+                if (item->Value > item->Max) item->Value = item->Max;
+            }
         }
     }
 
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
         if (r->OnClose) r->OnClose(r->callbackCtx);
+    }
+
+    if (IsKeyPressed(KEY_ENTER)) {
+        if (r->OnApply) r->OnApply(r->callbackCtx);
     }
     return 0;
 }
@@ -65,7 +88,7 @@ static void Settings_Draw(Component *base) {
     Font faceSm = UIFonts_GetFace(S(11));
     Font faceMd = UIFonts_GetFace(S(13));
 
-    float rowH = 28.0f;
+    float rowH = S(28.0f);
     int visibleRows = 12;
 
     for (int i = 0; i < visibleRows; i++) {
@@ -77,45 +100,49 @@ static void Settings_Draw(Component *base) {
 
         bool selected = (i == r->State->CursorPos);
         if (selected) {
-            DrawRectangle(0, ry, SCREEN_WIDTH - 2, rowH - 1, ColorGray);
+            DrawRectangle(0, ry, SCREEN_WIDTH - S(2), rowH - S(1), ColorGray);
         } else if (i % 2 == 0) {
-            DrawRectangle(0, ry, SCREEN_WIDTH - 2, rowH - 1, ColorDark1);
+            DrawRectangle(0, ry, SCREEN_WIDTH - S(2), rowH - S(1), ColorDark1);
         }
 
         Color rowClr = ColorWhite;
 
         if (selected) {
-            UIDrawText("\xe2\x96\xba", faceXS, S(6), ry + S(6), S(9), ColorOrange); // â–º
+            UIDrawText("\xe2\x96\xba", faceXS, S(6), ry + S(6), S(9), ColorOrange); // ►
         }
 
         UIDrawText(item->Label, faceMd, S(24), ry + S(6), S(13), rowClr);
 
-        const char* valStr = "";
-        if (item->Current < item->OptionsCount) valStr = item->Options[item->Current];
-        
-        UIDrawText(valStr, faceMd, SCREEN_WIDTH - Si(120), ry + S(6), S(13), ColorOrange);
+        if (item->Type == SETTING_TYPE_LIST) {
+            const char* valStr = "";
+            if (item->Current < item->OptionsCount) valStr = item->Options[item->Current];
+            
+            UIDrawText(valStr, faceMd, SCREEN_WIDTH - S(120), ry + S(6), S(13), ColorOrange);
 
-        if (selected && item->OptionsCount > 1) {
-            UIDrawText("\xe2\x97\x84", faceXS, SCREEN_WIDTH - Si(150), ry + S(6), S(9), ColorShadow); // â—„
-            UIDrawText("\xe2\x96\xba", faceXS, SCREEN_WIDTH - Si(15), ry + S(6), S(9), ColorShadow);  // â–º
+            if (selected && item->OptionsCount > 1) {
+                UIDrawText("\xe2\x97\x84", faceXS, SCREEN_WIDTH - S(150), ry + S(6), S(9), ColorShadow); // ◄
+                UIDrawText("\xe2\x96\xba", faceXS, SCREEN_WIDTH - S(15), ry + S(6), S(9), ColorShadow);  // ►
+            }
+        } else if (item->Type == SETTING_TYPE_KNOB) {
+            UIDrawKnob(SCREEN_WIDTH - S(80), ry + (rowH / 2.0f), S(9), item->Value, item->Min, item->Max, item->Unit, ColorOrange);
         }
     }
 
     DrawScrollbar(r->State->ItemsCount, r->State->Scroll + r->State->CursorPos, visibleRows);
 
-    float divY = SCREEN_HEIGHT - 28.0f;
-    DrawLine(4, divY, SCREEN_WIDTH - 4, divY, ColorDark1);
+    float divY = SCREEN_HEIGHT - S(28.0f);
+    DrawLine(S(4), divY, SCREEN_WIDTH - S(4), divY, ColorDark1);
 
-    DrawRectangle(30, divY + 4, 80, 18, ColorDGreen);
-    UIDrawText("APPLY", faceSm, 44, divY + 7, S(11), ColorBlack);
+    DrawRectangle(S(30), divY + S(4), S(80), S(18), ColorDGreen);
+    UIDrawText("APPLY", faceSm, S(44), divY + S(7), S(11), ColorBlack);
 
     char countStr[32];
     sprintf(countStr, "%d / %d", r->State->Scroll + r->State->CursorPos + 1, r->State->ItemsCount);
-    UIDrawText(countStr, faceXS, SCREEN_WIDTH / 2.0f - 24.0f, divY + 7, S(9), ColorShadow);
+    UIDrawText(countStr, faceXS, SCREEN_WIDTH / 2.0f - S(24.0f), divY + S(7), S(9), ColorShadow);
 
-    DrawRectangle(SCREEN_WIDTH - 110, divY + 4, 80, 18, ColorDark1);
-    DrawRectangleLines(SCREEN_WIDTH - 110, divY + 4, 80, 18, ColorShadow);
-    UIDrawText("CANCEL", faceSm, SCREEN_WIDTH - 90, divY + 7, S(11), ColorWhite);
+    DrawRectangle(SCREEN_WIDTH - S(110), divY + S(4), S(80), S(18), ColorDark1);
+    DrawRectangleLines(SCREEN_WIDTH - S(110), divY + S(4), S(80), S(18), ColorShadow);
+    UIDrawText("CLOSE", faceSm, SCREEN_WIDTH - S(90), divY + S(7), S(11), ColorWhite);
 }
 
 void SettingsRenderer_Init(SettingsRenderer *r, SettingsState *state) {
@@ -123,5 +150,6 @@ void SettingsRenderer_Init(SettingsRenderer *r, SettingsState *state) {
     r->base.Draw = Settings_Draw;
     r->State = state;
     r->OnClose = NULL;
+    r->OnApply = NULL;
     r->callbackCtx = NULL;
 }

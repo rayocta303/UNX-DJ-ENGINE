@@ -2,11 +2,27 @@
 #include <stdbool.h>
 #include "library/rekordbox_reader.h"
 
-typedef struct HotCue {
+typedef struct {
     unsigned int Start; // ms
     unsigned int ID;
     unsigned char Color[3]; // RGB
 } HotCue;
+
+typedef enum {
+    WAVEFORM_STYLE_BLUE = 0,
+    WAVEFORM_STYLE_RGB = 1,
+    WAVEFORM_STYLE_3BAND = 2
+} WaveformStyle;
+
+typedef struct {
+    WaveformStyle Style;
+    float GainLow;
+    float GainMid;
+    float GainHigh;
+    float VinylStartMs;
+    float VinylStopMs;
+    bool LoadLock;
+} WaveformSettings;
 
 typedef struct TrackState {
     RBBeat BeatGrid[1024]; 
@@ -68,6 +84,8 @@ typedef struct DeckState {
 
     float LastPhaseAdjustment; // For Phase (Beat) Sync proportional control
     void *bpmCtx;
+    
+    WaveformSettings Waveform;
 } DeckState;
 
 typedef struct BeatFXState {

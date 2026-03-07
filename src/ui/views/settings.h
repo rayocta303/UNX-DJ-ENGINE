@@ -6,11 +6,25 @@
 #define MAX_SETTING_OPTIONS 8
 #define MAX_SETTINGS_ITEMS 32
 
+typedef enum {
+    SETTING_TYPE_LIST,
+    SETTING_TYPE_KNOB
+} SettingType;
+
 typedef struct {
     char Label[64];
+    SettingType Type;
+    
+    // List part
     char Options[MAX_SETTING_OPTIONS][32];
     int OptionsCount;
     int Current;
+
+    // Knob part
+    float Value;
+    float Min;
+    float Max;
+    char Unit[16];
 } SettingItem;
 
 typedef struct {
@@ -27,6 +41,7 @@ struct SettingsRenderer {
     Component base;
     SettingsState *State;
     void (*OnClose)(void*);
+    void (*OnApply)(void*);
     void *callbackCtx;
 };
 

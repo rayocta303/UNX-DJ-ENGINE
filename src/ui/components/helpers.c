@@ -2,6 +2,11 @@
 #include "ui/components/theme.h"
 #include "ui/components/fonts.h"
 #include <stdio.h>
+#include <math.h>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 void DrawTopBar(int remainMin, int remainSec, int clockMin, int clockSec, bool showInfo) {
     DrawRectangle(0, 0, SCREEN_WIDTH, TOP_BAR_H, ColorDark2);
@@ -60,4 +65,33 @@ void DrawCentredText(const char* str, Font font, float padX, float width, float 
     Vector2 size = MeasureTextEx(font, str, fontSize, 1.0f);
     float x = padX + (width - size.x) / 2.0f;
     UIDrawText(str, font, x, y, fontSize, clr);
+}
+
+void UIDrawKnob(float x, float y, float radius, float value, float min, float max, const char* unit, Color color) {
+    // Background arc
+    DrawCircleSectorLines((Vector2){x, y}, radius, 135, 405, 32, ColorShadow);
+    
+    // Active arc
+    float normalized = (value - min) / (max - min);
+    if (normalized < 0) normalized = 0;
+    if (normalized > 1) normalized = 1;
+    
+    float endAngle = 135 + (normalized * 270);
+    DrawCircleSectorLines((Vector2){x, y}, radius, 135, endAngle, 32, color);
+    
+    // Needle
+    float angleRad = (endAngle - 90) * (M_PI / 180.0f);
+    Vector2 needleEnd = {
+        x + cosf(angleRad) * radius,
+        y + sinf(angleRad) * radius
+    };
+    DrawLineEx((Vector2){x, y}, needleEnd, 2.0f, color);
+    
+    // Value text
+    char valStr[32];
+    if (unit) sprintf(valStr, "%.0f%s", value, unit);
+    else sprintf(valStr, "%.0f", value);
+    
+    Font face = UIFonts_GetFace(S(8));
+    DrawCentredText(valStr, face, x - radius, radius * 2, y + radius + 2, S(8), ColorWhite);
 }

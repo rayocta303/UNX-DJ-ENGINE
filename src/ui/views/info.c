@@ -31,15 +31,16 @@ static void Info_Draw(Component *base) {
     DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ColorBlack);
     DrawLine(0, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT / 2, ColorDark1);
 
-    Font faceXXS = UIFonts_GetFace(7);
-    Font faceXS  = UIFonts_GetFace(8);
-    Font faceSm  = UIFonts_GetFace(9);
-    Font faceLg  = UIFonts_GetFace(14);
-    Font iconFace = UIFonts_GetIcon(14);
+    Font faceXXS = UIFonts_GetFace(S(7));
+    Font faceXS  = UIFonts_GetFace(S(8));
+    Font faceSm  = UIFonts_GetFace(S(9));
+    Font faceLg  = UIFonts_GetFace(S(14));
+    Font iconFace = UIFonts_GetIcon(S(14));
+
+    float availableH = SCREEN_HEIGHT - TOP_BAR_H - DECK_STR_H;
+    float halfH = availableH / 2.0f;
 
     for (int deckIdx = 0; deckIdx < 2; deckIdx++) {
-        float availableH = SCREEN_HEIGHT - TOP_BAR_H - DECK_STR_H;
-        float halfH = availableH / 2.0f;
         float offsetY = deckIdx * halfH;
         float baseY = TOP_BAR_H + offsetY;
 
@@ -47,17 +48,17 @@ static void Info_Draw(Component *base) {
 
         char deckLab[32];
         sprintf(deckLab, "DECK %d", deckIdx + 1);
-        UIDrawText(deckLab, faceXXS, 10, baseY + 4, 7, ColorRed);
+        UIDrawText(deckLab, faceXXS, S(10), baseY + S(4), S(7), ColorRed);
 
-        UIDrawText("\xef\x80\x81", iconFace, 10, baseY + 18, 14, ColorWhite); // f001 music note
+        UIDrawText("\xef\x80\x81", iconFace, S(10), baseY + S(18), S(14), ColorWhite); // f001 music note
         
         char tTitle[128]; truncateStr(trk->Title, tTitle, 80);
-        UIDrawText(tTitle, faceLg, 30, baseY + 18, 14, ColorWhite);
+        UIDrawText(tTitle, faceLg, S(30), baseY + S(18), S(14), ColorWhite);
 
         char tArtist[128]; truncateStr(trk->Artist, tArtist, 80);
-        UIDrawText(tArtist, faceSm, 24, baseY + 36, 9, ColorShadow);
+        UIDrawText(tArtist, faceSm, S(24), baseY + S(36), S(9), ColorShadow);
 
-        DrawLine(8, baseY + 52, SCREEN_WIDTH - 8, baseY + 52, ColorDark1);
+        DrawLine(S(8), baseY + S(52), SCREEN_WIDTH - S(8), baseY + S(52), ColorDark1);
 
         // Rows
         struct { const char* l1; const char* v1; const char* l2; const char* v2; } rows[4];
@@ -83,24 +84,24 @@ static void Info_Draw(Component *base) {
         rows[3].l1 = "SOURCE"; rows[3].v1 = trk->Source;
         rows[3].l2 = "FILE"; rows[3].v2 = tFile;
 
-        float rowH = 22;
-        float col1X = 10;
-        float col2X = 360;
+        float rowH = S(22);
+        float col1X = S(10);
+        float col2X = SCREEN_WIDTH / 2.0f + S(40); // Adjusted for proportional split
 
         for (int i = 0; i < 4; i++) {
-            float ry = baseY + 58 + i * rowH;
-            UIDrawText(rows[i].l1, faceXXS, col1X, ry, 7, ColorShadow);
-            UIDrawText(rows[i].v1, faceXS, col1X + 54, ry, 8, ColorWhite);
+            float ry = baseY + S(58) + i * rowH;
+            UIDrawText(rows[i].l1, faceXXS, col1X, ry, S(7), ColorShadow);
+            UIDrawText(rows[i].v1, faceXS, col1X + S(54), ry, S(8), ColorWhite);
             
-            UIDrawText(rows[i].l2, faceXXS, col2X, ry, 7, ColorShadow);
-            UIDrawText(rows[i].v2, faceXS, col2X + 50, ry, 8, ColorWhite);
+            UIDrawText(rows[i].l2, faceXXS, col2X, ry, S(7), ColorShadow);
+            UIDrawText(rows[i].v2, faceXS, col2X + S(50), ry, S(8), ColorWhite);
         }
 
         // Comment
-        float ry = baseY + 58 + 4 * rowH;
-        UIDrawText("COMMENT", faceXXS, col1X, ry, 7, ColorShadow);
+        float ry = baseY + S(58) + 4 * rowH;
+        UIDrawText("COMMENT", faceXXS, col1X, ry, S(7), ColorShadow);
         char tComment[256]; truncateStr(trk->Comment, tComment, 80);
-        UIDrawText(tComment, faceXS, col1X + 54, ry, 8, ColorWhite);
+        UIDrawText(tComment, faceXS, col1X + S(54), ry, S(8), ColorWhite);
     }
 }
 

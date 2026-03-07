@@ -55,6 +55,9 @@ typedef struct DeckAudioState {
     
     SpeedChangeState SpeedState; // Need ramp up/down
     
+    float VinylStartAccel;
+    float VinylStopAccel;
+    
     // Mixxx EngineBufferScaleLinear state
     float BaseRate;             // Determined by pitch slider
     float OutlinedRate;         // Final calculated rate including scratch offsets

@@ -94,10 +94,10 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
         // Hand is off
         if (deck->IsMotorOn) {
             targetRate = deck->BaseRate;
-            accel = 0.12f; // Motor startup
+            accel = deck->VinylStartAccel > 0 ? deck->VinylStartAccel : 0.12f; // Motor startup
         } else {
             targetRate = 0.0;
-            accel = 0.015f; // Platter braking (slow glide to stop)
+            accel = deck->VinylStopAccel > 0 ? deck->VinylStopAccel : 0.015f; // Platter braking
         }
     }
 

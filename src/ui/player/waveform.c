@@ -148,15 +148,43 @@ static void Waveform_Draw(Component *base) {
                 int amplitude = (count > 0) ? (sumAmp / count) : 0;
                 int colorIdx = (count > 0) ? (sumColor / count) : (dynData[dataIndex] >> 5);
 
+                // Apply Gains
+                float gLow = (r->State->Waveform.GainLow > 0) ? r->State->Waveform.GainLow : 1.0f;
+                float gMid = (r->State->Waveform.GainMid > 0) ? r->State->Waveform.GainMid : 1.0f;
+                float gHigh = (r->State->Waveform.GainHigh > 0) ? r->State->Waveform.GainHigh : 1.0f;
+
                 // --- Calibration Parameters ---
                 float vertScale = 1.9f; 
-                float bAmp = (float)amplitude * vertScale;
-                float mAmp = 0, hAmp = 0;
+                float baseAmp = (float)amplitude * vertScale;
+                float bAmp = 0, mAmp = 0, hAmp = 0;
 
-                // Frequency splitting
-                if (colorIdx >= 6) { mAmp = bAmp * 0.85f; hAmp = bAmp * 0.60f; }
-                else if (colorIdx >= 3) { mAmp = bAmp * 0.75f; hAmp = bAmp * 0.20f; }
-                else { mAmp = bAmp * 0.40f; hAmp = bAmp * 0.05f; }
+                // Frequency splitting (Heuristic)
+                if (colorIdx >= 6) { 
+                    bAmp = baseAmp * 0.95f; 
+                    mAmp = baseAmp * 0.85f; 
+                    hAmp = baseAmp * 0.60f; 
+                }
+                else if (colorIdx >= 3) { 
+                    bAmp = baseAmp * 0.90f;
+                    mAmp = baseAmp * 0.75f; 
+                    hAmp = baseAmp * 0.20f; 
+                }
+                else { 
+                    bAmp = baseAmp * 0.85f;
+                    mAmp = baseAmp * 0.40f; 
+                    hAmp = baseAmp * 0.05f; 
+                }
+
+                // Apply user gains
+                bAmp *= gLow;
+                mAmp *= gMid;
+                hAmp *= gHigh;
+
+                // Ensure visibility for 3BAND even if heuristic is weak
+                if (r->State->Waveform.Style == WAVEFORM_STYLE_3BAND) {
+                    if (mAmp < bAmp * 0.3f) mAmp = bAmp * 0.3f;
+                    if (hAmp < mAmp * 0.3f) hAmp = mAmp * 0.3f;
+                }
 
                 if (bAmp > waveCenter - 1.0f) bAmp = waveCenter - 1.0f;
                 if (mAmp > bAmp) mAmp = bAmp * 0.9f;
@@ -166,27 +194,60 @@ static void Waveform_Draw(Component *base) {
 
                 if (px >= wfLeft - 2.0f && px <= wfRight + 2.0f) {
                     if (prevPX > -90.0f) {
-                        Color colorBass = {0, 100, 255, 255};
-                        Color colorMid  = {150, 95, 20, 255};
-                        Color colorHigh = {255, 250, 230, 255};
-
-                        // Bass
-                        DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevBAmp}, (Vector2){px, wfY + waveCenter + bAmp}, (Vector2){px, wfY + waveCenter - bAmp}, colorBass);
-                        DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevBAmp}, (Vector2){prevPX, wfY + waveCenter + prevBAmp}, (Vector2){px, wfY + waveCenter + bAmp}, colorBass);
+                        WaveformStyle style = r->State->Waveform.Style;
                         
-                        // Mid
-                        if (mAmp > 0 || prevMAmp > 0) {
-                            DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevMAmp}, (Vector2){px, wfY + waveCenter + mAmp}, (Vector2){px, wfY + waveCenter - mAmp}, colorMid);
-                            DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevMAmp}, (Vector2){prevPX, wfY + waveCenter + prevMAmp}, (Vector2){px, wfY + waveCenter + mAmp}, colorMid);
-                        }
+                        if (style == WAVEFORM_STYLE_3BAND) {
+                            // Layered Vector Style (Rekordbox Look)
+                            Color colorBass = {0, 100, 255, 255};
+                            Color colorMid  = {150, 95, 20, 255}; // Amber/Brown
+                            Color colorHigh = {255, 250, 230, 255}; // Off-white
 
-                        // High
-                        if (hAmp > 0 || prevHAmp > 0) {
-                            DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevHAmp}, (Vector2){px, wfY + waveCenter + hAmp}, (Vector2){px, wfY + waveCenter - hAmp}, colorHigh);
-                            DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevHAmp}, (Vector2){prevPX, wfY + waveCenter + prevHAmp}, (Vector2){px, wfY + waveCenter + hAmp}, colorHigh);
+                            // Bass (Blue) - Outermost
+                            DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevBAmp}, (Vector2){px, wfY + waveCenter + bAmp}, (Vector2){px, wfY + waveCenter - bAmp}, colorBass);
+                            DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevBAmp}, (Vector2){prevPX, wfY + waveCenter + prevBAmp}, (Vector2){px, wfY + waveCenter + bAmp}, colorBass);
+                            
+                            // Mid (Amber)
+                            if (mAmp > 0 || prevMAmp > 0) {
+                                DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevMAmp}, (Vector2){px, wfY + waveCenter + mAmp}, (Vector2){px, wfY + waveCenter - mAmp}, colorMid);
+                                DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevMAmp}, (Vector2){prevPX, wfY + waveCenter + prevMAmp}, (Vector2){px, wfY + waveCenter + mAmp}, colorMid);
+                            }
+
+                            // High (White) - Innermost
+                            if (hAmp > 0 || prevHAmp > 0) {
+                                DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevHAmp}, (Vector2){px, wfY + waveCenter + hAmp}, (Vector2){px, wfY + waveCenter - hAmp}, colorHigh);
+                                DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevHAmp}, (Vector2){prevPX, wfY + waveCenter + prevHAmp}, (Vector2){px, wfY + waveCenter + hAmp}, colorHigh);
+                            }
+                        }
+                        else if (style == WAVEFORM_STYLE_RGB) {
+                            // Mixxx style RGB (Amplitude-based mixing)
+                            // Normalized amplitude weighted color
+                            float total = bAmp + mAmp + hAmp + 0.001f;
+                            Color mix;
+                            mix.r = (unsigned char)((bAmp * 0 + mAmp * 255 + hAmp * 255) / total);
+                            mix.g = (unsigned char)((bAmp * 120 + mAmp * 255 + hAmp * 50) / total);
+                            mix.b = (unsigned char)((bAmp * 255 + mAmp * 20 + hAmp * 50) / total);
+                            mix.a = 255;
+
+                            DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevBAmp}, (Vector2){px, wfY + waveCenter + bAmp}, (Vector2){px, wfY + waveCenter - bAmp}, mix);
+                            DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevBAmp}, (Vector2){prevPX, wfY + waveCenter + prevBAmp}, (Vector2){px, wfY + waveCenter + bAmp}, mix);
+                        }
+                        else {
+                            // WAVEFORM_STYLE_BLUE (Classic Pioneer)
+                            Color colorBlue = {0, 100, 255, 255};
+                            // Center is lighter for high-energy parts
+                            float highlight = hAmp / (waveCenter + 0.001f);
+                            if (highlight > 1) highlight = 1;
+                            Color mix = colorBlue;
+                            mix.r += (unsigned char)(highlight * 150);
+                            mix.g += (unsigned char)(highlight * 100);
+
+                            DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevBAmp}, (Vector2){px, wfY + waveCenter + bAmp}, (Vector2){px, wfY + waveCenter - bAmp}, mix);
+                            DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevBAmp}, (Vector2){prevPX, wfY + waveCenter + prevBAmp}, (Vector2){px, wfY + waveCenter + bAmp}, mix);
                         }
                     } else {
-                        DrawRectangleV((Vector2){px, wfY + waveCenter - bAmp}, (Vector2){1, bAmp * 2}, (Color){0, 100, 255, 255});
+                        Color clr = {0, 100, 255, 255};
+                        if (r->State->Waveform.Style == WAVEFORM_STYLE_RGB) clr = (Color){255, 0, 0, 255};
+                        DrawRectangleV((Vector2){px, wfY + waveCenter - bAmp}, (Vector2){1, bAmp * 2}, clr);
                     }
                     prevBAmp = bAmp; prevMAmp = mAmp; prevHAmp = hAmp; prevPX = px;
                 }
