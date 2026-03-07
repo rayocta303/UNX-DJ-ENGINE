@@ -13,7 +13,8 @@ void Roll_Free(BeatFX_Roll* fx) {
 }
 
 void Roll_Process(BeatFX_Roll* fx, float* outL, float* outR, float inL, float inR, float beatMs, float levelDepth, float sampleRate, bool isFxOn) {
-    float delaySamples = (beatMs / 1000.0f) * sampleRate;
+    (void)beatMs;
+    (void)sampleRate;
     
     // In Pioneer FX, Roll grabs the audio at the moment it's turned ON and loops exactly that chunk.
     if (isFxOn && !fx->holding) {

@@ -6,7 +6,7 @@ void Noise_Init(ColorFX_Noise* fx) {
 }
 
 void Noise_Free(ColorFX_Noise* fx) {
-    // Nothing to free
+    (void)fx;
 }
 
 void Noise_Process(ColorFX_Noise* fx, float* outL, float* outR, float inL, float inR, float colorVal, float sampleRate) {

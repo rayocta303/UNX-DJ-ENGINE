@@ -7,7 +7,7 @@ void Filter_Init(ColorFX_Filter* fx) {
 }
 
 void Filter_Free(ColorFX_Filter* fx) {
-    // Nothing to free
+    (void)fx;
 }
 
 void Filter_Process(ColorFX_Filter* fx, float* outL, float* outR, float inL, float inR, float colorVal, float sampleRate) {

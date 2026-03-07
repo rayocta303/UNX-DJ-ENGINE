@@ -7,7 +7,7 @@ void Sweep_Init(ColorFX_Sweep* fx) {
 }
 
 void Sweep_Free(ColorFX_Sweep* fx) {
-    // Nothing to free
+    (void)fx;
 }
 
 void Sweep_Process(ColorFX_Sweep* fx, float* outL, float* outR, float inL, float inR, float colorVal, float sampleRate) {

@@ -1,5 +1,7 @@
+#ifdef _WIN32
 #ifndef KS_STR_ENCODING_WIN32API
 #define KS_STR_ENCODING_WIN32API
+#endif
 #endif
 
 #include "library/rekordbox_reader.h"

@@ -9,7 +9,7 @@ void BFilter_Init(BeatFX_BFilter* fx) {
 }
 
 void BFilter_Free(BeatFX_BFilter* fx) {
-    // Nothing
+    (void)fx;
 }
 
 void BFilter_Process(BeatFX_BFilter* fx, float* outL, float* outR, float inL, float inR, float beatMs, float levelDepth, float sampleRate) {

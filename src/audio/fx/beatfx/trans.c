@@ -7,7 +7,7 @@ void Trans_Init(BeatFX_Trans* fx) {
 }
 
 void Trans_Free(BeatFX_Trans* fx) {
-    // Nothing
+    (void)fx;
 }
 
 void Trans_Process(BeatFX_Trans* fx, float* outL, float* outR, float inL, float inR, float beatMs, float levelDepth, float sampleRate) {

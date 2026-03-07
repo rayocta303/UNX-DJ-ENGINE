@@ -12,7 +12,7 @@ void Phaser_Init(BeatFX_Phaser* fx) {
 }
 
 void Phaser_Free(BeatFX_Phaser* fx) {
-    // Nothing
+    (void)fx;
 }
 
 static inline void setAllpass(BiquadFilter* filter, float param, float sampleRate) {

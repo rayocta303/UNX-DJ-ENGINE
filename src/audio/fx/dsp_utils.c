@@ -178,10 +178,10 @@ float DelayLine_Read(DelayLine* delay, float delaySamples) {
     // readPosF goes backwards in time.
     // So 'x0' is at readPos. 'xm1' is older (readPos - 1), 'x1' is newer (readPos + 1).
     // Let's implement wrap-around indices.
-    int i0 = readPos;
-    int im1 = (i0 == 0) ? delay->length - 1 : i0 - 1;
-    int i1 = (i0 + 1 >= delay->length) ? 0 : i0 + 1;
-    int i2 = (i0 + 2 >= delay->length) ? (i0 + 2) - delay->length : i0 + 2;
+    int i0 = (int)readPos;
+    int im1 = (i0 == 0) ? (int)delay->length - 1 : i0 - 1;
+    int i1 = (i0 + 1 >= (int)delay->length) ? 0 : i0 + 1;
+    int i2 = (i0 + 2 >= (int)delay->length) ? (i0 + 2) - (int)delay->length : i0 + 2;
 
     float x0 = delay->buffer[i0];
     float xm1 = delay->buffer[im1];

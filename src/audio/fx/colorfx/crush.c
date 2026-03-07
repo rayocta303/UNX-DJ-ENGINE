@@ -11,7 +11,7 @@ void Crush_Init(ColorFX_Crush* fx) {
 }
 
 void Crush_Free(ColorFX_Crush* fx) {
-    // Nothing to free
+    (void)fx;
 }
 
 void Crush_Process(ColorFX_Crush* fx, float* outL, float* outR, float inL, float inR, float colorVal, float sampleRate) {

@@ -1,10 +1,31 @@
-CC = t:\zig\zig.exe cc
-CXX = t:\zig\zig.exe c++
-CFLAGS = -Wall -Wextra -Isrc -Ilib -O2 -target x86_64-windows -DKS_STR_ENCODING_WIN32API
-CXXFLAGS = -Wall -Wextra -Isrc -Ilib -Ilib/kaitai -O2 -target x86_64-windows -std=c++11 -DKS_STR_ENCODING_WIN32API
+# XDJ-UNX-C Multi-platform Makefile
+# Supports Windows (x86_64) and Linux (ARM64 / DRM-KMS)
 
-LDFLAGS = -Llib -lraylib -lgdi32 -lwinmm -lopengl32
+PLATFORM ?= WINDOWS_X64
 
+# Compiler settings
+# Using Zig for cross-compilation on Windows, or native GCC on Linux
+ifeq ($(PLATFORM),WINDOWS_X64)
+    CC = t:\zig\zig.exe cc
+    CXX = t:\zig\zig.exe c++
+    TARGET = xdjunx.exe
+    CFLAGS = -O2 -target x86_64-windows -D_WIN32 -DKS_STR_ENCODING_WIN32API
+    CXXFLAGS = -O2 -target x86_64-windows -std=c++11 -D_WIN32 -DKS_STR_ENCODING_WIN32API
+    LDFLAGS = -Llib -lraylib -lgdi32 -lwinmm -lopengl32
+else ifeq ($(PLATFORM),LINUX_ARM64)
+    # Native compilation or cross-compilation for Aarch64
+    CC ?= gcc
+    CXX ?= g++
+    TARGET = xdjunx
+    CFLAGS = -O2 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
+    CXXFLAGS = -O2 -std=c++11 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
+    LDFLAGS = -Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lpthread -ldl -lm
+endif
+
+CFLAGS += -Wall -Wextra -Isrc -Ilib -Ilib/kaitai
+CXXFLAGS += -Wall -Wextra -Isrc -Ilib -Ilib/kaitai -Ilib/rekordbox-metadata
+
+# Source files
 SRC_C = src/main.c \
         src/ui/components/theme.c \
         src/ui/components/fonts.c \
@@ -21,7 +42,12 @@ SRC_C = src/main.c \
         src/ui/player/player.c \
         src/audio/engine.c \
         src/input/keyboard.c \
-        src/ui/browser/browser.c
+        src/ui/browser/browser.c \
+        src/logic/quantize.c \
+        src/logic/sync.c \
+        src/audio/fx/dsp_utils.c \
+        $(wildcard src/audio/fx/colorfx/*.c) \
+        $(wildcard src/audio/fx/beatfx/*.c)
 
 SRC_CXX = lib/kaitai/kaitai/kaitaistream.cpp \
           lib/rekordbox-metadata/rekordbox_anlz.cpp \
@@ -29,7 +55,6 @@ SRC_CXX = lib/kaitai/kaitai/kaitaistream.cpp \
           src/library/rekordbox_reader.cpp
 
 OBJ = $(SRC_C:.c=.o) $(SRC_CXX:.cpp=.o)
-TARGET = xdjunx.exe
 
 all: $(TARGET)
 
@@ -45,3 +70,4 @@ $(TARGET): $(OBJ)
 clean:
 	rm -f $(OBJ) $(TARGET)
 
+.PHONY: all clean

@@ -6,6 +6,7 @@
 #include "ui/components/helpers.h"
 #include "rlgl.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 
