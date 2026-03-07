@@ -57,9 +57,23 @@ static void Splash_Draw(Component *base) {
     }
 }
 
+#include <stdio.h>
+#include <stddef.h>
+
+#include "ui/components/assets_bundle.h"
+
 void SplashRenderer_Init(SplashRenderer *s, int *progress) {
     s->base.Update = Splash_Update;
     s->base.Draw = Splash_Draw;
-    s->logo = LoadTexture("assets/images/Pioneer.png");
+    
+    Image img = LoadImageFromMemory(".png", pioneer_logo, pioneer_logo_size);
+    if (img.data != NULL) {
+        s->logo = LoadTextureFromImage(img);
+        UnloadImage(img);
+    } else {
+        s->logo = (Texture2D){0};
+        printf("[SPLASH] Failed to load logo from memory\n");
+    }
+    
     s->Progress = progress;
 }

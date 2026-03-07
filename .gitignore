@@ -1,13 +1,17 @@
 # Build artifacts
 *.o
 *.obj
+*.exe
+*.pdb
+xdjunx
 build_log.txt
 build_out.txt
 bin/
 build/
+tools/bin2c.exe
 
-# Testing
-# *test/
+# Generated code
+src/ui/components/assets_bundle.h
 
 # Raylib/Zig temp
 zig-cache/

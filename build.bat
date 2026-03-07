@@ -2,13 +2,33 @@
 set PLATFORM=%1
 if "%PLATFORM%"=="" set PLATFORM=windows
 
+if "%PLATFORM%"=="clean" (
+    echo Cleaning...
+    del /s /q *.o xdjunx xdjunx.exe >nul 2>&1
+    exit /b 0
+)
+
 set ZIG=t:\zig\zig.exe
 set CC=%ZIG% cc
 set CXX=%ZIG% c++
 
+echo [Building Asset Bundle...]
+if not exist tools\bin2c.exe (
+    %CC% tools\bin2c.c -o tools\bin2c.exe
+)
+
+if exist src\ui\components\assets_bundle.h del src\ui\components\assets_bundle.h
+echo #ifndef ASSETS_BUNDLE_H > src\ui\components\assets_bundle.h
+echo #define ASSETS_BUNDLE_H >> src\ui\components\assets_bundle.h
+.\tools\bin2c.exe "assets\fonts\otfs\Font Awesome 5 Free-Solid-900.otf" src\ui\components\assets_bundle.h font_awesome_solid
+.\tools\bin2c.exe "assets\fonts\otfs\Font Awesome 5 Free-Regular-400.otf" src\ui\components\assets_bundle.h font_awesome_regular
+.\tools\bin2c.exe "assets\fonts\otfs\Font Awesome 5 Brands-Regular-400.otf" src\ui\components\assets_bundle.h font_awesome_brand
+.\tools\bin2c.exe "assets\images\Pioneer.png" src\ui\components\assets_bundle.h pioneer_logo
+echo #endif >> src\ui\components\assets_bundle.h
+
 if "%PLATFORM%"=="linux" (
     echo [Target: Linux ARM64]
-    set TARGET_FLAGS=-target aarch64-linux-gnu.2.36 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
+    set TARGET_FLAGS=-target aarch64-linux-gnu.2.36 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include
     set LDFLAGS=-Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lpthread -ldl -lm
     set TARGET=xdjunx
 ) else (
@@ -49,6 +69,4 @@ echo Linking...
 %CXX% %CXXFLAGS% src/main.o src/ui/components/theme.o src/ui/components/fonts.o src/ui/components/helpers.o src/ui/views/topbar.o src/ui/views/info.o src/ui/views/splash.o src/ui/views/settings.o src/ui/player/bottomstrip.o src/ui/player/beatfx.o src/ui/player/deckinfo.o src/ui/player/deckstrip.o src/ui/player/waveform.o src/ui/player/player.o src/audio/engine.o src/audio/fx/dsp_utils.o src/audio/fx/colorfx/space.o src/audio/fx/colorfx/dub_echo.o src/audio/fx/colorfx/sweep.o src/audio/fx/colorfx/noise.o src/audio/fx/colorfx/crush.o src/audio/fx/colorfx/filter.o src/audio/fx/colorfx/colorfx_manager.o src/audio/fx/beatfx/delay.o src/audio/fx/beatfx/echo.o src/audio/fx/beatfx/pingpong.o src/audio/fx/beatfx/spiral.o src/audio/fx/beatfx/roll.o src/audio/fx/beatfx/sliproll.o src/audio/fx/beatfx/reverb.o src/audio/fx/beatfx/helix.o src/audio/fx/beatfx/flanger.o src/audio/fx/beatfx/phaser.o src/audio/fx/beatfx/bfilter.o src/audio/fx/beatfx/trans.o src/audio/fx/beatfx/pitch.o src/audio/fx/beatfx/vinylbrake.o src/audio/fx/beatfx/beatfx_manager.o src/input/keyboard.o src/ui/browser/browser.o src/logic/quantize.o src/logic/sync.o lib/kaitai/kaitai/kaitaistream.o lib/rekordbox-metadata/rekordbox_anlz.o lib/rekordbox-metadata/rekordbox_pdb.o src/library/rekordbox_reader.o %LDFLAGS% -o %TARGET% || exit /b 1
 
 :end
-echo Done.
-
 echo Done.

@@ -2,6 +2,8 @@
 #include "ui/components/theme.h"
 #include <stdio.h>
 
+#include "ui/components/assets_bundle.h"
+
 static Font defaultFace;
 static Font iconSolid;
 static Font iconRegular;
@@ -11,6 +13,7 @@ static Font iconBrand;
 // For now, we allow raylib to fallback to default loading or we load specific ranges.
 void UIFonts_Init(void) {
     // Attempt to load standard font. Use Arial on Windows as requested.
+    // TODO: Embed a primary UI font to avoid OS dependencies.
     const char* fontPath = UI_BoldEnabled ? "C:/Windows/Fonts/arialbd.ttf" : "C:/Windows/Fonts/arial.ttf";
     defaultFace = LoadFontEx(fontPath, 64, 0, 0); 
     if (defaultFace.texture.id == 0) {
@@ -34,23 +37,22 @@ void UIFonts_Init(void) {
     codepoints[count++] = 0x266A; // eighth note
     codepoints[count++] = 0x2022; // bullet
 
-    // Font Awesome 5 Solid
-    iconSolid = LoadFontEx("assets/fonts/otfs/Font Awesome 5 Free-Solid-900.otf", 64, codepoints, count);
+    // Font Awesome 5 Solid - Loaded from Memory
+    iconSolid = LoadFontFromMemory(".otf", font_awesome_solid, font_awesome_solid_size, 64, codepoints, count);
     if (iconSolid.texture.id == 0) {
-        iconSolid = LoadFontEx("assets/fonts/Font Awesome 6 Free-Solid-900.otf", 64, codepoints, count);
-        if (iconSolid.texture.id == 0) printf("[FONT] Failed to load solid icon font\n");
+        printf("[FONT] Failed to load solid icon font from memory\n");
     }
 
-    // Font Awesome 5 Regular
-    iconRegular = LoadFontEx("assets/fonts/otfs/Font Awesome 5 Free-Regular-400.otf", 64, codepoints, count);
+    // Font Awesome 5 Regular - Loaded from Memory
+    iconRegular = LoadFontFromMemory(".otf", font_awesome_regular, font_awesome_regular_size, 64, codepoints, count);
     if (iconRegular.texture.id == 0) {
-        printf("[FONT] Failed to load regular icon font\n");
+        printf("[FONT] Failed to load regular icon font from memory\n");
     }
 
-    // Font Awesome 5 Brands
-    iconBrand = LoadFontEx("assets/fonts/otfs/Font Awesome 5 Brands-Regular-400.otf", 64, codepoints, count);
+    // Font Awesome 5 Brands - Loaded from Memory
+    iconBrand = LoadFontFromMemory(".otf", font_awesome_brand, font_awesome_brand_size, 64, codepoints, count);
     if (iconBrand.texture.id == 0) {
-        printf("[FONT] Failed to load brand icon font\n");
+        printf("[FONT] Failed to load brand icon font from memory\n");
     }
 }
 
