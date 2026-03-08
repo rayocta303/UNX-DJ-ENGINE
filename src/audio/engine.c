@@ -9,6 +9,18 @@
 #include "minimp3.h"
 #include "minimp3_ex.h"
 
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#endif
+
+#define DR_WAV_IMPLEMENTATION
+#include "dr_wav.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
+
 void AudioEngine_Init(AudioEngine *engine) {
     memset(engine, 0, sizeof(AudioEngine));
 
@@ -59,22 +71,62 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
 
     if (!filePath || strlen(filePath) == 0) return;
 
-    // Load file using minimp3
-    mp3dec_t mp3d;
-    mp3dec_file_info_t info;
-    int res = mp3dec_load(&mp3d, filePath, &info, NULL, NULL);
+    // Check file extension
+    const char *ext = strrchr(filePath, '.');
+    bool isWav = (ext && (strcasecmp(ext, ".wav") == 0 || strcasecmp(ext, ".aif") == 0 || strcasecmp(ext, ".aiff") == 0));
 
-    if (res == 0) {
-        // Successfully loaded
-        deck->PCMBuffer = info.buffer; // info.buffer is allocated by malloc internally in minimp3
-        deck->TotalSamples = info.samples;
-        deck->SampleRate = info.hz;
-        
-        // If mono, we should duplicate to stereo, but assuming Rekordbox tracks are mostly stereo
-        // We'll leave it as is for now, but realistically we should resample/rechannel here
-        // if info.channels == 1.
+    if (isWav) {
+        // Load file using dr_wav
+        unsigned int channels;
+        unsigned int sampleRate;
+        drwav_uint64 totalPCMFrameCount;
+        float *pSampleData = drwav_open_file_and_read_pcm_frames_f32(filePath, &channels, &sampleRate, &totalPCMFrameCount, NULL);
+
+        if (pSampleData) {
+            if (channels == 1) {
+                // Duplicate mono to stereo
+                float *stereoBuf = (float *)malloc(totalPCMFrameCount * 2 * sizeof(float));
+                for (drwav_uint64 i = 0; i < totalPCMFrameCount; i++) {
+                    stereoBuf[i*2] = pSampleData[i];
+                    stereoBuf[i*2 + 1] = pSampleData[i];
+                }
+                drwav_free(pSampleData, NULL);
+                deck->PCMBuffer = stereoBuf;
+                deck->TotalSamples = totalPCMFrameCount * 2;
+            } else {
+                deck->PCMBuffer = pSampleData;
+                deck->TotalSamples = totalPCMFrameCount * channels;
+            }
+            deck->SampleRate = sampleRate;
+        } else {
+            printf("Failed to load WAV/AIFF file: %s\n", filePath);
+        }
     } else {
-        printf("Failed to load audio file: %s (Error %d)\n", filePath, res);
+        // Load file using minimp3
+        mp3dec_t mp3d;
+        mp3dec_file_info_t info;
+        int res = mp3dec_load(&mp3d, filePath, &info, NULL, NULL);
+
+        if (res == 0) {
+            // Successfully loaded MP3
+            if (info.channels == 1) {
+                // Duplicate mono to stereo
+                float *stereoBuf = (float *)malloc(info.samples * 2 * sizeof(float));
+                for (size_t i = 0; i < info.samples; i++) {
+                    stereoBuf[i*2] = info.buffer[i];
+                    stereoBuf[i*2 + 1] = info.buffer[i];
+                }
+                free(info.buffer);
+                deck->PCMBuffer = stereoBuf;
+                deck->TotalSamples = info.samples * 2;
+            } else {
+                deck->PCMBuffer = info.buffer; // info.buffer is allocated by malloc internally in minimp3
+                deck->TotalSamples = info.samples;
+            }
+            deck->SampleRate = info.hz;
+        } else {
+            printf("Failed to load audio file: %s (Error %d)\n", filePath, res);
+        }
     }
 }
 
