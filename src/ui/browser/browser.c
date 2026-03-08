@@ -377,13 +377,26 @@ static int Browser_Update(Component *base) {
                             targetDeck->IsPlaying = false;
                         }
 
-                        // Auto-Cue: Jump to first memory cue, hot cue, or beat grid
+                        // Auto-Cue: Find the absolute first cue point across all types
                         uint32_t firstMs = 0;
-                        if (newTrack->CuesCount > 0) {
-                            firstMs = newTrack->Cues[0].Start;
-                        } else if (newTrack->HotCuesCount > 0) {
-                            firstMs = newTrack->HotCues[0].Start;
-                        } else if (t->BeatGridCount > 0) {
+                        bool foundCue = false;
+
+                        // Check Memory Cues
+                        for (int i = 0; i < newTrack->CuesCount; i++) {
+                            if (!foundCue || newTrack->Cues[i].Start < firstMs) {
+                                firstMs = newTrack->Cues[i].Start;
+                                foundCue = true;
+                            }
+                        }
+                        // Check Hot Cues
+                        for (int i = 0; i < newTrack->HotCuesCount; i++) {
+                            if (!foundCue || newTrack->HotCues[i].Start < firstMs) {
+                                firstMs = newTrack->HotCues[i].Start;
+                                foundCue = true;
+                            }
+                        }
+                        // Fallback to first BeatGrid if no cues
+                        if (!foundCue && newTrack->BeatGridCount > 0) {
                             firstMs = newTrack->BeatGrid[0].Time;
                         }
 

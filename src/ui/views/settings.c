@@ -25,6 +25,32 @@ static int Settings_Update(Component *base) {
         if (mouse.x >= SCREEN_WIDTH - S(110) && mouse.x <= SCREEN_WIDTH - S(30) && mouse.y >= divY + S(4) && mouse.y <= divY + S(22)) {
             if (r->OnClose) r->OnClose(r->callbackCtx);
         }
+
+        // List Item Selection & Action Clicking
+        float rowH = S(28.0f);
+        int visibleRows = 12;
+        for (int i = 0; i < visibleRows; i++) {
+            int idx = r->State->Scroll + i;
+            if (idx >= r->State->ItemsCount) break;
+
+            float ry = TOP_BAR_H + (i * rowH);
+            Rectangle rowRect = {0, ry, SCREEN_WIDTH, rowH};
+            
+            if (CheckCollisionPointRec(mouse, rowRect)) {
+                static float lastClickTime = 0;
+                float now = GetTime();
+                
+                if (r->State->CursorPos == i && (now - lastClickTime < 0.3f)) {
+                    // Double click or confirmed select on item
+                    SettingItem *clickedItem = &r->State->Items[idx];
+                    if (clickedItem->Type == SETTING_TYPE_ACTION) {
+                        if (r->OnAction) r->OnAction(r->callbackCtx, idx);
+                    }
+                }
+                r->State->CursorPos = i;
+                lastClickTime = now;
+            }
+        }
     }
 
     if (IsKeyPressed(KEY_UP)) {
@@ -64,6 +90,11 @@ static int Settings_Update(Component *base) {
             if (IsKeyDown(KEY_RIGHT)) {
                 item->Value += step * GetFrameTime() * 10.0f;
                 if (item->Value > item->Max) item->Value = item->Max;
+            }
+        } else if (item->Type == SETTING_TYPE_ACTION) {
+            if (IsKeyPressed(KEY_ENTER)) {
+                if (r->OnAction) r->OnAction(r->callbackCtx, idx);
+                return 0; // Prevent fall-through to global Enter/Apply handler
             }
         }
     }
@@ -108,7 +139,7 @@ static void Settings_Draw(Component *base) {
         Color rowClr = ColorWhite;
 
         if (selected) {
-            UIDrawText("\xe2\x96\xba", faceXS, S(6), ry + S(6), S(9), ColorOrange); // ►
+            DrawSelectionTriangle(S(8), ry + S(9), ColorOrange);
         }
 
         UIDrawText(item->Label, faceMd, S(24), ry + S(6), S(13), rowClr);
@@ -125,6 +156,9 @@ static void Settings_Draw(Component *base) {
             }
         } else if (item->Type == SETTING_TYPE_KNOB) {
             UIDrawKnob(SCREEN_WIDTH - S(80), ry + (rowH / 2.0f), S(9), item->Value, item->Min, item->Max, item->Unit, ColorOrange);
+        } else if (item->Type == SETTING_TYPE_ACTION) {
+            // Action items like EXIT don't have side controls, maybe just a symbol
+            UIDrawText("\uf2f5", faceSm, SCREEN_WIDTH - S(30), ry + S(6), S(12), ColorOrange); // Sign-out icon placeholder
         }
     }
 

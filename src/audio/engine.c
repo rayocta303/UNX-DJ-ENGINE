@@ -159,13 +159,15 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
         }
     }
 
-    // 3. Glide OutlinedRate towards targetRate
+    // 3. Glide OutlinedRate towards targetRate (Linear Ramping)
     if (deck->OutlinedRate != targetRate) {
-        double diff = targetRate - deck->OutlinedRate;
-        deck->OutlinedRate += diff * accel;
-
-        if (fabs(diff) < 0.001) {
+        float diff = targetRate - (float)deck->OutlinedRate;
+        
+        if (fabs(diff) < accel) {
             deck->OutlinedRate = targetRate;
+        } else {
+            if (diff > 0) deck->OutlinedRate += accel;
+            else deck->OutlinedRate -= accel;
         }
     }
 

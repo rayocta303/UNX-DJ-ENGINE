@@ -13,6 +13,7 @@
 #include "input/keyboard.h"
 #include "logic/sync.h"
 #include "logic/settings_io.h"
+#include "ui/components/helpers.h"
 
 typedef enum {
     ScreenPlayer,
@@ -42,6 +43,7 @@ typedef struct {
     SettingsRenderer settings;
     SplashRenderer splash;
     KeyboardMapping keyMap;
+    bool showExitConfirm;
 } App;
 
 AudioEngine *globalAudioEngine = NULL;
@@ -81,6 +83,13 @@ void OnSettingsApply(void *ctx) {
     Settings_Save(a->deckA.Waveform, a->deckB.Waveform);
     a->screen = ScreenPlayer;
     a->settingsState.IsActive = false;
+}
+
+void OnSettingsAction(void *ctx, int idx) {
+    App *a = (App*)ctx;
+    if (idx == 8) { // EXIT APPLICATION
+        a->showExitConfirm = true;
+    }
 }
 
 void App_Init(App *a) {
@@ -178,6 +187,10 @@ void App_Init(App *a) {
     a->settingsState.Items[7].Value = a->deckA.Waveform.VinylStopMs;
     strcpy(a->settingsState.Items[7].Unit, "ms");
     
+    strcpy(a->settingsState.Items[8].Label, "EXIT APPLICATION");
+    a->settingsState.Items[8].Type = SETTING_TYPE_ACTION;
+    a->settingsState.ItemsCount = 9;
+
     // Set Load Lock current opt
     a->settingsState.Items[1].Current = a->deckA.Waveform.LoadLock ? 1 : 0;
     
@@ -198,6 +211,7 @@ void App_Init(App *a) {
     SettingsRenderer_Init(&a->settings, &a->settingsState);
     a->settings.OnApply = OnSettingsApply;
     a->settings.OnClose = OnSettingsApply;
+    a->settings.OnAction = OnSettingsAction;
     a->settings.callbackCtx = a;
     SplashRenderer_Init(&a->splash, &a->splashCounter);
     a->keyMap = GetDefaultMapping();
@@ -367,13 +381,18 @@ int main(void) {
         // Apply Vinyl Start/Stop Physics
         for (int i=0; i<2; i++) {
             DeckState *ds = (i == 0) ? &app.deckA : &app.deckB;
-            // Accel calculation: approximate 4096 samples per block logic
-            // Assuming 44100Hz, a 1024 sample block is ~23ms.
-            // If StartMs is 500ms, we need approx 500/23 = 21 steps.
-            // accel = 1.0 / 21 = 0.047
-            float blockMs = 23.2f; // approximate at 1024 frames @ 44.1k
-            audioEngine.Decks[i].VinylStartAccel = blockMs / (ds->Waveform.VinylStartMs + 1.0f);
-            audioEngine.Decks[i].VinylStopAccel = blockMs / (ds->Waveform.VinylStopMs + 1.0f);
+            double sr = (double)audioEngine.Decks[i].SampleRate;
+            if (sr < 8000) sr = 44100.0;
+            
+            // Assuming 1024 frames per block as set in InitAudio
+            float blockSize = 1024.0f; 
+            float blocksPerSec = (float)sr / blockSize;
+            
+            // Accel is the increment per block to reach pitch 1.0 in N seconds
+            // Since we want linear ramp: delta = (TargetRate - 0) / TotalBlocks
+            // TotalBlocks = DurationSeconds * blocksPerSec
+            audioEngine.Decks[i].VinylStartAccel = 1.0f / ((ds->Waveform.VinylStartMs / 1000.0f) * blocksPerSec + 1.0f);
+            audioEngine.Decks[i].VinylStopAccel = 1.0f / ((ds->Waveform.VinylStopMs / 1000.0f) * blocksPerSec + 1.0f);
         }
 
         // --- Sync Audio Engine State to UI State ---
@@ -493,6 +512,48 @@ int main(void) {
             app.stripB.base.Draw((Component*)&app.stripB);
             app.topbar.base.Draw((Component*)&app.topbar);
             DrawText("SPACE: Browser | I: Info | TAB: Settings", 10, Si(REF_HEIGHT) - 20, 10, GRAY);
+        }
+
+        // Exit Confirmation Popup
+        if (app.showExitConfirm) {
+            float pw = S(200);
+            float ph = S(100);
+            float px = (SCREEN_WIDTH - pw) / 2.0f;
+            float py = (SCREEN_HEIGHT - ph) / 2.0f;
+
+            // Overlay
+            DrawRectangle(-UI_OffsetX, -UI_OffsetY, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, 0.8f));
+            
+            // Box
+            DrawRectangle(px, py, pw, ph, ColorBGUtil);
+            DrawRectangleLinesEx((Rectangle){px, py, pw, ph}, 1.0f, ColorGray);
+            
+            Font fMd = UIFonts_GetFace(S(12));
+            DrawCentredText("EXIT APPLICATION?", fMd, px, pw, py + S(20), S(12), ColorWhite);
+            DrawCentredText("Are you sure?", UIFonts_GetFace(S(9)), px, pw, py + S(40), S(9), ColorShadow);
+
+            // Options
+            float btnW = S(60);
+            float btnH = S(20);
+            
+            // NO Button
+            bool noHover = CheckCollisionPointRec(UIGetMousePosition(), (Rectangle){px + S(30), py + S(65), btnW, btnH});
+            DrawRectangle(px + S(30), py + S(65), btnW, btnH, noHover ? ColorGray : ColorDark1);
+            DrawRectangleLines(px + S(30), py + S(65), btnW, btnH, ColorShadow);
+            DrawCentredText("NO", fMd, px + S(30), btnW, py + S(68), S(11), ColorWhite);
+            
+            // YES Button
+            bool yesHover = CheckCollisionPointRec(UIGetMousePosition(), (Rectangle){px + pw - S(90), py + S(65), btnW, btnH});
+            DrawRectangle(px + pw - S(90), py + S(65), btnW, btnH, yesHover ? ColorRed : ColorDark1);
+            DrawRectangleLines(px + pw - S(90), py + S(65), btnW, btnH, ColorRed);
+            DrawCentredText("YES", fMd, px + pw - S(90), btnW, py + S(68), S(11), ColorWhite);
+
+            if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+                if (noHover) app.showExitConfirm = false;
+                if (yesHover) break; // Exit loop
+            }
+            if (IsKeyPressed(KEY_ENTER)) break;
+            if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) app.showExitConfirm = false;
         }
 
         rlPopMatrix();

@@ -8,7 +8,8 @@
 
 typedef enum {
     SETTING_TYPE_LIST,
-    SETTING_TYPE_KNOB
+    SETTING_TYPE_KNOB,
+    SETTING_TYPE_ACTION
 } SettingType;
 
 typedef struct {
@@ -42,6 +43,7 @@ struct SettingsRenderer {
     SettingsState *State;
     void (*OnClose)(void*);
     void (*OnApply)(void*);
+    void (*OnAction)(void*, int);
     void *callbackCtx;
 };
 
