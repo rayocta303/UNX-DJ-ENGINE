@@ -111,6 +111,7 @@ void App_Init(App *a) {
     memset(&a->browserState, 0, sizeof(BrowserState));
     a->browserState.IsActive = false;
     a->browserState.BrowseLevel = 3; // Source level
+    for (int i = 0; i < 3; i++) a->browserState.PlaylistBankIdx[i] = -1;
     Browser_RefreshStorages(&a->browserState);
 
     // Init Settings State

@@ -110,12 +110,64 @@ static int Browser_Update(Component *base) {
 
     if (!s->IsActive) return 0;
 
+    // Mouse Interaction
+    Vector2 mousePos = UIGetMousePosition();
+    float sidebarW = S(40);
+    float rowH = S(26);
+    float listW = SCREEN_WIDTH - sidebarW - S(8);
+    if (s->InfoEnabled) listW = SCREEN_WIDTH - sidebarW - S(160);
+
+    // 1. Sidebar Clicking & Interaction
+    for (int i = 0; i < 7; i++) {
+        float boxY = TOP_BAR_H + i * sidebarW;
+        Rectangle boxRect = {0, boxY, sidebarW, sidebarW};
+        
+        if (CheckCollisionPointRec(mousePos, boxRect)) {
+            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                if (i < 4) {
+                    // Navigate to categories (Playlist, Folder, Search, History)
+                    s->BrowseLevel = 2; // Categories level
+                    s->CursorPos = i; 
+                    s->ScrollOffset = 0;
+                    // Trigger "Enter" logic for the category
+                    if (s->CursorPos == 2) { s->BrowseLevel = 1; } // Playlists
+                    else if (s->CursorPos == 3 || s->CursorPos == 0) { 
+                        s->BrowseLevel = 0; // Tracks
+                        s->CurrentPlaylistIdx = -1;
+                        Browser_UpdateActiveTracks(s);
+                    }
+                    s->CursorPos = 0;
+                } else {
+                    // Playlist Bank Jump
+                    int bankIdx = i - 4;
+                    if (s->PlaylistBankIdx[bankIdx] >= 0) {
+                        s->CurrentPlaylistIdx = s->PlaylistBankIdx[bankIdx];
+                        s->BrowseLevel = 0; // Tracks
+                        Browser_UpdateActiveTracks(s);
+                        s->CursorPos = s->ScrollOffset = 0;
+                    }
+                }
+            }
+            
+            // Handle Dropping into Bank
+            if (s->IsDragging && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+                if (i >= 4) {
+                    int bankIdx = i - 4;
+                    if (s->DraggingType == 1) { // Only playlists can be banked
+                        s->PlaylistBankIdx[bankIdx] = s->DraggingIdx;
+                        printf("[BROWSER] Banked Playlist %d to Slot %d\n", s->DraggingIdx, bankIdx + 1);
+                    }
+                }
+                s->IsDragging = false;
+            }
+        }
+    }
+
+    // 2. List Item Interaction
     int totalVisible = 9;
     int totalItems = 0;
-
-    if (s->IsTagList) {
-        totalItems = s->TagListCount;
-    } else {
+    if (s->IsTagList) totalItems = s->TagListCount;
+    else {
         switch (s->BrowseLevel) {
             case 0: totalItems = s->ActiveTrackCount; break;
             case 1: totalItems = s->DB ? s->DB->PlaylistCount : 0; break;
@@ -123,6 +175,36 @@ static int Browser_Update(Component *base) {
             case 3: totalItems = s->StorageCount; break;
         }
     }
+
+    for (int i = 0; i < totalVisible; i++) {
+        int idx = s->ScrollOffset + i;
+        if (idx >= totalItems) break;
+
+        Rectangle itemRect = {sidebarW, TOP_BAR_H + i * rowH, listW, rowH};
+        if (CheckCollisionPointRec(mousePos, itemRect)) {
+            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                // Drag start for Playlists
+                if (s->BrowseLevel == 1) {
+                    s->IsDragging = true;
+                    s->DraggingIdx = idx;
+                    s->DraggingType = 1;
+                }
+                
+                // Click = Select + Execute (Mocking double-click check)
+                static float lastClickTime = 0;
+                float now = GetTime();
+                if (s->CursorPos == i && (now - lastClickTime < 0.3f)) {
+                    // Double Clicked -> Trigger Enter logic
+                    // ... existing Enter logic ...
+                    // We can reuse the IsKeyPressed(KEY_ENTER) logic block below or refactor
+                }
+                s->CursorPos = i;
+                lastClickTime = now;
+            }
+        }
+    }
+
+    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) s->IsDragging = false;
 
     if (IsKeyPressed(KEY_DOWN)) {
         if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
@@ -356,12 +438,35 @@ static void Browser_Draw(Component *base) {
     (void)faceIcon;
     (void)faceBrand;
 
-    // Vertical Sidebar text
-    rlPushMatrix();
-    rlTranslatef(S(24), TOP_BAR_H + S(24), 0);
-    rlRotatef(90, 0, 0, 1);
-    UIDrawText("PLAYLIST BANK", faceXS, 0, 0, S(10), ColorShadow);
-    rlPopMatrix();
+    // Sidebar Boxes (1:1 Squares)
+    Vector2 mPos = UIGetMousePosition();
+    for (int i = 0; i < 7; i++) {
+        float boxY = TOP_BAR_H + i * sidebarW;
+        Rectangle boxRect = {0, boxY, sidebarW, sidebarW};
+        bool isHovered = CheckCollisionPointRec(mPos, boxRect);
+        bool isBank = (i >= 4);
+        bool isAssigned = isBank && (s->PlaylistBankIdx[i-4] >= 0);
+        
+        // Background
+        Color bg = isHovered ? ColorBlue : (isBank ? (isAssigned ? ColorDGreen : ColorDark3) : ColorDark2);
+        DrawRectangle(0, boxY, sidebarW, sidebarW, bg);
+        
+        // Inner separation lines
+        DrawRectangleLinesEx(boxRect, 1.0f, ColorDark1);
+        
+        if (!isBank) {
+            // Icon / Symbol for main navigation
+            const char* sidIcons[] = {"\uf03c", "\uf07b", "\uf002", "\uf017"}; // Playlist, Folder, Search, History
+            UIDrawText(sidIcons[i], faceIcon, S(12), boxY + S(12), S(16), ColorWhite);
+        } else {
+            // Playlist Bank Placeholders (1-3)
+            char bankNum[4];
+            sprintf(bankNum, "P%d", i - 3);
+            // Draw a bookmark icon as a background for the bank spot
+            UIDrawText("\uf02e", faceIcon, S(13), boxY + S(8), S(14), isAssigned ? ColorWhite : ColorShadow); 
+            UIDrawText(bankNum, faceXS, S(14), boxY + S(24), S(10), ColorWhite);
+        }
+    }
 
     // Header Color & Text
     Color headerClr = ColorBlue;
@@ -474,6 +579,16 @@ static void Browser_Draw(Component *base) {
         if (thumbH < S(10)) thumbH = S(10);
         float thumbY = TOP_BAR_H + ((float)s->ScrollOffset / maxItems) * listAreaH;
         DrawRectangle(SCREEN_WIDTH - S(4), thumbY, S(2), thumbH, ColorWhite);
+    }
+
+    // Drag and Drop Preview
+    if (s->IsDragging) {
+        const char *dragTitle = "Playlist Item";
+        if (s->DraggingType == 1 && s->DB && s->DraggingIdx >= 0 && (uint32_t)s->DraggingIdx < s->DB->PlaylistCount) {
+             dragTitle = s->DB->Playlists[s->DraggingIdx].Name;
+        }
+        DrawRectangle(mPos.x, mPos.y, S(120), rowH, Fade(ColorBlue, 0.6f));
+        UIDrawText(dragTitle, faceSm, mPos.x + S(8), mPos.y + S(6), S(13), ColorWhite);
     }
 }
 

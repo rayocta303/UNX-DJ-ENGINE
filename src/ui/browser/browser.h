@@ -35,6 +35,14 @@ typedef struct {
     struct AudioEngine *AudioPlugin;
     struct DeckState *DeckA;
     struct DeckState *DeckB;
+
+    // Playlist Bank (Slot shortcuts)
+    int PlaylistBankIdx[3]; // Stores index of playlist in DB->Playlists (-1 if empty)
+    
+    // Drag and Drop (Mouse interaction)
+    bool IsDragging;
+    int DraggingIdx;         // Playlist index being dragged
+    int DraggingType;        // 0=Tracks, 1=Playlists
 } BrowserState;
 
 void Browser_RefreshStorages(BrowserState *s);
