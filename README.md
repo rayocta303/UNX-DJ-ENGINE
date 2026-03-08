@@ -2,6 +2,8 @@
 
 UNX DJ ENGINE is an experimental DJ Media Player firmware subset, ported to C and Raylib for high-performance cross-platform development, simulation, and embedded deployment. It aims to provide a professional-grade mixing experience inspired by industry-standard hardware.
 
+![UNX DJ ENGINE Player Screenshot](screenshots/player.png)
+
 ## Features
 
 ### Audio Engine
