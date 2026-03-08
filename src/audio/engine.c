@@ -29,6 +29,8 @@ void AudioEngine_Init(AudioEngine *engine) {
         ColorFXManager_Init(&engine->Decks[i].ColorFX);
         engine->Decks[i].IsMotorOn = false;
         engine->Decks[i].IsPlaying = false;
+        engine->Decks[i].MTSearchTrigger[0] = true;
+        engine->Decks[i].MTSearchTrigger[1] = true;
     }
     
     BeatFXManager_Init(&engine->BeatFX);
@@ -50,6 +52,10 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
     deck->JogRate = 0;
     deck->MTOffset = 0;
     deck->MTSampleCount = 0;
+    deck->MTSearchTrigger[0] = true;
+    deck->MTSearchTrigger[1] = true;
+    deck->MTPhaseOffset[0] = 0;
+    deck->MTPhaseOffset[1] = 0;
 
     if (!filePath || strlen(filePath) == 0) return;
 
@@ -221,7 +227,7 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int frames,
     for (int i = 0; i < frames; i++) {
         double readPos = deck->Position;
         // MT is active if Key Lock is ON, not scratching, motor is running, and speed is not precisely 1.0
-        bool mtActive = deck->MasterTempoActive && !deck->IsTouching && deck->IsMotorOn && fabs(rate - 1.0) > 0.005;
+        bool mtActive = deck->MasterTempoActive && !deck->IsTouching && deck->IsMotorOn && fabs(rate - 1.0) > 0.0005;
 
         float l_sample = 0.0f;
         float r_sample = 0.0f;
@@ -246,45 +252,64 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int frames,
         if (mtActive) {
             deck->MTOffset += (1.0 - rate);
             
-            // High-resolution OLA: continuous 50% overlap with Hanning windows
-            // deck->MTOffset accumulates drift in source samples.
-            // Using a period of 4096.0 samples (approx 92ms at 44.1kHz)
-            double period = 4096.0; 
+            if (deck->MTOffset > 65536.0) deck->MTOffset -= 65536.0;
+            if (deck->MTOffset < -65536.0) deck->MTOffset += 65536.0;
+
+            double period = 2048.0;
             double drift = deck->MTOffset;
             
-            // Grain 0 phase
-            double shift0 = fmod(drift, period);
-            if (shift0 < 0) shift0 += period;
+            double phase[2];
+            phase[0] = fmod(drift, period); if (phase[0] < 0) phase[0] += period;
+            phase[1] = fmod(drift + period * 0.5, period); if (phase[1] < 0) phase[1] += period;
+
+            // Synchronization Trigger: Only search ONCE when grain is silent (phase close to 0)
+            for (int k = 0; k < 2; k++) {
+                if (phase[k] < 16.0 && deck->MTSearchTrigger[k]) {
+                    float bestCorr = -1e30f;
+                    float bestOff = 0.0f;
+                    // Search window: match against the OTHER grain which is currently at its peak (50% phase)
+                    int other = 1 - k;
+                    double otherRp = deck->Position + (phase[other] - period * 0.5) + deck->MTPhaseOffset[other];
+                    
+                    for (float o = -128.0f; o <= 128.0f; o += 2.0f) {
+                        float corr = 0;
+                        for (int j = -24; j < 24; j++) {
+                            double tPos = deck->Position - (period * 0.5) + o + j;
+                            if (tPos < 0) continue;
+                            float tl, tr, bl, br;
+                            INTERP_SAMPLES_HI(tPos, tl, tr);
+                            INTERP_SAMPLES_HI(otherRp + j, bl, br);
+                            corr += tl * bl + tr * br;
+                        }
+                        if (corr > bestCorr) { bestCorr = corr; bestOff = o; }
+                    }
+                    deck->MTPhaseOffset[k] = bestOff;
+                    deck->MTSearchTrigger[k] = false; // Latched
+                } else if (phase[k] > period * 0.2) {
+                    deck->MTSearchTrigger[k] = true; // Rearm when grain is well into its life
+                }
+            }
+
+            // Power-constant cross-fade for perfect smoothness (sin/cos windows)
+            // w0 + w1 = 1.0 (approx) for amplitude, but sin^2 + cos^2 = 1.0 for power
+            double w0 = pow(sin(M_PI * phase[0] / period), 2.0);
+            double w1 = 1.0 - w0;
+
+            double rp0 = deck->Position + (phase[0] - period * 0.5) + deck->MTPhaseOffset[0];
+            double rp1 = deck->Position + (phase[1] - period * 0.5) + deck->MTPhaseOffset[1];
+
+            if (rp0 < 0) rp0 = 0; if (rp1 < 0) rp1 = 0;
             
-            // Grain 1 phase (offset by 180 degrees)
-            double shift1 = fmod(drift + period * 0.5, period);
-            if (shift1 < 0) shift1 += period;
+            float l0, r0, l1, r1;
+            INTERP_SAMPLES_HI(rp0, l0, r0);
+            INTERP_SAMPLES_HI(rp1, l1, r1);
             
-            // Center shifts to [-period/2, period/2]
-            shift0 -= period * 0.5;
-            shift1 -= period * 0.5;
-            
-            // Calculate 1.0x continuous read positions
-            double readPos0 = deck->Position + shift0;
-            double readPos1 = deck->Position + shift1;
-            
-            // Calculate Hanning window weights (which sum perfectly to 1.0)
-            double w0 = 0.5 * (1.0 + cos(2.0 * M_PI * shift0 / period));
-            double w1 = 0.5 * (1.0 + cos(2.0 * M_PI * shift1 / period));
-            
-            // Boundary safeguards
-            if (readPos0 < 0) readPos0 = 0;
-            if (readPos1 < 0) readPos1 = 0;
-            
-            float l0 = 0.0f, r0 = 0.0f, l1 = 0.0f, r1 = 0.0f;
-            INTERP_SAMPLES_HI(readPos0, l0, r0);
-            INTERP_SAMPLES_HI(readPos1, l1, r1);
-            
-            // Mix grains seamlessly
             l_sample = (float)(l0 * w0 + l1 * w1);
             r_sample = (float)(r0 * w0 + r1 * w1);
         } else {
             deck->MTOffset = 0.0;
+            deck->MTPhaseOffset[0] = 0; deck->MTPhaseOffset[1] = 0;
+            deck->MTSearchTrigger[0] = true; deck->MTSearchTrigger[1] = true;
             if (readPos < 0) readPos = 0;
             INTERP_SAMPLES_HI(readPos, l_sample, r_sample);
         }

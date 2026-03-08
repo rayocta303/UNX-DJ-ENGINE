@@ -5,6 +5,7 @@
 #include "logic/quantize.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 static int Waveform_Update(Component *base) {
     WaveformRenderer *r = (WaveformRenderer *)base;
@@ -125,28 +126,62 @@ static void Waveform_Draw(Component *base) {
         // Anti-flicker: Use stable fractional sampling
         for (float screenX = 0; screenX <= wfW + 1; screenX += 1.0f) {
             double dataPos = baseDataPos + (double)(screenX - centerOffset) * zoomStep;
-            int dataIndex = (int)dataPos;
 
-            if (dataIndex >= 0 && dataIndex < r->dynWfmFrames) {
-                // Average window for smooth liquid shape
-                int sumAmp = 0;
-                int sumColor = 0;
-                int count = 0;
+            if (dataPos >= 0 && dataPos < (double)r->dynWfmFrames) {
+                // Peak-Hold window for smooth liquid shape & consistency
+                float maxAmp = 0;
+                float fSumColor = 0;
+                float totalWeight = 0;
                 
-                int loopSpan = aggZoom > 11 ? aggZoom : 11;
-                int startK = dataIndex - (loopSpan / 2);
+                // Normalizing span to ensure consistent amplitude regardless of zoom
+                float span = (float)(aggZoom > 15 ? aggZoom : 15);
+                if (r->State->Waveform.Style == WAVEFORM_STYLE_SHAPE) {
+                    span = (float)(aggZoom > 30 ? aggZoom : 30);
+                }
+                float hSpan = span / 2.0f;
                 
-                for (int j = 0; j < loopSpan; j++) {
-                    int chkX = startK + j;
-                    if (chkX >= 0 && chkX < r->dynWfmFrames) {
-                        sumAmp += (dynData[chkX] & 0x1F);
-                        sumColor += (dynData[chkX] >> 5);
-                        count++;
+                for (float j = -hSpan; j <= hSpan; j += 1.0f) { // Dense sampling
+                    float sPos = (float)dataPos + j;
+                    int i0 = (int)sPos;
+                    int im1 = i0 - 1;
+                    int i1 = i0 + 1;
+                    int i2 = i0 + 2;
+                    float t = sPos - (float)i0;
+                    
+                    if (i0 >= 0 && i1 < r->dynWfmFrames) {
+                        float a_m1 = (float)(im1 >= 0 ? (dynData[im1] & 0x1F) : (dynData[i0] & 0x1F));
+                        float a0 = (float)(dynData[i0] & 0x1F);
+                        float a1 = (float)(dynData[i1] & 0x1F);
+                        float a2 = (float)(i2 < r->dynWfmFrames ? (dynData[i2] & 0x1F) : (dynData[i1] & 0x1F));
+                        
+                        // Cubic Hermite Spline for sub-sample accuracy
+                        float amp = 0.5f * (
+                            (2.0f * a0) +
+                            (-a_m1 + a1) * t +
+                            (2.0f * a_m1 - 5.0f * a0 + 4.0f * a1 - a2) * t * t +
+                            (-a_m1 + 3.0f * a0 - 3.0f * a1 + a2) * t * t * t
+                        );
+                        
+                        float c0 = (float)(dynData[i0] >> 5);
+                        float c1 = (float)(dynData[i1] >> 5);
+                        float col = c0 + (c1 - c0) * t; 
+                        
+                        // Weight based on distance from center (Quadratic)
+                        float distNorm = fabsf(j) / hSpan;
+                        float weight = 1.0f - (distNorm * distNorm);
+                        if (weight < 0) weight = 0;
+
+                        // PEAK HOLD: We take the weighted peak
+                        if (amp * weight > maxAmp) maxAmp = amp * weight;
+                        
+                        fSumColor += col * weight;
+                        totalWeight += weight;
                     }
                 }
 
-                int amplitude = (count > 0) ? (sumAmp / count) : 0;
-                int colorIdx = (count > 0) ? (sumColor / count) : (dynData[dataIndex] >> 5);
+                // Adjust amplitude to compensate for the weight curve used in peak detection
+                int amplitude = (int)(maxAmp * 1.05f); 
+                int colorIdx = (totalWeight > 0) ? (int)(fSumColor / totalWeight) : (dynData[(int)dataPos] >> 5);
 
                 // Apply Gains
                 float gLow = (r->State->Waveform.GainLow > 0) ? r->State->Waveform.GainLow : 1.0f;
@@ -196,11 +231,18 @@ static void Waveform_Draw(Component *base) {
                     if (prevPX > -90.0f) {
                         WaveformStyle style = r->State->Waveform.Style;
                         
-                        if (style == WAVEFORM_STYLE_3BAND) {
-                            // Layered Vector Style (Rekordbox Look)
-                            Color colorBass = {0, 100, 255, 255};
-                            Color colorMid  = {150, 95, 20, 255}; // Amber/Brown
-                            Color colorHigh = {255, 250, 230, 255}; // Off-white
+                        if (style == WAVEFORM_STYLE_3BAND || style == WAVEFORM_STYLE_SHAPE) {
+                            // Layered Vector Style (Rekordbox/Mixxx Look)
+                            Color colorBass = {0, 85, 240, 255};   // Vibrant Blue
+                            Color colorMid  = {240, 150, 20, 255}; // Vibrant Amber
+                            Color colorHigh = {255, 255, 255, 255}; // Pure White
+
+                            if (style == WAVEFORM_STYLE_SHAPE) {
+                                // In Shape mode, we use alpha layering for a richer look
+                                colorBass.a = 210;
+                                colorMid.a = 180;
+                                colorHigh.a = 240;
+                            }
 
                             // Bass (Blue) - Outermost
                             DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevBAmp}, (Vector2){px, wfY + waveCenter + bAmp}, (Vector2){px, wfY + waveCenter - bAmp}, colorBass);
@@ -217,6 +259,9 @@ static void Waveform_Draw(Component *base) {
                                 DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevHAmp}, (Vector2){px, wfY + waveCenter + hAmp}, (Vector2){px, wfY + waveCenter - hAmp}, colorHigh);
                                 DrawTriangle((Vector2){prevPX, wfY + waveCenter - prevHAmp}, (Vector2){prevPX, wfY + waveCenter + prevHAmp}, (Vector2){px, wfY + waveCenter + hAmp}, colorHigh);
                             }
+
+                            // Horizontal Axis (Subtle white line)
+                            DrawLineEx((Vector2){px, wfY + waveCenter}, (Vector2){px + 1, wfY + waveCenter}, 1.0f, (Color){255, 255, 255, 60});
                         }
                         else if (style == WAVEFORM_STYLE_RGB) {
                             // Mixxx style RGB (Amplitude-based mixing)

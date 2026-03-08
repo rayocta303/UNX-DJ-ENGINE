@@ -4,6 +4,7 @@
 #include "ui/components/helpers.h"
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 static void drawLeftBadgeColumn(DeckStrip *d, float x, float y, float h) {
     float lColW = S(40);
@@ -286,34 +287,88 @@ static void DeckStrip_Draw(Component *base) {
         float playedRatio = 0;
         if (totalMs > 0) playedRatio = (float)playedMs / totalMs;
 
-        if (d->State->LoadedTrack->StaticWaveformLen >= 202) {
-            float chunkW = ww / 202.0f;
-            for (int i = 0; i < 202; i++) {
-                unsigned char val = d->State->LoadedTrack->StaticWaveform[i];
-                float px = wx + (i * chunkW);
-                float amp = ((val & 0x1F) / 31.0f) * wh;
-                if (amp < 1) amp = 1;
+        if (d->State->LoadedTrack->StaticWaveformLen > 0) {
+            int len = d->State->LoadedTrack->StaticWaveformLen;
+            
+            float prevPX = -1.0f;
+            float prevBAmp = 0, prevMAmp = 0, prevHAmp = 0;
 
-                int freq = val >> 5;
-                float ampB = 0, ampY = 0, ampW = 0;
-                if (freq >= 6) {
-                    ampW = amp;
-                } else if (freq >= 3) {
-                    ampY = amp; ampW = amp * 0.5f;
-                } else {
-                    ampB = amp; ampY = amp * 0.7f; ampW = amp * 0.35f;
-                }
-
-                bool isPlayed = (i / 202.0f) <= playedRatio;
+            for (float screenX = 0; screenX < ww; screenX += 1.0f) {
+                double dataPos = (double)(screenX / ww) * (double)len;
                 
-                if (isPlayed) {
-                    if (ampY > 0) DrawRectangle(px, wy + wh/2 - ampY/2, chunkW, ampY, (Color){130, 70, 0, 255});
-                    if (ampW > 0) DrawRectangle(px, wy + wh/2 - ampW/2, chunkW, ampW, (Color){200, 180, 140, 255});
-                } else {
-                    if (ampB > 0) DrawRectangle(px, wy + wh/2 - ampB/2, chunkW, ampB, (Color){0, 90, 255, 255});
-                    if (ampY > 0) DrawRectangle(px, wy + wh/2 - ampY/2, chunkW, ampY, (Color){210, 130, 20, 255});
-                    if (ampW > 0) DrawRectangle(px, wy + wh/2 - ampW/2, chunkW, ampW, (Color){255, 250, 220, 255});
+                // Peak-Hold sampling for smooth overview
+                float maxAmp = 0;
+                float fSumColor = 0;
+                float totalWeight = 0;
+                float span = 8.0f; // Wide enough for smooth Rekordbox style
+                float hSpan = span / 2.0f;
+
+                for (float j = -hSpan; j <= hSpan; j += 1.0f) {
+                    float sPos = (float)dataPos + j;
+                    int i0 = (int)sPos;
+                    int i1 = i0 + 1;
+                    float t = sPos - (float)i0;
+                    
+                    if (i0 >= 0 && i1 < len) {
+                        float a0 = (float)(d->State->LoadedTrack->StaticWaveform[i0] & 0x1F);
+                        float a1 = (float)(d->State->LoadedTrack->StaticWaveform[i1] & 0x1F);
+                        float amp = a0 + (a1 - a0) * t;
+                        
+                        float c0 = (float)(d->State->LoadedTrack->StaticWaveform[i0] >> 5);
+                        float c1 = (float)(d->State->LoadedTrack->StaticWaveform[i1] >> 5);
+                        float col = c0 + (c1 - c0) * t;
+                        
+                        float distNorm = fabsf(j) / hSpan;
+                        float weight = 1.0f - (distNorm * distNorm);
+                        if (weight < 0) weight = 0;
+
+                        if (amp * weight > maxAmp) maxAmp = amp * weight;
+                        
+                        fSumColor += col * weight;
+                        totalWeight += weight;
+                    }
                 }
+
+                float baseAmp = (maxAmp / 31.0f) * wh * 1.05f;
+                int freq = (totalWeight > 0) ? (int)(fSumColor / totalWeight) : 0;
+                float px = wx + screenX;
+
+                float bAmp = 0, mAmp = 0, hAmp = 0;
+                if (freq >= 6) { 
+                    bAmp = baseAmp * 0.95f; mAmp = baseAmp * 0.85f; hAmp = baseAmp * 0.65f; 
+                } else if (freq >= 3) { 
+                    bAmp = baseAmp * 0.90f; mAmp = baseAmp * 0.70f; hAmp = baseAmp * 0.25f; 
+                } else { 
+                    bAmp = baseAmp * 0.85f; mAmp = baseAmp * 0.40f; hAmp = baseAmp * 0.10f; 
+                }
+
+                if (prevPX >= 0) {
+                    bool isPlayed = (screenX / ww) <= playedRatio;
+                    
+                    Color cB = {0, 85, 240, 255};
+                    Color cM = {240, 150, 20, 255};
+                    Color cH = {255, 255, 255, 255};
+
+                    if (isPlayed) {
+                        cB = (Color){0, 40, 100, 255};
+                        cM = (Color){110, 60, 0, 255};
+                        cH = (Color){160, 160, 140, 255};
+                    }
+
+                    // Bass
+                    DrawTriangle((Vector2){prevPX, wy + wh/2 - prevBAmp/2}, (Vector2){px, wy + wh/2 + bAmp/2}, (Vector2){px, wy + wh/2 - bAmp/2}, cB);
+                    DrawTriangle((Vector2){prevPX, wy + wh/2 - prevBAmp/2}, (Vector2){prevPX, wy + wh/2 + prevBAmp/2}, (Vector2){px, wy + wh/2 + bAmp/2}, cB);
+                    
+                    // Mid
+                    DrawTriangle((Vector2){prevPX, wy + wh/2 - prevMAmp/2}, (Vector2){px, wy + wh/2 + mAmp/2}, (Vector2){px, wy + wh/2 - mAmp/2}, cM);
+                    DrawTriangle((Vector2){prevPX, wy + wh/2 - prevMAmp/2}, (Vector2){prevPX, wy + wh/2 + prevMAmp/2}, (Vector2){px, wy + wh/2 + mAmp/2}, cM);
+
+                    // High
+                    DrawTriangle((Vector2){prevPX, wy + wh/2 - prevHAmp/2}, (Vector2){px, wy + wh/2 + hAmp/2}, (Vector2){px, wy + wh/2 - hAmp/2}, cH);
+                    DrawTriangle((Vector2){prevPX, wy + wh/2 - prevHAmp/2}, (Vector2){prevPX, wy + wh/2 + prevHAmp/2}, (Vector2){px, wy + wh/2 + hAmp/2}, cH);
+                }
+
+                prevPX = px; prevBAmp = bAmp; prevMAmp = mAmp; prevHAmp = hAmp;
             }
         }
         

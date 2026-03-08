@@ -11,7 +11,8 @@ typedef struct {
 typedef enum {
     WAVEFORM_STYLE_BLUE = 0,
     WAVEFORM_STYLE_RGB = 1,
-    WAVEFORM_STYLE_3BAND = 2
+    WAVEFORM_STYLE_3BAND = 2,
+    WAVEFORM_STYLE_SHAPE = 3
 } WaveformStyle;
 
 typedef struct {

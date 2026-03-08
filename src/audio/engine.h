@@ -65,6 +65,8 @@ typedef struct DeckAudioState {
     
     // OLA (Master Tempo) State
     double MTOffset;
+    float MTPhaseOffset[2]; // Synchronization offsets for SOLA
+    bool MTSearchTrigger[2]; // Flags to perform search once per wrap
     int MTSampleCount;
 
     float Trim;

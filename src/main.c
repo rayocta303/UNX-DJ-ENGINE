@@ -135,7 +135,8 @@ void App_Init(App *a) {
     strcpy(a->settingsState.Items[2].Options[0], "BLUE");
     strcpy(a->settingsState.Items[2].Options[1], "RGB");
     strcpy(a->settingsState.Items[2].Options[2], "3-BAND");
-    a->settingsState.Items[2].OptionsCount = 3;
+    strcpy(a->settingsState.Items[2].Options[3], "SHAPE");
+    a->settingsState.Items[2].OptionsCount = 4;
     a->settingsState.Items[2].Current = a->deckA.Waveform.Style;
 
     const char* gLabels[] = { "0.5x", "0.75x", "1.0x", "1.25x", "1.5x", "2.0x" };

@@ -10,6 +10,8 @@ bin/
 build/
 tools/bin2c.exe
 
+tests
+
 # Generated code
 src/ui/components/assets_bundle.h
 
