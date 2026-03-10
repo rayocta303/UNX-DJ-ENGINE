@@ -8,6 +8,7 @@
 #include "ui/views/splash.h"
 #include "ui/views/info.h"
 #include "ui/views/settings.h"
+#include "ui/views/about.h"
 #include "ui/player/player.h"
 #include "ui/browser/browser.h"
 #include "input/keyboard.h"
@@ -20,6 +21,7 @@ typedef enum {
     ScreenBrowser,
     ScreenInfo,
     ScreenSettings,
+    ScreenAbout,
     ScreenSplash
 } CurrentScreen;
 
@@ -33,6 +35,7 @@ typedef struct {
     BrowserState browserState;
     InfoState infoState;
     SettingsState settingsState;
+    AboutState aboutState;
 
     TopBar topbar;
     DeckStrip stripA;
@@ -41,6 +44,7 @@ typedef struct {
     BrowserRenderer browser;
     InfoRenderer info;
     SettingsRenderer settings;
+    AboutRenderer about;
     SplashRenderer splash;
     KeyboardMapping keyMap;
     bool showExitConfirm;
@@ -87,7 +91,10 @@ void OnSettingsApply(void *ctx) {
 
 void OnSettingsAction(void *ctx, int idx) {
     App *a = (App*)ctx;
-    if (idx == 8) { // EXIT APPLICATION
+    if (idx == 8) { // ABOUT
+        a->screen = ScreenAbout;
+        a->aboutState.IsActive = true;
+    } else if (idx == 9) { // EXIT APPLICATION
         a->showExitConfirm = true;
     }
 }
@@ -187,9 +194,12 @@ void App_Init(App *a) {
     a->settingsState.Items[7].Value = a->deckA.Waveform.VinylStopMs;
     strcpy(a->settingsState.Items[7].Unit, "ms");
     
-    strcpy(a->settingsState.Items[8].Label, "EXIT APPLICATION");
+    strcpy(a->settingsState.Items[8].Label, "ABOUT");
     a->settingsState.Items[8].Type = SETTING_TYPE_ACTION;
-    a->settingsState.ItemsCount = 9;
+
+    strcpy(a->settingsState.Items[9].Label, "EXIT APPLICATION");
+    a->settingsState.Items[9].Type = SETTING_TYPE_ACTION;
+    a->settingsState.ItemsCount = 10;
 
     // Set Load Lock current opt
     a->settingsState.Items[1].Current = a->deckA.Waveform.LoadLock ? 1 : 0;
@@ -200,6 +210,13 @@ void App_Init(App *a) {
 
     // Init FX State
     memset(&a->fxState, 0, sizeof(BeatFXState));
+
+    // Init About State
+    memset(&a->aboutState, 0, sizeof(AboutState));
+    a->aboutState.IsActive = false;
+    strcpy(a->aboutState.Version, "v1.2.0-Alpha");
+    strcpy(a->aboutState.Developer, "Hanif Bagus Saputra Hadi");
+    strcpy(a->aboutState.Instagram, "@unxchr");
 
     // Init Components
     TopBar_Init(&a->topbar);
@@ -213,6 +230,7 @@ void App_Init(App *a) {
     a->settings.OnClose = OnSettingsApply;
     a->settings.OnAction = OnSettingsAction;
     a->settings.callbackCtx = a;
+    AboutRenderer_Init(&a->about, &a->aboutState);
     SplashRenderer_Init(&a->splash, &a->splashCounter);
     a->keyMap = GetDefaultMapping();
 }
@@ -475,6 +493,7 @@ int main(void) {
                 app.browserState.IsActive = false;
                 app.infoState.IsActive = false;
                 app.settingsState.IsActive = false;
+                app.aboutState.IsActive = false;
             }
         }
 
@@ -484,6 +503,7 @@ int main(void) {
         if (app.screen == ScreenBrowser) app.browser.base.Update((Component*)&app.browser);
         if (app.screen == ScreenInfo) app.info.base.Update((Component*)&app.info);
         if (app.screen == ScreenSettings) app.settings.base.Update((Component*)&app.settings);
+        if (app.screen == ScreenAbout) app.about.base.Update((Component*)&app.about);
         
         if (app.screen != ScreenSplash) {
             app.stripA.base.Update((Component*)&app.stripA);
@@ -504,6 +524,7 @@ int main(void) {
             case ScreenBrowser: app.browser.base.Draw((Component*)&app.browser); break;
             case ScreenInfo: app.info.base.Draw((Component*)&app.info); break;
             case ScreenSettings: app.settings.base.Draw((Component*)&app.settings); break;
+            case ScreenAbout: app.about.base.Draw((Component*)&app.about); break;
             default: break;
         }
 
