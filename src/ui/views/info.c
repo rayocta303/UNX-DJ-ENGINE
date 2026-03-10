@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <string.h>
 
-
 // Helper to truncate string (simple byte truncation for C)
 static void truncateStr(const char *src, char *dst, int maxLen) {
   strncpy(dst, src, maxLen);
@@ -30,106 +29,160 @@ static void Info_Draw(Component *base) {
   if (!r->State->IsActive)
     return;
 
+  // Background shading
   DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ColorBlack);
-  DrawLine(0, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT / 2, ColorDark1);
 
   Font faceXXS = UIFonts_GetFace(S(7));
-  Font faceXS = UIFonts_GetFace(S(8));
   Font faceSm = UIFonts_GetFace(S(9));
-  Font faceLg = UIFonts_GetFace(S(14));
-  Font iconFace = UIFonts_GetIcon(S(14));
+  Font faceMd = UIFonts_GetFace(S(11));
+  Font faceLg = UIFonts_GetFace(S(15));
+  Font iconFace = UIFonts_GetIcon(S(12));
+  Font iconMd = UIFonts_GetIcon(S(20));
 
-  float availableH = SCREEN_HEIGHT - TOP_BAR_H - DECK_STR_H;
-  float halfH = availableH / 2.0f;
+  float availableH = SCREEN_HEIGHT - TOP_BAR_H - DECK_STR_H - FX_BAR_H;
+  float halfH = availableH / 1.75f;
+  float centerX = SCREEN_WIDTH / 2.0f;
 
   for (int deckIdx = 0; deckIdx < 2; deckIdx++) {
     float offsetY = deckIdx * halfH;
     float baseY = TOP_BAR_H + offsetY;
+    float panelH = halfH - S(6);
+    float panelW = SCREEN_WIDTH - S(20);
+    float panelX = S(10);
+    float panelY = baseY + S(3);
+
+    // Draw Deck Panel Card - Darker, cleaner borders
+    DrawRectangle(panelX, panelY, panelW, panelH, (Color){22, 22, 25, 255});
+    DrawRectangleLinesEx((Rectangle){panelX, panelY, panelW, panelH}, 1.0f,
+                         (Color){50, 50, 60, 255});
+
+    // Deck Badge
+    float badgeW = S(40);
+    DrawRectangle(panelX, panelY, badgeW, S(16), (Color){40, 40, 50, 255});
+    char deckLab[32];
+    sprintf(deckLab, "DECK %d", deckIdx + 1);
+    UIDrawText(deckLab, faceXXS, panelX + S(6), panelY + S(4.5f), S(7),
+               ColorOrange);
 
     InfoTrack *trk = &r->State->Tracks[deckIdx];
 
-    char deckLab[32];
-    sprintf(deckLab, "DECK %d", deckIdx + 1);
-    UIDrawText(deckLab, faceXXS, S(10), baseY + S(4), S(7), ColorRed);
+    // Main Header Area (Title & Artist)
+    float headX = panelX + S(80);
+    float headY = panelY + S(14);
 
-    UIDrawText("\xef\x80\x81", iconFace, S(10), baseY + S(18), S(14),
-               ColorWhite); // f001 music note
+    // Large Music Icon - Slightly translucent
+    UIDrawText("\xef\x80\x81", iconMd, panelX + S(30), headY + S(2), S(20),
+               Fade(ColorWhite, 0.8f));
 
+    // Title
     char tTitle[128];
-    truncateStr(trk->Title, tTitle, 80);
-    UIDrawText(tTitle, faceLg, S(30), baseY + S(18), S(14), ColorWhite);
+    if (trk->Title[0] == '\0')
+      strcpy(tTitle, "Waiting for track...");
+    else
+      truncateStr(trk->Title, tTitle, 60);
+    UIDrawText(tTitle, faceLg, headX, headY, S(15), ColorWhite);
 
+    // Artist
     char tArtist[128];
-    truncateStr(trk->Artist, tArtist, 80);
-    UIDrawText(tArtist, faceSm, S(24), baseY + S(36), S(9), ColorShadow);
+    if (trk->Artist[0] == '\0')
+      strcpy(tArtist, "---");
+    else
+      truncateStr(trk->Artist, tArtist, 75);
+    UIDrawText(tArtist, faceMd, headX, headY + S(20), S(11), ColorShadow);
 
-    DrawLine(S(8), baseY + S(52), SCREEN_WIDTH - S(8), baseY + S(52),
-             ColorDark1);
+    // Metadata Grid - Centered in remaining space
+    float col1IconX = panelX + S(20);
+    float col1TextX = panelX + S(40);
+    float col2IconX = centerX + S(20);
+    float col2TextX = centerX + S(40);
 
-    // Rows
-    struct {
-      const char *l1;
-      const char *v1;
-      const char *l2;
-      const char *v2;
-    } rows[4];
-    char tAlbum[128];
-    truncateStr(trk->Album, tAlbum, 40);
-    char tGenre[64];
-    truncateStr(trk->Genre, tGenre, 25);
-    rows[0].l1 = "ALBUM";
-    rows[0].v1 = tAlbum;
-    rows[0].l2 = "GENRE";
-    rows[0].v2 = tGenre;
+    // Adjust Y start based on panel height to center it better
+    float startGridY = panelY + S(60);
+    float rowH = S(22);
 
+    // Row 1: BPM & KEY
     char bpmStr[32];
-    sprintf(bpmStr, "%.1f", trk->BPM);
-    rows[1].l1 = "BPM";
-    rows[1].v1 = bpmStr;
-    rows[1].l2 = "KEY";
-    rows[1].v2 = trk->Key;
+    sprintf(bpmStr, "%.1f BPM", trk->BPM);
+    UIDrawText("\xef\x80\x97", iconFace, col1IconX, startGridY + S(8), S(12),
+               ColorShadow); // Clock for timing/BPM
+    UIDrawText("BPM", faceXXS, col1TextX, startGridY, S(7), ColorShadow);
+    UIDrawText(bpmStr, faceSm, col1TextX, startGridY + S(9), S(9), ColorWhite);
+
+    UIDrawText("\xef\x82\x84", iconFace, col2IconX, startGridY + S(8), S(12),
+               ColorShadow); // Key
+    UIDrawText("KEY", faceXXS, col2TextX, startGridY, S(7), ColorShadow);
+    UIDrawText(trk->Key[0] ? trk->Key : "---", faceSm, col2TextX,
+               startGridY + S(9), S(9), ColorOrange);
+
+    // Row 2: ALBUM & DURATION
+    char tAlbum[128];
+    if (trk->Album[0] == '\0')
+      strcpy(tAlbum, "---");
+    else
+      truncateStr(trk->Album, tAlbum, 40);
+    UIDrawText("\xef\x8a\x91", iconFace, col1IconX, startGridY + rowH + S(8),
+               S(12), ColorShadow); // CD
+    UIDrawText("ALBUM", faceXXS, col1TextX, startGridY + rowH, S(7),
+               ColorShadow);
+    UIDrawText(tAlbum, faceSm, col1TextX, startGridY + rowH + S(9), S(9),
+               ColorWhite);
 
     char durStr[32];
     sprintf(durStr, "%02d:%02d", trk->Duration / 60, trk->Duration % 60);
-    char ratingStr[32] = "";
-    for (int i = 0; i < 5; i++) {
-      if (i < trk->Rating)
-        strcat(ratingStr, "\xe2\x98\x85"); // solid star
-      else
-        strcat(ratingStr, "\xe2\x98\x86"); // outline star
+    UIDrawText("\xef\x80\x97", iconFace, col2IconX, startGridY + rowH + S(8),
+               S(12), ColorShadow); // Clock
+    UIDrawText("DURATION", faceXXS, col2TextX, startGridY + rowH, S(7),
+               ColorShadow);
+    UIDrawText(durStr, faceSm, col2TextX, startGridY + rowH + S(9), S(9),
+               ColorWhite);
+
+    // Row 3: GENRE & RATING
+    char tGenre[64];
+    if (trk->Genre[0] == '\0')
+      strcpy(tGenre, "---");
+    else
+      truncateStr(trk->Genre, tGenre, 30);
+    UIDrawText("\xef\x80\xac", iconFace, col1IconX,
+               startGridY + rowH * 2 + S(8), S(12), ColorShadow); // Tag
+    UIDrawText("GENRE", faceXXS, col1TextX, startGridY + rowH * 2, S(7),
+               ColorShadow);
+    UIDrawText(tGenre, faceSm, col1TextX, startGridY + rowH * 2 + S(9), S(9),
+               ColorWhite);
+
+    UIDrawText("\xef\x80\x85", iconFace, col2IconX,
+               startGridY + rowH * 2 + S(8), S(12), ColorShadow); // Star
+    UIDrawText("RATING", faceXXS, col2TextX, startGridY + rowH * 2, S(7),
+               ColorShadow);
+
+    // Rating as Icons if possible, fallback to text
+    if (trk->Rating > 0) {
+      for (int i = 0; i < 5; i++) {
+        const char *starIco =
+            (i < trk->Rating) ? "\xef\x80\x85" : ""; // Star or empty
+        if (starIco[0]) {
+          UIDrawText(starIco, iconFace, col2TextX + i * S(10),
+                     startGridY + rowH * 2 + S(9), S(9), ColorOrange);
+        } else {
+          // Outline star fa-star-o or just shadow star? FA5 has fa-star-o as
+          // part of regular Let's just use empty space or a dot
+          UIDrawText(".", faceXXS, col2TextX + i * S(10) + S(4),
+                     startGridY + rowH * 2 + S(9), S(7), ColorShadow);
+        }
+      }
+    } else {
+      UIDrawText("NOT RATED", faceSm, col2TextX, startGridY + rowH * 2 + S(9),
+                 S(9), ColorShadow);
     }
-    rows[2].l1 = "DURATION";
-    rows[2].v1 = durStr;
-    rows[2].l2 = "RATING";
-    rows[2].v2 = ratingStr;
 
-    char tFile[256];
-    truncateStr(trk->FilePath, tFile, 45);
-    rows[3].l1 = "SOURCE";
-    rows[3].v1 = trk->Source;
-    rows[3].l2 = "FILE";
-    rows[3].v2 = tFile;
-
-    float rowH = S(22);
-    float col1X = S(10);
-    float col2X =
-        SCREEN_WIDTH / 2.0f + S(40); // Adjusted for proportional split
-
-    for (int i = 0; i < 4; i++) {
-      float ry = baseY + S(58) + i * rowH;
-      UIDrawText(rows[i].l1, faceXXS, col1X, ry, S(7), ColorShadow);
-      UIDrawText(rows[i].v1, faceXS, col1X + S(54), ry, S(8), ColorWhite);
-
-      UIDrawText(rows[i].l2, faceXXS, col2X, ry, S(7), ColorShadow);
-      UIDrawText(rows[i].v2, faceXS, col2X + S(50), ry, S(8), ColorWhite);
+    // Small source info at absolute bottom of card
+    if (trk->FilePath[0]) {
+      char sourceInfo[128];
+      sprintf(sourceInfo, "[%s] %s", trk->Source, trk->FilePath);
+      char tSource[128];
+      truncateStr(sourceInfo, tSource, 110);
+      UIDrawText(tSource, faceXXS, panelX + S(10), panelY + panelH - S(10),
+                 S(7), Fade(ColorShadow, 0.5f));
     }
-
-    // Comment
-    float ry = baseY + S(58) + 4 * rowH;
-    UIDrawText("COMMENT", faceXXS, col1X, ry, S(7), ColorShadow);
-    char tComment[256];
-    truncateStr(trk->Comment, tComment, 80);
-    UIDrawText(tComment, faceXS, col1X + S(54), ry, S(8), ColorWhite);
   }
 }
 
