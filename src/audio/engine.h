@@ -15,8 +15,8 @@ extern "C" {
 #define CHANNELS 2
 #define MAX_DECKS 2
 
-// 1 frame = 1/150 s at 44.1kHz = 294 samples (High-Res Waveform Rate)
-#define SAMPLES_PER_FRAME 294 
+// 1 frame = 1/105 s at 44.1kHz = 420 samples (Teensy Matching Rate)
+#define SAMPLES_PER_FRAME 420 
 
 typedef enum {
     CHANGE_SPEED_NO_CHANGE = 0,

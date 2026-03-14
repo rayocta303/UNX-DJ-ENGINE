@@ -3,7 +3,7 @@
 #include "raylib.h"
 #include <stdbool.h>
 
-// Reference resolution â€” 640Ã—400 (16:10)
+// Reference resolution - 640x400 (16:10)
 #define REF_WIDTH       640
 #define REF_HEIGHT      400
 

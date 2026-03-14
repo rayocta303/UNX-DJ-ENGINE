@@ -420,7 +420,7 @@ int main(void) {
             double srA = (double)audioEngine.Decks[0].SampleRate;
             if (srA < 8000) srA = 44100.0;
 
-            app.deckA.Position = (playheadFrames * 150.0) / srA;
+            app.deckA.Position = (playheadFrames * 105.0) / srA;
             app.deckA.IsTouching = audioEngine.Decks[0].IsTouching;
             app.deckA.IsPlaying = audioEngine.Decks[0].IsPlaying;
             
@@ -435,7 +435,7 @@ int main(void) {
             double srB = (double)audioEngine.Decks[1].SampleRate;
             if (srB < 8000) srB = 44100.0;
 
-            app.deckB.Position = (playheadFrames * 150.0) / srB;
+            app.deckB.Position = (playheadFrames * 105.0) / srB;
             app.deckB.IsTouching = audioEngine.Decks[1].IsTouching;
             app.deckB.IsPlaying = audioEngine.Decks[1].IsPlaying;
             

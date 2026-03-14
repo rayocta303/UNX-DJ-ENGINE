@@ -63,7 +63,7 @@ static void About_Draw(Component *base) {
 
   // Content Section (Bottom part of card)
   float labelX = cardX + S(30);
-  float valueX = cardX + S(120);
+
   float rowSpacing = S(35);
   float startY = cardY + S(95);
 

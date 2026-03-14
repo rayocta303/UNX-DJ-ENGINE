@@ -290,8 +290,7 @@ static void DeckStrip_Draw(Component *base) {
         if (d->State->LoadedTrack->StaticWaveformLen > 0) {
             int len = d->State->LoadedTrack->StaticWaveformLen;
             
-            float prevPX = -1.0f;
-            float prevBAmp = 0, prevMAmp = 0, prevHAmp = 0;
+
 
             for (float screenX = 0; screenX < ww; screenX += 1.0f) {
                 double dataPos = (double)(screenX / ww) * (double)len;
@@ -318,14 +317,10 @@ static void DeckStrip_Draw(Component *base) {
                         float c1 = (float)(d->State->LoadedTrack->StaticWaveform[i1] >> 5);
                         float col = c0 + (c1 - c0) * t;
                         
-                        float distNorm = fabsf(j) / hSpan;
-                        float weight = 1.0f - (distNorm * distNorm);
-                        if (weight < 0) weight = 0;
-
-                        if (amp * weight > maxAmp) maxAmp = amp * weight;
+                        if (amp > maxAmp) maxAmp = amp;
                         
-                        fSumColor += col * weight;
-                        totalWeight += weight;
+                        fSumColor += col;
+                        totalWeight += 1.0f;
                     }
                 }
 
@@ -342,33 +337,24 @@ static void DeckStrip_Draw(Component *base) {
                     bAmp = baseAmp * 0.85f; mAmp = baseAmp * 0.40f; hAmp = baseAmp * 0.10f; 
                 }
 
-                if (prevPX >= 0) {
-                    bool isPlayed = (screenX / ww) <= playedRatio;
-                    
-                    Color cB = {0, 85, 240, 255};
-                    Color cM = {240, 150, 20, 255};
-                    Color cH = {255, 255, 255, 255};
+                bool isPlayed = (screenX / ww) <= playedRatio;
+                
+                Color cB = {16, 105, 238, 255};
+                Color cM = {16, 190, 82, 255};
+                Color cH = {246, 251, 246, 255};
 
-                    if (isPlayed) {
-                        cB = (Color){0, 40, 100, 255};
-                        cM = (Color){110, 60, 0, 255};
-                        cH = (Color){160, 160, 140, 255};
-                    }
-
-                    // Bass
-                    DrawTriangle((Vector2){prevPX, wy + wh/2 - prevBAmp/2}, (Vector2){px, wy + wh/2 + bAmp/2}, (Vector2){px, wy + wh/2 - bAmp/2}, cB);
-                    DrawTriangle((Vector2){prevPX, wy + wh/2 - prevBAmp/2}, (Vector2){prevPX, wy + wh/2 + prevBAmp/2}, (Vector2){px, wy + wh/2 + bAmp/2}, cB);
-                    
-                    // Mid
-                    DrawTriangle((Vector2){prevPX, wy + wh/2 - prevMAmp/2}, (Vector2){px, wy + wh/2 + mAmp/2}, (Vector2){px, wy + wh/2 - mAmp/2}, cM);
-                    DrawTriangle((Vector2){prevPX, wy + wh/2 - prevMAmp/2}, (Vector2){prevPX, wy + wh/2 + prevMAmp/2}, (Vector2){px, wy + wh/2 + mAmp/2}, cM);
-
-                    // High
-                    DrawTriangle((Vector2){prevPX, wy + wh/2 - prevHAmp/2}, (Vector2){px, wy + wh/2 + hAmp/2}, (Vector2){px, wy + wh/2 - hAmp/2}, cH);
-                    DrawTriangle((Vector2){prevPX, wy + wh/2 - prevHAmp/2}, (Vector2){prevPX, wy + wh/2 + prevHAmp/2}, (Vector2){px, wy + wh/2 + hAmp/2}, cH);
+                if (isPlayed) {
+                    cB = (Color){8, 52, 119, 255};
+                    cM = (Color){8, 95, 41, 255};
+                    cH = (Color){123, 125, 123, 255};
                 }
 
-                prevPX = px; prevBAmp = bAmp; prevMAmp = mAmp; prevHAmp = hAmp;
+                // Bar rendering (Bottom Aligned)
+                DrawRectangle(px, wy + wh - bAmp, 1, bAmp, cB);
+                if (mAmp > 0) DrawRectangle(px, wy + wh - mAmp, 1, mAmp, cM);
+                if (hAmp > 0) DrawRectangle(px, wy + wh - hAmp, 1, hAmp, cH);
+
+
             }
         }
         
