@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #define MINIMP3_FLOAT_OUTPUT
+#define MINIMP3_API static
 #define MINIMP3_IMPLEMENTATION
 #include "minimp3.h"
 #include "minimp3_ex.h"
@@ -14,6 +15,8 @@
 #pragma clang diagnostic ignored "-Wunused-but-set-variable"
 #endif
 
+#define DRWAV_API static
+#define DRWAV_PRIVATE static
 #define DR_WAV_IMPLEMENTATION
 #include "dr_wav.h"
 
