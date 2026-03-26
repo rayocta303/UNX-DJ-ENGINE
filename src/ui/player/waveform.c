@@ -82,6 +82,175 @@ static int Waveform_Update(Component *base) {
   return 0;
 }
 
+void Waveform_DrawGeneric(
+    Rectangle bounds, unsigned char *data, int dataLen,
+    double positionHalfFrames, // For scrolling: playhead pos. For static: unused/0
+    float zoomStep,         // For scrolling: samples per pixel. For static: totalLen/width
+    bool isStatic,          // True for deckstrip overview, False for scrolling track
+    WaveformStyle style, float gLow, float gMid, float gHigh,
+    float playedRatio,      // 0.0-1.0 to dim played area (only for static)
+    float startScreenX,     // Usually 0
+    float endScreenX        // Usually bounds.width
+) {
+  if (data == NULL || dataLen <= 0)
+    return;
+
+  float waveCenterY = bounds.y + (bounds.height / 2.0f);
+
+  BeginScissorMode((int)(bounds.x + UI_OffsetX), (int)(bounds.y + UI_OffsetY),
+                   (int)bounds.width, (int)bounds.height);
+
+  if (isStatic) {
+    // Static base line
+    DrawRectangle((int)bounds.x, (int)(bounds.y + bounds.height - 1), (int)bounds.width, 1, (Color){22, 110, 240, 255});
+
+    for (float screenX = startScreenX; screenX <= endScreenX; screenX += 1.0f) {
+      float px = bounds.x + screenX;
+
+      double binStart = (double)(screenX / bounds.width) * (double)dataLen;
+      double binEnd = (double)((screenX + 1.0f) / bounds.width) * (double)dataLen;
+
+      int startIdx = (int)floor(binStart);
+      int endIdx = (int)ceil(binEnd);
+      if (endIdx <= startIdx) endIdx = startIdx + 1;
+
+      if (startIdx < 0) startIdx = 0;
+      if (endIdx > dataLen) endIdx = dataLen;
+
+      if (startIdx < dataLen) {
+        float maxAmp = 0;
+        unsigned char firstColor = data[startIdx] >> 5;
+
+        for (int i = startIdx; i < endIdx; i++) {
+          float amp = (float)(data[i] & 0x1F);
+          if (amp > maxAmp) maxAmp = amp;
+        }
+
+        float totalGain = (gLow + gMid + gHigh) / 3.0f;
+        if (totalGain <= 0.01f) totalGain = 1.0f;
+
+        float amplitudeZ = maxAmp * totalGain;
+        float maxBarH = bounds.height;
+        float ampBarH = (amplitudeZ / 31.0f) * maxBarH;
+        if (ampBarH > maxBarH) ampBarH = maxBarH;
+
+        Color drawColor = (Color){22, 110, 240, 255}; 
+        if (style == WAVEFORM_STYLE_RGB) {
+          if (firstColor >= 6) drawColor = (Color){255, 100, 100, 255};
+          else if (firstColor >= 3) drawColor = (Color){100, 255, 100, 255};
+        } else if (style == WAVEFORM_STYLE_3BAND || style == WAVEFORM_STYLE_SHAPE) {
+          float highlight = amplitudeZ / 31.0f;
+          if (highlight > 1.0f) highlight = 1.0f;
+          drawColor.r += (unsigned char)(highlight * 100);
+          drawColor.g += (unsigned char)(highlight * 80);
+        }
+
+        bool isPlayed = (screenX / bounds.width) <= playedRatio;
+        if (isPlayed) {
+          drawColor.r /= 2; drawColor.g /= 2; drawColor.b /= 2; drawColor.a = 150;
+        }
+
+        DrawRectangle((int)px, (int)(bounds.y + bounds.height - ampBarH), 1, (int)ampBarH, drawColor);
+      }
+    }
+  } else {
+    // Dynamic smooth-scrolling view aligned to data to prevent horizontal flickering/gaps
+    float centerScreenOffset = (endScreenX - startScreenX) / 2.0f;
+    
+    // Base line for entire area
+    DrawRectangle((int)(bounds.x + startScreenX), (int)(waveCenterY - 1), (int)(endScreenX - startScreenX), 2, (Color){22, 110, 240, 255});
+
+    double firstVisibleData = positionHalfFrames - (centerScreenOffset * zoomStep);
+    double lastVisibleData = positionHalfFrames + (centerScreenOffset * zoomStep);
+
+    int startDataIdx = (int)floor(firstVisibleData);
+    if (startDataIdx < 0) startDataIdx = 0;
+    
+    int endDataIdx = (int)ceil(lastVisibleData);
+    if (endDataIdx > dataLen) endDataIdx = dataLen;
+
+    float zCountF = zoomStep;
+    if (zCountF < 1.0f) zCountF = 1.0f;
+    int zCount = (int)zCountF;
+
+    startDataIdx = (startDataIdx / zCount) * zCount;
+
+    for (int i = startDataIdx; i < endDataIdx; i += zCount) {
+      int endI = i + zCount;
+      if (endI > dataLen) endI = dataLen;
+
+      float maxAmp = 0;
+      float sumAmp = 0;
+      int count = 0;
+      unsigned char firstColor = (i >= 0 && i < dataLen) ? (data[i] >> 5) : 0;
+
+      for (int j = i; j < endI; j++) {
+        float amp = (float)(data[j] & 0x1F);
+        if (amp > maxAmp) maxAmp = amp;
+        sumAmp += amp;
+        count++;
+      }
+
+      float avgAmp = count > 0 ? (sumAmp / count) : 0;
+      float rmsVal = count > 1 ? avgAmp : (maxAmp * 0.7f);
+
+      float totalGain = (gLow + gMid + gHigh) / 3.0f;
+      if (totalGain <= 0.01f) totalGain = 1.0f;
+
+      float amplitudeZ = maxAmp * totalGain;
+      float rmsZ = rmsVal * totalGain;
+
+      float maxBarH = (bounds.height / 2.0f) - 1.0f;
+      float ampBarH = (amplitudeZ / 31.0f) * maxBarH;
+      float rmsBarH = (rmsZ / 31.0f) * maxBarH;
+
+      if (ampBarH > maxBarH) ampBarH = maxBarH;
+      if (rmsBarH > maxBarH) rmsBarH = maxBarH;
+
+      Color drawColor = (Color){22, 110, 240, 255}; 
+      Color rmsColor = ColorWhite;
+
+      if (style == WAVEFORM_STYLE_RGB) {
+        if (firstColor >= 6) drawColor = (Color){255, 100, 100, 255};
+        else if (firstColor >= 3) drawColor = (Color){100, 255, 100, 255};
+      } else if (style == WAVEFORM_STYLE_3BAND || style == WAVEFORM_STYLE_SHAPE) {
+        float highlight = amplitudeZ / 31.0f;
+        if (highlight > 1.0f) highlight = 1.0f;
+        drawColor.r += (unsigned char)(highlight * 100);
+        drawColor.g += (unsigned char)(highlight * 80);
+      }
+
+      float screenX1 = (float)((i - positionHalfFrames) / zoomStep) + centerScreenOffset;
+      float screenX2 = (float)((endI - positionHalfFrames) / zoomStep) + centerScreenOffset;
+
+      if(screenX2 < 0) continue;
+      if(screenX1 > endScreenX - startScreenX) continue;
+
+      float barW = screenX2 - screenX1;
+      barW = ceilf(barW);
+      if (barW < 1.0f) barW = 1.0f; 
+
+      Rectangle ampRect = {
+          bounds.x + startScreenX + screenX1,
+          waveCenterY - ampBarH - 1.0f,
+          barW,
+          2.0f + 2.0f * ampBarH
+      };
+      DrawRectangleRec(ampRect, drawColor);
+
+      Rectangle rmsRect = {
+          bounds.x + startScreenX + screenX1,
+          waveCenterY - rmsBarH - 1.0f,
+          barW,
+          2.0f + 2.0f * rmsBarH
+      };
+      DrawRectangleRec(rmsRect, rmsColor);
+    }
+  }
+
+  EndScissorMode();
+}
+
 static void Waveform_Draw(Component *base) {
   WaveformRenderer *r = (WaveformRenderer *)base;
 
@@ -95,216 +264,38 @@ static void Waveform_Draw(Component *base) {
     return;
   }
 
-  float playheadX = wfLeft + wfW / 2.0f;
+  DrawRectangle(wfLeft, wfY, wfW, waveH, ColorBlack);
+
   float effectiveZoom = (float)r->State->ZoomScale;
   if (effectiveZoom < 0.1f)
     effectiveZoom = 0.1f;
-
   double elapsedHalfFrames = r->State->Position;
-
-  unsigned char *dynData = r->State->LoadedTrack->DynamicWaveform;
-  float waveCenter = waveH / 2.0f;
 
   float fAggZoom = effectiveZoom * r->dataDensity;
   if (fAggZoom < 1.0f)
     fAggZoom = 1.0f;
 
-  // --- Boundary Setup ---
-  // Scissor everything to prevent rendering outside deck area
-  // BeginScissorMode expects raw screen coordinates, so we must add the UI
-  // offset
+  float gLow =
+      (r->State->Waveform.GainLow > 0) ? r->State->Waveform.GainLow : 1.0f;
+  float gMid =
+      (r->State->Waveform.GainMid > 0) ? r->State->Waveform.GainMid : 1.0f;
+  float gHigh =
+      (r->State->Waveform.GainHigh > 0) ? r->State->Waveform.GainHigh : 1.0f;
+
+  Rectangle bounds = {wfLeft, wfY, wfW, waveH};
+
+  // 1. Draw dynamic scrolling waveform via generic function
+  Waveform_DrawGeneric(
+      bounds, r->State->LoadedTrack->DynamicWaveform, r->dynWfmFrames,
+      elapsedHalfFrames * (double)r->dataDensity,
+      (float)(effectiveZoom * r->dataDensity),
+      false, // scrolling mode
+      r->State->Waveform.Style, gLow, gMid, gHigh, 0.0f, 0.0f, wfW + 1.0f);
+
+  float playheadX = wfLeft + wfW / 2.0f;
+
   BeginScissorMode((int)(wfLeft + UI_OffsetX), (int)(wfY + UI_OffsetY),
                    (int)wfW, (int)waveH);
-
-  DrawRectangle(wfLeft, wfY, wfW, waveH, ColorBlack);
-
-  // Store previous amplitudes for continuous shape rendering
-
-  if (dynData != NULL && r->dynWfmFrames > 0) {
-    // Pre-calculate constants for the loop
-    double baseDataPos = elapsedHalfFrames * (double)r->dataDensity;
-    double zoomStep = (double)effectiveZoom * (double)r->dataDensity;
-    float centerOffset = wfW / 2.0f;
-
-    // Anti-flicker: Use stable fractional sampling with Pixel-Binning
-    for (float screenX = 0; screenX <= wfW + 1; screenX += 1.0f) {
-      double binCenter =
-          baseDataPos + (double)(screenX - centerOffset) * zoomStep;
-      double binStart = binCenter - zoomStep * 0.5;
-      double binEnd = binCenter + zoomStep * 0.5;
-
-      if (binEnd >= 0 && binStart < (double)r->dynWfmFrames) {
-        float maxAmp = 0;
-        float fSumColor = 0;
-        float totalWeight = 0;
-
-        // Iterate through all samples that overlap with this pixel's bin
-        int startIdx = (int)floor(binStart);
-        int endIdx = (int)floor(binEnd);
-
-        if (startIdx < 0)
-          startIdx = 0;
-        if (endIdx >= r->dynWfmFrames)
-          endIdx = r->dynWfmFrames - 1;
-
-        for (int i = startIdx; i <= endIdx; i++) {
-          float sampleWeight = 1.0f;
-
-          // Fractional weight for the boundary samples
-          if (i == startIdx) {
-            sampleWeight = (float)(1.0 - (binStart - (double)startIdx));
-            if (sampleWeight > 1.0f)
-              sampleWeight = 1.0f;
-            if (sampleWeight < 0.0f)
-              sampleWeight = 0.0f;
-          } else if (i == endIdx) {
-            sampleWeight = (float)(binEnd - (double)endIdx);
-            if (sampleWeight > 1.0f)
-              sampleWeight = 1.0f;
-            if (sampleWeight < 0.0f)
-              sampleWeight = 0.0f;
-          }
-
-          if (sampleWeight <= 0)
-            continue;
-
-          float amp = (float)(dynData[i] & 0x1F);
-          float col = (float)(dynData[i] >> 5);
-
-          // PEAK HOLD: We take the sample-weighted peak
-          // This keeps the vertical scale stable as samples move in/out
-          if (amp > maxAmp)
-            maxAmp = amp;
-
-          fSumColor += col * sampleWeight;
-          totalWeight += sampleWeight;
-        }
-
-        // Adjust amplitude
-        int amplitude = (int)(maxAmp);
-        int colorIdx =
-            (totalWeight > 0) ? (int)(fSumColor / totalWeight) : 0;
-
-        // Apply Gains
-        float gLow = (r->State->Waveform.GainLow > 0)
-                         ? r->State->Waveform.GainLow
-                         : 1.0f;
-        float gMid = (r->State->Waveform.GainMid > 0)
-                         ? r->State->Waveform.GainMid
-                         : 1.0f;
-        float gHigh = (r->State->Waveform.GainHigh > 0)
-                          ? r->State->Waveform.GainHigh
-                          : 1.0f;
-
-        // --- Calibration Parameters ---
-        float vertScale = 1.9f;
-        float baseAmp = (float)amplitude * vertScale;
-        float bAmp = 0, mAmp = 0, hAmp = 0;
-
-        // Frequency splitting (Heuristic)
-        if (colorIdx >= 6) {
-          bAmp = baseAmp * 0.95f;
-          mAmp = baseAmp * 0.85f;
-          hAmp = baseAmp * 0.60f;
-        } else if (colorIdx >= 3) {
-          bAmp = baseAmp * 0.90f;
-          mAmp = baseAmp * 0.75f;
-          hAmp = baseAmp * 0.20f;
-        } else {
-          bAmp = baseAmp * 0.85f;
-          mAmp = baseAmp * 0.40f;
-          hAmp = baseAmp * 0.05f;
-        }
-
-        // Apply user gains
-        bAmp *= gLow;
-        mAmp *= gMid;
-        hAmp *= gHigh;
-
-        // Ensure visibility for 3BAND even if heuristic is weak
-        if (r->State->Waveform.Style == WAVEFORM_STYLE_3BAND) {
-          if (mAmp < bAmp * 0.3f)
-            mAmp = bAmp * 0.3f;
-          if (hAmp < mAmp * 0.3f)
-            hAmp = mAmp * 0.3f;
-        }
-
-        if (bAmp > waveCenter - 1.0f)
-          bAmp = waveCenter - 1.0f;
-        if (mAmp > bAmp)
-          mAmp = bAmp * 0.9f;
-        if (hAmp > mAmp)
-          hAmp = mAmp * 0.8f;
-
-        float px = wfLeft + screenX;
-
-        if (px >= wfLeft - 2.0f && px <= wfRight + 2.0f) {
-          WaveformStyle style = r->State->Waveform.Style;
-
-          if (style == WAVEFORM_STYLE_3BAND || style == WAVEFORM_STYLE_SHAPE) {
-            // Layered Vector Style (Teensy Look)
-            Color colorBass = {16, 105, 238, 255};  // Teensy Blue
-            Color colorMid = {16, 190, 82, 255};    // Teensy Green
-            Color colorHigh = {246, 251, 246, 255}; // Teensy White
-
-            if (style == WAVEFORM_STYLE_SHAPE) {
-              // Solid colors for Teensy shape match
-              colorBass.a = 255;
-              colorMid.a = 255;
-              colorHigh.a = 255;
-            }
-
-            // Bass (Blue) - Outermost
-            DrawRectangle(px, wfY + waveCenter - bAmp, 1, (int)(bAmp * 2),
-                          colorBass);
-
-            // Mid (Green)
-            if (mAmp > 0) {
-              DrawRectangle(px, wfY + waveCenter - mAmp, 1, (int)(mAmp * 2),
-                            colorMid);
-            }
-
-            // High (White) - Innermost
-            if (hAmp > 0) {
-              DrawRectangle(px, wfY + waveCenter - hAmp, 1, (int)(hAmp * 2),
-                            colorHigh);
-            }
-
-            // Horizontal Axis (Subtle white line)
-            DrawLineEx((Vector2){px, wfY + waveCenter},
-                       (Vector2){px + 1, wfY + waveCenter}, 1.0f,
-                       (Color){255, 255, 255, 60});
-          } else if (style == WAVEFORM_STYLE_RGB) {
-            // Mixxx style RGB (Amplitude-based mixing)
-            float total = bAmp + mAmp + hAmp + 0.001f;
-            Color mix;
-            mix.r =
-                (unsigned char)((bAmp * 0 + mAmp * 255 + hAmp * 255) / total);
-            mix.g =
-                (unsigned char)((bAmp * 120 + mAmp * 255 + hAmp * 50) / total);
-            mix.b =
-                (unsigned char)((bAmp * 255 + mAmp * 20 + hAmp * 50) / total);
-            mix.a = 255;
-
-            DrawRectangle(px, wfY + waveCenter - bAmp, 1, (int)(bAmp * 2), mix);
-          } else {
-            // WAVEFORM_STYLE_BLUE (Classic Pioneer)
-            Color colorBlue = {0, 100, 255, 255};
-            float highlight = hAmp / (waveCenter + 0.001f);
-            if (highlight > 1)
-              highlight = 1;
-            Color mix = colorBlue;
-            mix.r += (unsigned char)(highlight * 150);
-            mix.g += (unsigned char)(highlight * 100);
-
-            DrawRectangle(px, wfY + waveCenter - bAmp, 1, (int)(bAmp * 2), mix);
-          }
-        }
-      }
-    }
-  }
-
-  EndScissorMode();
 
   // Beat Grid
   if (r->State->LoadedTrack != NULL) {
@@ -343,7 +334,6 @@ static void Waveform_Draw(Component *base) {
                       {0, 255, 255, 255}, {128, 0, 255, 255}};
   const char *hcLabels[] = {"A", "B", "C", "D", "E", "F", "G", "H"};
 
-  // 1. Draw Memory Cues (white lines)
   for (int i = 0; i < r->State->LoadedTrack->CuesCount; i++) {
     HotCue *mc = &r->State->LoadedTrack->Cues[i];
     double mcHF = (double)mc->Start * 0.105;
@@ -355,7 +345,6 @@ static void Waveform_Draw(Component *base) {
     }
   }
 
-  // 2. Draw HotCues (flags)
   for (int i = 0; i < r->State->LoadedTrack->HotCuesCount; i++) {
     HotCue *hc = &r->State->LoadedTrack->HotCues[i];
     int hcIdx = hc->ID - 1;
@@ -378,7 +367,6 @@ static void Waveform_Draw(Component *base) {
 
       DrawLineEx((Vector2){hx, wfY}, (Vector2){hx, wfY + waveH}, 1.5f, clr);
 
-      // Flag
       float fw = S(14);
       DrawRectangle(hx, wfY, fw, fw, clr);
       UIDrawText(hcLabels[hcIdx], UIFonts_GetFace(S(10)), hx + S(3), wfY + S(1),
@@ -396,29 +384,22 @@ static void Waveform_Draw(Component *base) {
   EndScissorMode();
 
   // --- Phase Meter UI ---
-  // Drawn above the main waveform block
   if (r->State->LoadedTrack && r->OtherDeck && r->OtherDeck->LoadedTrack) {
     float pmY = wfY + S(4);
     float pmW = S(160);
     float pmX = wfLeft + (wfW / 2.0f) - (pmW / 2.0f);
     float pmH = S(8);
 
-    // Background track
     DrawRectangleLines(pmX, pmY, pmW, pmH, ColorShadow);
-    DrawLine(pmX + pmW / 2, pmY, pmX + pmW / 2, pmY + pmH,
-             ColorOrange); // Center mark
+    DrawLine(pmX + pmW / 2, pmY, pmX + pmW / 2, pmY + pmH, ColorOrange);
 
-    // Calculate offset
     int32_t myPhase =
         Quantize_GetPhaseErrorMs(r->State->LoadedTrack, r->State->PositionMs);
     int32_t otherPhase = Quantize_GetPhaseErrorMs(r->OtherDeck->LoadedTrack,
                                                   r->OtherDeck->PositionMs);
 
-    // Difference: positive means I am ahead of the other deck
     int32_t phaseDiff = myPhase - otherPhase;
 
-    // Max displayable drift in ms: let's say 200ms is full scale (edge of
-    // meter)
     float maxDrift = 150.0f;
     float driftRatio = (float)phaseDiff / maxDrift;
     if (driftRatio > 1.0f)
@@ -426,13 +407,7 @@ static void Waveform_Draw(Component *base) {
     if (driftRatio < -1.0f)
       driftRatio = -1.0f;
 
-    // Size of the block itself
     float blockW = S(16);
-
-    // Depending on Sync mode, Pioneer phase meters behavior:
-    // A single active block usually represents the current deck's phase
-    // position relative to the master. We will render a block that moves
-    // relative to the center.
     float blockX =
         (pmX + pmW / 2) + (driftRatio * (pmW / 2.0f)) - (blockW / 2.0f);
 
@@ -440,7 +415,7 @@ static void Waveform_Draw(Component *base) {
     if (r->State->IsMaster)
       blockColor = ColorOrange;
     else if (r->State->SyncMode == 2 && abs(phaseDiff) < 5)
-      blockColor = (Color){0, 255, 255, 255}; // Locked
+      blockColor = (Color){0, 255, 255, 255};
 
     DrawRectangle(blockX, pmY + S(1), blockW, pmH - S(2), blockColor);
   }
