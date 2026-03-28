@@ -5,9 +5,9 @@
 typedef struct DeckStrip DeckStrip;
 
 struct DeckStrip {
-    Component base;
-    int ID;
-    DeckState *State;
+  Component base;
+  int ID;
+  DeckState *State;
 };
 
 void DeckStrip_Init(DeckStrip *d, int id, DeckState *state);
