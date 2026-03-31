@@ -1,11 +1,13 @@
 #include "ui/player/waveform.h"
 #include "logic/quantize.h"
+#include "rlgl.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+
 
 static int Waveform_Update(Component *base) {
   WaveformRenderer *r = (WaveformRenderer *)base;
@@ -82,172 +84,313 @@ static int Waveform_Update(Component *base) {
   return 0;
 }
 
-void Waveform_DrawGeneric(
-    Rectangle bounds, unsigned char *data, int dataLen,
-    double positionHalfFrames, // For scrolling: playhead pos. For static: unused/0
-    float zoomStep,         // For scrolling: samples per pixel. For static: totalLen/width
-    bool isStatic,          // True for deckstrip overview, False for scrolling track
-    WaveformStyle style, float gLow, float gMid, float gHigh,
-    float playedRatio,      // 0.0-1.0 to dim played area (only for static)
-    float startScreenX,     // Usually 0
-    float endScreenX        // Usually bounds.width
-) {
+static Color GetFreqColor(float r, float g, float b) {
+  // Determine dominant hue based on RGB proportions
+  float maxVal = fmaxf(r, fmaxf(g, b));
+  float minVal = fminf(r, fminf(g, b));
+  float h = 0;
+  if (maxVal > 0 && maxVal != minVal) {
+    float d = maxVal - minVal;
+    if (maxVal == r)
+      h = (g - b) / d + (g < b ? 6 : 0);
+    else if (maxVal == g)
+      h = (b - r) / d + 2;
+    else
+      h = (r - g) / d + 4;
+    h /= 6.0f;
+  }
+  // High saturation and medium lightness for vibrant "gelombang" look
+  return ColorFromHSV(h * 360.0f, 0.70f, 0.50f);
+}
+
+// Samples amplitude and color, using linear interpolation if zoomed in enough
+// This guarantees a smooth continuous spline (bentuk sinewave) instead of
+// discrete boxes (garis dijajarkan)
+static float SampleMaxAmplitude(unsigned char *data, int dataLen,
+                                double exactIdx, float width, int *outColor) {
+  if (exactIdx < 0.0 || exactIdx >= (double)dataLen) {
+    if (outColor)
+      *outColor = 0;
+    return 0.0f;
+  }
+
+  int idx1 = (int)exactIdx;
+
+  if (width <= 1.0f) {
+    float frac = (float)(exactIdx - idx1);
+    int idx2 = (idx1 + 1 < dataLen) ? idx1 + 1 : idx1;
+    float a1 = (float)(data[idx1] & 0x1F);
+    float a2 = (float)(data[idx2] & 0x1F);
+    if (outColor)
+      *outColor = data[idx1] >> 5;
+    return a1 * (1.0f - frac) + a2 * frac;
+  } else {
+    int idx2 = (int)(exactIdx + width);
+    if (idx2 >= dataLen)
+      idx2 = dataLen - 1;
+    float maxA = 0;
+    int maxColor = data[idx1] >> 5;
+    for (int i = idx1; i <= idx2; i++) {
+      float a = (float)(data[i] & 0x1F);
+      if (a > maxA) {
+        maxA = a;
+        maxColor = data[i] >> 5;
+      }
+    }
+    if (outColor)
+      *outColor = maxColor;
+    return maxA;
+  }
+}
+
+static void Waveform_DrawBlue(Rectangle bounds, float centerOffset,
+                              unsigned char *data, int dataLen, double position,
+                              float zoomStep, bool isStatic, float playedRatio,
+                              float startX, float endX) {
+  float centerY = bounds.y + (bounds.height / 2.0f);
+  Color waveColor = (Color){22, 110, 240, 255};
+  Color rmsColor = (Color){100, 180, 255, 255};
+  float z = isStatic ? ((float)dataLen / bounds.width) : zoomStep;
+
+  for (float x = startX; x < endX; x += 1.0f) {
+    float nextX = x + 1.0f;
+    double d1 = isStatic ? (double)(x / bounds.width * dataLen)
+                         : (position + (x - centerOffset) * z);
+    double d2 = isStatic ? (double)(nextX / bounds.width * dataLen)
+                         : (position + (nextX - centerOffset) * z);
+
+    float a1 = SampleMaxAmplitude(data, dataLen, d1, z, NULL);
+    float a2 = SampleMaxAmplitude(data, dataLen, d2, z, NULL);
+
+    float h1 = (a1 / 31.0f) * (bounds.height / 2.0f),
+          h2 = (a2 / 31.0f) * (bounds.height / 2.0f);
+    // RMS overlay approximated for smooth gelombang shape.
+    float rh1 = h1 * 0.7f, rh2 = h2 * 0.7f;
+
+    Color cW = waveColor, cR = rmsColor;
+    if (isStatic && x / bounds.width <= playedRatio) {
+      cW.r >>= 1;
+      cW.g >>= 1;
+      cW.b >>= 1;
+      cW.a = 150;
+      cR.r >>= 1;
+      cR.g >>= 1;
+      cR.b >>= 1;
+      cR.a = 150;
+    }
+
+    rlBegin(RL_QUADS);
+    rlColor4ub(cW.r, cW.g, cW.b, cW.a);
+    rlVertex2f(bounds.x + x, centerY - h1);
+    rlVertex2f(bounds.x + x, centerY + h1);
+    rlVertex2f(bounds.x + nextX, centerY + h2);
+    rlVertex2f(bounds.x + nextX, centerY - h2);
+
+    rlColor4ub(cR.r, cR.g, cR.b, cR.a);
+    rlVertex2f(bounds.x + x, centerY - rh1);
+    rlVertex2f(bounds.x + x, centerY + rh1);
+    rlVertex2f(bounds.x + nextX, centerY + rh2);
+    rlVertex2f(bounds.x + nextX, centerY - rh2);
+    rlEnd();
+  }
+}
+
+static void Waveform_DrawRGB(Rectangle bounds, float centerOffset,
+                             unsigned char *data, int dataLen, double position,
+                             float zoomStep, bool isStatic, float playedRatio,
+                             float startX, float endX) {
+  float centerY = bounds.y + (bounds.height / 2.0f);
+  float z = isStatic ? ((float)dataLen / bounds.width) : zoomStep;
+
+  for (float x = startX; x < endX; x += 1.0f) {
+    float nextX = x + 1.0f;
+    double d1 = isStatic ? (double)(x / bounds.width * dataLen)
+                         : (position + (x - centerOffset) * z);
+    double d2 = isStatic ? (double)(nextX / bounds.width * dataLen)
+                         : (position + (nextX - centerOffset) * z);
+
+    int c1, c2;
+    float a1 = SampleMaxAmplitude(data, dataLen, d1, z, &c1);
+    float a2 = SampleMaxAmplitude(data, dataLen, d2, z, &c2);
+
+    float iL1 = (c1 < 3) ? a1 : a1 * 0.4f,
+          iM1 = (c1 >= 3 && c1 < 6) ? a1 : (c1 >= 6 ? a1 * 0.6f : a1 * 0.2f),
+          iH1 = (c1 >= 6) ? a1 : a1 * 0.2f;
+    float iL2 = (c2 < 3) ? a2 : a2 * 0.4f,
+          iM2 = (c2 >= 3 && c2 < 6) ? a2 : (c2 >= 6 ? a2 * 0.6f : a2 * 0.2f),
+          iH2 = (c2 >= 6) ? a2 : a2 * 0.2f;
+
+    Color clr1 = GetFreqColor(iH1, iM1, iL1),
+          clr2 = GetFreqColor(iH2, iM2, iL2);
+    if (isStatic && x / bounds.width <= playedRatio) {
+      clr1.r >>= 1;
+      clr1.g >>= 1;
+      clr1.b >>= 1;
+      clr1.a = 150;
+      clr2.r >>= 1;
+      clr2.g >>= 1;
+      clr2.b >>= 1;
+      clr2.a = 150;
+    }
+
+    float h1 = (a1 / 31.0f) * (bounds.height / 2.0f);
+    float h2 = (a2 / 31.0f) * (bounds.height / 2.0f);
+
+    rlBegin(RL_QUADS);
+    rlColor4ub(
+        clr1.r, clr1.g, clr1.b,
+        clr1.a); // Assuming gentle gradient isn't strictly required per-vertex
+                 // for exact copy, but we can interpolate clr1
+    rlVertex2f(bounds.x + x, centerY - h1);
+    rlVertex2f(bounds.x + x, centerY + h1);
+    rlColor4ub(clr2.r, clr2.g, clr2.b, clr2.a);
+    rlVertex2f(bounds.x + nextX, centerY + h2);
+    rlVertex2f(bounds.x + nextX, centerY - h2);
+
+    // Highlight Overlay for "gelombang" depth
+    rlColor4ub(255, 255, 255, 40);
+    rlVertex2f(bounds.x + x, centerY - h1 * 0.7f);
+    rlVertex2f(bounds.x + x, centerY + h1 * 0.7f);
+    rlVertex2f(bounds.x + nextX, centerY + h2 * 0.7f);
+    rlVertex2f(bounds.x + nextX, centerY - h2 * 0.7f);
+    rlEnd();
+  }
+}
+
+static void Waveform_Draw3Band(Rectangle bounds, float centerOffset,
+                               unsigned char *data, int dataLen,
+                               double position, float zoomStep, bool isStatic,
+                               float playedRatio, float gL, float gM, float gH,
+                               float startX, float endX) {
+  float centerY = bounds.y + (bounds.height / 2.0f);
+  Color colL = (Color){0, 85, 225, 255};    // Blue #0055e1
+  Color colM = (Color){255, 166, 0, 255};   // Orange #ffa600
+  Color colH = (Color){255, 255, 255, 255}; // White #ffffff
+
+  const float pL = 0.1665f, pM = 0.333f, pH = 0.666f;
+  const float sL = 0.7f, sM = 0.4f, sH = 0.2f;
+
+  float z = isStatic ? ((float)dataLen / bounds.width) : zoomStep;
+
+  for (float x = startX; x < endX; x += 1.0f) {
+    float nextX = x + 1.0f;
+    double d1 = isStatic ? (double)(x / bounds.width * dataLen)
+                         : (position + (x - centerOffset) * z);
+    double d2 = isStatic ? (double)(nextX / bounds.width * dataLen)
+                         : (position + (nextX - centerOffset) * z);
+
+    int c1, c2;
+    float r1 = SampleMaxAmplitude(data, dataLen, d1, z, &c1);
+    float r2 = SampleMaxAmplitude(data, dataLen, d2, z, &c2);
+
+    // Scale amplitude (0-31 to 0.0-1.0 range)
+    float n1 = r1 / 31.0f;
+    float n2 = r2 / 31.0f;
+
+    // Filter simulation using color index (0=Low, 7=High)
+    // Low drops to 40% at high freq, Mid peaks at 100% in center, High rises to
+    // 100% at high freq.
+    float m1L = 1.0f - (c1 / 7.0f) * 0.6f;
+    float m1M = 1.0f - fabsf((float)c1 - 3.5f) / 3.5f * 0.7f;
+    float m1H = 0.2f + (c1 / 7.0f) * 0.8f;
+
+    float m2L = 1.0f - (c2 / 7.0f) * 0.6f;
+    float m2M = 1.0f - fabsf((float)c2 - 3.5f) / 3.5f * 0.7f;
+    float m2H = 0.2f + (c2 / 7.0f) * 0.8f;
+
+    float halfH = bounds.height / 2.0f;
+
+    // Ported from three_band.py standard scaling (power, scale) mapped with
+    // artificial filtered frequency
+    float h1L = powf(n1 * m1L, pL) * sL * gL * halfH;
+    float h2L = powf(n2 * m2L, pL) * sL * gL * halfH;
+
+    float h1M = powf(n1 * m1M, pM) * sM * gM * halfH;
+    float h2M = powf(n2 * m2M, pM) * sM * gM * halfH;
+
+    float h1H = powf(n1 * m1H, pH) * sH * gH * halfH;
+    float h2H = powf(n2 * m2H, pH) * sH * gH * halfH;
+
+    Color cLow = colL, cMid = colM, cHigh = colH;
+    if (isStatic && x / bounds.width <= playedRatio) {
+      cLow.r >>= 1;
+      cLow.g >>= 1;
+      cLow.b >>= 1;
+      cLow.a = 150;
+      cMid.r >>= 1;
+      cMid.g >>= 1;
+      cMid.b >>= 1;
+      cMid.a = 150;
+      cHigh.r >>= 1;
+      cHigh.g >>= 1;
+      cHigh.b >>= 1;
+      cHigh.a = 150;
+    }
+
+    // Draw using solid un-mixed colors
+    rlBegin(RL_QUADS);
+
+    // Draw Low Band Background (Blue)
+    rlColor4ub(cLow.r, cLow.g, cLow.b, cLow.a);
+    rlVertex2f(bounds.x + x, centerY - h1L);
+    rlVertex2f(bounds.x + x, centerY + h1L);
+    rlVertex2f(bounds.x + nextX, centerY + h2L);
+    rlVertex2f(bounds.x + nextX, centerY - h2L);
+
+    // Draw Mid Band Overlap (Orange)
+    rlColor4ub(cMid.r, cMid.g, cMid.b, cMid.a);
+    rlVertex2f(bounds.x + x, centerY - h1M);
+    rlVertex2f(bounds.x + x, centerY + h1M);
+    rlVertex2f(bounds.x + nextX, centerY + h2M);
+    rlVertex2f(bounds.x + nextX, centerY - h2M);
+
+    // Draw High Band Overlap (White)
+    rlColor4ub(cHigh.r, cHigh.g, cHigh.b, cHigh.a);
+    rlVertex2f(bounds.x + x, centerY - h1H);
+    rlVertex2f(bounds.x + x, centerY + h1H);
+    rlVertex2f(bounds.x + nextX, centerY + h2H);
+    rlVertex2f(bounds.x + nextX, centerY - h2H);
+
+    rlEnd();
+  }
+}
+
+void Waveform_DrawGeneric(Rectangle bounds, unsigned char *data, int dataLen,
+                          double positionHalfFrames, float zoomStep,
+                          bool isStatic, WaveformStyle style, float gLow,
+                          float gMid, float gHigh, float playedRatio,
+                          float startX, float endX) {
   if (data == NULL || dataLen <= 0)
     return;
-
-  float waveCenterY = bounds.y + (bounds.height / 2.0f);
 
   BeginScissorMode((int)(bounds.x + UI_OffsetX), (int)(bounds.y + UI_OffsetY),
                    (int)bounds.width, (int)bounds.height);
 
-  if (isStatic) {
-    // Static base line
-    DrawRectangle((int)bounds.x, (int)(bounds.y + bounds.height - 1), (int)bounds.width, 1, (Color){22, 110, 240, 255});
-
-    for (float screenX = startScreenX; screenX <= endScreenX; screenX += 1.0f) {
-      float px = bounds.x + screenX;
-
-      double binStart = (double)(screenX / bounds.width) * (double)dataLen;
-      double binEnd = (double)((screenX + 1.0f) / bounds.width) * (double)dataLen;
-
-      int startIdx = (int)floor(binStart);
-      int endIdx = (int)ceil(binEnd);
-      if (endIdx <= startIdx) endIdx = startIdx + 1;
-
-      if (startIdx < 0) startIdx = 0;
-      if (endIdx > dataLen) endIdx = dataLen;
-
-      if (startIdx < dataLen) {
-        float maxAmp = 0;
-        unsigned char firstColor = data[startIdx] >> 5;
-
-        for (int i = startIdx; i < endIdx; i++) {
-          float amp = (float)(data[i] & 0x1F);
-          if (amp > maxAmp) maxAmp = amp;
-        }
-
-        float totalGain = (gLow + gMid + gHigh) / 3.0f;
-        if (totalGain <= 0.01f) totalGain = 1.0f;
-
-        float amplitudeZ = maxAmp * totalGain;
-        float maxBarH = bounds.height;
-        float ampBarH = (amplitudeZ / 31.0f) * maxBarH;
-        if (ampBarH > maxBarH) ampBarH = maxBarH;
-
-        Color drawColor = (Color){22, 110, 240, 255}; 
-        if (style == WAVEFORM_STYLE_RGB) {
-          if (firstColor >= 6) drawColor = (Color){255, 100, 100, 255};
-          else if (firstColor >= 3) drawColor = (Color){100, 255, 100, 255};
-        } else if (style == WAVEFORM_STYLE_3BAND || style == WAVEFORM_STYLE_SHAPE) {
-          float highlight = amplitudeZ / 31.0f;
-          if (highlight > 1.0f) highlight = 1.0f;
-          drawColor.r += (unsigned char)(highlight * 100);
-          drawColor.g += (unsigned char)(highlight * 80);
-        }
-
-        bool isPlayed = (screenX / bounds.width) <= playedRatio;
-        if (isPlayed) {
-          drawColor.r /= 2; drawColor.g /= 2; drawColor.b /= 2; drawColor.a = 150;
-        }
-
-        DrawRectangle((int)px, (int)(bounds.y + bounds.height - ampBarH), 1, (int)ampBarH, drawColor);
-      }
-    }
-  } else {
-    // Dynamic smooth-scrolling view aligned to data to prevent horizontal flickering/gaps
-    float centerScreenOffset = (endScreenX - startScreenX) / 2.0f;
-    
-    // Base line for entire area
-    DrawRectangle((int)(bounds.x + startScreenX), (int)(waveCenterY - 1), (int)(endScreenX - startScreenX), 2, (Color){22, 110, 240, 255});
-
-    double firstVisibleData = positionHalfFrames - (centerScreenOffset * zoomStep);
-    double lastVisibleData = positionHalfFrames + (centerScreenOffset * zoomStep);
-
-    int startDataIdx = (int)floor(firstVisibleData);
-    if (startDataIdx < 0) startDataIdx = 0;
-    
-    int endDataIdx = (int)ceil(lastVisibleData);
-    if (endDataIdx > dataLen) endDataIdx = dataLen;
-
-    float zCountF = zoomStep;
-    if (zCountF < 1.0f) zCountF = 1.0f;
-    int zCount = (int)zCountF;
-
-    startDataIdx = (startDataIdx / zCount) * zCount;
-
-    for (int i = startDataIdx; i < endDataIdx; i += zCount) {
-      int endI = i + zCount;
-      if (endI > dataLen) endI = dataLen;
-
-      float maxAmp = 0;
-      float sumAmp = 0;
-      int count = 0;
-      unsigned char firstColor = (i >= 0 && i < dataLen) ? (data[i] >> 5) : 0;
-
-      for (int j = i; j < endI; j++) {
-        float amp = (float)(data[j] & 0x1F);
-        if (amp > maxAmp) maxAmp = amp;
-        sumAmp += amp;
-        count++;
-      }
-
-      float avgAmp = count > 0 ? (sumAmp / count) : 0;
-      float rmsVal = count > 1 ? avgAmp : (maxAmp * 0.7f);
-
-      float totalGain = (gLow + gMid + gHigh) / 3.0f;
-      if (totalGain <= 0.01f) totalGain = 1.0f;
-
-      float amplitudeZ = maxAmp * totalGain;
-      float rmsZ = rmsVal * totalGain;
-
-      float maxBarH = (bounds.height / 2.0f) - 1.0f;
-      float ampBarH = (amplitudeZ / 31.0f) * maxBarH;
-      float rmsBarH = (rmsZ / 31.0f) * maxBarH;
-
-      if (ampBarH > maxBarH) ampBarH = maxBarH;
-      if (rmsBarH > maxBarH) rmsBarH = maxBarH;
-
-      Color drawColor = (Color){22, 110, 240, 255}; 
-      Color rmsColor = ColorWhite;
-
-      if (style == WAVEFORM_STYLE_RGB) {
-        if (firstColor >= 6) drawColor = (Color){255, 100, 100, 255};
-        else if (firstColor >= 3) drawColor = (Color){100, 255, 100, 255};
-      } else if (style == WAVEFORM_STYLE_3BAND || style == WAVEFORM_STYLE_SHAPE) {
-        float highlight = amplitudeZ / 31.0f;
-        if (highlight > 1.0f) highlight = 1.0f;
-        drawColor.r += (unsigned char)(highlight * 100);
-        drawColor.g += (unsigned char)(highlight * 80);
-      }
-
-      float screenX1 = (float)((i - positionHalfFrames) / zoomStep) + centerScreenOffset;
-      float screenX2 = (float)((endI - positionHalfFrames) / zoomStep) + centerScreenOffset;
-
-      if(screenX2 < 0) continue;
-      if(screenX1 > endScreenX - startScreenX) continue;
-
-      float barW = screenX2 - screenX1;
-      barW = ceilf(barW);
-      if (barW < 1.0f) barW = 1.0f; 
-
-      Rectangle ampRect = {
-          bounds.x + startScreenX + screenX1,
-          waveCenterY - ampBarH - 1.0f,
-          barW,
-          2.0f + 2.0f * ampBarH
-      };
-      DrawRectangleRec(ampRect, drawColor);
-
-      Rectangle rmsRect = {
-          bounds.x + startScreenX + screenX1,
-          waveCenterY - rmsBarH - 1.0f,
-          barW,
-          2.0f + 2.0f * rmsBarH
-      };
-      DrawRectangleRec(rmsRect, rmsColor);
-    }
+  float centerOffset = bounds.width / 2.0f;
+  switch (style) {
+  case WAVEFORM_STYLE_BLUE:
+    Waveform_DrawBlue(bounds, centerOffset, data, dataLen, positionHalfFrames,
+                      zoomStep, isStatic, playedRatio, startX, endX);
+    break;
+  case WAVEFORM_STYLE_RGB:
+    Waveform_DrawRGB(bounds, centerOffset, data, dataLen, positionHalfFrames,
+                     zoomStep, isStatic, playedRatio, startX, endX);
+    break;
+  case WAVEFORM_STYLE_3BAND:
+    Waveform_Draw3Band(bounds, centerOffset, data, dataLen, positionHalfFrames,
+                       zoomStep, isStatic, playedRatio, gLow, gMid, gHigh,
+                       startX, endX);
+    break;
+  default:
+    Waveform_DrawBlue(bounds, centerOffset, data, dataLen, positionHalfFrames,
+                      zoomStep, isStatic, playedRatio, startX, endX);
+    break;
   }
 
+  if (!isStatic)
+    DrawRectangle((int)(bounds.x + startX),
+                  (int)(bounds.y + bounds.height / 2.0f), (int)(endX - startX),
+                  1, (Color){255, 255, 255, 40});
   EndScissorMode();
 }
 
