@@ -23,9 +23,12 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/raysan5/raylib.git
           cd raylib/src
+          
+          # Patch rlgl.h for iOS OpenGL ES headers (Raylib master is currently missing this)
+          sed -i '' 's|#include <GLES2/gl2.h>|#include <OpenGLES/ES2/gl.h>|g' rlgl.h
+          sed -i '' 's|#include <GLES2/gl2ext.h>|#include <OpenGLES/ES2/glext.h>|g' rlgl.h
+          
           # Build raylib for iOS ARM64
-          # We must specify GRAPHICS=GRAPHICS_API_OPENGL_ES2 to avoid an empty -D flag in Raylib's Makefile
-          # and use xcrun to ensure the correct compiler is used
           make PLATFORM=PLATFORM_IOS \
                ARCH=arm64 \
                GRAPHICS=GRAPHICS_API_OPENGL_ES2 \
