@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <string.h>
 
-
 static void drawLeftBadgeColumn(DeckStrip *d, float x, float y, float h) {
   float lColW = S(40);
   float lColX = x;
@@ -117,10 +116,13 @@ static int DeckStrip_Update(Component *base) {
     d->State->SyncMode = (d->State->SyncMode + 1) % 3;
   }
 
-  if (isHoverWaveform && IsMouseButtonDown(MOUSE_BUTTON_LEFT) && d->State->LoadedTrack != NULL) {
+  if (isHoverWaveform && IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
+      d->State->LoadedTrack != NULL) {
     float msRatio = (mouse.x - wx) / ww;
-    if (msRatio < 0.0f) msRatio = 0.0f;
-    if (msRatio > 1.0f) msRatio = 1.0f;
+    if (msRatio < 0.0f)
+      msRatio = 0.0f;
+    if (msRatio > 1.0f)
+      msRatio = 1.0f;
 
     long long newMs = (long long)(msRatio * d->State->TrackLengthMs);
     d->State->PositionMs = newMs;
@@ -341,73 +343,12 @@ static void DeckStrip_Draw(Component *base) {
     if (totalMs > 0)
       playedRatio = (float)playedMs / totalMs;
 
-    if (d->State->LoadedTrack->StaticWaveformLen > 0) {
-      float gLow =
-          (d->State->Waveform.GainLow > 0) ? d->State->Waveform.GainLow : 1.0f;
-      float gMid =
-          (d->State->Waveform.GainMid > 0) ? d->State->Waveform.GainMid : 1.0f;
-      float gHigh = (d->State->Waveform.GainHigh > 0)
-                        ? d->State->Waveform.GainHigh
-                        : 1.0f;
-
-      Rectangle bounds = {wx, wy, ww, wh};
-      Waveform_DrawGeneric(bounds, d->State->LoadedTrack->StaticWaveform,
-                           d->State->LoadedTrack->StaticWaveformLen, 0,
-                           (float)d->State->LoadedTrack->StaticWaveformLen / ww,
-                           true, d->State->Waveform.Style, gLow, gMid, gHigh,
-                           playedRatio, 0.0f, ww);
-    }
+    // --- Waveform rendering REMOVED per user request ---
 
     // Playhead Position Line
     if (totalMs > 0) {
       float progX = wx + playedRatio * ww;
       DrawRectangle(progX, wy, 2, wh, ColorRed);
-    }
-
-    // Memory Cue Markers
-    if (totalMs > 0) {
-      for (int i = 0; i < d->State->LoadedTrack->CuesCount; i++) {
-        HotCue *mc = &d->State->LoadedTrack->Cues[i];
-        float mcRatio = (float)mc->Start / (float)totalMs;
-        if (mcRatio >= 0 && mcRatio <= 1) {
-          float mcX = wx + mcRatio * ww;
-          DrawLine(mcX, wy, mcX, wy + wh, ColorWhite);
-        }
-      }
-    }
-
-    // HotCue Markers
-    if (totalMs > 0) {
-      Color hotCueColors[] = {{0, 255, 0, 255},   {255, 0, 0, 255},
-                              {255, 128, 0, 255}, {255, 255, 0, 255},
-                              {0, 0, 255, 255},   {255, 0, 255, 255},
-                              {0, 255, 255, 255}, {128, 0, 255, 255}};
-      const char *hotCueLabels[] = {"A", "B", "C", "D", "E", "F", "G", "H"};
-
-      for (int i = 0; i < d->State->LoadedTrack->HotCuesCount; i++) {
-        HotCue *hc = &d->State->LoadedTrack->HotCues[i];
-        int hcIdx = hc->ID - 1;
-        if (hcIdx < 0 || hcIdx >= 8)
-          continue;
-
-        float hcRatio = (float)hc->Start / (float)totalMs;
-        if (hcRatio < 0 || hcRatio > 1)
-          continue;
-
-        float hcX = wx + hcRatio * ww;
-        Color clr = hotCueColors[hcIdx];
-
-        // Thin vertical line
-        DrawLine(hcX, wy, hcX, wy + wh, clr);
-
-        // Triangle flag at the top
-        float hw = 4.0f;
-        DrawRectangle(hcX - hw / 2, wy, hw, hw + 2, clr);
-
-        // Letter label
-        UIDrawText(hotCueLabels[hcIdx], UIFonts_GetFace(S(7)),
-                   hcX - hw / 2 + S(0.5f), wy + hw + S(3), S(7), clr);
-      }
     }
   }
 }

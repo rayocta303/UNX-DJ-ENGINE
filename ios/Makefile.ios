@@ -1,0 +1,73 @@
+# iOS Makefile for XDJ-UNX-C (TrollStore / ARM64)
+# Targeted for iPhone 8 Plus (iOS 16)
+
+PROJECT_NAME = xdjunx
+PLATFORM = PLATFORM_IOS
+SDK = iphoneos
+ARCH = arm64
+MIN_IOS_VERSION = 16.0
+
+CC = xcrun --sdk $(SDK) clang
+CXX = xcrun --sdk $(SDK) clang++
+
+# Flags for iOS
+CFLAGS = -isysroot $(shell xcrun --sdk $(SDK) --show-sdk-path) -arch $(ARCH) -miphoneos-version-min=$(MIN_IOS_VERSION) -O2
+CFLAGS += -D$(PLATFORM) -DGRAPHICS_API_OPENGL_ES2 -Isrc -Ilib -Ilib/kaitai -Ilib/rekordbox-metadata
+CFLAGS += -Wall -Wextra
+
+CXXFLAGS = $(CFLAGS) -std=c++17
+
+# Raylib and Frameworks
+LDFLAGS = -arch $(ARCH) -miphoneos-version-min=$(MIN_IOS_VERSION)
+LDFLAGS += -Llib/ios -lraylib -framework CoreVideo -framework CoreGraphics -framework CoreFoundation -framework OpenGLES -framework QuartzCore -framework UIKit -framework AudioToolbox -framework AVFoundation -framework Foundation -lm
+
+# Source files (mirrored from main Makefile)
+SRC_C = src/main.c \
+        src/ui/components/theme.c \
+        src/ui/components/fonts.c \
+        src/ui/components/helpers.c \
+        src/ui/views/topbar.c \
+        src/ui/views/info.c \
+        src/ui/views/splash.c \
+        src/ui/views/settings.c \
+        src/ui/player/bottomstrip.c \
+        src/ui/player/beatfx.c \
+        src/ui/player/deckinfo.c \
+        src/ui/player/deckstrip.c \
+        src/ui/player/waveform.c \
+        src/ui/player/player.c \
+        src/audio/engine.c \
+        src/input/keyboard.c \
+        src/ui/browser/browser.c \
+        src/logic/quantize.c \
+        src/logic/sync.c \
+        src/logic/settings_io.c \
+        src/audio/fx/dsp_utils.c \
+        $(wildcard src/audio/fx/colorfx/*.c) \
+        $(wildcard src/audio/fx/beatfx/*.c)
+
+SRC_CXX = lib/kaitai/kaitai/kaitaistream.cpp \
+          lib/rekordbox-metadata/rekordbox_anlz.cpp \
+          lib/rekordbox-metadata/rekordbox_pdb.cpp \
+          lib/serato/serato_parser.cpp \
+          lib/serato/serato_waveform.cpp \
+          src/library/rekordbox_reader.cpp \
+          src/library/serato_reader.cpp
+
+OBJ = $(SRC_C:.c=.o) $(SRC_CXX:.cpp=.o)
+
+all: $(PROJECT_NAME)
+
+$(PROJECT_NAME): $(OBJ)
+	$(CXX) $(OBJ) -o $@ $(LDFLAGS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+clean:
+	rm -f $(OBJ) $(PROJECT_NAME)
+
+.PHONY: all clean

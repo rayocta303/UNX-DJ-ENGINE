@@ -14,12 +14,19 @@ static Font iconBrand;
 void UIFonts_Init(void) {
     // Attempt to load standard font. Use Arial on Windows as requested.
     // TODO: Embed a primary UI font to avoid OS dependencies.
-    const char* fontPath = UI_BoldEnabled ? "C:/Windows/Fonts/arialbd.ttf" : "C:/Windows/Fonts/arial.ttf";
-    defaultFace = LoadFontEx(fontPath, 64, 0, 0); 
+    // Attempt to load standard font from assets first, then fallback.
+    const char* fontPathBundled = UI_BoldEnabled ? "assets/fonts/Inter-Bold.ttf" : "assets/fonts/Inter-Regular.ttf";
+    defaultFace = LoadFontEx(fontPathBundled, 64, 0, 0);
+    
     if (defaultFace.texture.id == 0) {
-        printf("[FONT] Failed to load %s, trying regular arial.ttf\n", fontPath);
-        defaultFace = LoadFontEx("C:/Windows/Fonts/arial.ttf", 64, 0, 0); 
-        if (defaultFace.texture.id == 0) defaultFace = GetFontDefault();
+#ifdef _WIN32
+        const char* winFont = UI_BoldEnabled ? "C:/Windows/Fonts/arialbd.ttf" : "C:/Windows/Fonts/arial.ttf";
+        defaultFace = LoadFontEx(winFont, 64, 0, 0);
+#endif
+        if (defaultFace.texture.id == 0) {
+            printf("[FONT] Failed to load fonts, using default raylib font\n");
+            defaultFace = GetFontDefault();
+        }
     }
 
     // Common Unicode ranges for Font Awesome 5/6 (PUA range)
