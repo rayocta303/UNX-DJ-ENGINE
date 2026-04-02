@@ -24,28 +24,37 @@ jobs:
           git clone --depth 1 https://github.com/raysan5/raylib.git
           cd raylib
           
-          # Patch jenius untuk rlgl.h agar OpenGLES Apple terbaca
+          # Patch rlgl.h for iOS OpenGL ES headers because Raylib master is currently missing this
           sed -i '' 's|#include <GLES2/gl2.h>|#include <OpenGLES/ES2/gl.h>|g' src/rlgl.h
           sed -i '' 's|#include <GLES2/gl2ext.h>|#include <OpenGLES/ES2/glext.h>|g' src/rlgl.h
           
-          # Masuk langsung ke folder sumber
-          cd src
+          mkdir build && cd build
           
-          # Bersihkan sisa build (jaga-jaga)
-          make clean
+          # Generate Xcode project for iOS using CMake
+          cmake .. -G Xcode \
+                   -DCMAKE_SYSTEM_NAME=iOS \
+                   -DCMAKE_OSX_SYSROOT=iphoneos \
+                   -DCMAKE_OSX_ARCHITECTURES=arm64 \
+                   -DBUILD_SHARED_LIBS=OFF \
+                   -DGRAPHICS=GRAPHICS_API_OPENGL_ES2
           
-          # Eksekusi Makefile bawaan Raylib (BYPASS CMAKE SEPENUHNYA)
-          # Menggunakan PLATFORM_IOS dan memaksa arsitektur ke arm64
-          make PLATFORM=PLATFORM_IOS ARCH=arm64 -j$(sysctl -n hw.ncpu)
+          # Build the generated Xcode project
+          xcodebuild -project raylib.xcodeproj \
+                     -scheme raylib \
+                     -sdk iphoneos \
+                     -configuration Release \
+                     -arch arm64 \
+                     clean build
           
-          # Kembali ke root project Anda
+          # Create lib/ios directory in the project root
           cd ../../
           mkdir -p lib/ios
           
-          # Copy file static library (.a) yang dihasilkan dari folder src/
-          cp raylib/src/libraylib.a lib/ios/
+          # Copy the built static library
+          # With Xcode generator, it usually goes to build/src/Release-iphoneos/libraylib.a
+          find raylib/build -name "libraylib.a" -exec cp {} lib/ios/ \;
           
-          # Copy headers untuk main project build
+          # Copy headers to src/ for the main project build
           cp raylib/src/raylib.h src/
           cp raylib/src/raymath.h src/
           cp raylib/src/rlgl.h src/
