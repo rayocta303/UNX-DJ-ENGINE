@@ -29,6 +29,7 @@ jobs:
           cmake .. -DCMAKE_SYSTEM_NAME=iOS \
                    -DCMAKE_OSX_SYSROOT=iphoneos \
                    -DCMAKE_OSX_ARCHITECTURES=arm64 \
+                   -DPLATFORM=PLATFORM_IOS \
                    -DBUILD_SHARED_LIBS=OFF \
                    -DGRAPHICS=GRAPHICS_API_OPENGL_ES2 \
                    -DCMAKE_BUILD_TYPE=Release
