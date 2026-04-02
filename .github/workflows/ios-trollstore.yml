@@ -22,43 +22,47 @@ jobs:
       - name: Install Raylib for iOS
         run: |
           git clone --depth 1 https://github.com/raysan5/raylib.git
-          cd raylib
+          cd raylib/src
 
-          # Patch rlgl.h to use iOS OpenGLES headers (Raylib master still uses Linux GLES2 paths)
-          sed -i '' 's|#include <GLES2/gl2.h>|#include <OpenGLES/ES2/gl.h>|g' src/rlgl.h
-          sed -i '' 's|#include <GLES2/gl2ext.h>|#include <OpenGLES/ES2/glext.h>|g' src/rlgl.h
+          # Patch 1: Replace Linux GLES2 paths with iOS OpenGLES framework paths
+          sed -i '' 's|#include <GLES2/gl2.h>|#include <OpenGLES/ES2/gl.h>|g' rlgl.h
+          sed -i '' 's|#include <GLES2/gl2ext.h>|#include <OpenGLES/ES2/glext.h>|g' rlgl.h
 
-          # Download ios-cmake toolchain - the canonical way to tell CMake to target iOS device
-          curl -L https://raw.githubusercontent.com/leetal/ios-cmake/master/ios.toolchain.cmake \
-               -o ios.toolchain.cmake
+          # Patch 2: Write a compat header for OES typedefs removed from iOS 12+ SDK
+          printf '%s\n' \
+            '#pragma once' \
+            '/* OES typedefs removed from iOS 12+ SDK */' \
+            '#if defined(__APPLE__) && !defined(PFNGLGENVERTEXARRAYSOESPROC)' \
+            'typedef void (*PFNGLGENVERTEXARRAYSOESPROC)(int n, unsigned int* a);' \
+            'typedef void (*PFNGLBINDVERTEXARRAYOESPROC)(unsigned int a);' \
+            'typedef void (*PFNGLDELETEVERTEXARRAYSOESPROC)(int n, const unsigned int* a);' \
+            'typedef void (*PFNGLDRAWARRAYSINSTANCEDEXTPROC)(unsigned int m, int f, int c, int p);' \
+            'typedef void (*PFNGLDRAWELEMENTSINSTANCEDEXTPROC)(unsigned int m, int c, unsigned int t, const void* i, int p);' \
+            'typedef void (*PFNGLVERTEXATTRIBDIVISOREXTPROC)(unsigned int i, unsigned int d);' \
+            '#endif' \
+            > ios_oes_compat.h
 
-          mkdir build && cd build
+          # Patch rlgl.h: include the compat header right after glext.h
+          sed -i '' 's|#include <OpenGLES/ES2/glext.h>|#include <OpenGLES/ES2/glext.h>\'$'\n''#include "ios_oes_compat.h"|g' rlgl.h
 
-          # OS64 = arm64 physical iOS device (iPhone 8 Plus)
-          cmake .. -G Xcode \
-                   -DCMAKE_TOOLCHAIN_FILE=../ios.toolchain.cmake \
-                   -DPLATFORM=OS64 \
-                   -DBUILD_SHARED_LIBS=OFF \
-                   -DGRAPHICS=GRAPHICS_API_OPENGL_ES2 \
-                   -DBUILD_EXAMPLES=OFF
+          # Build: Compile each Raylib source file manually with xcrun
+          # CMake/Make cannot target iOS (not in Raylib master PLATFORM list)
+          CC="xcrun --sdk iphoneos clang"
+          CFLAGS="-arch arm64 -mios-version-min=16.0 -DPLATFORM_IOS -DGRAPHICS_API_OPENGL_ES2 -DGLES_SILENCE_DEPRECATION -Wno-missing-braces -Wno-deprecated-declarations -fno-strict-aliasing -std=c99 -I."
 
-          # Build only the raylib target, no code signing needed for our workflow
-          xcodebuild -project raylib.xcodeproj \
-                     -scheme raylib \
-                     -sdk iphoneos \
-                     -configuration Release \
-                     -arch arm64 \
-                     clean build \
-                     CODE_SIGNING_ALLOWED=NO
+          for src in rcore.c rshapes.c rtextures.c rtext.c rmodels.c raudio.c utils.c; do
+            echo "Compiling $src..."
+            $CC $CFLAGS -c $src -o ${src%.c}.o
+          done
 
-          # Create lib/ios directory
+          # Package into static library
+          xcrun --sdk iphoneos ar rcs libraylib.a *.o
+          xcrun --sdk iphoneos ranlib libraylib.a
+
+          # Copy output to project root
           cd ../../
           mkdir -p lib/ios
-
-          # Find and copy the built static library
-          find raylib/build -name "libraylib.a" -exec cp {} lib/ios/ \;
-
-          # Copy headers for the main project build
+          cp raylib/src/libraylib.a lib/ios/
           cp raylib/src/raylib.h src/
           cp raylib/src/raymath.h src/
           cp raylib/src/rlgl.h src/
@@ -69,24 +73,16 @@ jobs:
 
       - name: Package App Bundle
         run: |
-          # Create .app directory
           mkdir -p XDJUNX.app
-          # Move binary
           cp xdjunx XDJUNX.app/
-          # Copy Info.plist
           cp ios/Info.plist XDJUNX.app/
-          # Copy Assets (adjust paths if necessary)
           cp -r assets XDJUNX.app/
-          # Copy any .dll or required files if they were converted to static/bundled
-          # (Raylib projects usually bundle everything)
 
       - name: Create IPA for TrollStore
         run: |
           mkdir -p Payload
           cp -r XDJUNX.app Payload/
           zip -v -r XDJUNX_TrollStore.ipa Payload
-          # Optional: Sign with ldid for "fake-sign" if some TrollStore versions prefer it
-          # (Usually not needed for modern TrollStore)
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
