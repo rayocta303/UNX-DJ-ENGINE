@@ -22,24 +22,24 @@ jobs:
       - name: Install Raylib for iOS
         run: |
           git clone --depth 1 https://github.com/raysan5/raylib.git
-          cd raylib/src
+          cd raylib
+          mkdir build && cd build
           
-          # Patch rlgl.h for iOS OpenGL ES headers (Raylib master is currently missing this)
-          sed -i '' 's|#include <GLES2/gl2.h>|#include <OpenGLES/ES2/gl.h>|g' rlgl.h
-          sed -i '' 's|#include <GLES2/gl2ext.h>|#include <OpenGLES/ES2/glext.h>|g' rlgl.h
+          # Using CMake to handle iOS SDK paths and definitions correctly
+          cmake .. -DCMAKE_SYSTEM_NAME=iOS \
+                   -DCMAKE_OSX_SYSROOT=iphoneos \
+                   -DCMAKE_OSX_ARCHITECTURES=arm64 \
+                   -DBUILD_SHARED_LIBS=OFF \
+                   -DGRAPHICS=GRAPHICS_API_OPENGL_ES2 \
+                   -DCMAKE_BUILD_TYPE=Release
           
-          # Build raylib for iOS ARM64
-          make PLATFORM=PLATFORM_IOS \
-               ARCH=arm64 \
-               GRAPHICS=GRAPHICS_API_OPENGL_ES2 \
-               CC="xcrun --sdk iphoneos clang" \
-               AR="xcrun --sdk iphoneos ar" \
-               -j$(sysctl -n hw.ncpu)
+          cmake --build . --config Release -j$(sysctl -n hw.ncpu)
           
           # Create lib/ios directory in the project root
           cd ../../
           mkdir -p lib/ios
-          cp raylib/src/libraylib.a lib/ios/
+          # Copy the static library and headers
+          cp raylib/build/raylib/libraylib.a lib/ios/
           cp raylib/src/raylib.h src/
           cp raylib/src/raymath.h src/
           cp raylib/src/rlgl.h src/
