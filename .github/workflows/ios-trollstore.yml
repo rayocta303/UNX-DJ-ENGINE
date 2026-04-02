@@ -22,10 +22,24 @@ jobs:
       - name: Install Raylib for iOS
         run: |
           git clone --depth 1 https://github.com/raysan5/raylib.git
+          cd raylib
           
-          # Build raylib static library using the official Xcode project
-          # This is the most reliable way as it handles all iOS SDK headers and architectures correctly
-          xcodebuild -project raylib/projects/Xcode/raylib.xcodeproj \
+          # Patch rlgl.h for iOS OpenGL ES headers because Raylib master is currently missing this
+          sed -i '' 's|#include <GLES2/gl2.h>|#include <OpenGLES/ES2/gl.h>|g' src/rlgl.h
+          sed -i '' 's|#include <GLES2/gl2ext.h>|#include <OpenGLES/ES2/glext.h>|g' src/rlgl.h
+          
+          mkdir build && cd build
+          
+          # Generate Xcode project for iOS using CMake
+          cmake .. -G Xcode \
+                   -DCMAKE_SYSTEM_NAME=iOS \
+                   -DCMAKE_OSX_SYSROOT=iphoneos \
+                   -DCMAKE_OSX_ARCHITECTURES=arm64 \
+                   -DBUILD_SHARED_LIBS=OFF \
+                   -DGRAPHICS=GRAPHICS_API_OPENGL_ES2
+          
+          # Build the generated Xcode project
+          xcodebuild -project raylib.xcodeproj \
                      -scheme raylib \
                      -sdk iphoneos \
                      -configuration Release \
@@ -33,11 +47,12 @@ jobs:
                      clean build
           
           # Create lib/ios directory in the project root
+          cd ../../
           mkdir -p lib/ios
           
-          # Find and copy the built static library (path might vary slightly pending Xcode version)
-          # We look for libraylib.a in the DerivedData or build folder
-          find raylib/projects/Xcode/build -name "libraylib.a" -exec cp {} lib/ios/ \;
+          # Copy the built static library
+          # With Xcode generator, it usually goes to build/src/Release-iphoneos/libraylib.a
+          find raylib/build -name "libraylib.a" -exec cp {} lib/ios/ \;
           
           # Copy headers to src/ for the main project build
           cp raylib/src/raylib.h src/
