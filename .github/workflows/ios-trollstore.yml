@@ -23,38 +23,42 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/raysan5/raylib.git
           cd raylib
-          
-          # Patch rlgl.h for iOS OpenGL ES headers because Raylib master is currently missing this
+
+          # Patch rlgl.h to use iOS OpenGLES headers (Raylib master still uses Linux GLES2 paths)
           sed -i '' 's|#include <GLES2/gl2.h>|#include <OpenGLES/ES2/gl.h>|g' src/rlgl.h
           sed -i '' 's|#include <GLES2/gl2ext.h>|#include <OpenGLES/ES2/glext.h>|g' src/rlgl.h
-          
+
+          # Download ios-cmake toolchain - the canonical way to tell CMake to target iOS device
+          curl -L https://raw.githubusercontent.com/leetal/ios-cmake/master/ios.toolchain.cmake \
+               -o ios.toolchain.cmake
+
           mkdir build && cd build
-          
-          # Generate Xcode project for iOS using CMake
+
+          # OS64 = arm64 physical iOS device (iPhone 8 Plus)
           cmake .. -G Xcode \
-                   -DCMAKE_SYSTEM_NAME=iOS \
-                   -DCMAKE_OSX_SYSROOT=iphoneos \
-                   -DCMAKE_OSX_ARCHITECTURES=arm64 \
+                   -DCMAKE_TOOLCHAIN_FILE=../ios.toolchain.cmake \
+                   -DPLATFORM=OS64 \
                    -DBUILD_SHARED_LIBS=OFF \
-                   -DGRAPHICS=GRAPHICS_API_OPENGL_ES2
-          
-          # Build the generated Xcode project
+                   -DGRAPHICS=GRAPHICS_API_OPENGL_ES2 \
+                   -DBUILD_EXAMPLES=OFF
+
+          # Build only the raylib target, no code signing needed for our workflow
           xcodebuild -project raylib.xcodeproj \
                      -scheme raylib \
                      -sdk iphoneos \
                      -configuration Release \
                      -arch arm64 \
-                     clean build
-          
-          # Create lib/ios directory in the project root
+                     clean build \
+                     CODE_SIGNING_ALLOWED=NO
+
+          # Create lib/ios directory
           cd ../../
           mkdir -p lib/ios
-          
-          # Copy the built static library
-          # With Xcode generator, it usually goes to build/src/Release-iphoneos/libraylib.a
+
+          # Find and copy the built static library
           find raylib/build -name "libraylib.a" -exec cp {} lib/ios/ \;
-          
-          # Copy headers to src/ for the main project build
+
+          # Copy headers for the main project build
           cp raylib/src/raylib.h src/
           cp raylib/src/raymath.h src/
           cp raylib/src/rlgl.h src/
