@@ -24,14 +24,22 @@ jobs:
           git clone --depth 1 https://github.com/raysan5/raylib.git
           cd raylib/src
           # Build raylib for iOS ARM64
-          make PLATFORM=PLATFORM_IOS ARCH=arm64 SDK=iphoneos -j$(sysctl -n hw.ncpu)
+          # We must specify GRAPHICS=GRAPHICS_API_OPENGL_ES2 to avoid an empty -D flag in Raylib's Makefile
+          # and use xcrun to ensure the correct compiler is used
+          make PLATFORM=PLATFORM_IOS \
+               ARCH=arm64 \
+               GRAPHICS=GRAPHICS_API_OPENGL_ES2 \
+               CC="xcrun --sdk iphoneos clang" \
+               AR="xcrun --sdk iphoneos ar" \
+               -j$(sysctl -n hw.ncpu)
+          
           # Create lib/ios directory in the project root
           cd ../../
           mkdir -p lib/ios
           cp raylib/src/libraylib.a lib/ios/
-          cp raylib/src/raylib.h lib/
-          cp raylib/src/raymath.h lib/
-          cp raylib/src/rlgl.h lib/
+          cp raylib/src/raylib.h src/
+          cp raylib/src/raymath.h src/
+          cp raylib/src/rlgl.h src/
 
       - name: Build XDJ-UNX-C for iOS
         run: |
