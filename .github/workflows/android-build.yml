@@ -23,79 +23,119 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Build Raylib for Android
+      # Pin NDK version once and share across all steps via env
+      - name: Set NDK Path
+        run: |
+          # Use ANDROID_NDK_LATEST_HOME which is set by android-actions/setup-android
+          echo "NDK_PATH=$ANDROID_NDK_LATEST_HOME" >> $GITHUB_ENV
+          echo "Using NDK at: $ANDROID_NDK_LATEST_HOME"
+
+      - name: Build Raylib for Android (ARM64)
         run: |
           git clone --depth 1 https://github.com/raysan5/raylib.git
           cd raylib/src
-          
-          # Build Raylib for ARM64-v8a
-          # Note: We use the NDK's toolchain directly or raylib's Makefile
+
+          # Build using the same pinned NDK path
           make PLATFORM=PLATFORM_ANDROID \
                ANDROID_ARCH=arm64 \
                ANDROID_API_VERSION=26 \
-               ANDROID_NDK_ROOT=$ANDROID_NDK_LATEST_HOME \
+               ANDROID_NDK_ROOT=${{ env.NDK_PATH }} \
                RAYLIB_LIBTYPE=STATIC \
                -j$(nproc)
-          
-          # Create lib/android/arm64-v8a in the project root
+
           cd ../../
           mkdir -p lib/android/arm64-v8a
           cp raylib/src/libraylib.a lib/android/arm64-v8a/
-          
-          # Copy headers to src/ (optional if already there, but good for consistency)
+
+          # Copy headers to src/ for the project build
           cp raylib/src/raylib.h src/
           cp raylib/src/raymath.h src/
           cp raylib/src/rlgl.h src/
 
+      - name: Generate Asset Bundle Header
+        run: |
+          # Compile bin2c tool natively on Linux
+          gcc tools/bin2c.c -o tools/bin2c
+
+          # Generate assets_bundle.h (same logic as build.bat)
+          BUNDLE_H="src/ui/components/assets_bundle.h"
+          echo "#ifndef ASSETS_BUNDLE_H" > "$BUNDLE_H"
+          echo "#define ASSETS_BUNDLE_H" >> "$BUNDLE_H"
+
+          ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Free-Solid-900.otf"   "$BUNDLE_H" font_awesome_solid
+          ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Free-Regular-400.otf"  "$BUNDLE_H" font_awesome_regular
+          ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Brands-Regular-400.otf" "$BUNDLE_H" font_awesome_brand
+          ./tools/bin2c "assets/images/Pioneer.png"                               "$BUNDLE_H" pioneer_logo
+
+          echo "#endif" >> "$BUNDLE_H"
+          echo "assets_bundle.h generated successfully."
+
       - name: Build XDJ-UNX-C Native Library
         run: |
-          # The Makefile.android expects ANDROID_NDK_ROOT
-          export ANDROID_NDK_ROOT=$ANDROID_NDK_LATEST_HOME
-          make -f android/Makefile.android -j$(nproc)
+          # Pass same NDK path to Makefile.android via ANDROID_NDK_ROOT
+          make -f android/Makefile.android \
+               ANDROID_NDK_ROOT=${{ env.NDK_PATH }} \
+               -j$(nproc)
 
       - name: Package APK
         run: |
-          # 1. Prepare directory structure
-          mkdir -p build/android/apk/lib/arm64-v8a
-          mkdir -p build/android/apk/assets
-          
-          # 2. Copy binary
-          cp libmain.so build/android/apk/lib/arm64-v8a/
-          
-          # 3. Copy Assets
-          cp -r assets/* build/android/apk/assets/
-          
-          # 4. Generate R.java (dummy) and package resources with aapt2
-          # We use aapt2 from the build-tools
+          # Get the latest build-tools version installed
           BUILD_TOOLS_VERSION=$(ls $ANDROID_HOME/build-tools | sort -V | tail -n 1)
           AAPT2=$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/aapt2
-          
-          # Compile manifest and link into an unsigned APK
-          $AAPT2 link --manifest android/AndroidManifest.xml \
-                      -I $ANDROID_HOME/platforms/android-34/android.jar \
-                      -o xdjunx-unsigned.apk \
-                      --auto-add-overlay
-          
-          # 5. Add library and assets to the APK
-          # APK is just a ZIP, so we can use 'zip'
-          cd build/android/apk
-          zip -v -r ../../../xdjunx-unsigned.apk lib assets
-          cd ../../../
+          echo "Using build-tools: $BUILD_TOOLS_VERSION"
+
+          # Get the highest installed platform jar
+          PLATFORM_JAR=$(ls -d $ANDROID_HOME/platforms/android-* | sort -V | tail -n 1)
+          echo "Using platform: $PLATFORM_JAR"
+
+          # Prepare APK directory structure
+          mkdir -p apk_staging/lib/arm64-v8a
+          mkdir -p apk_staging/assets
+
+          # Copy native library
+          cp libmain.so apk_staging/lib/arm64-v8a/
+
+          # Copy assets folder
+          cp -r assets/* apk_staging/assets/
+
+          # Create unsigned APK using aapt2: link manifest + platform jar
+          $AAPT2 link \
+            --manifest android/AndroidManifest.xml \
+            -I "$PLATFORM_JAR/android.jar" \
+            -o xdjunx-unsigned.apk \
+            --auto-add-overlay
+
+          # Add lib/ and assets/ into the APK (APK is a ZIP)
+          cd apk_staging
+          zip -v -r ../xdjunx-unsigned.apk lib assets
+          cd ..
 
       - name: Sign & Align APK
         run: |
           BUILD_TOOLS_VERSION=$(ls $ANDROID_HOME/build-tools | sort -V | tail -n 1)
           ZIPALIGN=$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/zipalign
           APKSIGNER=$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/apksigner
-          
-          # Align
+
+          # Zipalign for optimal memory mapping
           $ZIPALIGN -v 4 xdjunx-unsigned.apk xdjunx-aligned.apk
-          
-          # Create a debug keystore if not exists (for CI)
-          keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -storepass android -keypass android
-          
-          # Sign
-          $APKSIGNER sign --ks debug.keystore --ks-pass pass:android --key-pass pass:android --out xdjunx.apk xdjunx-aligned.apk
+
+          # Generate a debug keystore for CI signing
+          keytool -genkey -v \
+            -keystore debug.keystore \
+            -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -storepass android -keypass android
+
+          # Sign the APK
+          $APKSIGNER sign \
+            --ks debug.keystore \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out xdjunx.apk \
+            xdjunx-aligned.apk
+
+          echo "APK signed successfully."
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
