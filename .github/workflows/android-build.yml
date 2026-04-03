@@ -23,23 +23,29 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # Pin NDK version once and share across all steps via env
+      # Detect and pin a single NDK version shared across all build steps
       - name: Set NDK Path
         run: |
-          # Use ANDROID_NDK_LATEST_HOME which is set by android-actions/setup-android
-          echo "NDK_PATH=$ANDROID_NDK_LATEST_HOME" >> $GITHUB_ENV
-          echo "Using NDK at: $ANDROID_NDK_LATEST_HOME"
+          # Detect the highest NDK version installed on the runner
+          NDK_ROOT=$(ls -d $ANDROID_HOME/ndk/*/ 2>/dev/null | sort -V | tail -n 1)
+          NDK_ROOT="${NDK_ROOT%/}"  # Strip trailing slash
+          echo "NDK_PATH=$NDK_ROOT" >> $GITHUB_ENV
+          echo "Pinned NDK: $NDK_ROOT"
 
       - name: Build Raylib for Android (ARM64)
         run: |
           git clone --depth 1 https://github.com/raysan5/raylib.git
           cd raylib/src
 
-          # Build using the same pinned NDK path
+          # Force Raylib to use the SAME pinned NDK via ANDROID_NDK_ROOT
+          # Also set ANDROID_NDK so Raylib's Makefile fallback picks it up
+          export ANDROID_NDK_ROOT="${{ env.NDK_PATH }}"
+          export ANDROID_NDK="${{ env.NDK_PATH }}"
+
           make PLATFORM=PLATFORM_ANDROID \
                ANDROID_ARCH=arm64 \
                ANDROID_API_VERSION=26 \
-               ANDROID_NDK_ROOT=${{ env.NDK_PATH }} \
+               ANDROID_NDK_ROOT="${{ env.NDK_PATH }}" \
                RAYLIB_LIBTYPE=STATIC \
                -j$(nproc)
 
