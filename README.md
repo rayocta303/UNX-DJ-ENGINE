@@ -29,6 +29,8 @@ UNX DJ ENGINE is an experimental DJ Media Player firmware subset, ported to C an
 ### Platform Support
 - Windows (x64): Native development and simulation.
 - Linux (ARM64): Optimized for embedded targets using DRM-KMS and GLES2.
+- Android (ARM64): Experimental builds for mobile devices.
+- iOS (ARM64): Experimental builds (TrollStore / Sideloading).
 
 ## Upcoming Features (TODO)
 - ColorFX Tab (UI)
@@ -55,6 +57,18 @@ Run the provided build script:
 Use the included Makefile:
 ```bash
 make PLATFORM=LINUX_ARM64
+```
+
+### Android
+Automated builds are available via GitHub Actions. For manual builds, ensure Android NDK is installed and run:
+```bash
+make -f android/Makefile.android
+```
+
+### iOS
+Requires macOS and Xcode. Automated builds are available via GitHub Actions.
+```bash
+make -f ios/Makefile.ios
 ```
 
 ## Credits

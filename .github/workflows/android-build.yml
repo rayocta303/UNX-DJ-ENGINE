@@ -1,0 +1,104 @@
+name: Android Build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build Raylib for Android
+        run: |
+          git clone --depth 1 https://github.com/raysan5/raylib.git
+          cd raylib/src
+          
+          # Build Raylib for ARM64-v8a
+          # Note: We use the NDK's toolchain directly or raylib's Makefile
+          make PLATFORM=PLATFORM_ANDROID \
+               ANDROID_ARCH=arm64 \
+               ANDROID_API_VERSION=26 \
+               ANDROID_NDK_ROOT=$ANDROID_NDK_LATEST_HOME \
+               RAYLIB_LIBTYPE=STATIC \
+               -j$(nproc)
+          
+          # Create lib/android/arm64-v8a in the project root
+          cd ../../
+          mkdir -p lib/android/arm64-v8a
+          cp raylib/src/libraylib.a lib/android/arm64-v8a/
+          
+          # Copy headers to src/ (optional if already there, but good for consistency)
+          cp raylib/src/raylib.h src/
+          cp raylib/src/raymath.h src/
+          cp raylib/src/rlgl.h src/
+
+      - name: Build XDJ-UNX-C Native Library
+        run: |
+          # The Makefile.android expects ANDROID_NDK_ROOT
+          export ANDROID_NDK_ROOT=$ANDROID_NDK_LATEST_HOME
+          make -f android/Makefile.android -j$(nproc)
+
+      - name: Package APK
+        run: |
+          # 1. Prepare directory structure
+          mkdir -p build/android/apk/lib/arm64-v8a
+          mkdir -p build/android/apk/assets
+          
+          # 2. Copy binary
+          cp libmain.so build/android/apk/lib/arm64-v8a/
+          
+          # 3. Copy Assets
+          cp -r assets/* build/android/apk/assets/
+          
+          # 4. Generate R.java (dummy) and package resources with aapt2
+          # We use aapt2 from the build-tools
+          BUILD_TOOLS_VERSION=$(ls $ANDROID_HOME/build-tools | sort -V | tail -n 1)
+          AAPT2=$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/aapt2
+          
+          # Compile manifest and link into an unsigned APK
+          $AAPT2 link --manifest android/AndroidManifest.xml \
+                      -I $ANDROID_HOME/platforms/android-34/android.jar \
+                      -o xdjunx-unsigned.apk \
+                      --auto-add-overlay
+          
+          # 5. Add library and assets to the APK
+          # APK is just a ZIP, so we can use 'zip'
+          cd build/android/apk
+          zip -v -r ../../../xdjunx-unsigned.apk lib assets
+          cd ../../../
+
+      - name: Sign & Align APK
+        run: |
+          BUILD_TOOLS_VERSION=$(ls $ANDROID_HOME/build-tools | sort -V | tail -n 1)
+          ZIPALIGN=$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/zipalign
+          APKSIGNER=$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/apksigner
+          
+          # Align
+          $ZIPALIGN -v 4 xdjunx-unsigned.apk xdjunx-aligned.apk
+          
+          # Create a debug keystore if not exists (for CI)
+          keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -storepass android -keypass android
+          
+          # Sign
+          $APKSIGNER sign --ks debug.keystore --ks-pass pass:android --key-pass pass:android --out xdjunx.apk xdjunx-aligned.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: XDJ-UNX-Android-APK
+          path: xdjunx.apk
