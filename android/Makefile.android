@@ -9,7 +9,8 @@ ANDROID_API_VERSION = 26
 
 # NDK Paths (To be provided by environment or GitHub Actions)
 NDK_PATH ?= $(ANDROID_NDK_ROOT)
-TOOLCHAIN_PATH = $(NDK_PATH)/toolchain/llvm
+TOOLCHAIN_NAME = linux-x86_64
+TOOLCHAIN_PATH = $(NDK_PATH)/toolchains/llvm/prebuilt/$(TOOLCHAIN_NAME)
 CC = $(TOOLCHAIN_PATH)/bin/aarch64-linux-android$(ANDROID_API_VERSION)-clang
 CXX = $(TOOLCHAIN_PATH)/bin/aarch64-linux-android$(ANDROID_API_VERSION)-clang++
 AR = $(TOOLCHAIN_PATH)/bin/llvm-ar
@@ -36,6 +37,7 @@ SRC_C = src/main.c \
         src/ui/views/info.c \
         src/ui/views/splash.c \
         src/ui/views/settings.c \
+        src/ui/views/about.c \
         src/ui/player/bottomstrip.c \
         src/ui/player/beatfx.c \
         src/ui/player/deckinfo.c \
