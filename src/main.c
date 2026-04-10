@@ -9,6 +9,7 @@
 #include "ui/views/info.h"
 #include "ui/views/settings.h"
 #include "ui/views/about.h"
+#include "ui/views/mixer.h"
 #include "ui/player/player.h"
 #include "ui/browser/browser.h"
 #include "input/keyboard.h"
@@ -22,6 +23,7 @@ typedef enum {
     ScreenInfo,
     ScreenSettings,
     ScreenAbout,
+    ScreenMixer,
     ScreenSplash
 } CurrentScreen;
 
@@ -36,6 +38,7 @@ typedef struct {
     InfoState infoState;
     SettingsState settingsState;
     AboutState aboutState;
+    MixerState mixerState;
 
     TopBar topbar;
     DeckStrip stripA;
@@ -45,6 +48,7 @@ typedef struct {
     InfoRenderer info;
     SettingsRenderer settings;
     AboutRenderer about;
+    MixerRenderer mixer;
     SplashRenderer splash;
     KeyboardMapping keyMap;
     bool showExitConfirm;
@@ -230,6 +234,7 @@ void App_Init(App *a) {
     a->settings.OnAction = OnSettingsAction;
     a->settings.callbackCtx = a;
     AboutRenderer_Init(&a->about, &a->aboutState);
+    MixerRenderer_Init(&a->mixer, &a->mixerState);
     SplashRenderer_Init(&a->splash, &a->splashCounter);
     a->keyMap = GetDefaultMapping();
 }
@@ -478,6 +483,18 @@ int main(void) {
             }
         }
 
+        if (IsKeyPressed(app.keyMap.toggleMixer)) {
+            if (app.screen == ScreenMixer) {
+                app.screen = ScreenPlayer;
+                app.mixerState.IsActive = false;
+            } else {
+                app.screen = ScreenMixer;
+                app.mixerState.IsActive = true;
+                // Hook audio engine up right before drawing if not earlier
+                app.mixerState.AudioPlugin = &audioEngine;
+            }
+        }
+
         // ESC / Back logic
         if (IsKeyPressed(app.keyMap.back)) {
             if (app.screen == ScreenBrowser) {
@@ -493,6 +510,7 @@ int main(void) {
                 app.infoState.IsActive = false;
                 app.settingsState.IsActive = false;
                 app.aboutState.IsActive = false;
+                app.mixerState.IsActive = false;
             }
         }
 
@@ -503,6 +521,7 @@ int main(void) {
         if (app.screen == ScreenInfo) app.info.base.Update((Component*)&app.info);
         if (app.screen == ScreenSettings) app.settings.base.Update((Component*)&app.settings);
         if (app.screen == ScreenAbout) app.about.base.Update((Component*)&app.about);
+        if (app.screen == ScreenMixer) app.mixer.base.Update((Component*)&app.mixer);
         
         if (app.screen != ScreenSplash) {
             app.stripA.base.Update((Component*)&app.stripA);
@@ -524,6 +543,7 @@ int main(void) {
             case ScreenInfo: app.info.base.Draw((Component*)&app.info); break;
             case ScreenSettings: app.settings.base.Draw((Component*)&app.settings); break;
             case ScreenAbout: app.about.base.Draw((Component*)&app.about); break;
+            case ScreenMixer: app.mixer.base.Draw((Component*)&app.mixer); break;
             default: break;
         }
 
@@ -531,7 +551,7 @@ int main(void) {
             app.stripA.base.Draw((Component*)&app.stripA);
             app.stripB.base.Draw((Component*)&app.stripB);
             app.topbar.base.Draw((Component*)&app.topbar);
-            DrawText("SPACE: Browser | I: Info | TAB: Settings", 10, Si(REF_HEIGHT) - 20, 10, GRAY);
+            DrawText("SPACE: Browser | I: Info | TAB: Settings | M: Mixer", 10, Si(REF_HEIGHT) - 20, 10, GRAY);
         }
 
         // Exit Confirmation Popup

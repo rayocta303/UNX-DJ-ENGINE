@@ -14,6 +14,7 @@ typedef struct {
     KeyboardKey toggleBrowser;
     KeyboardKey toggleInfo;
     KeyboardKey toggleSettings;
+    KeyboardKey toggleMixer;
     KeyboardKey back;
 } KeyboardMapping;
 

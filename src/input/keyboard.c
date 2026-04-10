@@ -25,6 +25,7 @@ KeyboardMapping GetDefaultMapping() {
     m.toggleBrowser = KEY_SPACE;
     m.toggleInfo = KEY_I;
     m.toggleSettings = KEY_TAB;
+    m.toggleMixer = KEY_M;
     m.back = KEY_ESCAPE;
     
     return m;
