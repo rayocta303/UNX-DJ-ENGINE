@@ -82,6 +82,10 @@ typedef struct DeckAudioState {
 
     // Sound Color FX
     ColorFXManager ColorFX;
+
+    // VU Meter (Real-time tracking of DSP output peak for UI)
+    float VuMeterL;
+    float VuMeterR;
 } DeckAudioState;
 
 typedef struct AudioEngine {

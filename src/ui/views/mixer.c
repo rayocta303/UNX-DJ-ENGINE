@@ -4,10 +4,35 @@
 #include "ui/components/helpers.h"
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 static int Mixer_Update(Component *base) {
     (void)base;
     return 0;
+}
+
+// Helper to draw a horizontal VU Meter
+static void DrawHorizontalVUMeter(float x, float y, float w, float h, float level) {
+    DrawRectangle(x, y, w, h, (Color){ 10, 10, 10, 255 });
+    DrawRectangleLines(x, y, w, h, ColorDark1);
+    
+    int segments = 40;
+    float segW = (w - S(4)) / segments;
+    for (int i = 0; i < segments; i++) {
+        float segLevel = (float)(i + 1) / segments;
+        if (level >= segLevel) {
+            Color c = ColorDGreen;
+            if (i >= (int)(segments * 0.7f)) c = ColorOrange;
+            if (i >= (int)(segments * 0.9f)) c = ColorRed;
+            DrawRectangle(x + S(2) + i * segW, y + S(2), segW - S(1), h - S(4), c);
+        } else {
+            // Draw dimmed off state
+            Color offC = (Color){ 20, 30, 20, 255 };
+            if (i >= (int)(segments * 0.7f)) offC = (Color){ 40, 20, 10, 255 };
+            if (i >= (int)(segments * 0.9f)) offC = (Color){ 40, 10, 10, 255 };
+            DrawRectangle(x + S(2) + i * segW, y + S(2), segW - S(1), h - S(4), offC);
+        }
+    }
 }
 
 // Helper to draw a clickable Color FX button
@@ -57,11 +82,40 @@ static void Mixer_Draw(Component *base) {
 
     AudioEngine *eng = r->State->AudioPlugin;
 
+    // --- TOP VU METERS (EXACTLY BELOW TOP_BAR) ---
+    float vuBarY = TOP_BAR_H;
+    float vuBarH = S(24);
+    DrawRectangle(0, vuBarY, SCREEN_WIDTH, vuBarH, ColorDark2);
+    DrawLine(0, vuBarY + vuBarH, SCREEN_WIDTH, vuBarY + vuBarH, ColorDark1);
+
+    float vuPadding = S(10);
+    float vuW = (SCREEN_WIDTH / 2.0f) - (vuPadding * 2.0f);
+    float vuH = S(12);
+
+    // Real-time Peak VU Level from Audio Engine DSP
+    float activeLevelA = fmaxf(eng->Decks[0].VuMeterL, eng->Decks[0].VuMeterR);
+    float activeLevelB = fmaxf(eng->Decks[1].VuMeterL, eng->Decks[1].VuMeterR);
+
+    // Visually clip to the 1.0 margin
+    if (activeLevelA > 1.0f) activeLevelA = 1.0f;
+    if (activeLevelB > 1.0f) activeLevelB = 1.0f;
+
+    Font fLabels = UIFonts_GetFace(S(8));
+    
+    // CH 1 VU
+    UIDrawText("CH 1", fLabels, vuPadding, vuBarY + S(7), S(9), ColorWhite);
+    DrawHorizontalVUMeter(vuPadding + S(25), vuBarY + S(6), vuW - S(25), vuH, activeLevelA);
+
+    // CH 2 VU
+    float ch2TextX = SCREEN_WIDTH/2.0f + vuPadding;
+    UIDrawText("CH 2", fLabels, ch2TextX, vuBarY + S(7), S(9), ColorWhite);
+    DrawHorizontalVUMeter(ch2TextX + S(25), vuBarY + S(6), vuW - S(25), vuH, activeLevelB);
+
     // Compact Professional Mixer Layout
     float ww = S(360);
-    float wh = S(320);
+    float wh = S(250); // Reduced height to prevent overlap with deck info
     float wx = (SCREEN_WIDTH - ww) / 2.0f;
-    float wy = (SCREEN_HEIGHT - wh) / 2.0f + S(20);
+    float wy = TOP_BAR_H + S(24) + S(8); // Start exactly below VU bar with small gap
 
     // Main Panel Background
     DrawRectangle(wx, wy, ww, wh, (Color){ 20, 20, 20, 240 });
@@ -94,11 +148,11 @@ static void Mixer_Draw(Component *base) {
     DrawCentredText("BEAT FX / COLOR", fSub, fxX, fxW, contentY + S(3), S(8), ColorOrange);
 
     float btnW = S(65);
-    float btnH = S(24);
+    float btnH = S(20); // Slightly shorter
     float btnGapX = S(10);
-    float btnGapY = S(12);
+    float btnGapY = S(8); // Tighter gap
     float btnStartX = fxX + (fxW - (btnW * 2 + btnGapX)) / 2.0f;
-    float btnY = contentY + S(30);
+    float btnY = contentY + S(25);
 
     ColorFXType activeFX = eng->Decks[0].ColorFX.activeFX;
 
@@ -136,9 +190,9 @@ static void Mixer_Draw(Component *base) {
         DrawCentredText(chTitle, fSub, lX, chW, contentY + S(3), S(8), ColorWhite);
 
         float cx = lX + chW / 2.0f;
-        float ky = contentY + S(35);
-        float kH = S(45); // Tighter vertical spacing
-        float kR = S(14); // Slightly smaller EQ knobs
+        float ky = contentY + S(28); // Compacted
+        float kH = S(38); // Good balance
+        float kR = S(12); // Smaller EQ knobs
 
         // TRIM
         HandleKnob(&d->Trim, cx, ky, kR, 0.0f, 2.0f, false, mousePos, mDown);
@@ -160,12 +214,12 @@ static void Mixer_Draw(Component *base) {
         UIDrawKnob(cx, ky, kR, d->EqLow, 0.0f, 1.0f, "LOW", ColorWhite);
 
         // COLOR FX KNOB (Larger and distinctive)
-        float colorKR = S(18);
-        ky += kH + S(5);
+        float colorKR = S(15); // Smaller
+        ky += kH + S(3);
         
         // Draw a dark enclosing box for the Color FX knob 
-        DrawRectangle(lX + S(5), ky - colorKR - S(8), chW - S(10), colorKR * 2 + S(22), (Color){ 15, 15, 15, 255 });
-        DrawRectangleLines(lX + S(5), ky - colorKR - S(8), chW - S(10), colorKR * 2 + S(22), ColorDark1);
+        DrawRectangle(lX + S(8), ky - colorKR - S(6), chW - S(16), colorKR * 2 + S(16), (Color){ 15, 15, 15, 255 });
+        DrawRectangleLines(lX + S(8), ky - colorKR - S(6), chW - S(16), colorKR * 2 + S(16), ColorDark1);
         
         HandleKnob(&d->ColorFX.colorValue, cx, ky, colorKR, -1.0f, 1.0f, true, mousePos, mDown);
         UIDrawKnob(cx, ky, colorKR, d->ColorFX.colorValue, -1.0f, 1.0f, "COLOR", ColorOrange);
@@ -179,3 +233,4 @@ void MixerRenderer_Init(MixerRenderer *r, MixerState *state) {
     r->base.Draw = Mixer_Draw;
     r->base.Update = Mixer_Update;
 }
+

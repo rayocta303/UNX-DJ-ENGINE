@@ -229,7 +229,8 @@ static void calcCrossoverCoeffs(int type, float freq, float sampleRate, float *b
 
 // Resampling directly from PCM
 static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int frames, AudioEngine *engine, int deckIndex) {
-    if (!deck->PCMBuffer) return;
+    bool noiseActive = (deck->ColorFX.activeFX == COLORFX_NOISE && deck->ColorFX.colorValue != 0.0f);
+    if (!deck->PCMBuffer && !noiseActive) return;
 
     // Handle Quantize Buffering Logic
     if (deck->HasQueuedJump) {
@@ -249,26 +250,39 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int frames,
 
     ProcessDeckPhysics(deck);
 
-    if (!deck->IsPlaying) return;
+    if (!deck->IsPlaying && !noiseActive) {
+        deck->VuMeterL -= deck->VuMeterL * 0.05f;
+        deck->VuMeterR -= deck->VuMeterR * 0.05f;
+        if (deck->VuMeterL < 0.001f) deck->VuMeterL = 0.0f;
+        if (deck->VuMeterR < 0.001f) deck->VuMeterR = 0.0f;
+        return;
+    }
 
     double rate = deck->OutlinedRate;
     if (deck->IsReverse) {
         rate = -rate;
     }
 
-    if (rate == 0.0) return;
+    if (rate == 0.0 && !noiseActive) {
+        deck->VuMeterL -= deck->VuMeterL * 0.05f;
+        deck->VuMeterR -= deck->VuMeterR * 0.05f;
+        if (deck->VuMeterL < 0.001f) deck->VuMeterL = 0.0f;
+        if (deck->VuMeterR < 0.001f) deck->VuMeterR = 0.0f;
+        return;
+    }
 
     // --- EQ Coefficient Setup ---
+    float fs = (deck->SampleRate > 0) ? (float)deck->SampleRate : (float)SAMPLE_RATE;
     // Crossover frequencies (typical DJ mixer: Low/Mid split at 250Hz, Mid/High split at 2500Hz)
     float b0_lp1, b1_lp1, b2_lp1, a1_lp1, a2_lp1; // Low band (LPF @ 250Hz)
     float b0_hp1, b1_hp1, b2_hp1, a1_hp1, a2_hp1; // Mid band lower (HPF @ 250Hz)
     float b0_lp2, b1_lp2, b2_lp2, a1_lp2, a2_lp2; // Mid band upper (LPF @ 2500Hz)
     float b0_hp2, b1_hp2, b2_hp2, a1_hp2, a2_hp2; // High band (HPF @ 2500Hz)
 
-    calcCrossoverCoeffs(0, 250.0f, deck->SampleRate, &b0_lp1, &b1_lp1, &b2_lp1, &a1_lp1, &a2_lp1);
-    calcCrossoverCoeffs(1, 250.0f, deck->SampleRate, &b0_hp1, &b1_hp1, &b2_hp1, &a1_hp1, &a2_hp1);
-    calcCrossoverCoeffs(0, 2500.0f, deck->SampleRate, &b0_lp2, &b1_lp2, &b2_lp2, &a1_lp2, &a2_lp2);
-    calcCrossoverCoeffs(1, 2500.0f, deck->SampleRate, &b0_hp2, &b1_hp2, &b2_hp2, &a1_hp2, &a2_hp2);
+    calcCrossoverCoeffs(0, 250.0f, fs, &b0_lp1, &b1_lp1, &b2_lp1, &a1_lp1, &a2_lp1);
+    calcCrossoverCoeffs(1, 250.0f, fs, &b0_hp1, &b1_hp1, &b2_hp1, &a1_hp1, &a2_hp1);
+    calcCrossoverCoeffs(0, 2500.0f, fs, &b0_lp2, &b1_lp2, &b2_lp2, &a1_lp2, &a2_lp2);
+    calcCrossoverCoeffs(1, 2500.0f, fs, &b0_hp2, &b1_hp2, &b2_hp2, &a1_hp2, &a2_hp2);
 
     // Map 0.0-1.0 knob range to gain: 0.5 is 1x (0dB), 0.0 is 0x (-inf dB), 1.0 is ~3x (+9dB)
     float gainLow = (deck->EqLow < 0.5f) ? (deck->EqLow * 2.0f) : (1.0f + (deck->EqLow - 0.5f) * 4.0f);
@@ -280,76 +294,97 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int frames,
     if (gainMid < 1.0f) gainMid *= gainMid;
     if (gainHigh < 1.0f) gainHigh *= gainHigh;
 
+    float maxL = 0.0f;
+    float maxR = 0.0f;
+
     // We process frame by frame
     for (int i = 0; i < frames; i++) {
-        double readPos = deck->Position;
-        // MT is active if Key Lock is ON, not scratching, motor is running, and speed is not precisely 1.0
-        bool mtActive = deck->MasterTempoActive && !deck->IsTouching && deck->IsMotorOn && fabs(rate - 1.0) > 0.0005;
-
         float l_sample = 0.0f;
         float r_sample = 0.0f;
 
-        // --- Helper for 4-point Hermite interpolation ---
-        #define INTERP_SAMPLES_HI(pos, l, r) { \
-            int sf = (int)floor(pos); \
-            float fr = (float)(pos - floor(pos)); \
-            l = 0; r = 0; \
-            if (sf >= 1 && (uint32_t)((sf * 2) + 5) < deck->TotalSamples) { \
-                int idx = sf * 2; \
-                l = hermite4(fr, deck->PCMBuffer[idx-2], deck->PCMBuffer[idx], deck->PCMBuffer[idx+2], deck->PCMBuffer[idx+4]); \
-                r = hermite4(fr, deck->PCMBuffer[idx-1], deck->PCMBuffer[idx+1], deck->PCMBuffer[idx+3], deck->PCMBuffer[idx+5]); \
-            } else if (sf >= 0 && (uint32_t)((sf * 2) + 1) < deck->TotalSamples) { \
-                /* Fallback to linear at track start/end boundaries */ \
-                int idx = sf * 2; \
-                l = deck->PCMBuffer[idx] + fr * (deck->PCMBuffer[idx + 2] - deck->PCMBuffer[idx]); \
-                r = deck->PCMBuffer[idx + 1] + fr * (deck->PCMBuffer[idx + 3] - deck->PCMBuffer[idx + 1]); \
-            } \
-        }
+        if (deck->IsPlaying && deck->PCMBuffer && rate != 0.0) {
+            double readPos = deck->Position;
+            // MT is active if Key Lock is ON, not scratching, motor is running, and speed is not precisely 1.0
+            bool mtActive = deck->MasterTempoActive && !deck->IsTouching && deck->IsMotorOn && fabs(rate - 1.0) > 0.0005;
+
+            // --- Helper for 4-point Hermite interpolation ---
+            #define INTERP_SAMPLES_HI(pos, l, r) { \
+                int sf = (int)floor(pos); \
+                float fr = (float)(pos - floor(pos)); \
+                l = 0; r = 0; \
+                if (sf >= 1 && (uint32_t)((sf * 2) + 5) < deck->TotalSamples) { \
+                    int idx = sf * 2; \
+                    l = hermite4(fr, deck->PCMBuffer[idx-2], deck->PCMBuffer[idx], deck->PCMBuffer[idx+2], deck->PCMBuffer[idx+4]); \
+                    r = hermite4(fr, deck->PCMBuffer[idx-1], deck->PCMBuffer[idx+1], deck->PCMBuffer[idx+3], deck->PCMBuffer[idx+5]); \
+                } else if (sf >= 0 && (uint32_t)((sf * 2) + 1) < deck->TotalSamples) { \
+                    /* Fallback to linear at track start/end boundaries */ \
+                    int idx = sf * 2; \
+                    l = deck->PCMBuffer[idx] + fr * (deck->PCMBuffer[idx + 2] - deck->PCMBuffer[idx]); \
+                    r = deck->PCMBuffer[idx + 1] + fr * (deck->PCMBuffer[idx + 3] - deck->PCMBuffer[idx + 1]); \
+                } \
+            }
 
         if (mtActive) {
             deck->MTOffset += (1.0 - rate);
             
-            if (deck->MTOffset > 65536.0) deck->MTOffset -= 65536.0;
-            if (deck->MTOffset < -65536.0) deck->MTOffset += 65536.0;
-
-            double period = 2048.0;
-            double drift = deck->MTOffset;
+            // Grain period: 44100 / 1536 = ~28 per sec (approx 35ms)
+            // Shorter grains reduce "echo/double" on drums, 
+            // but too short causes robotic buzzing. 1536 is a good balance.
+            const double period = 1536.0;
+            const double drift = deck->MTOffset;
             
             double phase[2];
             phase[0] = fmod(drift, period); if (phase[0] < 0) phase[0] += period;
             phase[1] = fmod(drift + period * 0.5, period); if (phase[1] < 0) phase[1] += period;
 
-            // Synchronization Trigger: Only search ONCE when grain is silent (phase close to 0)
+            // SOLA (Synchronized Overlap-Add) Search
             for (int k = 0; k < 2; k++) {
-                if (phase[k] < 16.0 && deck->MTSearchTrigger[k]) {
+                // Perform search when grain is at its minimum amplitude (near wraparound)
+                if (phase[k] < 12.0 && deck->MTSearchTrigger[k]) {
                     float bestCorr = -1e30f;
                     float bestOff = 0.0f;
-                    // Search window: match against the OTHER grain which is currently at its peak (50% phase)
                     int other = 1 - k;
+                    
+                    // The reference point in the track for the other grain (currently at peak volume)
                     double otherRp = deck->Position + (phase[other] - period * 0.5) + deck->MTPhaseOffset[other];
                     
-                    for (float o = -128.0f; o <= 128.0f; o += 2.0f) {
+                    // Pre-fetch reference window for correlation to speed up search
+                    // Use a slightly larger window than 128 to allow for search shift
+                    #define CORR_W 128
+                    float refL[CORR_W], refR[CORR_W];
+                    for (int j = 0; j < CORR_W; j++) {
+                        INTERP_SAMPLES_HI(otherRp - (CORR_W/2) + j, refL[j], refR[j]);
+                        // Simple center-clipping to focus correlation on transients/peaks
+                        if (fabsf(refL[j]) < 0.1f) refL[j] = 0;
+                        if (fabsf(refR[j]) < 0.1f) refR[j] = 0;
+                    }
+
+                    // Search +/- 384 samples (~8ms) around the nominal position
+                    // This is wide enough for 50Hz waves to find a decent phase match
+                    for (float o = -384.0f; o <= 384.0f; o += 1.0f) {
                         float corr = 0;
-                        for (int j = -24; j < 24; j++) {
-                            double tPos = deck->Position - (period * 0.5) + o + j;
-                            if (tPos < 0) continue;
-                            float tl, tr, bl, br;
+                        for (int j = 0; j < CORR_W; j++) {
+                            double tPos = deck->Position - (period * 0.5) + o - (CORR_W/2) + j;
+                            float tl, tr;
                             INTERP_SAMPLES_HI(tPos, tl, tr);
-                            INTERP_SAMPLES_HI(otherRp + j, bl, br);
-                            corr += tl * bl + tr * br;
+                            // Only need to clip one side for effect, ref is already clipped
+                            corr += tl * refL[j] + tr * refR[j];
                         }
                         if (corr > bestCorr) { bestCorr = corr; bestOff = o; }
                     }
                     deck->MTPhaseOffset[k] = bestOff;
-                    deck->MTSearchTrigger[k] = false; // Latched
-                } else if (phase[k] > period * 0.2) {
-                    deck->MTSearchTrigger[k] = true; // Rearm when grain is well into its life
+                    deck->MTSearchTrigger[k] = false; 
+                    #undef CORR_W
+                } else if (phase[k] > period * 0.25) {
+                    deck->MTSearchTrigger[k] = true; 
                 }
             }
 
-            // Power-constant cross-fade for perfect smoothness (sin/cos windows)
-            // w0 + w1 = 1.0 (approx) for amplitude, but sin^2 + cos^2 = 1.0 for power
-            double w0 = pow(sin(M_PI * phase[0] / period), 2.0);
+            // Constant-Power Crossfade (Hann-style)
+            // w0^2 + w1^2 = 1.0 would be absolute power constant, 
+            // but standard sin/cos window is also very stable.
+            double s0 = sin(M_PI * phase[0] / period);
+            double w0 = s0 * s0; // Hann window
             double w1 = 1.0 - w0;
 
             double rp0 = deck->Position + (phase[0] - period * 0.5) + deck->MTPhaseOffset[0];
@@ -394,30 +429,50 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outBuffer, int frames,
         // Mix back
         l_sample = (lowL * gainLow) + (midL * gainMid) + (highL * gainHigh);
         r_sample = (lowR * gainLow) + (midR * gainMid) + (highR * gainHigh);
+    }
 
         // --- Sound Color FX ---
-        ColorFXManager_Process(&deck->ColorFX, &l_sample, &r_sample, l_sample, r_sample, deck->SampleRate);
+        ColorFXManager_Process(&deck->ColorFX, &l_sample, &r_sample, l_sample, r_sample, fs);
 
         // --- Beat FX (Per-Deck Routing) ---
         if (engine->BeatFX.targetChannel == deckIndex + 1) {
             BeatFXManager_Process(&engine->BeatFX, &l_sample, &r_sample, l_sample, r_sample, SAMPLE_RATE);
         }
 
+        float absL = fabsf(l_sample);
+        float absR = fabsf(r_sample);
+        if (absL > maxL) maxL = absL;
+        if (absR > maxR) maxR = absR;
+
         // Mix into output buffer
         outBuffer[i * CHANNELS] += l_sample;
         outBuffer[i * CHANNELS + 1] += r_sample;
 
-        // Advance playhead
-        deck->Position += rate;
+        if (deck->IsPlaying && deck->PCMBuffer && rate != 0.0) {
+            // Advance playhead
+            deck->Position += rate;
 
-        // Loop / End track boundaries
-        if (deck->Position < 0) deck->Position = 0;
-        if (deck->Position * CHANNELS >= (double)deck->TotalSamples) {
-            // Track end
-            deck->IsPlaying = false;
-            deck->Position = (double)(deck->TotalSamples / CHANNELS) - 1.0;
+            // Loop / End track boundaries
+            if (deck->Position < 0) deck->Position = 0;
+            if (deck->Position * CHANNELS >= (double)deck->TotalSamples) {
+                // Track end
+                deck->IsPlaying = false;
+                deck->Position = (double)(deck->TotalSamples / CHANNELS) - 1.0;
+            }
         }
     }
+
+    // VU Envelope smoothing (respond quickly, decay slowly)
+    float attack = 0.4f;
+    float decay = 0.05f;
+    if (maxL > deck->VuMeterL) deck->VuMeterL += (maxL - deck->VuMeterL) * attack;
+    else deck->VuMeterL -= deck->VuMeterL * decay;
+    
+    if (maxR > deck->VuMeterR) deck->VuMeterR += (maxR - deck->VuMeterR) * attack;
+    else deck->VuMeterR -= deck->VuMeterR * decay;
+    
+    if (deck->VuMeterL < 0.001f) deck->VuMeterL = 0.0f;
+    if (deck->VuMeterR < 0.001f) deck->VuMeterR = 0.0f;
 }
 
 void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {

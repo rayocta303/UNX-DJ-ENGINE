@@ -55,10 +55,11 @@ typedef struct {
     uint32_t PhraseCount;
     RBBeat BeatGrid[1024];
     int BeatGridCount;
-    unsigned char StaticWaveform[1024];
+    unsigned char StaticWaveform[8192];
     int StaticWaveformLen;
     unsigned char* DynamicWaveform;
     int DynamicWaveformLen;
+    int WaveformType; // 0=None, 1=Blue, 2=Color, 3=3Band
 } RBTrack;
 
 typedef struct {

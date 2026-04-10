@@ -316,12 +316,13 @@ static int Browser_Update(Component *base) {
                         
                         // Copy Static Waveform
                         newTrack->StaticWaveformLen = t->StaticWaveformLen;
-                        int copyLen = t->StaticWaveformLen > 1024 ? 1024 : t->StaticWaveformLen;
+                        int copyLen = t->StaticWaveformLen > 8192 ? 8192 : t->StaticWaveformLen;
                         memcpy(newTrack->StaticWaveform, t->StaticWaveform, copyLen);
                         
                         // Assign Dynamic Waveform Reference
                         newTrack->DynamicWaveform = t->DynamicWaveform;
                         newTrack->DynamicWaveformLen = t->DynamicWaveformLen;
+                        newTrack->WaveformType = t->WaveformType;
                         
                         // Copy Beatgrid
                         newTrack->GridOffset = 0;

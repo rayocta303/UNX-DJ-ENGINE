@@ -195,6 +195,7 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
     try {
         kaitai::kstream ks(&is);
         rekordbox_anlz_t anlz(&ks);
+        int currentStaticPrio = 0;
 
         for (auto& section : *anlz.sections()) {
             auto tag = section->fourcc();
@@ -259,23 +260,49 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
                         track->CueCount++;
                     }
                 }
-            } else if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_PREVIEW) {
-                auto wp = static_cast<rekordbox_anlz_t::wave_preview_tag_t*>(section->body());
-                std::string data = wp->data();
-                track->StaticWaveformLen = data.length() > 1024 ? 1024 : data.length();
-                memcpy(track->StaticWaveform, data.data(), track->StaticWaveformLen);
-            } else if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_COLOR_SCROLL || tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_3BAND_SCROLL) {
+            } else if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_TINY || tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_PREVIEW || 
+                       tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_COLOR_PREVIEW || tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_3BAND_PREVIEW) {
                 std::string data;
-                if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_COLOR_SCROLL) {
+                int prio = 0; // 1=blue, 2=color, 3=3band
+                if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_3BAND_PREVIEW) {
+                    auto w3 = static_cast<rekordbox_anlz_t::wave_3band_preview_tag_t*>(section->body());
+                    data = w3->entries();
+                    prio = 3;
+                } else if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_COLOR_PREVIEW) {
+                    auto wc = static_cast<rekordbox_anlz_t::wave_color_preview_tag_t*>(section->body());
+                    data = wc->entries();
+                    prio = 2;
+                } else {
+                    auto wp = static_cast<rekordbox_anlz_t::wave_preview_tag_t*>(section->body());
+                    data = wp->data();
+                    prio = 1;
+                }
+
+                if (prio > currentStaticPrio) {
+                    track->StaticWaveformLen = data.length() > 8192 ? 8192 : data.length();
+                    memcpy(track->StaticWaveform, data.data(), track->StaticWaveformLen);
+                    currentStaticPrio = prio;
+                }
+            } else if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_SCROLL || tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_COLOR_SCROLL || tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_3BAND_SCROLL) {
+                std::string data;
+                int type = 0;
+                if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_SCROLL) {
+                    auto ws = static_cast<rekordbox_anlz_t::wave_scroll_tag_t*>(section->body());
+                    data = ws->entries();
+                    type = 1;
+                } else if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_COLOR_SCROLL) {
                     auto wc = static_cast<rekordbox_anlz_t::wave_color_scroll_tag_t*>(section->body());
                     data = wc->entries();
+                    type = 2;
                 } else {
                     auto w3 = static_cast<rekordbox_anlz_t::wave_3band_scroll_tag_t*>(section->body());
                     data = w3->entries();
+                    type = 3;
                 }
                 
                 if (track->DynamicWaveform) delete[] track->DynamicWaveform;
                 track->DynamicWaveformLen = data.length();
+                track->WaveformType = type;
                 if (track->DynamicWaveformLen > 0) {
                     track->DynamicWaveform = new unsigned char[track->DynamicWaveformLen];
                     memcpy(track->DynamicWaveform, data.data(), track->DynamicWaveformLen);
