@@ -16,7 +16,7 @@ struct WaveformRenderer {
   float lastMouseX;
 };
 
-// --- Waveform rendering REMOVED per user request ---
+
 
 void WaveformRenderer_Init(WaveformRenderer *r, int id, DeckState *state,
                            DeckState *otherDeck);

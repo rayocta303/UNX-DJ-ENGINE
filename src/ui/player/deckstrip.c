@@ -6,6 +6,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <rlgl.h>
 
 static void drawLeftBadgeColumn(DeckStrip *d, float x, float y, float h) {
   float lColW = S(40);
@@ -168,6 +169,34 @@ static int DeckStrip_Update(Component *base) {
   return 0;
 }
 
+// Static helper for decoding waveform bands
+static void DecodeStaticWaveformBands(unsigned char byteVal, float hScale, float *b, float *m, float *h) {
+  int amp = byteVal & 0x1F;
+  int colorIdx = byteVal >> 5;
+  float base = ((float)amp / 31.0f) * hScale;
+  if (colorIdx >= 6) {
+    *b = base * 0.95f; *m = base * 0.85f; *h = base * 0.60f;
+  } else if (colorIdx >= 3) {
+    *b = base * 0.90f; *m = base * 0.75f; *h = base * 0.20f;
+  } else {
+    *b = base * 0.85f; *m = base * 0.40f; *h = base * 0.05f;
+  }
+}
+
+static unsigned char GetStaticWaveformPeak(unsigned char *data, int start, int end) {
+  if (start >= end) return data[start];
+  int maxAmp = -1;
+  unsigned char best = 0;
+  for (int i = start; i < end; i++) {
+    int amp = data[i] & 0x1F;
+    if (amp > maxAmp) {
+      maxAmp = amp;
+      best = data[i];
+    }
+  }
+  return best;
+}
+
 static void DeckStrip_Draw(Component *base) {
   DeckStrip *d = (DeckStrip *)base;
   float stripW = SCREEN_WIDTH / 2.0f;
@@ -201,7 +230,6 @@ static void DeckStrip_Draw(Component *base) {
   if (d->State->TrackTitle[0] != '\0') {
     strncpy(title, d->State->TrackTitle, sizeof(title) - 1);
 
-    // Draw music note icon separately using icon font
     Font iconFace = UIFonts_GetIcon(S(9));
     UIDrawText("\xef\x80\x81", iconFace, mx, y + S(2), S(9),
                ColorWhite); // f001 music note
@@ -338,12 +366,102 @@ static void DeckStrip_Draw(Component *base) {
     DrawRectangle(wx, wy, ww, wh, ColorDark3);
     DrawRectangleLines(wx, wy, ww, wh, ColorDark1);
 
+    int totalFrames = d->State->LoadedTrack->StaticWaveformLen;
     float totalMs = d->State->TrackLengthMs;
     float playedRatio = 0;
     if (totalMs > 0)
       playedRatio = (float)playedMs / totalMs;
 
-    // --- Waveform rendering REMOVED per user request ---
+    // High-Res Static Mini Waveform (Quads)
+    if (totalFrames > 1 && ww > 0) {
+      rlBegin(RL_QUADS);
+      for (int x = 0; x < (int)ww - 1; x++) {
+        float r1 = (float)x / ww;
+        float r2 = (float)(x + 1) / ww;
+        float r3 = (float)(x + 2) / ww;
+
+        int idx1 = (int)(r1 * totalFrames);
+        int idx2 = (int)(r2 * totalFrames);
+        int idx3 = (int)(r3 * totalFrames);
+
+        if (idx1 >= totalFrames) idx1 = totalFrames - 1;
+        if (idx2 >= totalFrames) idx2 = totalFrames - 1;
+        if (idx3 >= totalFrames) idx3 = totalFrames - 1;
+        if (idx1 < 0) idx1 = 0;
+
+        unsigned char s1 = GetStaticWaveformPeak(d->State->LoadedTrack->StaticWaveform, idx1, idx2);
+        unsigned char s2 = GetStaticWaveformPeak(d->State->LoadedTrack->StaticWaveform, idx2, idx3);
+
+        float b1, m1, h1, b2, m2, h2;
+        DecodeStaticWaveformBands(s1, wh, &b1, &m1, &h1);
+        DecodeStaticWaveformBands(s2, wh, &b2, &m2, &h2);
+
+        Color cB = {16, 105, 238, 255};
+        Color cM = {16, 190, 82, 255};
+        Color cH = {246, 251, 246, 255};
+
+        if (r1 <= playedRatio) {
+            cB = (Color){8, 52, 119, 255};
+            cM = (Color){8, 95, 41, 255};
+            cH = (Color){123, 125, 123, 255};
+        }
+
+        float cx1 = wx + x;
+        float cx2 = wx + x + 1.0f;
+        float yy = wy + wh;
+
+        // Bottom Aligned Envelope Fill (Correct CCW Winding: TL, BL, BR, TR)
+        // Bass
+        rlColor4ub(cB.r, cB.g, cB.b, cB.a);
+        rlVertex2f(cx1, yy - b1); // TL
+        rlVertex2f(cx1, yy);      // BL
+        rlVertex2f(cx2, yy);      // BR
+        rlVertex2f(cx2, yy - b2); // TR
+
+        // Mid
+        rlColor4ub(cM.r, cM.g, cM.b, cM.a);
+        rlVertex2f(cx1, yy - m1); // TL
+        rlVertex2f(cx1, yy);      // BL
+        rlVertex2f(cx2, yy);      // BR
+        rlVertex2f(cx2, yy - m2); // TR
+
+        // High
+        rlColor4ub(cH.r, cH.g, cH.b, cH.a);
+        rlVertex2f(cx1, yy - h1); // TL
+        rlVertex2f(cx1, yy);      // BL
+        rlVertex2f(cx2, yy);      // BR
+        rlVertex2f(cx2, yy - h2); // TR
+      }
+      rlEnd();
+    }
+
+    // Cue Markers Rendering (Hot Cues & Memory Cues)
+    if (totalMs > 0) {
+      // Hot Cues
+      for (int h = 0; h < d->State->LoadedTrack->HotCuesCount; h++) {
+        float ratio = (float)d->State->LoadedTrack->HotCues[h].Start / totalMs;
+        if (ratio >= 0.0f && ratio <= 1.0f) {
+          float rx = wx + ratio * ww;
+          Color hcClr = {d->State->LoadedTrack->HotCues[h].Color[0], d->State->LoadedTrack->HotCues[h].Color[1], d->State->LoadedTrack->HotCues[h].Color[2], 255};
+          if (hcClr.r == 0 && hcClr.g == 0 && hcClr.b == 0) {
+            Color palette[8] = {{0, 255, 0, 255}, {255, 0, 0, 255}, {255, 128, 0, 255}, {255, 255, 0, 255}, {0, 0, 255, 255}, {255, 0, 255, 255}, {0, 255, 255, 255}, {128, 0, 255, 255}};
+            int idx = d->State->LoadedTrack->HotCues[h].ID - 1;
+            if (idx < 0) idx = 0; if (idx > 7) idx = 7;
+            hcClr = palette[idx];
+          }
+          DrawTriangle((Vector2){rx - 4, wy}, (Vector2){rx + 4, wy}, (Vector2){rx, wy + 6}, hcClr);
+          DrawLineV((Vector2){rx, wy}, (Vector2){rx, wy + wh}, (Color){hcClr.r, hcClr.g, hcClr.b, 100});
+        }
+      }
+      // Memory Cues
+      for (int c = 0; c < d->State->LoadedTrack->CuesCount; c++) {
+        float ratio = (float)d->State->LoadedTrack->Cues[c].Start / totalMs;
+        if (ratio >= 0.0f && ratio <= 1.0f) {
+          float rx = wx + ratio * ww;
+          DrawTriangle((Vector2){rx - 3, wy + wh}, (Vector2){rx, wy + wh - 5}, (Vector2){rx + 3, wy + wh}, ColorOrange);
+        }
+      }
+    }
 
     // Playhead Position Line
     if (totalMs > 0) {
