@@ -24,13 +24,24 @@ static bool DrawFXButton(const char *label, float x, float y, float w, float h, 
 }
 
 static void HandleKnob(float *val, float cx, float cy, float r, float min, float max, bool centerZero, Vector2 mousePos, bool mDown) {
-    if (mDown && CheckCollisionPointCircle(mousePos, (Vector2){cx, cy}, r + S(10))) {
+    bool hovered = CheckCollisionPointCircle(mousePos, (Vector2){cx, cy}, r + S(10));
+    if (mDown && hovered) {
         Vector2 delta = GetMouseDelta();
         float range = max - min;
         *val -= (delta.y / S(100.0f)) * range;
         if (*val < min) *val = min;
         if (*val > max) *val = max;
     }
+    
+    // Scroll Wheel Support
+    float wheel = GetMouseWheelMove();
+    if (wheel != 0.0f && hovered) {
+        float range = max - min;
+        *val += (wheel * 0.05f) * range; // 5% step per scroll tick
+        if (*val < min) *val = min;
+        if (*val > max) *val = max;
+    }
+
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointCircle(mousePos, (Vector2){cx, cy}, r)) {
          static float lastClickTime = 0;
          if (GetTime() - lastClickTime < 0.3) {
@@ -46,50 +57,61 @@ static void Mixer_Draw(Component *base) {
 
     AudioEngine *eng = r->State->AudioPlugin;
 
-    // Background Panel
-    float wx = S(60);
-    float wy = S(40);
-    float ww = SCREEN_WIDTH - S(120);
-    float wh = SCREEN_HEIGHT - S(80);
+    // Compact Professional Mixer Layout
+    float ww = S(360);
+    float wh = S(320);
+    float wx = (SCREEN_WIDTH - ww) / 2.0f;
+    float wy = (SCREEN_HEIGHT - wh) / 2.0f + S(20);
 
-    DrawRectangle(wx, wy, ww, wh, ColorDark3);
+    // Main Panel Background
+    DrawRectangle(wx, wy, ww, wh, (Color){ 20, 20, 20, 240 });
     DrawRectangleLines(wx, wy, ww, wh, ColorDark1);
 
-    Font fTitle = UIFonts_GetFace(S(16));
-    Font fSub = UIFonts_GetFace(S(9));
+    Font fTitle = UIFonts_GetFace(S(12));
+    Font fSub = UIFonts_GetFace(S(8));
+    Font fXXS = UIFonts_GetFace(S(7));
 
-    // Title
-    UIDrawText("MIXER / EQ / COLOR FX", fTitle, wx + S(20), wy + S(15), S(16), ColorWhite);
-    DrawLine(wx, wy + S(40), wx + ww, wy + S(40), ColorDark1);
+    // Title Bar
+    DrawRectangle(wx, wy, ww, S(24), ColorDark3);
+    DrawCentredText("MIXER & SOUND COLOR FX", fTitle, wx, ww, wy + S(5), S(12), ColorWhite);
+    DrawLine(wx, wy + S(24), wx + ww, wy + S(24), ColorDark1);
 
-    // Three columns: CH1 (Left), FX Bank (Center), CH2 (Right)
-    float colW = ww / 3.0f;
+    float contentY = wy + S(25);
+    float contentH = wh - S(25);
+
+    float chW = S(80);
+    float fxW = ww - (chW * 2);
+    
     float ch1X = wx;
-    float fxBankX = wx + colW;
-    float ch2X = wx + 2.0f * colW;
-    float contentY = wy + S(50);
-    float contentH = wh - S(50);
+    float fxX = wx + chW;
+    float ch2X = fxX + fxW;
 
     // --- FX BANK (CENTER) ---
-    DrawRectangle(fxBankX, contentY, colW, contentH, (Color){15, 15, 15, 255});
-    DrawRectangleLines(fxBankX, contentY, colW, contentH, ColorDark1);
-    DrawCentredText("SOUND COLOR FX", fSub, fxBankX, colW, contentY + S(10), S(9), ColorWhite);
+    DrawRectangle(fxX, contentY, fxW, contentH, (Color){ 10, 10, 10, 255 });
+    DrawRectangleLines(fxX, contentY, fxW, contentH, ColorDark1);
+    
+    DrawRectangle(fxX, contentY, fxW, S(16), ColorDark2);
+    DrawCentredText("BEAT FX / COLOR", fSub, fxX, fxW, contentY + S(3), S(8), ColorOrange);
 
-    float btnW = S(80);
-    float btnH = S(30);
-    float btnStartX = fxBankX + (colW - btnW * 2 - S(10)) / 2.0f;
-    float btnY = contentY + S(40);
+    float btnW = S(65);
+    float btnH = S(24);
+    float btnGapX = S(10);
+    float btnGapY = S(12);
+    float btnStartX = fxX + (fxW - (btnW * 2 + btnGapX)) / 2.0f;
+    float btnY = contentY + S(30);
 
     ColorFXType activeFX = eng->Decks[0].ColorFX.activeFX;
 
     if (DrawFXButton("SPACE", btnStartX, btnY, btnW, btnH, activeFX == COLORFX_SPACE)) activeFX = COLORFX_SPACE;
-    if (DrawFXButton("DUB ECHO", btnStartX + btnW + S(10), btnY, btnW, btnH, activeFX == COLORFX_DUBECHO)) activeFX = COLORFX_DUBECHO;
+    if (DrawFXButton("DUB ECHO", btnStartX + btnW + btnGapX, btnY, btnW, btnH, activeFX == COLORFX_DUBECHO)) activeFX = COLORFX_DUBECHO;
     
-    if (DrawFXButton("SWEEP", btnStartX, btnY + btnH + S(10), btnW, btnH, activeFX == COLORFX_SWEEP)) activeFX = COLORFX_SWEEP;
-    if (DrawFXButton("NOISE", btnStartX + btnW + S(10), btnY + btnH + S(10), btnW, btnH, activeFX == COLORFX_NOISE)) activeFX = COLORFX_NOISE;
+    btnY += btnH + btnGapY;
+    if (DrawFXButton("SWEEP", btnStartX, btnY, btnW, btnH, activeFX == COLORFX_SWEEP)) activeFX = COLORFX_SWEEP;
+    if (DrawFXButton("NOISE", btnStartX + btnW + btnGapX, btnY, btnW, btnH, activeFX == COLORFX_NOISE)) activeFX = COLORFX_NOISE;
     
-    if (DrawFXButton("CRUSH", btnStartX, btnY + btnH * 2 + S(20), btnW, btnH, activeFX == COLORFX_CRUSH)) activeFX = COLORFX_CRUSH;
-    if (DrawFXButton("FILTER", btnStartX + btnW + S(10), btnY + btnH * 2 + S(20), btnW, btnH, activeFX == COLORFX_FILTER)) activeFX = COLORFX_FILTER;
+    btnY += btnH + btnGapY;
+    if (DrawFXButton("CRUSH", btnStartX, btnY, btnW, btnH, activeFX == COLORFX_CRUSH)) activeFX = COLORFX_CRUSH;
+    if (DrawFXButton("FILTER", btnStartX + btnW + btnGapX, btnY, btnW, btnH, activeFX == COLORFX_FILTER)) activeFX = COLORFX_FILTER;
 
     if (activeFX != eng->Decks[0].ColorFX.activeFX) {
         ColorFXManager_SetFX(&eng->Decks[0].ColorFX, activeFX);
@@ -104,18 +126,25 @@ static void Mixer_Draw(Component *base) {
         DeckAudioState *d = &eng->Decks[i];
         float lX = (i == 0) ? ch1X : ch2X;
         
-        DrawRectangle(lX, contentY, colW, contentH, (Color){30, 30, 30, 255});
-        DrawRectangleLines(lX, contentY, colW, contentH, ColorDark1);
+        // Channel strip background
+        DrawRectangle(lX, contentY, chW, contentH, (Color){ 25, 25, 25, 255 });
+        DrawRectangleLines(lX, contentY, chW, contentH, ColorDark1);
 
         char chTitle[16];
         sprintf(chTitle, "CH %d", i + 1);
-        DrawCentredText(chTitle, fTitle, lX, colW, contentY + S(10), S(16), ColorWhite);
+        DrawRectangle(lX, contentY, chW, S(16), ColorDark2);
+        DrawCentredText(chTitle, fSub, lX, chW, contentY + S(3), S(8), ColorWhite);
 
-        float cx = lX + colW / 2.0f;
-        float ky = contentY + S(60);
-        float kH = S(60);
-        float kR = S(16);
+        float cx = lX + chW / 2.0f;
+        float ky = contentY + S(35);
+        float kH = S(45); // Tighter vertical spacing
+        float kR = S(14); // Slightly smaller EQ knobs
 
+        // TRIM
+        HandleKnob(&d->Trim, cx, ky, kR, 0.0f, 2.0f, false, mousePos, mDown);
+        UIDrawKnob(cx, ky, kR, d->Trim, 0.0f, 2.0f, "TRIM", ColorPaper);
+        
+        ky += kH;
         // HI
         HandleKnob(&d->EqHigh, cx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
         UIDrawKnob(cx, ky, kR, d->EqHigh, 0.0f, 1.0f, "HI", ColorWhite);
@@ -130,10 +159,16 @@ static void Mixer_Draw(Component *base) {
         HandleKnob(&d->EqLow, cx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
         UIDrawKnob(cx, ky, kR, d->EqLow, 0.0f, 1.0f, "LOW", ColorWhite);
 
-        // COLOR FX KNOB
-        ky += kH + S(20);
-        HandleKnob(&d->ColorFX.colorValue, cx, ky, kR + S(4), -1.0f, 1.0f, true, mousePos, mDown);
-        UIDrawKnob(cx, ky, kR + S(4), d->ColorFX.colorValue, -1.0f, 1.0f, "COLOR", ColorOrange);
+        // COLOR FX KNOB (Larger and distinctive)
+        float colorKR = S(18);
+        ky += kH + S(5);
+        
+        // Draw a dark enclosing box for the Color FX knob 
+        DrawRectangle(lX + S(5), ky - colorKR - S(8), chW - S(10), colorKR * 2 + S(22), (Color){ 15, 15, 15, 255 });
+        DrawRectangleLines(lX + S(5), ky - colorKR - S(8), chW - S(10), colorKR * 2 + S(22), ColorDark1);
+        
+        HandleKnob(&d->ColorFX.colorValue, cx, ky, colorKR, -1.0f, 1.0f, true, mousePos, mDown);
+        UIDrawKnob(cx, ky, colorKR, d->ColorFX.colorValue, -1.0f, 1.0f, "COLOR", ColorOrange);
     }
 }
 
