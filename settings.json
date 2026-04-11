@@ -1,4 +1,4 @@
 {
-  "wfmA": { "style": 1, "low": 0.75, "mid": 0.50, "high": 0.50, "start": 483.4, "stop": 933.3, "lock": 1 },
-  "wfmB": { "style": 1, "low": 0.75, "mid": 0.50, "high": 0.50, "start": 483.4, "stop": 933.3, "lock": 1 }
+  "wfmA": { "style": 2, "low": 0.75, "mid": 0.50, "high": 0.50, "start": 483.4, "stop": 933.3, "lock": 1 },
+  "wfmB": { "style": 2, "low": 0.75, "mid": 0.50, "high": 0.50, "start": 483.4, "stop": 933.3, "lock": 1 }
 }

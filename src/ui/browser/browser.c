@@ -316,6 +316,7 @@ static int Browser_Update(Component *base) {
                         
                         // Copy Static Waveform
                         newTrack->StaticWaveformLen = t->StaticWaveformLen;
+                        newTrack->StaticWaveformType = t->StaticWaveformType;
                         int copyLen = t->StaticWaveformLen > 8192 ? 8192 : t->StaticWaveformLen;
                         memcpy(newTrack->StaticWaveform, t->StaticWaveform, copyLen);
                         

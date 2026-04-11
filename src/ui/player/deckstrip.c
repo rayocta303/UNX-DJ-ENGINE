@@ -329,127 +329,115 @@ static void DeckStrip_Draw(Component *base) {
   DrawCentredText(syncText, faceXXS, bpmX, bpmBoxW, syncY + S(2.5f), S(7),
                   syncColor);
 
-  // Static Waveform rendering
+  // === New Preview Waveform rendering ===
   if (d->State->LoadedTrack != NULL) {
     float wx = lColX + lColW + S(12);
-    float ww = bpmX - wx - S(10); 
+    float ww = bpmX - wx - S(10);
     float wy = y + DECK_STR_H - S(28);
     float wh = S(18);
 
     // Background box
-    DrawRectangle(wx, wy, ww, wh, (Color){10, 10, 10, 200});
+    DrawRectangle(wx, wy, ww, wh, (Color){10, 10, 10, 255});
     DrawRectangleLinesEx((Rectangle){wx, wy, ww, wh}, 1.0f, ColorDark1);
 
-    // Flush batch before manual rlgl drawing to maintain layer order
-    rlDrawRenderBatchActive();
+    int type = d->State->LoadedTrack->StaticWaveformType;
+    unsigned char *data = d->State->LoadedTrack->StaticWaveform;
+    int dataLen = d->State->LoadedTrack->StaticWaveformLen;
+    float totalMs = (float)d->State->TrackLengthMs;
+    float playedRatio = (totalMs > 0) ? (float)d->State->PositionMs / totalMs : 0;
 
-    long long playedMs = d->State->PositionMs;
-    int totalFrames = d->State->LoadedTrack->StaticWaveformLen;
-    float totalMs = d->State->TrackLengthMs;
-    float playedRatio = 0;
-    if (totalMs > 0)
-      playedRatio = (float)playedMs / totalMs;
-
-    // === Mini Waveform - High Fidelity Rendering ===
-    if (totalFrames > 1 && ww > 0) {
-      WaveformStyle style = d->State->Waveform.Style;
-      
-      // Exact Pioneer PWV2 Color Table
-      static const unsigned char BLU_P[8][3] = {
-        {200, 224, 232}, {136, 192, 232}, {136, 192, 232}, {120, 184, 216},
-        {  0, 184, 216}, {  0, 168, 232}, {  0, 136, 176}, {  0, 104, 144},
-      };
-
-      // 3-Band Palette
-      Color BL_LOW   = {32,  83,  217, 255};
-      Color BL_MID   = {242, 170, 60,  255};
-      Color BL_HIGH  = {255, 255, 255, 255};
-
-      float yy = wy + wh * 0.5f;
-      int bpf = 1;
-      if (totalFrames >= 2400) bpf = 6;
-      else if (totalFrames >= 1200) bpf = 3;
-      int nF = totalFrames / bpf;
-      unsigned char *data = d->State->LoadedTrack->StaticWaveform;
-
-      const float ATK = 0.50f;
-      const float REL = 0.12f;
-      float smL = 0, smM = 0, smH = 0;
-      
-      // Initial smoothing seed from first frame
-      if (nF > 0) {
-        if (bpf == 3) {
-          smM = (float)data[0] * (wh / 255.0f);
-          smH = (float)data[1] * (wh / 255.0f);
-          smL = (float)data[2] * (wh / 255.0f);
-        } else {
-          smH = (float)(data[0] & 0x1F) * (wh / 31.0f);
-        }
-      }
-
+    if (dataLen > 0 && ww > 0) {
+      rlDrawRenderBatchActive(); // Ensure layer order
       rlBegin(RL_TRIANGLES);
+
+      // We determine frame count based on type
+      // Preview BPF: 3-Band = 3, Color (PWV4) = 6, Blue = 1
+      int bpf = (type == 3) ? 3 : (type == 2 ? 6 : 1);
+      int totalFrames = dataLen / bpf;
+      float yy = wy + wh * 0.5f;
+
+      // Pioneer Palette from settings/waveform renderer
+      Color BL_LOW = {32, 83, 217, 255};
+      Color BL_MID = {242, 170, 60, 255};
+      Color BL_HIGH = {255, 255, 255, 255};
+
+      WaveformStyle style = d->State->Waveform.Style;
+
       for (int xi = 0; xi < (int)ww; xi++) {
-        float r1 = (float)xi / ww;
-        int i1 = (int)(r1 * nF); if (i1 >= nF) i1 = nF - 1;
+        float r0 = (float)xi / ww;
+        float r1 = (float)(xi + 1) / ww;
 
-        float pL = smL, pM = smM, pH = smH;
-        float curL = 0, curM = 0, curH = 0;
-        Color col = {0,0,0,255};
-
-        if (bpf == 3) { // PWV6 3-Band: [Mid, High, Low]
-          curM = (float)data[i1 * 3]     * (wh / 255.0f);
-          curH = (float)data[i1 * 3 + 1] * (wh / 255.0f);
-          curL = (float)data[i1 * 3 + 2] * (wh / 255.0f);
-        } else if (bpf == 6) { // PWV4 RGB Previews
-          int h = (data[i1 * 6] & 0x1F);
-          int c = (data[i1 * 6] >> 5) & 0x7;
-          curH = h * (wh / 31.0f);
-          col = (Color){BLU_P[7-c][0], BLU_P[7-c][1], BLU_P[7-c][2], 255};
-        } else { // PWV2 Blue
-          unsigned char sv = data[i1];
-          curH = (sv & 0x1F) * (wh / 31.0f);
-          int ci = 7 - ((sv >> 5) & 0x7);
-          col = (Color){BLU_P[ci][0], BLU_P[ci][1], BLU_P[ci][2], 255};
-        }
-
-        // Apply smoothing
-        smL += (curL - smL) * ((curL > smL) ? ATK : REL);
-        smM += (curM - smM) * ((curM > smM) ? ATK : REL);
-        smH += (curH - smH) * ((curH > smH) ? ATK : REL);
+        // Peak sampling over the range of the current pixel
+        double p0 = r0 * totalFrames;
+        double p1 = r1 * totalFrames;
 
         float cx0 = wx + xi;
         float cx1 = wx + xi + 1.0f;
-        bool played = (r1 < playedRatio);
+        bool played = (r0 < playedRatio);
 
-        if (style == WAVEFORM_STYLE_3BAND && bpf == 3) {
-          Color lo = played ? (Color){BL_LOW.r/3,  BL_LOW.g/3,  BL_LOW.b/3,  255} : BL_LOW;
-          Color mi = played ? (Color){BL_MID.r/3,  BL_MID.g/3,  BL_MID.b/3,  255} : BL_MID;
-          Color hi = played ? (Color){BL_HIGH.r/3, BL_HIGH.g/3, BL_HIGH.b/3, 255} : BL_HIGH;
-          
-          #define DRAW_STACK_BI(pa, ca, cl) do { \
-            if ((pa) > 0.1f || (ca) > 0.1f) { \
-              float h1 = (pa) * 0.5f; float h2 = (ca) * 0.5f; \
-              rlColor4ub(cl.r, cl.g, cl.b, cl.a); \
-              rlVertex2f(cx0, yy - h1); rlVertex2f(cx0, yy + h1); rlVertex2f(cx1, yy + h2); \
-              rlVertex2f(cx0, yy - h1); rlVertex2f(cx1, yy + h2); rlVertex2f(cx1, yy - h2); \
-            } } while(0)
-          
-          DRAW_STACK_BI(pL, smL, lo);
-          DRAW_STACK_BI(pM, smM, mi);
-          DRAW_STACK_BI(pH, smH, hi);
-          #undef DRAW_STACK_BI
+        // Rendering Type Determination
+        // If data is 3-band, we can render as 3-band or fallback to Blue/RGB
+        // If data is Blue/Color, we can't render as 3-band, fallback to symmetric
+        if (style == WAVEFORM_STYLE_3BAND && type == 3) {
+          float iL, iM, iH;
+          Get3BandPeak(data, totalFrames, p0, p1, &iL, &iM, &iH);
+
+          float hL = (iL / 255.0f) * wh * 0.5f;
+          float hM = (iM / 255.0f) * wh * 0.5f;
+          float hH = (iH / 255.0f) * wh * 0.5f;
+
+          Color lo = played ? Fade(BL_LOW, 0.3f) : BL_LOW;
+          Color mi = played ? Fade(BL_MID, 0.3f) : BL_MID;
+          Color hi = played ? Fade(BL_HIGH, 0.3f) : BL_HIGH;
+
+#define DRAW_STACK(h, cl)                                                      \
+  if (h > 0.1f) {                                                              \
+    rlColor4ub(cl.r, cl.g, cl.b, cl.a);                                        \
+    rlVertex2f(cx0, yy - h); rlVertex2f(cx0, yy + h); rlVertex2f(cx1, yy + h);  \
+    rlVertex2f(cx0, yy - h); rlVertex2f(cx1, yy + h); rlVertex2f(cx1, yy - h);  \
+  }
+          DRAW_STACK(hL, lo);
+          DRAW_STACK(hM, mi);
+          DRAW_STACK(hH, hi);
+#undef DRAW_STACK
         } else {
-          // Blue or RGB simple mode (drawn symmetric)
+          // BLUE or RGB Symmetric Mode
+          float rawH = 0;
+          Color col = {0, 0, 0, 255};
+
+          if (type == 3) {
+            // Downmix 3-band to single symmetric height
+            float iL, iM, iH;
+            Get3BandPeak(data, totalFrames, p0, p1, &iL, &iM, &iH);
+            rawH = ((iL + iM + iH) / 3.0f) * (wh / 255.0f) * 0.5f;
+            if (style == WAVEFORM_STYLE_RGB)
+              col = (iL > iM && iL > iH) ? BL_LOW : (iM > iH ? BL_MID : BL_HIGH);
+            else {
+              col = (Color){PWV2_BLUE_TABLE[4][0], PWV2_BLUE_TABLE[4][1],
+                            PWV2_BLUE_TABLE[4][2], 255};
+              PWV2_Decode(64, &col); // Seed from table
+            }
+          } else if (type == 2) {
+            // PWV4 Preview (6 bytes per entry)
+            // byte 0 is usually height/whiteness like PWV2
+            int hIdx = PWV2_Decode(data[(int)p0 * 6], &col);
+            rawH = (hIdx / 31.0f) * wh * 0.5f;
+          } else {
+            // PWV2 Preview
+            int hIdx = PWV2_Decode(data[(int)p0], &col);
+            rawH = (hIdx / 31.0f) * wh * 0.5f;
+          }
+
           if (played) { col.r /= 3; col.g /= 3; col.b /= 3; }
-          float h1 = pH * 0.5f; float h2 = smH * 0.5f;
-          rlColor4ub(col.r, col.g, col.b, col.a);
-          rlVertex2f(cx0, yy - h1); rlVertex2f(cx0, yy + h1); rlVertex2f(cx1, yy + h2);
-          rlVertex2f(cx0, yy - h1); rlVertex2f(cx1, yy + h2); rlVertex2f(cx1, yy - h2);
+          rlColor4ub(col.r, col.g, col.b, 255);
+          rlVertex2f(cx0, yy - rawH); rlVertex2f(cx0, yy + rawH); rlVertex2f(cx1, yy + rawH);
+          rlVertex2f(cx0, yy - rawH); rlVertex2f(cx1, yy + rawH); rlVertex2f(cx1, yy - rawH);
         }
       }
       rlEnd();
-    } else if (totalFrames == 0) {
-      UIDrawText("WAVEFORM NOT LOADED", faceXXS, wx + S(10), wy + S(6), S(8), ColorShadow);
+    } else {
+      UIDrawText("WAVEFORM NOT LOADED", faceXXS, wx + S(10), wy + S(6), S(8),
+                 ColorShadow);
     }
 
     // Cue Markers Rendering (Hot Cues & Memory Cues)
@@ -459,15 +447,22 @@ static void DeckStrip_Draw(Component *base) {
         float ratio = (float)d->State->LoadedTrack->HotCues[h].Start / totalMs;
         if (ratio >= 0.0f && ratio <= 1.0f) {
           float rx = wx + ratio * ww;
-          Color hcClr = {d->State->LoadedTrack->HotCues[h].Color[0], d->State->LoadedTrack->HotCues[h].Color[1], d->State->LoadedTrack->HotCues[h].Color[2], 255};
+          Color hcClr = {d->State->LoadedTrack->HotCues[h].Color[0],
+                         d->State->LoadedTrack->HotCues[h].Color[1],
+                         d->State->LoadedTrack->HotCues[h].Color[2], 255};
           if (hcClr.r == 0 && hcClr.g == 0 && hcClr.b == 0) {
-            static const Color defPalette[8] = {{0, 255, 0, 255}, {255, 0, 0, 255}, {255, 128, 0, 255}, {255, 255, 0, 255}, {0, 0, 255, 255}, {255, 0, 255, 255}, {0, 255, 255, 255}, {128, 0, 255, 255}};
+            static const Color defPalette[8] = {
+                {0, 255, 0, 255},   {255, 0, 0, 255},   {255, 128, 0, 255},
+                {255, 255, 0, 255}, {0, 0, 255, 255},   {255, 0, 255, 255},
+                {0, 255, 255, 255}, {128, 0, 255, 255}};
             int idx = d->State->LoadedTrack->HotCues[h].ID - 1;
             if (idx < 0) idx = 0; if (idx > 7) idx = 7;
             hcClr = defPalette[idx];
           }
-          DrawTriangle((Vector2){rx - 4, wy}, (Vector2){rx + 4, wy}, (Vector2){rx, wy + 6}, hcClr);
-          DrawLineV((Vector2){rx, wy}, (Vector2){rx, wy + wh}, (Color){hcClr.r, hcClr.g, hcClr.b, 100});
+          DrawTriangle((Vector2){rx - 4, wy}, (Vector2){rx + 4, wy},
+                       (Vector2){rx, wy + 6}, hcClr);
+          DrawLineV((Vector2){rx, wy}, (Vector2){rx, wy + wh},
+                    (Color){hcClr.r, hcClr.g, hcClr.b, 100});
         }
       }
       // Memory Cues
@@ -475,7 +470,9 @@ static void DeckStrip_Draw(Component *base) {
         float ratio = (float)d->State->LoadedTrack->Cues[c].Start / totalMs;
         if (ratio >= 0.0f && ratio <= 1.0f) {
           float rx = wx + ratio * ww;
-          DrawTriangle((Vector2){rx - 3, wy + wh}, (Vector2){rx, wy + wh - 5}, (Vector2){rx + 3, wy + wh}, ColorOrange);
+          DrawTriangle((Vector2){rx - 3, wy + wh},
+                       (Vector2){rx, wy + wh - 5}, (Vector2){rx + 3, wy + wh},
+                       ColorOrange);
         }
       }
     }

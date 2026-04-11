@@ -30,6 +30,7 @@ typedef struct TrackState {
   int BeatGridCount;
   unsigned char StaticWaveform[8192];
   int StaticWaveformLen;
+  int StaticWaveformType; // 0=None, 1=Blue, 2=Color, 3=3Band
   unsigned char *DynamicWaveform;
   int DynamicWaveformLen;
   int WaveformType; // 0=None, 1=Blue, 2=Color, 3=3Band

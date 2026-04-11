@@ -280,6 +280,7 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
 
                 if (prio > currentStaticPrio) {
                     track->StaticWaveformLen = data.length() > 8192 ? 8192 : data.length();
+                    track->StaticWaveformType = prio;
                     memcpy(track->StaticWaveform, data.data(), track->StaticWaveformLen);
                     currentStaticPrio = prio;
                 }

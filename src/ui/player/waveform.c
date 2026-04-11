@@ -100,7 +100,7 @@ static int Waveform_Update(Component *base) {
 // whiteness = bits[7:5] of the raw byte (0=darkest, 7=lightest/brightest)
 // color_index used for lookup = 7 - whiteness
 // ─────────────────────────────────────────────────────────────────────────────
-static const unsigned char PWV2_BLUE_TABLE[8][3] = {
+const unsigned char PWV2_BLUE_TABLE[8][3] = {
   {200, 224, 232},  // index 0 → whiteness 7 (brightest, most white)
   {136, 192, 232},  // index 1 → whiteness 6
   {136, 192, 232},  // index 2 → whiteness 5
@@ -113,7 +113,7 @@ static const unsigned char PWV2_BLUE_TABLE[8][3] = {
 
 // Decode 1-byte PWV2 Blue sample.
 // Returns: height (0..31), color RGB via out params.
-static inline int PWV2_Decode(unsigned char v, Color *outColor) {
+int PWV2_Decode(unsigned char v, Color *outColor) {
   int height    = v & 0x1F;        // bits 4-0
   int whiteness = (v >> 5) & 0x7;  // bits 7-5
   int ci        = 7 - whiteness;   // 0=brightest, 7=darkest
@@ -134,7 +134,7 @@ static inline int PWV2_Decode(unsigned char v, Color *outColor) {
 //   Red    = (v >> 13) & 0x07  → bits 15-13
 //   Color intensities are scaled: component = (intensity / 7.0) * 255
 // ─────────────────────────────────────────────────────────────────────────────
-static inline int PWV4_Decode(unsigned char *data, int64_t frame, Color *outColor) {
+int PWV4_Decode(unsigned char *data, int64_t frame, Color *outColor) {
   if (frame < 0) { *outColor = (Color){0,0,0,0}; return 0; }
   uint16_t v = ((uint16_t)data[frame * 2] << 8) | data[frame * 2 + 1];
   int height = (v >> 2) & 0x1F;
@@ -211,7 +211,7 @@ static void Get3BandPeakLerp(unsigned char *data, int64_t maxFrames, double pos,
 }
 
 // Peak extraction over a range of frames, falling back to lerp at high zoom
-static void Get3BandPeak(unsigned char *data, int64_t maxFrames, double start, double end, float *outL, float *outM, float *outH) {
+void Get3BandPeak(unsigned char *data, int64_t maxFrames, double start, double end, float *outL, float *outM, float *outH) {
     if (start < 0) start = 0;
     if (end > maxFrames) end = maxFrames;
     
