@@ -362,6 +362,9 @@ static void DeckStrip_Draw(Component *base) {
       Color BL_HIGH = {255, 255, 255, 255};
 
       WaveformStyle style = d->State->Waveform.Style;
+      float gLow = d->State->Waveform.GainLow;
+      float gMid = d->State->Waveform.GainMid;
+      float gHigh = d->State->Waveform.GainHigh;
 
       for (int xi = 0; xi < (int)ww; xi++) {
         float r0 = (float)xi / ww;
@@ -382,9 +385,10 @@ static void DeckStrip_Draw(Component *base) {
           float iL, iM, iH;
           Get3BandPeak(data, totalFrames, p0, p1, &iL, &iM, &iH);
 
-          float hL = (iL / 255.0f) * wh * 0.5f;
-          float hM = (iM / 255.0f) * wh * 0.5f;
-          float hH = (iH / 255.0f) * wh * 0.5f;
+          // Scaling to fit the mini height with Gains applied
+          float hL = (iL / 255.0f) * wh * 0.5f * gLow;
+          float hM = (iM / 255.0f) * wh * 0.5f * gMid;
+          float hH = (iH / 255.0f) * wh * 0.5f * gHigh;
 
           Color lo = played ? Fade(BL_LOW, 0.3f) : BL_LOW;
           Color mi = played ? Fade(BL_MID, 0.3f) : BL_MID;
@@ -393,8 +397,12 @@ static void DeckStrip_Draw(Component *base) {
 #define DRAW_STACK(h, cl)                                                      \
   if (h > 0.1f) {                                                              \
     rlColor4ub(cl.r, cl.g, cl.b, cl.a);                                        \
-    rlVertex2f(cx0, yy - h); rlVertex2f(cx0, yy + h); rlVertex2f(cx1, yy + h);  \
-    rlVertex2f(cx0, yy - h); rlVertex2f(cx1, yy + h); rlVertex2f(cx1, yy - h);  \
+    rlVertex2f(cx0, yy - h);                                                   \
+    rlVertex2f(cx0, yy + h);                                                   \
+    rlVertex2f(cx1, yy + h);                                                   \
+    rlVertex2f(cx0, yy - h);                                                   \
+    rlVertex2f(cx1, yy + h);                                                   \
+    rlVertex2f(cx1, yy - h);                                                   \
   }
           DRAW_STACK(hL, lo);
           DRAW_STACK(hM, mi);
@@ -409,29 +417,47 @@ static void DeckStrip_Draw(Component *base) {
             // Downmix 3-band to single symmetric height
             float iL, iM, iH;
             Get3BandPeak(data, totalFrames, p0, p1, &iL, &iM, &iH);
-            rawH = ((iL + iM + iH) / 3.0f) * (wh / 255.0f) * 0.5f;
-            if (style == WAVEFORM_STYLE_RGB)
-              col = (iL > iM && iL > iH) ? BL_LOW : (iM > iH ? BL_MID : BL_HIGH);
-            else {
-              col = (Color){PWV2_BLUE_TABLE[4][0], PWV2_BLUE_TABLE[4][1],
-                            PWV2_BLUE_TABLE[4][2], 255};
-              PWV2_Decode(64, &col); // Seed from table
+            rawH = ((iL + iM + iH) / 3.0f) * (wh / 255.0f) * 0.5f * gLow;
+            if (style == WAVEFORM_STYLE_RGB) {
+              if (iL > iM && iL > iH)
+                col = BL_LOW;
+              else if (iM > iH)
+                col = BL_MID;
+              else
+                col = BL_HIGH;
+            } else {
+              // Default Blue for 3-band data when in BLUE mode
+              col = (Color){PWV2_BLUE_TABLE[5][0], PWV2_BLUE_TABLE[5][1],
+                            PWV2_BLUE_TABLE[5][2], 255};
             }
           } else if (type == 2) {
             // PWV4 Preview (6 bytes per entry)
             // byte 0 is usually height/whiteness like PWV2
             int hIdx = PWV2_Decode(data[(int)p0 * 6], &col);
-            rawH = (hIdx / 31.0f) * wh * 0.5f;
+            rawH = (hIdx / 31.0f) * wh * 0.5f * gLow;
+            if (style == WAVEFORM_STYLE_BLUE) {
+              // Force color to blue even if it was "Color" data
+              col = (Color){PWV2_BLUE_TABLE[5][0], PWV2_BLUE_TABLE[5][1],
+                            PWV2_BLUE_TABLE[5][2], 255};
+            }
           } else {
-            // PWV2 Preview
+            // PWV2 Preview (Always Blue data)
             int hIdx = PWV2_Decode(data[(int)p0], &col);
-            rawH = (hIdx / 31.0f) * wh * 0.5f;
+            rawH = (hIdx / 31.0f) * wh * 0.5f * gLow;
           }
 
-          if (played) { col.r /= 3; col.g /= 3; col.b /= 3; }
+          if (played) {
+            col.r /= 3;
+            col.g /= 3;
+            col.b /= 3;
+          }
           rlColor4ub(col.r, col.g, col.b, 255);
-          rlVertex2f(cx0, yy - rawH); rlVertex2f(cx0, yy + rawH); rlVertex2f(cx1, yy + rawH);
-          rlVertex2f(cx0, yy - rawH); rlVertex2f(cx1, yy + rawH); rlVertex2f(cx1, yy - rawH);
+          rlVertex2f(cx0, yy - rawH);
+          rlVertex2f(cx0, yy + rawH);
+          rlVertex2f(cx1, yy + rawH);
+          rlVertex2f(cx0, yy - rawH);
+          rlVertex2f(cx1, yy + rawH);
+          rlVertex2f(cx1, yy - rawH);
         }
       }
       rlEnd();
