@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mapping>
+    <!-- Deck 1 -->
+    <control>
+        <group>[Channel1]</group>
+        <key>play</key>
+        <status>0x90</status>
+        <midino>0x3C</midino> <!-- Note 60 -->
+    </control>
+    <control>
+        <group>[Channel1]</group>
+        <key>volume</key>
+        <status>0xB0</status>
+        <midino>0x07</midino>
+    </control>
+    <control>
+        <group>[Channel1]</group>
+        <key>filterHigh</key>
+        <status>0xB0</status>
+        <midino>0x0A</midino>
+    </control>
+    <control>
+        <group>[Channel1]</group>
+        <key>filterMid</key>
+        <status>0xB0</status>
+        <midino>0x0B</midino>
+    </control>
+    <control>
+        <group>[Channel1]</group>
+        <key>filterLow</key>
+        <status>0xB0</status>
+        <midino>0x0C</midino>
+    </control>
+
+    <!-- Deck 2 -->
+    <control>
+        <group>[Channel2]</group>
+        <key>play</key>
+        <status>0x91</status>
+        <midino>0x3C</midino>
+    </control>
+    <control>
+        <group>[Channel2]</group>
+        <key>volume</key>
+        <status>0xB1</status>
+        <midino>0x07</midino>
+    </control>
+
+    <!-- Master Fader -->
+    <control>
+        <group>[Master]</group>
+        <key>crossfader</key>
+        <status>0xB0</status>
+        <midino>0x08</midino>
+    </control>
+</mapping>

@@ -19,7 +19,7 @@ else ifeq ($(PLATFORM),LINUX_ARM64)
     TARGET = xdjunx
     CFLAGS = -O2 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
     CXXFLAGS = -O2 -std=c++17 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
-    LDFLAGS = -Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lpthread -ldl -lm
+    LDFLAGS = -Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lasound -lpthread -ldl -lm
 endif
 
 CFLAGS += -Wall -Wextra -Isrc -Ilib -Ilib/kaitai
@@ -46,7 +46,10 @@ SRC_C = src/main.c \
         src/logic/quantize.c \
         src/logic/sync.c \
         src/logic/settings_io.c \
+        src/logic/control_object.c \
         src/audio/fx/dsp_utils.c \
+        src/midi/midi_handler.c \
+        src/midi/midi_mapper.c \
         $(wildcard src/audio/fx/colorfx/*.c) \
         $(wildcard src/audio/fx/beatfx/*.c)
 

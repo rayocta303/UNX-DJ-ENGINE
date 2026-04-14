@@ -94,6 +94,7 @@ typedef struct DeckAudioState {
 typedef struct AudioEngine {
     DeckAudioState Decks[MAX_DECKS];
     BeatFXManager BeatFX;
+    float Crossfader; // -1.0 (Deck A) to 1.0 (Deck B)
 } AudioEngine;
 
 void AudioEngine_Init(AudioEngine *engine);

@@ -16,6 +16,8 @@
 #include "logic/sync.h"
 #include "logic/settings_io.h"
 #include "ui/components/helpers.h"
+#include "midi/midi_handler.h"
+#include "logic/control_object.h"
 
 typedef enum {
     ScreenPlayer,
@@ -51,6 +53,7 @@ typedef struct {
     MixerRenderer mixer;
     SplashRenderer splash;
     KeyboardMapping keyMap;
+    MidiContext midiCtx;
     bool showExitConfirm;
 } App;
 
@@ -257,6 +260,7 @@ void App_Init(App *a) {
     MixerRenderer_Init(&a->mixer, &a->mixerState);
     SplashRenderer_Init(&a->splash, &a->splashCounter);
     a->keyMap = GetDefaultMapping();
+    memset(&a->midiCtx, 0, sizeof(MidiContext));
 }
 
 int main(void) {
@@ -277,6 +281,8 @@ int main(void) {
     App app;
     App_Init(&app);
 
+    MIDI_Init(&app.midiCtx);
+
     // Initialize Audio
     InitAudioDevice();
     SetAudioStreamBufferSizeDefault(1024);
@@ -287,6 +293,24 @@ int main(void) {
     app.browserState.DeckA = (struct DeckState*)&app.deckA;
     app.browserState.DeckB = (struct DeckState*)&app.deckB;
     app.player.AudioPlugin = &audioEngine;
+
+    // Register Controls after Init
+    CO_Init();
+    CO_Register("[Channel1]", "play", CO_TYPE_BOOL, &audioEngine.Decks[0].IsMotorOn, 0, 1);
+    CO_Register("[Channel1]", "volume", CO_TYPE_FLOAT, &audioEngine.Decks[0].Trim, 0, 2.0f);
+    CO_Register("[Channel1]", "filterHigh", CO_TYPE_FLOAT, &audioEngine.Decks[0].EqHigh, 0, 1.0f);
+    CO_Register("[Channel1]", "filterMid", CO_TYPE_FLOAT, &audioEngine.Decks[0].EqMid, 0, 1.0f);
+    CO_Register("[Channel1]", "filterLow", CO_TYPE_FLOAT, &audioEngine.Decks[0].EqLow, 0, 1.0f);
+    CO_Register("[Channel1]", "cue_default", CO_TYPE_BOOL, &audioEngine.Decks[0].IsCueActive, 0, 1);
+
+    CO_Register("[Channel2]", "play", CO_TYPE_BOOL, &audioEngine.Decks[1].IsMotorOn, 0, 1);
+    CO_Register("[Channel2]", "volume", CO_TYPE_FLOAT, &audioEngine.Decks[1].Trim, 0, 2.0f);
+    CO_Register("[Channel2]", "filterHigh", CO_TYPE_FLOAT, &audioEngine.Decks[1].EqHigh, 0, 1.0f);
+    CO_Register("[Channel2]", "filterMid", CO_TYPE_FLOAT, &audioEngine.Decks[1].EqMid, 0, 1.0f);
+    CO_Register("[Channel2]", "filterLow", CO_TYPE_FLOAT, &audioEngine.Decks[1].EqLow, 0, 1.0f);
+    CO_Register("[Channel2]", "cue_default", CO_TYPE_BOOL, &audioEngine.Decks[1].IsCueActive, 0, 1);
+
+    CO_Register("[Master]", "crossfader", CO_TYPE_FLOAT, &audioEngine.Crossfader, -1.0f, 1.0f);
 
     // Attach custom audio processor via a global wrapper pointer since raylib callback takes no context
     globalAudioEngine = &audioEngine;
@@ -333,6 +357,7 @@ int main(void) {
         lastMasterB = app.deckB.IsMaster;
 
         HandleKeyboardInputs(&app.keyMap, &app.deckA, &app.deckB, &audioEngine);
+        MIDI_Update(&app.midiCtx, &app.deckA, &app.deckB, &audioEngine);
 
         // Global UI navigation using keyMap
         if (IsKeyPressed(app.keyMap.toggleBrowser)) {
@@ -622,6 +647,7 @@ int main(void) {
     }
 
     UIFonts_Unload();
+    MIDI_Close(&app.midiCtx);
     CloseWindow();
 
     return 0;

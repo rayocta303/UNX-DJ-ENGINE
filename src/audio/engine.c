@@ -48,6 +48,7 @@ void AudioEngine_Init(AudioEngine *engine) {
     }
     
     BeatFXManager_Init(&engine->BeatFX);
+    engine->Crossfader = 0.0f;
 }
 
 void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
