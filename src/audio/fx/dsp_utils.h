@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "../mixxx_engine.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,6 +25,11 @@ void Biquad_SetBandpass(BiquadFilter* filter, float cutoff, float q, float sampl
 void Biquad_SetPeak(BiquadFilter* filter, float cutoff, float q, float gainDb, float sampleRate);
 void Biquad_SetNotch(BiquadFilter* filter, float cutoff, float q, float sampleRate);
 float Biquad_Process(BiquadFilter* filter, float in);
+
+// --- professional Mixxx-Style LR4 Crossover ---
+typedef struct MixxxLR4 CrossoverLR4;
+void Crossover_Init(CrossoverLR4* lr, float freq, float sampleRate, bool highpass);
+float Crossover_Process(CrossoverLR4* lr, float in);
 
 // --- Delay Line ---
 typedef struct DelayLine {

@@ -76,12 +76,15 @@ typedef struct DeckAudioState {
     float EqMid;   // 0.0 to 1.0 (default 0.5)
     float EqHigh;  // 0.0 to 1.0 (default 0.5)
     
-    BiquadState EqLowStateL, EqLowStateR;
-    BiquadState EqMidStateL, EqMidStateR;
-    BiquadState EqHighStateL, EqHighStateR;
+    MixxxLR4 EqLowStateL, EqLowStateR;
+    MixxxLR4 EqHighStateL, EqHighStateR;
+
+    float LastRate;
 
     // Sound Color FX
     ColorFXManager ColorFX;
+
+    bool IsCueActive; // Channel monitoring for headphones (Ch 3-4)
 
     // VU Meter (Real-time tracking of DSP output peak for UI)
     float VuMeterL;

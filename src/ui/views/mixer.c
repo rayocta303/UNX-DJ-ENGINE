@@ -223,6 +223,24 @@ static void Mixer_Draw(Component *base) {
         
         HandleKnob(&d->ColorFX.colorValue, cx, ky, colorKR, -1.0f, 1.0f, true, mousePos, mDown);
         UIDrawKnob(cx, ky, colorKR, d->ColorFX.colorValue, -1.0f, 1.0f, "COLOR", ColorOrange);
+
+        // --- CUE BUTTON ---
+        ky += colorKR + S(28);
+        float cueW = S(45);
+        float cueH = S(18);
+        float cueX = cx - cueW/2.0f;
+        
+        bool cueHover = CheckCollisionPointRec(mousePos, (Rectangle){cueX, ky, cueW, cueH});
+        if (cueHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            d->IsCueActive = !d->IsCueActive;
+        }
+        
+        Color cueBg = d->IsCueActive ? ColorOrange : (cueHover ? ColorDark2 : ColorDark3);
+        Color cueFg = d->IsCueActive ? ColorBlack : ColorOrange;
+        
+        DrawRectangle(cueX, ky, cueW, cueH, cueBg);
+        DrawRectangleLines(cueX, ky, cueW, cueH, ColorOrange);
+        DrawCentredText("CUE", UIFonts_GetFace(S(9)), cueX, cueW, ky + S(4), S(9), cueFg);
     }
 }
 

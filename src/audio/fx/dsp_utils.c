@@ -147,15 +147,7 @@ void DelayLine_Write(DelayLine* delay, float sample) {
     }
 }
 
-// Cubic Hermite interpolation for smooth fractional delay reading
-static inline float hermite4(float frac_pos, float xm1, float x0, float x1, float x2) {
-    const float c = (x1 - xm1) * 0.5f;
-    const float v = x0 - x1;
-    const float w = c + v;
-    const float a = w + v + (x2 - x0) * 0.5f;
-    const float b_neg = w + a;
-    return ((((a * frac_pos) - b_neg) * frac_pos + c) * frac_pos + x0);
-}
+// Mixxx Hermite4 is used via Mixxx_InterpolateHermite4
 
 // Reads from the delay line. Returns interpolated sample at `delaySamples` in the past.
 float DelayLine_Read(DelayLine* delay, float delaySamples) {
@@ -188,7 +180,7 @@ float DelayLine_Read(DelayLine* delay, float delaySamples) {
     float x1 = delay->buffer[i1];
     float x2 = delay->buffer[i2];
 
-    return hermite4(frac, xm1, x0, x1, x2);
+    return Mixxx_InterpolateHermite4(frac, xm1, x0, x1, x2);
 }
 
 // --- LFO ---
@@ -242,4 +234,15 @@ float WhiteNoise_Process(void) {
     x ^= x << 5;
     xorshift_state = x;
     return ((float)x / 4294967296.0f) * 2.0f - 1.0f;
+}
+
+// --- Mixxx Engine Bridge Implementations ---
+void Crossover_Init(CrossoverLR4* lr, float freq, float sampleRate, bool highpass) {
+    MixxxLR4_Init(lr);
+    if (highpass) MixxxLR4_SetHighpass(lr, freq, sampleRate);
+    else MixxxLR4_SetLowpass(lr, freq, sampleRate);
+}
+
+float Crossover_Process(CrossoverLR4* lr, float in) {
+    return MixxxLR4_Process(lr, in);
 }

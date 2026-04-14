@@ -58,7 +58,27 @@ AudioEngine *globalAudioEngine = NULL;
 
 void AudioProcessCallback(void *buffer, unsigned int frames) {
     if (globalAudioEngine) {
+#if defined(PLATFORM_DRM)
+        // On DRM/ALSA target, we assume 4 channel output is ready
         AudioEngine_Process(globalAudioEngine, (float*)buffer, frames);
+#else
+        // On Windows/Others (Stereo), we process 4 channels internally and downmix
+        static float temp4Ch[4096 * 4];
+        AudioEngine_Process(globalAudioEngine, temp4Ch, frames);
+        
+        float *out = (float*)buffer;
+        for (unsigned int s = 0; s < frames; s++) {
+            // Mix Master (1-2) and Cue (3-4) for stereo monitoring
+            out[s*2] = temp4Ch[s*4] + temp4Ch[s*4 + 2] * 0.5f;
+            out[s*2+1] = temp4Ch[s*4 + 1] + temp4Ch[s*4 + 3] * 0.5f;
+            
+            // Hard clip for safety
+            if (out[s*2] > 1.0f) out[s*2] = 1.0f;
+            if (out[s*2] < -1.0f) out[s*2] = -1.0f;
+            if (out[s*2+1] > 1.0f) out[s*2+1] = 1.0f;
+            if (out[s*2+1] < -1.0f) out[s*2+1] = -1.0f;
+        }
+#endif
     }
 }
 
