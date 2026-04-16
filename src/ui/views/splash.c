@@ -86,27 +86,43 @@ void SplashRenderer_Init(SplashRenderer *s, int *progress) {
 
   s->base.Update = Splash_Update;
   s->base.Draw = Splash_Draw;
+  
+#ifdef SPLASH_FRAME_COUNT
+  s->frameCount = SPLASH_FRAME_COUNT;
+#else
   s->frameCount = 192;
+#endif
+  
   s->currentFrame = 0;
   s->frameTimer = 0;
   s->frames = (Texture2D *)malloc(sizeof(Texture2D) * s->frameCount);
 
   bool loadedAny = false;
   for (int i = 0; i < s->frameCount; i++) {
+    // Try memory bundle first (newly added)
+#ifdef SPLASH_FRAME_COUNT
+    Image img = LoadImageFromMemory(".png", splash_frames[i], splash_frames_size[i]);
+    if (img.data != NULL) {
+      s->frames[i] = LoadTextureFromImage(img);
+      UnloadImage(img);
+      loadedAny = true;
+      continue;
+    }
+#endif
+
+    // Fallback to disk
     char path[256];
-    // Try both 0.04s and 0.05s as seen in file list
     sprintf(path, "assets/splash/frame_%03d_delay-0.04s.png", i);
     if (!FileExists(path)) {
       sprintf(path, "assets/splash/frame_%03d_delay-0.05s.png", i);
     }
 
-    Image img = LoadImage(path);
-    if (img.data != NULL) {
-      s->frames[i] = LoadTextureFromImage(img);
-      UnloadImage(img);
+    Image imgDisk = LoadImage(path);
+    if (imgDisk.data != NULL) {
+      s->frames[i] = LoadTextureFromImage(imgDisk);
+      UnloadImage(imgDisk);
       loadedAny = true;
     } else {
-      // If a frame is missing, just use empty texture or previous frame
       if (i > 0)
         s->frames[i] = s->frames[i - 1];
       else

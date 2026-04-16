@@ -25,6 +25,16 @@ echo #define ASSETS_BUNDLE_H >> src\ui\components\assets_bundle.h
 ".\tools\bin2c.exe" "assets\fonts\otfs\Font Awesome 5 Brands-Regular-400.otf" src\ui\components\assets_bundle.h font_awesome_brand append
 ".\tools\bin2c.exe" "assets\splash.png" src\ui\components\assets_bundle.h unx_logo append
 ".\tools\bin2c.exe" "assets\icons\crown.png" src\ui\components\assets_bundle.h icon_crown append
+
+if not exist tools\gen_splash_bundle.exe (
+    %CC% tools\gen_splash_bundle.c -o tools\gen_splash_bundle.exe
+)
+
+echo [Generating Splash Bundle...]
+.\tools\gen_splash_bundle.exe assets\splash src\ui\components\splash_bundle_tmp.h
+type src\ui\components\splash_bundle_tmp.h >> src\ui\components\assets_bundle.h
+del src\ui\components\splash_bundle_tmp.h
+
 echo #endif >> src\ui\components\assets_bundle.h
 
 if "%PLATFORM%"=="linux" (
