@@ -173,8 +173,9 @@ void UpdateChannelOptions(App *a, int deviceIdx) {
   } else {
     a->settingsState.Items[9].Current = 0;
     a->settingsState.Items[10].Current = (channels > 1) ? 1 : 0;
-    a->settingsState.Items[11].Current = 0; // Blank
-    a->settingsState.Items[12].Current = 0; // Blank
+    // For 2-channel setups, mirror Master to Cue to ensure audio is heard and prevent null/blank errors
+    a->settingsState.Items[11].Current = 1; // CH 1 (Index 0 is Blank)
+    a->settingsState.Items[12].Current = (channels > 1) ? 2 : 1; // CH 2
   }
 }
 
@@ -446,8 +447,8 @@ void App_Init(App *a) {
   a->activeAudioConfig = (AudioBackendConfig){.DeviceIndex = -1,
                                               .MasterOutL = 0,
                                               .MasterOutR = 1,
-                                              .CueOutL = 2,
-                                              .CueOutR = 3,
+                                              .CueOutL = 0,
+                                              .CueOutR = 1,
                                               .SampleRate = 48000,
                                               .BufferSizeFrames = 256};
   AboutRenderer_Init(&a->about, &a->aboutState);
