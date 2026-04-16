@@ -72,6 +72,23 @@ jobs:
         cp /usr/local/lib/android/sdk/ndk/25.1.8937393/sources/android/native_app_glue/android_native_app_glue.c platform/android/app/src/main/cpp/
         cp /usr/local/lib/android/sdk/ndk/25.1.8937393/sources/android/native_app_glue/android_native_app_glue.h platform/android/app/src/main/cpp/
 
+    - name: Bundle Assets
+      run: |
+        gcc tools/bin2c.c -o tools/bin2c
+        rm -f src/ui/components/assets_bundle.h
+        echo "#ifndef ASSETS_BUNDLE_H" > src/ui/components/assets_bundle.h
+        echo "#define ASSETS_BUNDLE_H" >> src/ui/components/assets_bundle.h
+        ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Free-Solid-900.otf" src/ui/components/assets_bundle.h font_awesome_solid
+        ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Free-Regular-400.otf" src/ui/components/assets_bundle.h font_awesome_regular append
+        ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Brands-Regular-400.otf" src/ui/components/assets_bundle.h font_awesome_brand append
+        ./tools/bin2c "assets/images/Pioneer.png" src/ui/components/assets_bundle.h pioneer_logo append
+        echo "#endif" >> src/ui/components/assets_bundle.h
+
+    - name: Prepare Android Assets
+      run: |
+        mkdir -p platform/android/app/src/main/assets
+        cp -r assets/* platform/android/app/src/main/assets/
+
     - name: Create CMakeLists.txt for App
       run: |
         cat << 'EOF' > platform/android/app/CMakeLists.txt
@@ -113,7 +130,7 @@ jobs:
         find_library(egl-lib EGL)
         find_library(gles-lib GLESv2)
 
-        target_link_libraries(xdjunx ${log-lib} ${android-lib} ${egl-lib} ${gles-lib} -L${CMAKE_CURRENT_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI} raylib)
+        target_link_libraries(xdjunx ${log-lib} ${android-lib} ${egl-lib} ${gles-lib} ${CMAKE_CURRENT_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI}/libraylib.a)
         EOF
 
     - name: Setup Gradle
