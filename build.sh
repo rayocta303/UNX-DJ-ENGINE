@@ -54,7 +54,7 @@ C_FILES=(
     src/ui/views/topbar.c src/ui/views/info.c src/ui/views/splash.c src/ui/views/settings.c
     src/ui/views/about.c src/ui/views/mixer.c src/ui/player/bottomstrip.c src/ui/player/beatfx.c
     src/ui/player/deckinfo.c src/ui/player/deckstrip.c src/ui/player/waveform.c src/ui/player/player.c
-    src/audio/engine.c src/input/keyboard.c src/ui/browser/browser.c src/core/audio_backend.c
+    src/audio/engine.c src/audio/scalers.c src/input/keyboard.c src/ui/browser/browser.c src/core/audio_backend.c
     src/core/logic/quantize.c src/core/logic/sync.c src/core/logic/settings_io.c
     src/core/logic/control_object.c src/core/midi/midi_handler.c src/core/midi/midi_mapper.c
     src/core/midi/midi_backend_win.c
@@ -83,6 +83,9 @@ CPP_FILES=(
     src/library/rekordbox_reader.cpp
     src/library/serato_reader.cpp
     src/engine/util/engine_math.cpp
+    src/engine/scalers/enginebufferscale.cpp
+    src/engine/scalers/enginebufferscalest.cpp
+    src/engine/scalers/enginebufferscalerubberband.cpp
 )
 
 for f in "${CPP_FILES[@]}"; do

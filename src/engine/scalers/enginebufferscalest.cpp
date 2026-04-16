@@ -42,7 +42,7 @@ double EngineBufferScaleST::scaleBuffer(CSAMPLE* pOutputBuffer, SINT iOutputBuff
         return 0.0;
     }
 
-    uint32_t frames = getOutputSignal().samples2frames(iOutputBufferSize);
+    uint32_t frames = (uint32_t)iOutputBufferSize / (uint32_t)getOutputSignal().getChannelCount();
     WSOLA_Process(&d->wsola, nullptr, pOutputBuffer, frames, m_dTempoRatio, 
                  nullptr, nullptr, 0.0); // Simplified for this shim
                  

@@ -1,12 +1,12 @@
 #pragma once
 
 #if !defined(__ANDROID__)
-#include <QObject>
+#include "engine/shim.h"
 #else
 #include "engine/shim.h"
 #endif
 
-#include "audio/signalinfo.h"
+#include "engine/audio/signalinfo.h"
 
 // MAX_SEEK_SPEED needs to be good and high to allow room for the very high
 //  instantaneous velocities of advanced scratching (Uzi) and spin-backs.
