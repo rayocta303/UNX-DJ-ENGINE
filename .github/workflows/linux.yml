@@ -1,0 +1,31 @@
+name: Linux ARM64 Build
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.11.0
+
+      - name: Build with build.sh
+        run: |
+          chmod +x build.sh
+          export ZIG=zig
+          ./build.sh
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xdjunx-linux-arm64
+          path: xdjunx
