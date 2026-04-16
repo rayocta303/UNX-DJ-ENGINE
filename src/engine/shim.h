@@ -96,27 +96,4 @@ public:
     static void connect(T* sender, Func signal, void* receiver, Func slot) {}
 };
 
-// Math / Types Aliases
-typedef float CSAMPLE;
-typedef float CSAMPLE_GAIN;
-typedef double SINT;
-
-namespace unx {
-    typedef float Sample;
-    typedef std::vector<float> SampleBuffer;
-    
-    namespace audio {
-        typedef int ChannelCount;
-        typedef int SampleRate;
-        struct FramePos {
-            double value;
-            FramePos(double v = 0) : value(v) {}
-            operator double() const { return value; }
-        };
-        const FramePos kInvalidFramePos = FramePos(-1);
-    }
-}
-
-namespace Engine = unx;
-
 #endif

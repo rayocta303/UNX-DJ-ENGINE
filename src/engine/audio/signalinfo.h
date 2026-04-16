@@ -11,6 +11,8 @@ public:
     ChannelCount getChannelCount() const { return m_channelCount; }
     void setSampleRate(SampleRate sr) { m_sampleRate = sr; }
     void setChannelCount(ChannelCount cc) { m_channelCount = cc; }
+    bool isValid() const { return m_sampleRate.isValid() && m_channelCount.isValid(); }
+
 private:
     SampleRate m_sampleRate;
     ChannelCount m_channelCount;

@@ -1,7 +1,9 @@
-#include "engine/bufferscalers/enginebufferscale.h"
+#include "engine/scalers/enginebufferscale.h"
 
 #include "engine/engine.h"
+#ifndef __ANDROID__
 #include "moc_enginebufferscale.cpp"
+#endif
 #include "soundio/soundmanagerconfig.h"
 
 EngineBufferScale::EngineBufferScale()

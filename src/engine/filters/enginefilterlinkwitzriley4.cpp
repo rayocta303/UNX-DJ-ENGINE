@@ -1,6 +1,8 @@
 #include "engine/filters/enginefilterlinkwitzriley4.h"
 
+#ifndef __ANDROID__
 #include "moc_enginefilterlinkwitzriley4.cpp"
+#endif
 
 namespace {
 constexpr char kFidSpecLowPassButterworth2[] = "LpBu2";

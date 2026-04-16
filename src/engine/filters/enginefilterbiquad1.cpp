@@ -1,6 +1,8 @@
 #include "engine/filters/enginefilterbiquad1.h"
 
+#ifndef __ANDROID__
 #include "moc_enginefilterbiquad1.cpp"
+#endif
 
 EngineFilterBiquad1LowShelving::EngineFilterBiquad1LowShelving(unx::audio::SampleRate sampleRate,
         double centerFreq,
