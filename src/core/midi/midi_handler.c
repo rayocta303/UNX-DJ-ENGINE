@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#if defined(__linux__)
+#if defined(__linux__) && !defined(__ANDROID__)
 #include <alsa/asoundlib.h>
 static snd_seq_t *seq_handle;
 static int in_port;
@@ -11,6 +11,8 @@ static int in_port;
 // Forward declarations for win backend
 bool WinMIDI_Init(void (*cb)(uint8_t, uint8_t, uint8_t), char* outDeviceName);
 void WinMIDI_Close();
+#elif defined(__ANDROID__)
+// MIDI mapping on Android is not implemented yet.
 #endif
 
 static MidiMapping global_mapping;
@@ -34,7 +36,7 @@ bool MIDI_Init(MidiContext *ctx) {
     
     char deviceName[256] = "Generic MIDI";
 
-#if defined(__linux__)
+#if defined(__linux__) && !defined(__ANDROID__)
     if (snd_seq_open(&seq_handle, "default", SND_SEQ_OPEN_INPUT, 0) < 0) return false;
     snd_seq_set_client_name(seq_handle, "UNX-DJ-OS MIDI");
     in_port = snd_seq_create_simple_port(seq_handle, "Input",
@@ -44,6 +46,8 @@ bool MIDI_Init(MidiContext *ctx) {
     if (!WinMIDI_Init(EnqueueMIDI, deviceName)) {
         // Fallback or silence
     }
+#elif defined(__ANDROID__)
+    // Stub
 #endif
 
     // Organize mappings in a 'controllers' folder like Engine
@@ -64,10 +68,12 @@ bool MIDI_Init(MidiContext *ctx) {
 
 void MIDI_Close(MidiContext *ctx) {
     if (!ctx->initialized) return;
-#if defined(__linux__)
+#if defined(__linux__) && !defined(__ANDROID__)
     snd_seq_close(seq_handle);
 #elif defined(_WIN32)
     WinMIDI_Close();
+#elif defined(__ANDROID__)
+    // Stub
 #endif
     ctx->initialized = false;
 }
@@ -76,7 +82,7 @@ void MIDI_Update(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine *en
     (void)d1; (void)d2; (void)engine;
     if (!ctx->initialized) return;
 
-#if defined(__linux__)
+#if defined(__linux__) && !defined(__ANDROID__)
     snd_seq_event_t *ev;
     while (snd_seq_event_input_pending(seq_handle, 1) > 0) {
         snd_seq_event_input(seq_handle, &ev);

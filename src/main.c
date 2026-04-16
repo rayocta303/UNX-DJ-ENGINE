@@ -270,10 +270,16 @@ int main(void) {
     int startWidth = 1080;
     int startHeight = 675;
 
+#if defined(__ANDROID__)
+    // Android is always fullscreen and uses device resolution natively in NativeActivity
+    InitWindow(0, 0, "XDJ UNX - C Port Test");
+    SetTargetFPS(60); // Optionally limit to 60 or let Android handle VSync
+#else
     SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
     InitWindow(startWidth, startHeight, "XDJ UNX - C Port Test");
     SetWindowMinSize(REF_WIDTH, REF_HEIGHT);
     SetTargetFPS(60);
+#endif
     SetExitKey(KEY_NULL); // ESC is for 'back'
 
     UIFonts_Init();

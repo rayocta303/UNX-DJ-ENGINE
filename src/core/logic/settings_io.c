@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "raylib.h"
 
 static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSettings *wfmB) {
     if (!json) return;
@@ -48,7 +49,18 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB) {
     
     *wfmB = *wfmA;
 
-    FILE *f = fopen("settings.json", "r");
+    const char *basePath = "";
+#if defined(__ANDROID__)
+    basePath = GetApplicationDirectory();
+#endif
+    char path[512];
+    snprintf(path, sizeof(path), "%s/settings.json", basePath);
+
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        f = fopen("settings.json", "r");
+    }
+
     if (!f) {
         // If file doesn't exist, create it with defaults immediately
         Settings_Save(*wfmA, *wfmB);
@@ -70,8 +82,19 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB) {
 }
 
 void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB) {
-    FILE *f = fopen("settings.json", "w");
-    if (!f) return;
+    const char *basePath = "";
+#if defined(__ANDROID__)
+    basePath = GetApplicationDirectory(); // Raylib provides internal path
+#endif
+    char path[512];
+    snprintf(path, sizeof(path), "%s/settings.json", basePath);
+
+    FILE *f = fopen(path, "w");
+    if (!f) {
+        // Fallback for desktop if basePath is empty but we want local dir
+        f = fopen("settings.json", "w");
+        if (!f) return;
+    }
 
     fprintf(f, "{\n");
     fprintf(f, "  \"wfmA\": { \"style\": %d, \"low\": %.2f, \"mid\": %.2f, \"high\": %.2f, \"start\": %.1f, \"stop\": %.1f, \"lock\": %d },\n", 
