@@ -8,7 +8,7 @@ if "%PLATFORM%"=="clean" (
     exit /b 0
 )
 
-set ZIG=t:\zig\zig.exe
+if "%ZIG%"=="" set ZIG=t:\zig\zig.exe
 set CC=%ZIG% cc
 set CXX=%ZIG% c++
 
@@ -20,11 +20,10 @@ if not exist tools\bin2c.exe (
 if exist src\ui\components\assets_bundle.h del src\ui\components\assets_bundle.h
 echo #ifndef ASSETS_BUNDLE_H > src\ui\components\assets_bundle.h
 echo #define ASSETS_BUNDLE_H >> src\ui\components\assets_bundle.h
-.\tools\bin2c.exe "assets\fonts\otfs\Font Awesome 5 Free-Solid-900.otf" src\ui\components\assets_bundle.h font_awesome_solid append
-.\tools\bin2c.exe "assets\fonts\otfs\Font Awesome 5 Free-Regular-400.otf" src\ui\components\assets_bundle.h font_awesome_regular append
-.\tools\bin2c.exe "assets\fonts\otfs\Font Awesome 5 Brands-Regular-400.otf" src\ui\components\assets_bundle.h font_awesome_brand append
-ping localhost -n 2 > nul
-.\tools\bin2c.exe "assets\splash.png" src\ui\components\assets_bundle.h unx_logo append
+".\tools\bin2c.exe" "assets\fonts\otfs\Font Awesome 5 Free-Solid-900.otf" src\ui\components\assets_bundle.h font_awesome_solid append
+".\tools\bin2c.exe" "assets\fonts\otfs\Font Awesome 5 Free-Regular-400.otf" src\ui\components\assets_bundle.h font_awesome_regular append
+".\tools\bin2c.exe" "assets\fonts\otfs\Font Awesome 5 Brands-Regular-400.otf" src\ui\components\assets_bundle.h font_awesome_brand append
+".\tools\bin2c.exe" "assets\splash.png" src\ui\components\assets_bundle.h unx_logo append
 echo #endif >> src\ui\components\assets_bundle.h
 
 if "%PLATFORM%"=="linux" (

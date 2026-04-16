@@ -14,6 +14,7 @@ struct WaveformRenderer {
   int dynWfmFrames;
   float dataDensity;
   float lastMouseX;
+  Texture2D Logo;
 };
 
 

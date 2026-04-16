@@ -4,6 +4,7 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
+#include "ui/components/assets_bundle.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -287,7 +288,13 @@ static void Waveform_Draw(Component *base) {
   DrawRectangle(wfLeft, (int)(wfY + waveCenter), (int)wfW, 1, (Color){35, 35, 35, 255});
 
   if (r->State->LoadedTrack == NULL) {
-    EndScissorMode(); // Track guard — scissor was already opened
+    if (r->Logo.id != 0) {
+      float logoScale = (waveH * 0.7f) / r->Logo.height;
+      float lw = r->Logo.width * logoScale;
+      float lh = r->Logo.height * logoScale;
+      DrawTextureEx(r->Logo, (Vector2){wfLeft + (wfW - lw) / 2.0f, wfY + (waveH - lh) / 2.0f}, 0.0f, logoScale, Fade(WHITE, 0.3f));
+    }
+    EndScissorMode(); 
     return;
   }
 
@@ -540,4 +547,13 @@ void WaveformRenderer_Init(WaveformRenderer *r, int id, DeckState *state,
   r->cachedTrack = NULL;
   r->dynWfmFrames = 480;
   r->lastMouseX = 0;
+
+  // Load logo from memory bundle
+  Image img = LoadImageFromMemory(".png", unx_logo, unx_logo_size);
+  if (img.data != NULL) {
+    r->Logo = LoadTextureFromImage(img);
+    UnloadImage(img);
+  } else {
+    r->Logo = (Texture2D){0};
+  }
 }
