@@ -30,13 +30,17 @@ if "%PLATFORM%"=="linux" (
     echo [Target: Linux ARM64]
     set TARGET_FLAGS=-target aarch64-linux-gnu.2.36 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include
     set LDFLAGS=-Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lpthread -ldl -lm
+    set OUT_DIR=build\linux
     set TARGET=xdjunx
 ) else (
     echo [Target: Windows x64]
     set TARGET_FLAGS=-target x86_64-windows -D_WIN32 -DKS_STR_ENCODING_WIN32API
     set LDFLAGS=-Llib -lraylib -lgdi32 -lwinmm -lopengl32
+    set OUT_DIR=build\windows
     set TARGET=xdjunx.exe
 )
+
+if not exist %OUT_DIR% mkdir %OUT_DIR%
 
 set CFLAGS=-Wall -Wextra -Isrc -Isrc/core -Isrc/engine -Ilib -O2 %TARGET_FLAGS%
 set CXXFLAGS=-Wall -Wextra -Isrc -Isrc/core -Isrc/engine -Ilib -Ilib/kaitai -Ilib/rekordbox-metadata -O2 -std=c++17 %TARGET_FLAGS%
@@ -70,7 +74,12 @@ if "%2"=="check" (
 )
 
 echo Linking...
-%CXX% %CXXFLAGS% src/main.o src/ui/components/theme.o src/ui/components/fonts.o src/ui/components/helpers.o src/ui/views/topbar.o src/ui/views/info.o src/ui/views/splash.o src/ui/views/settings.o src/ui/views/about.o src/ui/views/mixer.o src/ui/player/bottomstrip.o src/ui/player/beatfx.o src/ui/player/deckinfo.o src/ui/player/deckstrip.o src/ui/player/waveform.o src/ui/player/player.o src/audio/engine.o src/engine/util/engine_math.o src/engine/fx/dsp_utils.o src/engine/fx/colorfx/space.o src/engine/fx/colorfx/dub_echo.o src/engine/fx/colorfx/sweep.o src/engine/fx/colorfx/noise.o src/engine/fx/colorfx/crush.o src/engine/fx/colorfx/filter.o src/engine/fx/colorfx/colorfx_manager.o src/engine/fx/beatfx/delay.o src/engine/fx/beatfx/echo.o src/engine/fx/beatfx/pingpong.o src/engine/fx/beatfx/spiral.o src/engine/fx/beatfx/roll.o src/engine/fx/beatfx/sliproll.o src/engine/fx/beatfx/reverb.o src/engine/fx/beatfx/helix.o src/engine/fx/beatfx/flanger.o src/engine/fx/beatfx/phaser.o src/engine/fx/beatfx/bfilter.o src/engine/fx/beatfx/trans.o src/engine/fx/beatfx/pitch.o src/engine/fx/beatfx/vinylbrake.o src/engine/fx/beatfx/beatfx_manager.o src/input/keyboard.o src/ui/browser/browser.o src/core/audio_backend.o src/core/logic/quantize.o src/core/logic/sync.o src/core/logic/settings_io.o src/core/logic/control_object.o src/core/midi/midi_handler.o src/core/midi/midi_mapper.o src/core/midi/midi_backend_win.o lib/kaitai/kaitai/kaitaistream.o lib/rekordbox-metadata/rekordbox_anlz.o lib/rekordbox-metadata/rekordbox_pdb.o lib/serato/serato_parser.o lib/serato/serato_waveform.o src/library/rekordbox_reader.o src/library/serato_reader.o %LDFLAGS% -o %TARGET% || exit /b 1
+%CXX% %CXXFLAGS% src/main.o src/ui/components/theme.o src/ui/components/fonts.o src/ui/components/helpers.o src/ui/views/topbar.o src/ui/views/info.o src/ui/views/splash.o src/ui/views/settings.o src/ui/views/about.o src/ui/views/mixer.o src/ui/player/bottomstrip.o src/ui/player/beatfx.o src/ui/player/deckinfo.o src/ui/player/deckstrip.o src/ui/player/waveform.o src/ui/player/player.o src/audio/engine.o src/engine/util/engine_math.o src/engine/fx/dsp_utils.o src/engine/fx/colorfx/space.o src/engine/fx/colorfx/dub_echo.o src/engine/fx/colorfx/sweep.o src/engine/fx/colorfx/noise.o src/engine/fx/colorfx/crush.o src/engine/fx/colorfx/filter.o src/engine/fx/colorfx/colorfx_manager.o src/engine/fx/beatfx/delay.o src/engine/fx/beatfx/echo.o src/engine/fx/beatfx/pingpong.o src/engine/fx/beatfx/spiral.o src/engine/fx/beatfx/roll.o src/engine/fx/beatfx/sliproll.o src/engine/fx/beatfx/reverb.o src/engine/fx/beatfx/helix.o src/engine/fx/beatfx/flanger.o src/engine/fx/beatfx/phaser.o src/engine/fx/beatfx/bfilter.o src/engine/fx/beatfx/trans.o src/engine/fx/beatfx/pitch.o src/engine/fx/beatfx/vinylbrake.o src/engine/fx/beatfx/beatfx_manager.o src/input/keyboard.o src/ui/browser/browser.o src/core/audio_backend.o src/core/logic/quantize.o src/core/logic/sync.o src/core/logic/settings_io.o src/core/logic/control_object.o src/core/midi/midi_handler.o src/core/midi/midi_mapper.o src/core/midi/midi_backend_win.o lib/kaitai/kaitai/kaitaistream.o lib/rekordbox-metadata/rekordbox_anlz.o lib/rekordbox-metadata/rekordbox_pdb.o lib/serato/serato_parser.o lib/serato/serato_waveform.o src/library/rekordbox_reader.o src/library/serato_reader.o %LDFLAGS% -o %OUT_DIR%\%TARGET% || exit /b 1
+
+if "%PLATFORM%"=="windows" (
+    echo [Copying Dependencies...]
+    if exist lib\raylib.dll copy /y lib\raylib.dll %OUT_DIR% > nul
+)
 
 :end
 echo Done.
