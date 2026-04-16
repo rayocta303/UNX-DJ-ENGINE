@@ -8,8 +8,11 @@ typedef struct SplashRenderer SplashRenderer;
 
 struct SplashRenderer {
   Component base;
-  Texture2D logo;
-  int *Progress; // Pointer to the progress counter (0-100 or current/total)
+  Texture2D *frames;
+  int frameCount;
+  int currentFrame;
+  float frameTimer;
+  int *Progress;
 };
 
 void SplashRenderer_Init(SplashRenderer *s, int *progress);

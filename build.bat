@@ -20,10 +20,11 @@ if not exist tools\bin2c.exe (
 if exist src\ui\components\assets_bundle.h del src\ui\components\assets_bundle.h
 echo #ifndef ASSETS_BUNDLE_H > src\ui\components\assets_bundle.h
 echo #define ASSETS_BUNDLE_H >> src\ui\components\assets_bundle.h
-.\tools\bin2c.exe "assets\fonts\otfs\Font Awesome 5 Free-Solid-900.otf" src\ui\components\assets_bundle.h font_awesome_solid
-.\tools\bin2c.exe "assets\fonts\otfs\Font Awesome 5 Free-Regular-400.otf" src\ui\components\assets_bundle.h font_awesome_regular
-.\tools\bin2c.exe "assets\fonts\otfs\Font Awesome 5 Brands-Regular-400.otf" src\ui\components\assets_bundle.h font_awesome_brand
-.\tools\bin2c.exe "assets\images\Pioneer.png" src\ui\components\assets_bundle.h pioneer_logo
+.\tools\bin2c.exe "assets\fonts\otfs\Font Awesome 5 Free-Solid-900.otf" src\ui\components\assets_bundle.h font_awesome_solid append
+.\tools\bin2c.exe "assets\fonts\otfs\Font Awesome 5 Free-Regular-400.otf" src\ui\components\assets_bundle.h font_awesome_regular append
+.\tools\bin2c.exe "assets\fonts\otfs\Font Awesome 5 Brands-Regular-400.otf" src\ui\components\assets_bundle.h font_awesome_brand append
+ping localhost -n 2 > nul
+.\tools\bin2c.exe "assets\splash.png" src\ui\components\assets_bundle.h unx_logo append
 echo #endif >> src\ui\components\assets_bundle.h
 
 if "%PLATFORM%"=="linux" (
