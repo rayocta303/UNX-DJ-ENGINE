@@ -21,6 +21,7 @@ typedef enum {
 typedef struct {
     ColorFXType activeFX;
     float colorValue; // -1.0 to 1.0 (Knob position)
+    float parameter;  // 0.0 to 1.0 (Secondary adjustment)
     
     // States for all FX (Memory is pre-allocated per channel)
     ColorFX_Space space;

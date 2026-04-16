@@ -4,6 +4,7 @@
 void ColorFXManager_Init(ColorFXManager* mgr) {
     mgr->activeFX = COLORFX_FILTER; // Default
     mgr->colorValue = 0.0f;
+    mgr->parameter = 0.5f; // Neutral mid point
 
     Space_Init(&mgr->space);
     DubEcho_Init(&mgr->dubEcho);
