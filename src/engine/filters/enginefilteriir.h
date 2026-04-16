@@ -12,6 +12,8 @@ public:
     void process(CSAMPLE* pInOut, const std::size_t bufferSize) override {}
     
     virtual void setCoefs(const char* spec, int specLen, unx::audio::SampleRate sampleRate, double centerFreq) {}
+    virtual void setCoefs2(unx::audio::SampleRate sampleRate, double centerFreq, double Q) {}
+
     
 protected:
     bool m_startFromDry;

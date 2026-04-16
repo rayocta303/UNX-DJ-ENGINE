@@ -7,7 +7,8 @@ namespace audio {
 class SignalInfo {
 public:
     SignalInfo() : m_sampleRate(44100), m_channelCount(2) {}
-    SignalInfo(ChannelCount cc, SampleRate sr) : m_sampleRate(sr), m_channelCount(cc) {}
+    SignalInfo(int cc, SampleRate sr) : m_sampleRate(sr), m_channelCount(cc) {}
+
 
     SampleRate getSampleRate() const { return m_sampleRate; }
     ChannelCount getChannelCount() const { return m_channelCount; }
