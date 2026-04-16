@@ -66,8 +66,8 @@ jobs:
     - name: Copy Android NDK Glue
       run: |
         mkdir -p platform/android/app/src/main/cpp
-        cp raylib-src/src/native_app_glue/android_native_app_glue.c platform/android/app/src/main/cpp/
-        cp raylib-src/src/native_app_glue/android_native_app_glue.h platform/android/app/src/main/cpp/
+        cp /usr/local/lib/android/sdk/ndk/25.1.8937393/sources/android/native_app_glue/android_native_app_glue.c platform/android/app/src/main/cpp/
+        cp /usr/local/lib/android/sdk/ndk/25.1.8937393/sources/android/native_app_glue/android_native_app_glue.h platform/android/app/src/main/cpp/
 
     - name: Create CMakeLists.txt for App
       run: |
