@@ -119,8 +119,8 @@ jobs:
     - name: Build APK with Gradle
       run: |
         cd platform/android
-        chmod +x ./gradlew || echo "Setting up gradlew..."
         gradle wrapper --gradle-version 8.1.0
+        chmod +x ./gradlew
         ./gradlew assembleDebug
 
     - name: Upload Artifact
