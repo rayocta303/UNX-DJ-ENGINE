@@ -149,16 +149,29 @@ int PWV4_Decode(unsigned char *data, int64_t frame, Color *outColor) {
 }
 
 // Peak-sample PWV2 over a range of frames
-static unsigned char GetPWV2Peak(unsigned char *data, int64_t maxFrames, int64_t start, int64_t end) {
-    if (start < 0) start = 0;
-    if (end > maxFrames) end = maxFrames;
-    if (start >= end) {
-        if (start < maxFrames) return data[start];
-        return 0;
+static unsigned char GetPWV2Peak(unsigned char *data, int64_t maxFrames, double start, double end) {
+    if (end <= 0 || start >= maxFrames) return 0;
+    
+    // For very tight windows (high zoom), use interpolation logic
+    if (end - start <= 1.0) {
+        int64_t i1 = (int64_t)floor(start);
+        if (i1 < 0) i1 = 0;
+        int64_t i2 = i1 + 1;
+        if (i2 >= maxFrames) i2 = maxFrames - 1;
+        double fr = start - floor(start);
+        
+        // Simple blend of the two surrounding samples - not perfect for Pioneer bytes but better for smoothness
+        int v1 = data[i1];
+        int v2 = data[i2];
+        return (unsigned char)((double)v1 * (1.0 - fr) + (double)v2 * fr);
     }
+
+    int64_t s = (int64_t)floor(start); if (s < 0) s = 0;
+    int64_t e = (int64_t)ceil(end);   if (e > maxFrames) e = maxFrames;
+
     int maxAmp = -1;
     unsigned char best = 0;
-    for (int64_t i = start; i < end; i++) {
+    for (int64_t i = s; i < e; i++) {
         int amp = data[i] & 0x1F;
         if (amp > maxAmp) { maxAmp = amp; best = data[i]; }
     }
@@ -166,13 +179,19 @@ static unsigned char GetPWV2Peak(unsigned char *data, int64_t maxFrames, int64_t
 }
 
 // Peak-sample PWV4 over a range: returns frame index with max height
-static int64_t GetPWV4PeakFrame(unsigned char *data, int64_t maxFrames, int64_t start, int64_t end) {
-    if (start < 0) start = 0;
-    if (end > maxFrames) end = maxFrames;
-    if (start >= end) return (start < maxFrames) ? start : -1;
+static int64_t GetPWV4PeakFrame(unsigned char *data, int64_t maxFrames, double start, double end) {
+    if (end <= 0 || start >= maxFrames) return -1;
+    
+    if (end - start <= 1.0) {
+        return (int64_t)floor(start + 0.5); // Round to nearest frame for discrete color formats
+    }
+
+    int64_t s = (int64_t)floor(start); if (s < 0) s = 0;
+    int64_t e = (int64_t)ceil(end);   if (e > maxFrames) e = maxFrames;
+
     int maxH = -1;
-    int64_t best = start;
-    for (int64_t i = start; i < end; i++) {
+    int64_t best = s;
+    for (int64_t i = s; i < e; i++) {
         uint16_t v = ((uint16_t)data[i*2] << 8) | data[i*2+1];
         int h = (v >> 2) & 0x1F;
         if (h > maxH) { maxH = h; best = i; }
@@ -186,17 +205,16 @@ static int64_t GetPWV4PeakFrame(unsigned char *data, int64_t maxFrames, int64_t 
 //   Byte 2 = Low frequency amplitude  (0-255)
 // Lerp variant for sub-frame precision when zoomed in
 static void Get3BandPeakLerp(unsigned char *data, int64_t maxFrames, double pos, float *outL, float *outM, float *outH) {
-    if (pos < 0) pos = 0;
+    if (pos < 0 || pos >= maxFrames) {
+        *outL = 0; *outM = 0; *outH = 0;
+        return;
+    }
     if (pos >= maxFrames - 1) {
-        if (pos < maxFrames) {
-            int64_t idx = (int64_t)pos;
-            // Byte layout: [Mid, High, Low]
-            *outM = (float)data[idx * 3];
-            *outH = (float)data[idx * 3 + 1];
-            *outL = (float)data[idx * 3 + 2];
-        } else {
-            *outL = 0; *outM = 0; *outH = 0;
-        }
+        int64_t idx = (int64_t)pos;
+        // Byte layout: [Mid, High, Low]
+        *outM = (float)data[idx * 3];
+        *outH = (float)data[idx * 3 + 1];
+        *outL = (float)data[idx * 3 + 2];
         return;
     }
     
@@ -212,15 +230,21 @@ static void Get3BandPeakLerp(unsigned char *data, int64_t maxFrames, double pos,
 
 // Peak extraction over a range of frames, falling back to lerp at high zoom
 void Get3BandPeak(unsigned char *data, int64_t maxFrames, double start, double end, float *outL, float *outM, float *outH) {
-    if (start < 0) start = 0;
-    if (end > maxFrames) end = maxFrames;
-    
+    // If the entire window is outside valid data, return zero
+    if (end <= 0 || start >= maxFrames) {
+        *outL = 0; *outM = 0; *outH = 0;
+        return;
+    }
+
+    // Preserve original window center for interpolation high zoom
     if (end - start <= 1.0) {
         Get3BandPeakLerp(data, maxFrames, (start + end) * 0.5, outL, outM, outH);
         return;
     }
 
+    // Clamp actual loop boundaries to data limits
     int64_t s = (int64_t)floor(start);
+    if (s < 0) s = 0;
     int64_t e = (int64_t)ceil(end);
     if (e > maxFrames) e = maxFrames;
     
@@ -270,7 +294,9 @@ static void Waveform_Draw(Component *base) {
   float effectiveZoom = (float)r->State->ZoomScale;
   if (effectiveZoom < 0.1f) effectiveZoom = 0.1f;
   double elapsedHalfFrames = r->State->Position;
-  float playheadX = wfLeft + wfW / 2.0f;
+  float centerX = SCREEN_WIDTH / 2.0f;
+  float playheadX = centerX;
+  float zoomDelta = effectiveZoom * r->dataDensity;
 
   // === Style from Settings ===
   WaveformStyle userStyle   = r->State->Waveform.Style;
@@ -303,22 +329,37 @@ static void Waveform_Draw(Component *base) {
   Color smCol = {0, 0, 0, 0};
   float yy = wfY + waveCenter;
 
-  // Warm-up: seed smoothed state
+  // Warm-up: seed smoothed state by simulating 100 frames of motion BEFORE the x=0 edge.
+  // This is CRITICAL for consistency during scrolling. An Attack/Release filter
+  // is state-dependent; by giving it a deep "history" (pre-roll), its value at
+  // x=0 will be the same regardless of sub-pixel scrolling offsets.
   {
-    double p0 = elapsedHalfFrames * r->dataDensity - (wfW / 2.0f) * (effectiveZoom * r->dataDensity);
-    double p0e = p0 + effectiveZoom * r->dataDensity;
-    if (p0 >= 0 && p0 < wfFrames) {
-      if (wfType == 3) {
-        float iL, iM, iH; Get3BandPeak(wfData, wfFrames, p0, p0e, &iL, &iM, &iH);
-        smLo = iL * LOW_SCALE * NORM * waveCenter * gLow;
-        smMi = iM * MID_SCALE * NORM * waveCenter * gMid;
-        smHi = iH * HIGH_SCALE * NORM * waveCenter * gHigh;
-      } else {
-        Color c; int h;
-        if (wfType == 2) { int64_t bf = GetPWV4PeakFrame(wfData, wfFrames, (int64_t)p0, (int64_t)p0e); h = PWV4_Decode(wfData, bf, &c); }
-        else { unsigned char sv = GetPWV2Peak(wfData, wfFrames, (int64_t)p0, (int64_t)p0e); h = PWV2_Decode(sv, &c); }
-        smLo = h * PWV2_HSCALE * gLow; smCol = c;
-      }
+    double preRollWidth = 100.0;
+    for (int i = 0; i <= (int)preRollWidth; i++) {
+        double px = (double)i - preRollWidth;
+        double pA = elapsedHalfFrames * r->dataDensity + (px - centerX) * zoomDelta;
+        double pB = pA + zoomDelta;
+
+        if (wfType == 3) {
+            float iL, iM, iH; Get3BandPeak(wfData, wfFrames, pA, pB, &iL, &iM, &iH);
+            float rL = iL * LOW_SCALE * NORM * waveCenter * gLow;
+            float rM = iM * MID_SCALE * NORM * waveCenter * gMid;
+            float rH = iH * HIGH_SCALE * NORM * waveCenter * gHigh;
+            smLo += (rL - smLo) * ((rL > smLo) ? ATK : REL);
+            smMi += (rM - smMi) * ((rM > smMi) ? ATK : REL);
+            smHi += (rH - smHi) * ((rH > smHi) ? ATK : REL);
+        } else {
+            Color col; int h;
+            if (wfType == 2) { int64_t bf = GetPWV4PeakFrame(wfData, wfFrames, pA, pB); h = (bf >= 0) ? PWV4_Decode(wfData, bf, &col) : 0; }
+            else { unsigned char sv = GetPWV2Peak(wfData, wfFrames, pA, pB); h = PWV2_Decode(sv, &col); }
+            float rawH = h * PWV2_HSCALE * gLow;
+            float coef = (rawH > smLo) ? ATK : REL;
+            smLo += (rawH - smLo) * coef;
+            smCol.r = (unsigned char)(smCol.r + (col.r - smCol.r) * coef);
+            smCol.g = (unsigned char)(smCol.g + (col.g - smCol.g) * coef);
+            smCol.b = (unsigned char)(smCol.b + (col.b - smCol.b) * coef);
+            smCol.a = 255;
+        }
     }
   }
 
@@ -327,95 +368,70 @@ static void Waveform_Draw(Component *base) {
     rlVertex2f(cx0, yy-(pA)); rlVertex2f(cx1, yy+(cA)); rlVertex2f(cx1, yy-(cA)); \
   } while(0)
 
-  rlBegin(RL_TRIANGLES);
-  for (int x = 0; x < (int)wfW - 1; x++) {
-    double p1 = elapsedHalfFrames * r->dataDensity + (x - (wfW / 2.0f)) * (effectiveZoom * r->dataDensity);
-    double p2 = elapsedHalfFrames * r->dataDensity + ((x + 1) - (wfW / 2.0f)) * (effectiveZoom * r->dataDensity);
+  // --- DATA-DRIVEN RENDERING LOOP ---
+  // Instead of iterating over screen pixels, we iterate over the waveform data 
+  // samples themselves. This ensures that every peak is consistently shaped 
+  // and height-stable during scrolling.
+  double framesPerPixel = zoomDelta;
+  double halfVisibleFrames = (centerX / 1.0f) * framesPerPixel;
+  int64_t startFrame = (int64_t)floor(elapsedHalfFrames * r->dataDensity - halfVisibleFrames) - 1;
+  int64_t endFrame   = (int64_t)ceil(elapsedHalfFrames * r->dataDensity + halfVisibleFrames) + 1;
+  
+  if (startFrame < 0) startFrame = 0;
+  if (endFrame > wfFrames) endFrame = wfFrames;
 
+  rlBegin(RL_TRIANGLES);
+  for (int64_t i = startFrame; i < endFrame - 1; i++) {
+    float x0 = (float)(((double)i - elapsedHalfFrames * r->dataDensity) / framesPerPixel + centerX);
+    float x1 = (float)(((double)(i + 1) - elapsedHalfFrames * r->dataDensity) / framesPerPixel + centerX);
+    
+    // Safety skip for off-screen data
+    if (x1 < wfLeft - 2 || x0 > wfRight + 2) continue;
+
+    float rL=0, rM=0, rH=0;
+    Color colRaw = {0,0,0,255};
+    
+    // Sample raw data
+    if (wfType == 3) {
+      rM = (float)wfData[i * 3]     * MID_SCALE  * NORM * waveCenter * gMid;
+      rH = (float)wfData[i * 3 + 1] * HIGH_SCALE * NORM * waveCenter * gHigh;
+      rL = (float)wfData[i * 3 + 2] * LOW_SCALE  * NORM * waveCenter * gLow;
+    } else {
+      int h;
+      if (wfType == 2) h = PWV4_Decode(wfData, i, &colRaw);
+      else h = PWV2_Decode(wfData[i], &colRaw);
+      rL = h * PWV2_HSCALE * gLow;
+    }
+
+    // Update smoothed state
     float pLo = smLo, pMi = smMi, pHi = smHi;
     Color pCol = smCol;
+    
+    smLo += (rL - smLo) * ((rL > smLo) ? ATK : REL);
+    smMi += (rM - smMi) * ((rM > smMi) ? ATK : REL);
+    smHi += (rH - smHi) * ((rH > smHi) ? ATK : REL);
+    if (wfType != 3) {
+       smCol.r = (unsigned char)(smCol.r + (colRaw.r - smCol.r) * ATK);
+       smCol.g = (unsigned char)(smCol.g + (colRaw.g - smCol.g) * ATK);
+       smCol.b = (unsigned char)(smCol.b + (colRaw.b - smCol.b) * ATK);
+       smCol.a = 255;
+    }
 
-    if (userStyle == WAVEFORM_STYLE_BLUE) {
-      float rawH = 0; Color col = {0,0,0,255};
-      if (p2 >= 0 && p1 < wfFrames) {
-        unsigned char sv;
-        if (wfType == 1) sv = GetPWV2Peak(wfData, wfFrames, (int64_t)p1, (int64_t)p2);
-        else if (wfType == 2) { int64_t bf = GetPWV4PeakFrame(wfData, wfFrames, (int64_t)p1, (int64_t)p2); sv = (bf >= 0) ? wfData[bf*2] : 0; }
-        else { float iL,iM,iH; Get3BandPeak(wfData, wfFrames, p1, p2, &iL,&iM,&iH); sv = (unsigned char)((iL+iM+iH)/3.0f); }
-        int h = PWV2_Decode(sv, &col); rawH = h * PWV2_HSCALE * gLow;
-      }
-      float coef = (rawH > smLo) ? ATK : REL; smLo += (rawH - smLo) * coef;
-      smCol.r = (unsigned char)(smCol.r + (col.r - smCol.r) * coef);
-      smCol.g = (unsigned char)(smCol.g + (col.g - smCol.g) * coef);
-      smCol.b = (unsigned char)(smCol.b + (col.b - smCol.b) * coef);
-      smCol.a = 255;
-      if (pLo > 0.5f || smLo > 0.5f) {
-        float cx0 = wfLeft + x, cx1 = wfLeft + x + 1.0f;
-        rlColor4ub(pCol.r, pCol.g, pCol.b, 255); rlVertex2f(cx0, yy-pLo); rlVertex2f(cx0, yy+pLo);
-        rlColor4ub(smCol.r, smCol.g, smCol.b, 255); rlVertex2f(cx1, yy+smLo);
-        rlColor4ub(pCol.r, pCol.g, pCol.b, 255); rlVertex2f(cx0, yy-pLo);
-        rlColor4ub(smCol.r, smCol.g, smCol.b, 255); rlVertex2f(cx1, yy+smLo); rlVertex2f(cx1, yy-smLo);
-      }
-    } else if (userStyle == WAVEFORM_STYLE_RGB) {
-      float rawH = 0; Color col = {0,0,0,255};
-      if (p2 >= 0 && p1 < wfFrames) {
-        if (wfType == 2) { int64_t bf = GetPWV4PeakFrame(wfData, wfFrames,(int64_t)p1,(int64_t)p2); if(bf>=0) { int h = PWV4_Decode(wfData, bf, &col); rawH = h * PWV2_HSCALE * gLow; } }
-        else if (wfType == 3) { float iL,iM,iH; Get3BandPeak(wfData, wfFrames, p1, p2, &iL,&iM,&iH); rawH = ((iL+iM+iH)/3.0f)*(waveCenter/255.0f)*gLow; col = (iL>iM && iL>iH)?BL_LOW:(iM>iH?BL_MID:BL_HIGH); }
-        else { unsigned char sv = GetPWV2Peak(wfData, wfFrames,(int64_t)p1,(int64_t)p2); int h = PWV2_Decode(sv, &col); rawH = h * PWV2_HSCALE * gLow; }
-      }
-      float coef = (rawH > smLo) ? ATK : REL; smLo += (rawH - smLo) * coef;
-      smCol.r = (unsigned char)(smCol.r + (col.r - smCol.r) * coef);
-      smCol.g = (unsigned char)(smCol.g + (col.g - smCol.g) * coef);
-      smCol.b = (unsigned char)(smCol.b + (col.b - smCol.b) * coef);
-      smCol.a = 255;
-      if (pLo > 0.5f || smLo > 0.5f) {
-        float cx0 = wfLeft+x, cx1 = cx0+1.0f;
+    // DRAW
+    if (userStyle == WAVEFORM_STYLE_BLUE || userStyle == WAVEFORM_STYLE_RGB) {
+      if (pLo > 0.1f || smLo > 0.1f) {
+        float cx0 = x0, cx1 = x1;
         rlColor4ub(pCol.r, pCol.g, pCol.b, 255); rlVertex2f(cx0, yy-pLo); rlVertex2f(cx0, yy+pLo);
         rlColor4ub(smCol.r, smCol.g, smCol.b, 255); rlVertex2f(cx1, yy+smLo);
         rlColor4ub(pCol.r, pCol.g, pCol.b, 255); rlVertex2f(cx0, yy-pLo);
         rlColor4ub(smCol.r, smCol.g, smCol.b, 255); rlVertex2f(cx1, yy+smLo); rlVertex2f(cx1, yy-smLo);
       }
     } else {
-      // ── STYLE: 3-BAND ──
-      float rL=0, rM=0, rH=0;
-      if (p2 >= 0 && p1 < wfFrames) {
-        if (wfType == 3) { 
-          Get3BandPeak(wfData, wfFrames, p1, p2, &rL, &rM, &rH); 
-          rL *= LOW_SCALE * NORM * waveCenter * gLow; 
-          rM *= MID_SCALE * NORM * waveCenter * gMid; 
-          rH *= HIGH_SCALE * NORM * waveCenter * gHigh; 
-        } else {
-          Color c; int h;
-          if (wfType == 2) { int64_t bf = GetPWV4PeakFrame(wfData, wfFrames,(int64_t)p1,(int64_t)p2); h = PWV4_Decode(wfData, bf, &c); }
-          else { unsigned char sv = GetPWV2Peak(wfData, wfFrames,(int64_t)p1,(int64_t)p2); h = PWV2_Decode(sv, &c); }
-          float baseH = h * PWV2_HSCALE;
-          if (c.r > c.b && c.r > c.g) { rL=baseH*0.4f; rM=baseH*0.9f; rH=baseH*0.2f; }
-          else if (c.b > c.r && c.b > c.g) { rL=baseH*0.95f; rM=baseH*0.6f; rH=baseH*0.1f; }
-          else { rL=baseH*0.8f; rM=baseH*0.8f; rH=baseH*0.6f; }
-          rL*=gLow; rM*=gMid; rH*=gHigh;
-        }
-      }
-      smLo += (rL-smLo)*((rL>smLo)?ATK:REL); 
-      smMi += (rM-smMi)*((rM>smMi)?ATK:REL); 
-      smHi += (rH-smHi)*((rH>smHi)?ATK:REL);
-
-      float cL=smLo, cM=smMi, cH=smHi; 
-      float cx0=wfLeft+x, cx1=wfLeft+x+1.0f;
-
-      // Pioneer-style Layered Stacking (Low -> Mid -> High)
-      if (pLo > 0.1f || cL > 0.1f) {
-        rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 255);
-        DRAW_TRAP(pLo, cL);
-      }
-      if (pMi > 0.1f || cM > 0.1f) {
-        rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 255);
-        DRAW_TRAP(pMi, cM);
-      }
-      if (pHi > 0.1f || cH > 0.1f) {
-        rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 255);
-        DRAW_TRAP(pHi, cH);
-      }
-
+      // 3-BAND
+      float cx0 = x0, cx1 = x1;
+      if (pLo > 0.1f || smLo > 0.1f) { rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 255); DRAW_TRAP(pLo, smLo); }
+      if (pMi > 0.1f || smMi > 0.1f) { rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 255); DRAW_TRAP(pMi, smMi); }
+      if (pHi > 0.1f || smHi > 0.1f) { rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 255); DRAW_TRAP(pHi, smHi); }
     }
   }
   rlEnd();
