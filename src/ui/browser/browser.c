@@ -111,8 +111,50 @@ static int Browser_Update(Component *base) {
 
     if (!s->IsActive) return 0;
 
-    // Mouse Interaction
+    int loadToDeck = -1;
+    int targetIdx = s->ScrollOffset + s->CursorPos;
     Vector2 mousePos = UIGetMousePosition();
+
+    // Load Popup Dialog Interaction handled FIRST to prevent same-frame double triggers
+    bool wasPopupOpen = s->ShowLoadPopup;
+    if (wasPopupOpen) {
+        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+            float pw = S(240);
+            float ph = S(120);
+            float viewH = SCREEN_HEIGHT - DECK_STR_H;
+            float px = (SCREEN_WIDTH - pw) / 2.0f;
+            float py = (viewH - ph) / 2.0f;
+            
+            Rectangle deckARect = {px, py + ph / 2.0f, pw / 2.0f, ph / 2.0f};
+            Rectangle deckBRect = {px + pw / 2.0f, py + ph / 2.0f, pw / 2.0f, ph / 2.0f};
+            
+            if (CheckCollisionPointRec(mousePos, deckARect)) {
+                loadToDeck = 0;
+                targetIdx = s->PopupTrackIdx;
+                s->ShowLoadPopup = false;
+            } else if (CheckCollisionPointRec(mousePos, deckBRect)) {
+                loadToDeck = 1;
+                targetIdx = s->PopupTrackIdx;
+                s->ShowLoadPopup = false;
+            } else if (!CheckCollisionPointRec(mousePos, (Rectangle){px, py, pw, ph})) {
+                // Backdrop click
+                s->ShowLoadPopup = false;
+            }
+        }
+        if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
+            s->ShowLoadPopup = false;
+        }
+        
+        // If we made a choice, continue to the loading logic at the bottom
+        // Otherwise, block other inputs for this frame
+        if (loadToDeck == -1) return 0;
+    } else {
+        if (IsKeyPressed(KEY_LEFT)) loadToDeck = 0;
+        if (IsKeyPressed(KEY_RIGHT)) loadToDeck = 1;
+    }
+
+
+    // Mouse Interaction
     float sidebarW = S(40);
     float rowH = S(28.0f);
     int totalVisible = 10;
@@ -230,7 +272,7 @@ static int Browser_Update(Component *base) {
                         if (isLoadClick) {
                             s->ShowLoadPopup = true;
                             s->PopupTrackIdx = idx;
-                        } else if (s->BrowseLevel > 0 && !s->IsTagList) {
+                        } else if (!s->IsTagList) {
                             triggerEnter = true;
                         } else {
                             // Just select (already handled in Pressed)
@@ -305,43 +347,18 @@ static int Browser_Update(Component *base) {
                 Browser_UpdateActiveTracks(s);
                 s->CursorPos = s->ScrollOffset = 0;
             }
+        } else if (s->BrowseLevel == 0) {
+            // Track selected -> Show Load Popup
+            int idx = s->ScrollOffset + s->CursorPos;
+            if (idx < s->ActiveTrackCount) {
+                s->ShowLoadPopup = true;
+                s->PopupTrackIdx = idx;
+            }
         }
     }
 
     if (IsKeyPressed(KEY_BACKSPACE)) {
         Browser_Back(s);
-    }
-
-    int loadToDeck = -1;
-    int targetIdx = s->ScrollOffset + s->CursorPos;
-    
-    // Load Popup Dialog Interaction
-    if (s->ShowLoadPopup) {
-        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
-            float pw = S(240);
-            float ph = S(120);
-            float viewH = SCREEN_HEIGHT - DECK_STR_H;
-            float px = (SCREEN_WIDTH - pw) / 2.0f;
-            float py = (viewH - ph) / 2.0f;
-            
-            Rectangle deckARect = {px, py + ph / 2.0f, pw / 2.0f, ph / 2.0f};
-            Rectangle deckBRect = {px + pw / 2.0f, py + ph / 2.0f, pw / 2.0f, ph / 2.0f};
-            
-            if (CheckCollisionPointRec(mousePos, deckARect)) loadToDeck = 0;
-            else if (CheckCollisionPointRec(mousePos, deckBRect)) loadToDeck = 1;
-            else if (!CheckCollisionPointRec(mousePos, (Rectangle){px, py, pw, ph})) s->ShowLoadPopup = false;
-            
-            if (loadToDeck != -1) {
-                targetIdx = s->PopupTrackIdx;
-            }
-            s->ShowLoadPopup = false;
-        }
-        if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
-            s->ShowLoadPopup = false;
-        }
-    } else {
-        if (IsKeyPressed(KEY_LEFT)) loadToDeck = 0;
-        if (IsKeyPressed(KEY_RIGHT)) loadToDeck = 1;
     }
 
     if (s->BrowseLevel == 0 && loadToDeck != -1) {
