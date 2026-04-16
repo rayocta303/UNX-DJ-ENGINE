@@ -203,7 +203,7 @@ static int Settings_Update(Component *base) {
           return 0;
       }
     } else if (item->Type == SETTING_TYPE_KNOB) {
-      float step = (item->Max - item->Min) / 20.0f; // 5% steps
+      float step = (item->Step > 0) ? item->Step : (item->Max - item->Min) / 20.0f; // Custom or 5% steps
       if (IsKeyDown(KEY_LEFT)) {
         item->Value -= step * GetFrameTime() * 10.0f;
         if (item->Value < item->Min)

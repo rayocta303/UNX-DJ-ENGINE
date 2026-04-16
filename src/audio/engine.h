@@ -70,6 +70,7 @@ typedef struct DeckAudioState {
     int MTSampleCount;
 
     float Trim;
+    float Fader; // Channel Fader (0.0 to 1.0)
 
     // EQ State (3-Band)
     float EqLow;   // 0.0 to 1.0 (default 0.5)

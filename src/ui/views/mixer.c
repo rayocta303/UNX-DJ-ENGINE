@@ -74,17 +74,19 @@ static void Mixer_DrawKnob(float x, float y, float radius, float value, float mi
     UIDrawKnob(x, y, radius, value, min, max, label, color);
     
     // Calculate percentage string
-    float pct = 0;
-    if (min < 0) { // Bipolar (Color FX)
-        pct = (value / max) * 100.0f;
-    } else { // Unipolar (EQ, Trim)
+    float range = max - min;
+    float pct = ((value - min) / range) * 100.0f;
+    
+    // Optional: for bipolar controls (like Color FX -1 to 1), map to -100% to 100%
+    if (min < 0.0f && max > 0.0f) {
         pct = (value / max) * 100.0f;
     }
     
     char pctStr[16];
     sprintf(pctStr, "%.0f%%", pct);
     Font f = UIFonts_GetFace(S(7));
-    DrawCentredText(pctStr, f, x - S(20), S(40), y + radius + S(2), S(7), ColorShadow);
+    // Draw directly below the main label that is drawn at `y + radius + 1`
+    DrawCentredText(pctStr, f, x - S(20), S(40), y + radius + S(11), S(7), ColorShadow);
 }
 
 static void HandleKnob(float *val, float cx, float cy, float r, float min, float max, bool centerZero, Vector2 mousePos, bool mDown) {

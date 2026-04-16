@@ -87,11 +87,8 @@ void UIDrawKnob(float x, float y, float radius, float value, float min, float ma
     };
     DrawLineEx((Vector2){x, y}, needleEnd, 2.0f, color);
     
-    // Value text
-    char valStr[32];
-    if (unit) sprintf(valStr, "%.0f%s", value, unit);
-    else sprintf(valStr, "%.0f", value);
-    
+    // Value / Label text
+    const char *finalLabel = unit ? unit : "";
     Font face = UIFonts_GetFace(S(8));
-    DrawCentredText(valStr, face, x - radius, radius * 2, y + radius + 2, S(8), ColorWhite);
+    DrawCentredText(finalLabel, face, x - radius, radius * 2, y + radius + 1, S(8), ColorWhite);
 }

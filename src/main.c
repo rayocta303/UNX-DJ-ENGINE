@@ -20,6 +20,7 @@
 #include "version.h"
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 typedef struct {
   CurrentScreen screen;
@@ -72,10 +73,9 @@ void OnSettingsApply(void *ctx) {
   a->deckA.Waveform.Style = (WaveformStyle)styleIdx;
   a->deckB.Waveform.Style = (WaveformStyle)styleIdx;
 
-  float gainMap[] = {0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f};
-  a->deckA.Waveform.GainLow = gainMap[a->settingsState.Items[3].Current];
-  a->deckA.Waveform.GainMid = gainMap[a->settingsState.Items[4].Current];
-  a->deckA.Waveform.GainHigh = gainMap[a->settingsState.Items[5].Current];
+  a->deckA.Waveform.GainLow = 0.5f + (a->settingsState.Items[3].Current * 0.1f);
+  a->deckA.Waveform.GainMid = 0.5f + (a->settingsState.Items[4].Current * 0.1f);
+  a->deckA.Waveform.GainHigh = 0.5f + (a->settingsState.Items[5].Current * 0.1f);
 
   a->deckB.Waveform = a->deckA.Waveform;
 
@@ -125,7 +125,6 @@ void OnSettingsApply(void *ctx) {
   }
 
   Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig);
-  OnSettingsClose(ctx);
 }
 
 void UpdateChannelOptions(App *a, int deviceIdx) {
@@ -310,32 +309,32 @@ void App_Init(App *a) {
   a->settingsState.Items[2].OptionsCount = 3;
   a->settingsState.Items[2].Current = a->deckA.Waveform.Style;
 
-  const char *gLabels[] = {"0.5x", "0.75x", "1.0x", "1.25x", "1.5x", "2.0x"};
-  float gValues[] = {0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f};
-
   strcpy(a->settingsState.Items[3].Label, "WFM LOW GAIN");
-  for (int i = 0; i < 6; i++) {
-    strcpy(a->settingsState.Items[3].Options[i], gLabels[i]);
-    if (a->deckA.Waveform.GainLow == gValues[i])
-      a->settingsState.Items[3].Current = i;
+  a->settingsState.Items[3].Type = SETTING_TYPE_LIST;
+  a->settingsState.Items[3].OptionsCount = 16; // 0.5 to 2.0 inclusive
+  for(int i=0; i<16; i++) {
+     float v = 0.5f + (i * 0.1f);
+     sprintf(a->settingsState.Items[3].Options[i], "%.1fx", v);
+     if (fabs(a->deckA.Waveform.GainLow - v) < 0.05f) a->settingsState.Items[3].Current = i;
   }
-  a->settingsState.Items[3].OptionsCount = 6;
 
   strcpy(a->settingsState.Items[4].Label, "WFM MID GAIN");
-  for (int i = 0; i < 6; i++) {
-    strcpy(a->settingsState.Items[4].Options[i], gLabels[i]);
-    if (a->deckA.Waveform.GainMid == gValues[i])
-      a->settingsState.Items[4].Current = i;
+  a->settingsState.Items[4].Type = SETTING_TYPE_LIST;
+  a->settingsState.Items[4].OptionsCount = 16;
+  for(int i=0; i<16; i++) {
+     float v = 0.5f + (i * 0.1f);
+     sprintf(a->settingsState.Items[4].Options[i], "%.1fx", v);
+     if (fabs(a->deckA.Waveform.GainMid - v) < 0.05f) a->settingsState.Items[4].Current = i;
   }
-  a->settingsState.Items[4].OptionsCount = 6;
 
   strcpy(a->settingsState.Items[5].Label, "WFM HIGH GAIN");
-  for (int i = 0; i < 6; i++) {
-    strcpy(a->settingsState.Items[5].Options[i], gLabels[i]);
-    if (a->deckA.Waveform.GainHigh == gValues[i])
-      a->settingsState.Items[5].Current = i;
+  a->settingsState.Items[5].Type = SETTING_TYPE_LIST;
+  a->settingsState.Items[5].OptionsCount = 16;
+  for(int i=0; i<16; i++) {
+     float v = 0.5f + (i * 0.1f);
+     sprintf(a->settingsState.Items[5].Options[i], "%.1fx", v);
+     if (fabs(a->deckA.Waveform.GainHigh - v) < 0.05f) a->settingsState.Items[5].Current = i;
   }
-  a->settingsState.Items[5].OptionsCount = 6;
 
   strcpy(a->settingsState.Items[6].Label, "JOG START TIME");
   a->settingsState.Items[6].Type = SETTING_TYPE_KNOB;

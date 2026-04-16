@@ -26,6 +26,7 @@ typedef struct {
   float Min;
   float Max;
   char Unit[16];
+  float Step; // Custom increment step (0 = auto 5%)
 } SettingItem;
 
 typedef struct {

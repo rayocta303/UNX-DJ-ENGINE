@@ -33,6 +33,7 @@ void AudioEngine_Init(AudioEngine *engine) {
         engine->Decks[i].OutlinedRate = 0.0f; // Motor is off initially
         engine->Decks[i].Pitch = 10000;
         engine->Decks[i].Trim = 1.0f;
+        engine->Decks[i].Fader = 1.0f;
         engine->Decks[i].EqLow = 0.5f;
         engine->Decks[i].EqMid = 0.5f;
         engine->Decks[i].EqHigh = 0.5f;
@@ -308,7 +309,8 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
         float midR = r_sample - lowR - highR;
         r_sample = (lowR * gainL) + (midR * gainM) + (highR * gainH);
 
-        l_sample *= deck->Trim; r_sample *= deck->Trim;
+        float mixGain = deck->Trim * deck->Fader;
+        l_sample *= mixGain; r_sample *= mixGain;
 
         // Color FX & Beat FX
         ColorFXManager_Process(&deck->ColorFX, &l_sample, &r_sample, l_sample, r_sample, fs);
