@@ -1,0 +1,20 @@
+#pragma once
+#include "engine/audio/types.h"
+
+namespace unx {
+namespace audio {
+
+class SignalInfo {
+public:
+    SignalInfo() : m_sampleRate(44100), m_channelCount(2) {}
+    SampleRate getSampleRate() const { return m_sampleRate; }
+    ChannelCount getChannelCount() const { return m_channelCount; }
+    void setSampleRate(SampleRate sr) { m_sampleRate = sr; }
+    void setChannelCount(ChannelCount cc) { m_channelCount = cc; }
+private:
+    SampleRate m_sampleRate;
+    ChannelCount m_channelCount;
+};
+
+} // namespace audio
+} // namespace unx
