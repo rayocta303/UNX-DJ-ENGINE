@@ -240,50 +240,77 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
 
         if (mtActive && fabs(rate) > 0.05) {
             deck->MTOffset += (1.0 - rate);
-            const double period = 1323.0; // 30ms @ 44.1kHz
+            
+            // Using a professional WSOLA-style dynamic period
+            // 80ms @ 44.1kHz (approx 3500 samples)
+            const double period = 2205.0; // 50ms is better for transient preserved low-latency
             const double drift = deck->MTOffset;
             double phase[2];
             phase[0] = fmod(drift, period); if (phase[0] < 0) phase[0] += period;
             phase[1] = fmod(drift + period * 0.5, period); if (phase[1] < 0) phase[1] += period;
 
             for (int k = 0; k < 2; k++) {
-                if (phase[k] < 12.0 && deck->MTSearchTrigger[k]) {
+                // If we are at the beginning of a window, find the best sync point
+                if (phase[k] < (double)frames && deck->MTSearchTrigger[k]) {
                     int other = 1 - k;
                     double refP = deck->Position + (phase[other] - period * 0.5) + deck->MTPhaseOffset[other];
-                    #define S_WIN 256
-                    #define S_RA 640
+                    
+                    #define S_WIN 512   // Larger correlation window
+                    #define S_RA  1024  // Larger search range (approx 23ms)
+                    
                     float refM[S_WIN], refE = 0.001f;
                     for (int j = 0; j < S_WIN; j++) {
-                        float l, r; INTERP_SAMPLES_PRO(refP + j, l, r);
+                        float l, r; INTERP_SAMPLES_PRO(refP - (S_WIN/2) + j, l, r);
                         refM[j] = l + r; refE += fabsf(refM[j]);
                     }
+                    
                     static float sCache[S_RA * 2 + S_WIN];
-                    double aStart = deck->Position - (period * 0.5) - S_RA;
+                    double aStart = deck->Position - (S_WIN/2) - S_RA;
                     for (int j = 0; j < S_RA * 2 + S_WIN; j++) {
                         float l, r; INTERP_SAMPLES_PRO(aStart + j, l, r);
                         sCache[j] = l + r;
                     }
+                    
                     float bestScore = 1e30f; int bestOff = S_RA;
                     for (int o = 0; o < S_RA * 2; o++) {
-                        float sad = 0; for (int j = 0; j < S_WIN; j++) sad += fabsf(sCache[o + j] - refM[j]);
-                        float score = (sad * (1.0f + 0.15f * (float)abs(o - S_RA) / (float)S_RA)) / refE;
-                        if (score < bestScore) { bestScore = score; bestOff = o; }
+                        float sad = 0; 
+                        for (int j = 0; j < S_WIN; j++) {
+                            sad += fabsf(sCache[o + j] - refM[j]);
+                        }
+                        // Penalize offsets far from center to reduce "jumpiness"
+                        float dist = (float)abs(o - S_RA) / (float)S_RA;
+                        float score = sad * (1.0f + 0.35f * dist * dist); 
+                        
+                        if (score < bestScore) { 
+                            bestScore = score; 
+                            bestOff = o; 
+                        }
                     }
-                    deck->MTPhaseOffset[k] = (float)(bestOff - S_RA);
+                    
+                    // Smooth the transition to new phase offset
+                    float newOff = (float)(bestOff - S_RA);
+                    deck->MTPhaseOffset[k] = deck->MTPhaseOffset[k] * 0.5f + newOff * 0.5f;
                     deck->MTSearchTrigger[k] = false;
+                    
                     #undef S_WIN
                     #undef S_RA
-                } else if (phase[k] > period * 0.3) {
+                } else if (phase[k] > (period * 0.4)) {
                     deck->MTSearchTrigger[k] = true;
                 }
             }
-            double s0 = sin(M_PI * phase[0] / period);
-            double w0 = s0 * s0; double w1 = 1.0 - w0;
+            
+            // Hann-windowed crossfade for cleaner transitions
+            double x = phase[0] / period;
+            double w0 = 0.5 * (1.0 - cos(2.0 * M_PI * x));
+            double w1 = 1.0 - w0;
+            
             double rp0 = deck->Position + (phase[0] - period * 0.5) + deck->MTPhaseOffset[0];
             double rp1 = deck->Position + (phase[1] - period * 0.5) + deck->MTPhaseOffset[1];
+            
             if (rp0 < 0) rp0 = 0; if (rp1 < 0) rp1 = 0;
             float l0, r0, l1, r1;
             INTERP_SAMPLES_PRO(rp0, l0, r0); INTERP_SAMPLES_PRO(rp1, l1, r1);
+            
             l_sample = (l0 * (float)w0 + l1 * (float)w1);
             r_sample = (r0 * (float)w0 + r1 * (float)w1);
         } else {
