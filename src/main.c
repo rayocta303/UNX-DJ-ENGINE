@@ -165,18 +165,13 @@ void UpdateChannelOptions(App *a, int deviceIdx) {
   }
 
   // Auto-Select defaults
-  if (channels >= 4) {
-    a->settingsState.Items[9].Current = 0;  // CH1
-    a->settingsState.Items[10].Current = 1; // CH2
-    a->settingsState.Items[11].Current = 3; // CH3 (idx 3 is Blank + CH1 + CH2 + CH3)
-    a->settingsState.Items[12].Current = 4; // CH4 (idx 4)
-  } else {
-    a->settingsState.Items[9].Current = 0;
-    a->settingsState.Items[10].Current = (channels > 1) ? 1 : 0;
-    // For 2-channel setups, mirror Master to Cue to ensure audio is heard and prevent null/blank errors
-    a->settingsState.Items[11].Current = 1; // CH 1 (Index 0 is Blank)
-    a->settingsState.Items[12].Current = (channels > 1) ? 2 : 1; // CH 2
-  }
+  // Auto-Select defaults: Start with 2-channel mirrored setup (CH 1/2 for Master and Cue)
+  // to prevent errors on fresh settings, even if more channels are available.
+  a->settingsState.Items[9].Current = 0;  // Master L -> CH1
+  a->settingsState.Items[10].Current = (channels > 1) ? 1 : 0; // Master R -> CH2
+  
+  a->settingsState.Items[11].Current = 1; // Cue L -> CH 1 (Index 0 is Blank)
+  a->settingsState.Items[12].Current = (channels > 1) ? 2 : 1; // Cue R -> CH 2
 }
 
 void OnSettingsValueChanged(void *ctx, int idx) {
