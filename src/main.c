@@ -307,27 +307,27 @@ void App_Init(App *a) {
 
   strcpy(a->settingsState.Items[3].Label, "WFM LOW GAIN");
   a->settingsState.Items[3].Type = SETTING_TYPE_LIST;
-  a->settingsState.Items[3].OptionsCount = 16; // 0.5 to 2.0 inclusive
-  for(int i=0; i<16; i++) {
-     float v = 0.5f + (i * 0.1f);
+  a->settingsState.Items[3].OptionsCount = 25; // 0.1 to 2.5
+  for(int i=0; i<25; i++) {
+     float v = 0.1f + (i * 0.1f);
      sprintf(a->settingsState.Items[3].Options[i], "%.1fx", v);
      if (fabs(a->deckA.Waveform.GainLow - v) < 0.05f) a->settingsState.Items[3].Current = i;
   }
 
   strcpy(a->settingsState.Items[4].Label, "WFM MID GAIN");
   a->settingsState.Items[4].Type = SETTING_TYPE_LIST;
-  a->settingsState.Items[4].OptionsCount = 16;
-  for(int i=0; i<16; i++) {
-     float v = 0.5f + (i * 0.1f);
+  a->settingsState.Items[4].OptionsCount = 25;
+  for(int i=0; i<25; i++) {
+     float v = 0.1f + (i * 0.1f);
      sprintf(a->settingsState.Items[4].Options[i], "%.1fx", v);
      if (fabs(a->deckA.Waveform.GainMid - v) < 0.05f) a->settingsState.Items[4].Current = i;
   }
 
   strcpy(a->settingsState.Items[5].Label, "WFM HIGH GAIN");
   a->settingsState.Items[5].Type = SETTING_TYPE_LIST;
-  a->settingsState.Items[5].OptionsCount = 16;
-  for(int i=0; i<16; i++) {
-     float v = 0.5f + (i * 0.1f);
+  a->settingsState.Items[5].OptionsCount = 25;
+  for(int i=0; i<25; i++) {
+     float v = 0.1f + (i * 0.1f);
      sprintf(a->settingsState.Items[5].Options[i], "%.1fx", v);
      if (fabs(a->deckA.Waveform.GainHigh - v) < 0.05f) a->settingsState.Items[5].Current = i;
   }

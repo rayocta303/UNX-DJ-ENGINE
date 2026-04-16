@@ -203,14 +203,28 @@ static int Settings_Update(Component *base) {
           return 0;
       }
     } else if (item->Type == SETTING_TYPE_KNOB) {
-      float step = (item->Step > 0) ? item->Step : (item->Max - item->Min) / 20.0f; // Custom or 5% steps
+      float step = (item->Step > 0) ? item->Step : (item->Max - item->Min) / 20.0f;
+      
+      // Discrete step on press
+      if (IsKeyPressed(KEY_LEFT)) {
+        item->Value -= step;
+        if (item->Value < item->Min) item->Value = item->Min;
+        if (r->OnApply) r->OnApply(r->callbackCtx);
+      }
+      if (IsKeyPressed(KEY_RIGHT)) {
+        item->Value += step;
+        if (item->Value > item->Max) item->Value = item->Max;
+        if (r->OnApply) r->OnApply(r->callbackCtx);
+      }
+
+      // Smooth step on hold
       if (IsKeyDown(KEY_LEFT)) {
-        item->Value -= step * GetFrameTime() * 10.0f;
+        item->Value -= step * GetFrameTime() * 5.0f;
         if (item->Value < item->Min)
           item->Value = item->Min;
       }
       if (IsKeyDown(KEY_RIGHT)) {
-        item->Value += step * GetFrameTime() * 10.0f;
+        item->Value += step * GetFrameTime() * 5.0f;
         if (item->Value > item->Max)
           item->Value = item->Max;
       }
@@ -296,6 +310,12 @@ static void Settings_Draw(Component *base) {
     } else if (item->Type == SETTING_TYPE_KNOB) {
       UIDrawKnob(SCREEN_WIDTH - S(80), ry + (rowH / 2.0f), S(9), item->Value,
                  item->Min, item->Max, item->Unit, ColorOrange);
+                 
+      char valBuf[16];
+      if (item->Value == (int)item->Value) sprintf(valBuf, "%d", (int)item->Value);
+      else sprintf(valBuf, "%.1f", item->Value);
+      
+      UIDrawText(valBuf, faceMd, SCREEN_WIDTH - S(65), ry + S(6), S(13), ColorOrange);
     } else if (item->Type == SETTING_TYPE_ACTION) {
       // Action items like EXIT don't have side controls, maybe just a symbol
       UIDrawText("\uf2f5", faceSm, SCREEN_WIDTH - S(30), ry + S(6), S(12),
