@@ -43,6 +43,7 @@ SRC_C = src/main.c \
         src/audio/engine.c \
         src/input/keyboard.c \
         src/ui/browser/browser.c \
+        src/core/audio_backend.c \
         src/core/logic/quantize.c \
         src/core/logic/sync.c \
         src/core/logic/settings_io.c \

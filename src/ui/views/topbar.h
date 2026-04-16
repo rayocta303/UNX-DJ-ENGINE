@@ -2,6 +2,16 @@
 
 #include "ui/components/component.h"
 
+typedef enum {
+    ScreenPlayer,
+    ScreenBrowser,
+    ScreenInfo,
+    ScreenSettings,
+    ScreenAbout,
+    ScreenMixer,
+    ScreenSplash
+} CurrentScreen;
+
 typedef struct TopBar TopBar;
 
 struct TopBar {
@@ -9,7 +19,7 @@ struct TopBar {
 
   // Callbacks
   void (*OnBrowse)(void *);
-  void (*OnTagList)(void *);
+  void (*OnMixer)(void *);
   void (*OnInfo)(void *);
   void (*OnSettings)(void *);
   void *callbackCtx;
@@ -19,9 +29,11 @@ struct TopBar {
   // Internal layout state
   float MarginX;
   float btnBrowseX, btnBrowseW;
-  float btnTagListX, btnTagListW;
+  float btnMixerX, btnMixerW;
   float btnInfoX, btnInfoW;
   float btnSettingsX, btnSettingsW;
+  
+  CurrentScreen ActiveScreen; // Defines current app screen to highlight
 };
 
 // Initializes a TopBar.

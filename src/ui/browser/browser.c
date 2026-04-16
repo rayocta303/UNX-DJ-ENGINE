@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <sys/stat.h>
 
 #ifdef _WIN32
@@ -176,48 +177,71 @@ static int Browser_Update(Component *base) {
         }
     }
 
-    for (int i = 0; i < totalVisible; i++) {
-        int idx = s->ScrollOffset + i;
-        if (idx >= totalItems) break;
+    bool triggerEnter = false;
 
-        Rectangle itemRect = {sidebarW, TOP_BAR_H + i * rowH, listW, rowH};
-        if (CheckCollisionPointRec(mousePos, itemRect)) {
-            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                // Drag start for Playlists
-                if (s->BrowseLevel == 1) {
-                    s->IsDragging = true;
-                    s->DraggingIdx = idx;
-                    s->DraggingType = 1;
+    if (!s->ShowLoadPopup) {
+        for (int i = 0; i < totalVisible; i++) {
+            int idx = s->ScrollOffset + i;
+            if (idx >= totalItems) break;
+
+            Rectangle itemRect = {sidebarW, TOP_BAR_H + i * rowH, listW, rowH};
+            if (CheckCollisionPointRec(mousePos, itemRect)) {
+                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                    s->TouchDragAccumulator = 0;
+                    if (s->BrowseLevel == 1) {
+                        s->IsDragging = true;
+                        s->DraggingIdx = idx;
+                        s->DraggingType = 1;
+                    }
+                    s->CursorPos = i;
                 }
-                
-                // Click = Select + Execute (Mocking double-click check)
-                static float lastClickTime = 0;
-                float now = GetTime();
-                if (s->CursorPos == i && (now - lastClickTime < 0.3f)) {
-                    // Double Clicked -> Trigger Enter logic
-                    // ... existing Enter logic ...
-                    // We can reuse the IsKeyPressed(KEY_ENTER) logic block below or refactor
+                if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && !s->IsDragging) {
+                    if (fabsf(s->TouchDragAccumulator) < 10.0f) { // Not a drag
+                        if (s->BrowseLevel > 0 && !s->IsTagList) {
+                            triggerEnter = true;
+                        } else {
+                            s->ShowLoadPopup = true;
+                            s->PopupTrackIdx = idx;
+                        }
+                    }
                 }
-                s->CursorPos = i;
-                lastClickTime = now;
             }
         }
-    }
 
-    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) s->IsDragging = false;
+        // Drag Scrolling logic
+        if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) && !s->IsDragging) {
+            Vector2 delta = GetMouseDelta();
+            s->TouchDragAccumulator += delta.y;
+            
+            float threshold = S(20.0f);
+            if (s->TouchDragAccumulator < -threshold) { // Dragged up -> Scroll down
+                if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
+                    if (s->CursorPos < totalVisible - 1) s->CursorPos++;
+                    else s->ScrollOffset++;
+                }
+                s->TouchDragAccumulator = 0;
+            } else if (s->TouchDragAccumulator > threshold) { // Dragged down -> Scroll up
+                if (s->CursorPos > 0) s->CursorPos--;
+                else if (s->ScrollOffset > 0) s->ScrollOffset--;
+                s->TouchDragAccumulator = 0;
+            }
+        }
+        
+        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) s->IsDragging = false;
 
-    if (IsKeyPressed(KEY_DOWN)) {
-        if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
-            if (s->CursorPos < totalVisible - 1) s->CursorPos++;
-            else s->ScrollOffset++;
+        if (IsKeyPressed(KEY_DOWN)) {
+            if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
+                if (s->CursorPos < totalVisible - 1) s->CursorPos++;
+                else s->ScrollOffset++;
+            }
+        }
+        if (IsKeyPressed(KEY_UP)) {
+            if (s->CursorPos > 0) s->CursorPos--;
+            else if (s->ScrollOffset > 0) s->ScrollOffset--;
         }
     }
-    if (IsKeyPressed(KEY_UP)) {
-        if (s->CursorPos > 0) s->CursorPos--;
-        else if (s->ScrollOffset > 0) s->ScrollOffset--;
-    }
 
-    if (IsKeyPressed(KEY_ENTER)) {
+    if (IsKeyPressed(KEY_ENTER) || triggerEnter) {
         if (s->BrowseLevel == 3) {
             int idx = s->ScrollOffset + s->CursorPos;
             if (idx < s->StorageCount) {
@@ -257,8 +281,35 @@ static int Browser_Update(Component *base) {
     }
 
     int loadToDeck = -1;
-    if (IsKeyPressed(KEY_LEFT)) loadToDeck = 0;
-    if (IsKeyPressed(KEY_RIGHT)) loadToDeck = 1;
+    int targetIdx = s->ScrollOffset + s->CursorPos;
+    
+    // Load Popup Dialog Interaction
+    if (s->ShowLoadPopup) {
+        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+            float pw = S(240);
+            float ph = S(120);
+            float viewH = SCREEN_HEIGHT - DECK_STR_H;
+            float px = (SCREEN_WIDTH - pw) / 2.0f;
+            float py = (viewH - ph) / 2.0f;
+            
+            Rectangle deckARect = {px, py + ph / 2.0f, pw / 2.0f, ph / 2.0f};
+            Rectangle deckBRect = {px + pw / 2.0f, py + ph / 2.0f, pw / 2.0f, ph / 2.0f};
+            
+            if (CheckCollisionPointRec(mousePos, deckARect)) loadToDeck = 0;
+            else if (CheckCollisionPointRec(mousePos, deckBRect)) loadToDeck = 1;
+            
+            if (loadToDeck != -1) {
+                targetIdx = s->PopupTrackIdx;
+            }
+            s->ShowLoadPopup = false;
+        }
+        if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
+            s->ShowLoadPopup = false;
+        }
+    } else {
+        if (IsKeyPressed(KEY_LEFT)) loadToDeck = 0;
+        if (IsKeyPressed(KEY_RIGHT)) loadToDeck = 1;
+    }
 
     if (s->BrowseLevel == 0 && loadToDeck != -1) {
         // LOAD TRACK
@@ -268,7 +319,7 @@ static int Browser_Update(Component *base) {
             return 0; // Prevent load
         }
 
-        int idx = s->ScrollOffset + s->CursorPos;
+        int idx = targetIdx;
         if (idx < s->ActiveTrackCount && s->TrackPointers[idx]) {
             RBTrack *t = s->TrackPointers[idx];
             printf("[BROWSER] Loading track: %s to Deck %c\n", t->Title, loadToDeck == 0 ? 'A' : 'B');
@@ -417,7 +468,7 @@ static int Browser_Update(Component *base) {
         }
     }
 
-    if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_ESCAPE)) {
+    if ((IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_ESCAPE)) && !s->ShowLoadPopup) {
         if (s->BrowseLevel == 0) {
             if (s->CurrentPlaylistIdx >= 0) s->BrowseLevel = 1;
             else s->BrowseLevel = 2;
@@ -604,6 +655,43 @@ static void Browser_Draw(Component *base) {
         }
         DrawRectangle(mPos.x, mPos.y, S(120), rowH, Fade(ColorBlue, 0.6f));
         UIDrawText(dragTitle, faceSm, mPos.x + S(8), mPos.y + S(6), S(13), ColorWhite);
+    }
+    
+    // Load Deck Popup Modal
+    if (s->ShowLoadPopup) {
+        float viewH = SCREEN_HEIGHT - DECK_STR_H;
+        DrawRectangle(0, 0, SCREEN_WIDTH, viewH, Fade(ColorBlack, 0.8f));
+        float pw = S(240);
+        float ph = S(120);
+        float px = (SCREEN_WIDTH - pw) / 2.0f;
+        float py = (viewH - ph) / 2.0f;
+        
+        // Background
+        DrawRectangle(px, py, pw, ph, ColorBGUtil);
+        DrawRectangleLinesEx((Rectangle){px, py, pw, ph}, 1.0f, ColorGray);
+        
+        // Title
+        DrawCentredText("LOAD TRACK TO...", faceMd, px, pw, py + S(15), S(15), ColorWhite);
+        const char* trackName = "Unknown";
+        if (s->PopupTrackIdx >= 0 && s->PopupTrackIdx < s->ActiveTrackCount && s->TrackPointers[s->PopupTrackIdx]) {
+            trackName = s->TrackPointers[s->PopupTrackIdx]->Title;
+        }
+        DrawCentredText(trackName, faceXS, px, pw, py + S(35), S(10), ColorShadow);
+        
+        // Buttons Deck A & Deck B
+        Rectangle deckARect = {px, py + ph / 2.0f, pw / 2.0f, ph / 2.0f};
+        Rectangle deckBRect = {px + pw / 2.0f, py + ph / 2.0f, pw / 2.0f, ph / 2.0f};
+        
+        bool hoverA = CheckCollisionPointRec(mPos, deckARect);
+        bool hoverB = CheckCollisionPointRec(mPos, deckBRect);
+        
+        DrawRectangleRec(deckARect, hoverA ? ColorOrange : ColorDark1);
+        DrawRectangleLinesEx(deckARect, 1.0f, ColorShadow);
+        DrawCentredText("DECK 1", faceMd, px, pw / 2.0f, py + ph / 2.0f + S(20), S(15), hoverA ? ColorBlack : ColorOrange);
+        
+        DrawRectangleRec(deckBRect, hoverB ? ColorBlue : ColorDark2);
+        DrawRectangleLinesEx(deckBRect, 1.0f, ColorShadow);
+        DrawCentredText("DECK 2", faceMd, px + pw / 2.0f, pw / 2.0f, py + ph / 2.0f + S(20), S(15), hoverB ? ColorBlack : ColorBlue);
     }
 }
 

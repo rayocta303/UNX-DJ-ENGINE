@@ -15,10 +15,10 @@ static int TopBar_Update(Component *base) {
         if (t->OnBrowse)
           t->OnBrowse(t->callbackCtx);
       }
-      if (mouse.x >= t->btnTagListX &&
-          mouse.x <= t->btnTagListX + t->btnTagListW) {
-        if (t->OnTagList)
-          t->OnTagList(t->callbackCtx);
+      if (mouse.x >= t->btnMixerX &&
+          mouse.x <= t->btnMixerX + t->btnMixerW) {
+        if (t->OnMixer)
+          t->OnMixer(t->callbackCtx);
       }
       if (mouse.x >= t->btnInfoX && mouse.x <= t->btnInfoX + t->btnInfoW) {
         if (t->OnInfo)
@@ -52,7 +52,7 @@ static void TopBar_Draw(Component *base) {
   float btnSpacing = S(8);
 
   t->btnBrowseW = S(84);
-  t->btnTagListW = t->btnBrowseW;
+  t->btnMixerW = t->btnBrowseW;
   t->btnInfoW = t->btnBrowseW;
   t->btnSettingsW = t->btnBrowseW;
 
@@ -60,14 +60,15 @@ static void TopBar_Draw(Component *base) {
   float centerX = (SCREEN_WIDTH - totalCenterW) / 2.0f;
 
   t->btnBrowseX = centerX;
-  t->btnTagListX = t->btnBrowseX + t->btnBrowseW + btnSpacing;
-  t->btnInfoX = t->btnTagListX + t->btnTagListW + btnSpacing;
+  t->btnMixerX = t->btnBrowseX + t->btnBrowseW + btnSpacing;
+  t->btnInfoX = t->btnMixerX + t->btnMixerW + btnSpacing;
   t->btnSettingsX = t->btnInfoX + t->btnInfoW + btnSpacing;
 
   Font iconFace = UIFonts_GetIcon(S(8));
 
   // Draw BROWSE
-  DrawRectangle(t->btnBrowseX, btnY, t->btnBrowseW, btnH, ColorDark1);
+  DrawRectangle(t->btnBrowseX, btnY, t->btnBrowseW, btnH, 
+                t->ActiveScreen == ScreenBrowser ? ColorBlue : ColorDark1);
   DrawRectangleLines(t->btnBrowseX, btnY, t->btnBrowseW, btnH, ColorShadow);
   {
     float iconW = MeasureTextEx(iconFace, "\xef\x80\x82", S(8), 1.0f).x; // f002
@@ -80,22 +81,24 @@ static void TopBar_Draw(Component *base) {
                ColorWhite);
   }
 
-  // Draw TAG LIST
-  DrawRectangle(t->btnTagListX, btnY, t->btnTagListW, btnH, ColorDark1);
-  DrawRectangleLines(t->btnTagListX, btnY, t->btnTagListW, btnH, ColorShadow);
+  // Draw MIXER
+  DrawRectangle(t->btnMixerX, btnY, t->btnMixerW, btnH, 
+                t->ActiveScreen == ScreenMixer ? ColorBlue : ColorDark1);
+  DrawRectangleLines(t->btnMixerX, btnY, t->btnMixerW, btnH, ColorShadow);
   {
-    float iconW = MeasureTextEx(iconFace, "\xef\x80\xae", S(8), 1.0f).x; // f02e
-    float textW = MeasureTextEx(faceSm, "TAG LIST", S(9), 1.0f).x;
+    float iconW = MeasureTextEx(iconFace, "\xef\x87\xde", S(8), 1.0f).x; // f1de
+    float textW = MeasureTextEx(faceSm, "MIXER", S(9), 1.0f).x;
     float spacing = S(4);
     float totalW = iconW + spacing + textW;
-    float startX = t->btnTagListX + (t->btnTagListW - totalW) / 2.0f;
-    UIDrawText("\xef\x80\xae", iconFace, startX, btnY + S(3), S(8), ColorWhite);
-    UIDrawText("TAG LIST", faceSm, startX + iconW + spacing, btnY + S(2.5f),
+    float startX = t->btnMixerX + (t->btnMixerW - totalW) / 2.0f;
+    UIDrawText("\xef\x87\xde", iconFace, startX, btnY + S(3), S(8), ColorWhite);
+    UIDrawText("MIXER", faceSm, startX + iconW + spacing, btnY + S(2.5f),
                S(9), ColorWhite);
   }
 
   // Draw INFO
-  DrawRectangle(t->btnInfoX, btnY, t->btnInfoW, btnH, ColorDark1);
+  DrawRectangle(t->btnInfoX, btnY, t->btnInfoW, btnH, 
+                t->ActiveScreen == ScreenInfo ? ColorBlue : ColorDark1);
   DrawRectangleLines(t->btnInfoX, btnY, t->btnInfoW, btnH, ColorShadow);
   {
     float iconW = MeasureTextEx(iconFace, "\xef\x84\xa9", S(8), 1.0f).x; // f129
@@ -109,7 +112,8 @@ static void TopBar_Draw(Component *base) {
   }
 
   // Draw MENU
-  DrawRectangle(t->btnSettingsX, btnY, t->btnSettingsW, btnH, ColorDark1);
+  DrawRectangle(t->btnSettingsX, btnY, t->btnSettingsW, btnH, 
+                t->ActiveScreen == ScreenSettings ? ColorBlue : ColorDark1);
   DrawRectangleLines(t->btnSettingsX, btnY, t->btnSettingsW, btnH, ColorShadow);
   {
     float iconW = MeasureTextEx(iconFace, "\xef\x80\x93", S(8), 1.0f).x; // f013
@@ -168,7 +172,7 @@ void TopBar_Init(TopBar *t) {
   t->MarginX = S(4);
   t->BatteryLevel = 0.85f;
   t->OnBrowse = NULL;
-  t->OnTagList = NULL;
+  t->OnMixer = NULL;
   t->OnInfo = NULL;
   t->OnSettings = NULL;
   t->callbackCtx = NULL;

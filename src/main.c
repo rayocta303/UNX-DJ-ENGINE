@@ -16,18 +16,12 @@
 #include "core/logic/sync.h"
 #include "core/logic/settings_io.h"
 #include "ui/components/helpers.h"
+#include "core/audio_backend.h"
 #include "core/midi/midi_handler.h"
 #include "core/logic/control_object.h"
+#include "core/audio_backend.h"
 
-typedef enum {
-    ScreenPlayer,
-    ScreenBrowser,
-    ScreenInfo,
-    ScreenSettings,
-    ScreenAbout,
-    ScreenMixer,
-    ScreenSplash
-} CurrentScreen;
+
 
 typedef struct {
     CurrentScreen screen;
@@ -55,33 +49,14 @@ typedef struct {
     KeyboardMapping keyMap;
     MidiContext midiCtx;
     bool showExitConfirm;
+    AudioBackendConfig activeAudioConfig;
 } App;
 
 AudioEngine *globalAudioEngine = NULL;
 
-void AudioProcessCallback(void *buffer, unsigned int frames) {
+void AudioProcessCallback(float *buffer, unsigned int frames) {
     if (globalAudioEngine) {
-#if defined(PLATFORM_DRM)
-        // On DRM/ALSA target, we assume 4 channel output is ready
-        AudioEngine_Process(globalAudioEngine, (float*)buffer, frames);
-#else
-        // On Windows/Others (Stereo), we process 4 channels internally and downmix
-        static float temp4Ch[4096 * 4];
-        AudioEngine_Process(globalAudioEngine, temp4Ch, frames);
-        
-        float *out = (float*)buffer;
-        for (unsigned int s = 0; s < frames; s++) {
-            // Mix Master (1-2) and Cue (3-4) for stereo monitoring
-            out[s*2] = temp4Ch[s*4] + temp4Ch[s*4 + 2] * 0.5f;
-            out[s*2+1] = temp4Ch[s*4 + 1] + temp4Ch[s*4 + 3] * 0.5f;
-            
-            // Hard clip for safety
-            if (out[s*2] > 1.0f) out[s*2] = 1.0f;
-            if (out[s*2] < -1.0f) out[s*2] = -1.0f;
-            if (out[s*2+1] > 1.0f) out[s*2+1] = 1.0f;
-            if (out[s*2+1] < -1.0f) out[s*2+1] = -1.0f;
-        }
-#endif
+        AudioEngine_Process(globalAudioEngine, buffer, frames);
     }
 }
 
@@ -110,19 +85,107 @@ void OnSettingsApply(void *ctx) {
            a->deckA.Waveform.GainMid, a->deckA.Waveform.GainHigh,
            a->deckA.Waveform.VinylStartMs, a->deckA.Waveform.VinylStopMs,
            a->deckA.Waveform.LoadLock);
+           
+    // Apply Audio backend settings
+    AudioBackendConfig aconf = {
+        .DeviceIndex = a->settingsState.Items[8].Current - 1, // 0 is System Default
+        .MasterOutL = a->settingsState.Items[9].Current,
+        .MasterOutR = a->settingsState.Items[10].Current,
+        .CueOutL = a->settingsState.Items[11].Current,
+        .CueOutR = a->settingsState.Items[12].Current,
+        .SampleRate = (a->settingsState.Items[14].Current == 0) ? 44100 : 48000,
+    };
+    int bufMap[] = {128, 256, 512, 1024};
+    aconf.BufferSizeFrames = bufMap[a->settingsState.Items[13].Current];
+    
+    // Auto-restart audio ONLY if hardware-critical config changed
+    bool audioChanged = (aconf.DeviceIndex != a->activeAudioConfig.DeviceIndex) ||
+                        (aconf.SampleRate != a->activeAudioConfig.SampleRate) ||
+                        (aconf.BufferSizeFrames != a->activeAudioConfig.BufferSizeFrames) ||
+                        (aconf.MasterOutL != a->activeAudioConfig.MasterOutL) ||
+                        (aconf.MasterOutR != a->activeAudioConfig.MasterOutR) ||
+                        (aconf.CueOutL != a->activeAudioConfig.CueOutL) ||
+                        (aconf.CueOutR != a->activeAudioConfig.CueOutR);
+
+    if (audioChanged) {
+        printf("[SETTINGS] Audio Hardware config changed, restarting backend...\n");
+        AudioBackend_Start(aconf, AudioProcessCallback);
+        a->activeAudioConfig = aconf;
+    }
 
     Settings_Save(a->deckA.Waveform, a->deckB.Waveform);
+}
+
+void OnSettingsClose(void *ctx) {
+    App *a = (App*)ctx;
     a->screen = ScreenPlayer;
     a->settingsState.IsActive = false;
 }
 
 void OnSettingsAction(void *ctx, int idx) {
     App *a = (App*)ctx;
-    if (idx == 8) { // ABOUT
+    if (idx == 15) { // ABOUT
         a->screen = ScreenAbout;
         a->aboutState.IsActive = true;
-    } else if (idx == 9) { // EXIT APPLICATION
+    } else if (idx == 16) { // EXIT APPLICATION
         a->showExitConfirm = true;
+    }
+}
+
+void TopBar_OnBrowse(void *ctx) {
+    App *a = (App*)ctx;
+    if (a->screen == ScreenBrowser) {
+        a->screen = ScreenPlayer;
+        a->browserState.IsActive = false;
+    } else {
+        a->screen = ScreenBrowser;
+        a->browserState.IsActive = true;
+    }
+}
+
+void TopBar_OnMixer(void *ctx) {
+    App *a = (App*)ctx;
+    if (a->screen == ScreenMixer) {
+        a->screen = ScreenPlayer;
+        a->mixerState.IsActive = false;
+    } else {
+        a->screen = ScreenMixer;
+        a->mixerState.IsActive = true;
+        a->mixerState.AudioPlugin = globalAudioEngine;
+    }
+}
+
+void TopBar_OnInfo(void *ctx) {
+    App *a = (App*)ctx;
+    if (a->screen == ScreenInfo) {
+        a->screen = ScreenPlayer;
+        a->infoState.IsActive = false;
+    } else {
+        a->screen = ScreenInfo;
+        a->infoState.IsActive = true;
+        
+        // Sync Info State
+        for (int i=0; i<2; i++) {
+            DeckState *ds = (i == 0) ? &a->deckA : &a->deckB;
+            InfoTrack *it = &a->infoState.Tracks[i];
+            strcpy(it->Title, ds->TrackTitle);
+            strcpy(it->Artist, ds->ArtistName);
+            it->BPM = ds->OriginalBPM;
+            strcpy(it->Key, ds->TrackKey);
+            it->Duration = ds->TrackLengthMs / 1000;
+            strcpy(it->Source, ds->SourceName);
+        }
+    }
+}
+
+void TopBar_OnSettings(void *ctx) {
+    App *a = (App*)ctx;
+    if (a->screen == ScreenSettings) {
+        a->screen = ScreenPlayer;
+        a->settingsState.IsActive = false;
+    } else {
+        a->screen = ScreenSettings;
+        a->settingsState.IsActive = true;
     }
 }
 
@@ -220,12 +283,65 @@ void App_Init(App *a) {
     a->settingsState.Items[7].Value = a->deckA.Waveform.VinylStopMs;
     strcpy(a->settingsState.Items[7].Unit, "ms");
     
-    strcpy(a->settingsState.Items[8].Label, "ABOUT");
-    a->settingsState.Items[8].Type = SETTING_TYPE_ACTION;
+    // --- Audio Configurations ---
+    AudioDeviceInfo devs[MAX_AUDIO_DEVICES];
+    int devCount = AudioBackend_GetDevices(devs, MAX_AUDIO_DEVICES);
 
-    strcpy(a->settingsState.Items[9].Label, "EXIT APPLICATION");
-    a->settingsState.Items[9].Type = SETTING_TYPE_ACTION;
-    a->settingsState.ItemsCount = 10;
+    strcpy(a->settingsState.Items[8].Label, "AUDIO DEVICE");
+    a->settingsState.Items[8].Type = SETTING_TYPE_LIST;
+    a->settingsState.Items[8].OptionsCount = devCount + 1;
+    strcpy(a->settingsState.Items[8].Options[0], "System Default");
+    for (int i=0; i<devCount && i < 31; i++) {
+        snprintf(a->settingsState.Items[8].Options[i+1], 32, "%.31s", devs[i].Name);
+    }
+    a->settingsState.Items[8].Current = 0;
+
+    strcpy(a->settingsState.Items[9].Label, "MASTER LEFT");
+    a->settingsState.Items[9].Type = SETTING_TYPE_LIST;
+    a->settingsState.Items[9].OptionsCount = 8;
+    for(int i=0; i<8; i++) sprintf(a->settingsState.Items[9].Options[i], "CH %d", i+1);
+    a->settingsState.Items[9].Current = 0;
+
+    strcpy(a->settingsState.Items[10].Label, "MASTER RIGHT");
+    a->settingsState.Items[10].Type = SETTING_TYPE_LIST;
+    a->settingsState.Items[10].OptionsCount = 8;
+    for(int i=0; i<8; i++) sprintf(a->settingsState.Items[10].Options[i], "CH %d", i+1);
+    a->settingsState.Items[10].Current = 1;
+
+    strcpy(a->settingsState.Items[11].Label, "CUE LEFT");
+    a->settingsState.Items[11].Type = SETTING_TYPE_LIST;
+    a->settingsState.Items[11].OptionsCount = 8;
+    for(int i=0; i<8; i++) sprintf(a->settingsState.Items[11].Options[i], "CH %d", i+1);
+    a->settingsState.Items[11].Current = 2;
+
+    strcpy(a->settingsState.Items[12].Label, "CUE RIGHT");
+    a->settingsState.Items[12].Type = SETTING_TYPE_LIST;
+    a->settingsState.Items[12].OptionsCount = 8;
+    for(int i=0; i<8; i++) sprintf(a->settingsState.Items[12].Options[i], "CH %d", i+1);
+    a->settingsState.Items[12].Current = 3;
+
+    strcpy(a->settingsState.Items[13].Label, "BUFFER SIZE");
+    a->settingsState.Items[13].Type = SETTING_TYPE_LIST;
+    a->settingsState.Items[13].OptionsCount = 4;
+    strcpy(a->settingsState.Items[13].Options[0], "128");
+    strcpy(a->settingsState.Items[13].Options[1], "256");
+    strcpy(a->settingsState.Items[13].Options[2], "512");
+    strcpy(a->settingsState.Items[13].Options[3], "1024");
+    a->settingsState.Items[13].Current = 1;
+
+    strcpy(a->settingsState.Items[14].Label, "SAMPLE RATE");
+    a->settingsState.Items[14].Type = SETTING_TYPE_LIST;
+    a->settingsState.Items[14].OptionsCount = 2;
+    strcpy(a->settingsState.Items[14].Options[0], "44.1 kHz");
+    strcpy(a->settingsState.Items[14].Options[1], "48.0 kHz");
+    a->settingsState.Items[14].Current = 1;
+
+    strcpy(a->settingsState.Items[15].Label, "ABOUT");
+    a->settingsState.Items[15].Type = SETTING_TYPE_ACTION;
+
+    strcpy(a->settingsState.Items[16].Label, "EXIT APPLICATION");
+    a->settingsState.Items[16].Type = SETTING_TYPE_ACTION;
+    a->settingsState.ItemsCount = 17;
 
     // Set Load Lock current opt
     a->settingsState.Items[1].Current = a->deckA.Waveform.LoadLock ? 1 : 0;
@@ -246,6 +362,12 @@ void App_Init(App *a) {
 
     // Init Components
     TopBar_Init(&a->topbar);
+    a->topbar.callbackCtx = a;
+    a->topbar.OnBrowse = TopBar_OnBrowse;
+    a->topbar.OnMixer = TopBar_OnMixer;
+    a->topbar.OnInfo = TopBar_OnInfo;
+    a->topbar.OnSettings = TopBar_OnSettings;
+    
     DeckStrip_Init(&a->stripA, 0, &a->deckA);
     DeckStrip_Init(&a->stripB, 1, &a->deckB);
     PlayerRenderer_Init(&a->player, &a->deckA, &a->deckB, &a->fxState, NULL);
@@ -253,9 +375,20 @@ void App_Init(App *a) {
     InfoRenderer_Init(&a->info, &a->infoState);
     SettingsRenderer_Init(&a->settings, &a->settingsState);
     a->settings.OnApply = OnSettingsApply;
-    a->settings.OnClose = OnSettingsApply;
+    a->settings.OnClose = OnSettingsClose;
     a->settings.OnAction = OnSettingsAction;
     a->settings.callbackCtx = a;
+    
+    // Default active audio config (matches main's initialAudioCfg)
+    a->activeAudioConfig = (AudioBackendConfig){
+        .DeviceIndex = -1,
+        .MasterOutL = 0,
+        .MasterOutR = 1,
+        .CueOutL = 2,
+        .CueOutR = 3,
+        .SampleRate = 48000,
+        .BufferSizeFrames = 256
+    };
     AboutRenderer_Init(&a->about, &a->aboutState);
     MixerRenderer_Init(&a->mixer, &a->mixerState);
     SplashRenderer_Init(&a->splash, &a->splashCounter);
@@ -289,9 +422,19 @@ int main(void) {
 
     MIDI_Init(&app.midiCtx);
 
-    // Initialize Audio
-    InitAudioDevice();
-    SetAudioStreamBufferSizeDefault(1024);
+    // Initialize Audio Backend
+    AudioBackend_Init();
+    
+    AudioBackendConfig initialAudioCfg = {
+        .DeviceIndex = -1,
+        .MasterOutL = 0,
+        .MasterOutR = 1,
+        .CueOutL = 2,
+        .CueOutR = 3,
+        .SampleRate = 48000,
+        .BufferSizeFrames = 256
+    };
+    AudioBackend_Start(initialAudioCfg, AudioProcessCallback);
     
     AudioEngine audioEngine;
     AudioEngine_Init(&audioEngine);
@@ -318,14 +461,13 @@ int main(void) {
 
     CO_Register("[Master]", "crossfader", CO_TYPE_FLOAT, &audioEngine.Crossfader, -1.0f, 1.0f);
 
-    // Attach custom audio processor via a global wrapper pointer since raylib callback takes no context
     globalAudioEngine = &audioEngine;
-    SetAudioStreamBufferSizeDefault(4096);
-    AttachAudioMixedProcessor(AudioProcessCallback);
 
     while (!WindowShouldClose()) {
         // Cache scale for this frame based on current window size
         UI_UpdateScale();
+
+        app.topbar.ActiveScreen = app.screen;
 
         // Navigation Logic (Mock)
         if (app.screen == ScreenSplash) {

@@ -3,7 +3,7 @@
 #include "ui/components/component.h"
 #include <stdbool.h>
 
-#define MAX_SETTING_OPTIONS 8
+#define MAX_SETTING_OPTIONS 32
 #define MAX_SETTINGS_ITEMS 32
 
 typedef enum {
@@ -34,6 +34,10 @@ typedef struct {
   int ItemsCount;
   int CursorPos;
   int Scroll;
+  float TouchDragAccumulator;
+  bool IsDropdownOpen;
+  int DropdownItemIdx;
+  float DropdownScroll;
 } SettingsState;
 
 typedef struct SettingsRenderer SettingsRenderer;

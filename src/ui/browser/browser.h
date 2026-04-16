@@ -43,6 +43,11 @@ typedef struct {
     bool IsDragging;
     int DraggingIdx;         // Playlist index being dragged
     int DraggingType;        // 0=Tracks, 1=Playlists
+    
+    // Touch scrolling and Popups
+    float TouchDragAccumulator;
+    bool ShowLoadPopup;
+    int PopupTrackIdx;
 } BrowserState;
 
 void Browser_RefreshStorages(BrowserState *s);

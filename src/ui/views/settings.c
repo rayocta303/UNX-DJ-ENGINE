@@ -3,6 +3,7 @@
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
 #include <stdio.h>
+#include <math.h>
 
 
 static int Settings_Update(Component *base) {
@@ -10,7 +11,84 @@ static int Settings_Update(Component *base) {
   if (!r->State->IsActive)
     return 0;
 
-  if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+  Vector2 mouse = GetMousePosition();
+
+  // Handle dropdown intercept
+  if (r->State->IsDropdownOpen) {
+      SettingItem *item = &r->State->Items[r->State->DropdownItemIdx];
+      float winH = GetScreenHeight() - DECK_STR_H;
+      float winW = GetScreenWidth();
+      
+      float dropdownW = S(200.0f);
+      float opHeight = S(40.0f);
+      float contentH = item->OptionsCount * opHeight;
+      float dropdownH = contentH > (winH * 0.7f) ? (winH * 0.7f) : contentH;
+      float dropdownX = (winW - dropdownW) / 2.0f;
+      float dropdownY = (winH - dropdownH) / 2.0f;
+      
+      Rectangle dropRect = { dropdownX, dropdownY, dropdownW, dropdownH };
+      
+      // Scroll handling for dropdown
+      Vector2 mouseReq = GetMouseDelta();
+      r->State->DropdownScroll -= GetMouseWheelMove() * S(30.0f);
+      if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse, dropRect)) {
+          r->State->DropdownScroll -= mouseReq.y;
+      }
+      
+      float maxScroll = contentH - dropdownH;
+      if (maxScroll < 0) maxScroll = 0;
+      if (r->State->DropdownScroll < 0) r->State->DropdownScroll = 0;
+      if (r->State->DropdownScroll > maxScroll) r->State->DropdownScroll = maxScroll;
+      
+      if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+          if (!CheckCollisionPointRec(mouse, dropRect)) {
+              r->State->IsDropdownOpen = false;
+          } else {
+              float cy = dropdownY - r->State->DropdownScroll;
+              for(int i=0; i<item->OptionsCount; i++) {
+                  Rectangle opRect = { dropdownX, cy, dropdownW, opHeight };
+                  if (CheckCollisionPointRec(mouse, opRect) && cy >= dropdownY && (cy + opHeight) <= (dropdownY + dropdownH)) {
+                      if (fabsf(r->State->TouchDragAccumulator) < 10.0f) {
+                          item->Current = i;
+                          r->State->IsDropdownOpen = false;
+                          if (r->OnApply) r->OnApply(r->callbackCtx);
+                      }
+                  }
+                  cy += opHeight;
+              }
+          }
+      }
+      
+      if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
+         r->State->IsDropdownOpen = false;
+      }
+      return 1; // block background UI interaction
+  }
+
+  if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+    Vector2 delta = GetMouseDelta();
+    r->State->TouchDragAccumulator += delta.y;
+    
+    int visibleRows = 12;
+    float threshold = S(20.0f);
+    if (r->State->TouchDragAccumulator < -threshold) { 
+      if (r->State->Scroll + visibleRows < r->State->ItemsCount) {
+        r->State->Scroll++;
+      }
+      r->State->TouchDragAccumulator = 0;
+    } else if (r->State->TouchDragAccumulator > threshold) {
+      if (r->State->Scroll > 0) {
+        r->State->Scroll--;
+      }
+      r->State->TouchDragAccumulator = 0;
+    }
+  }
+
+  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+      r->State->TouchDragAccumulator = 0;
+  }
+
+  if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
     Vector2 mouse = UIGetMousePosition();
     float divY = SCREEN_HEIGHT - S(28.0f);
 
@@ -46,20 +124,19 @@ static int Settings_Update(Component *base) {
       float ry = TOP_BAR_H + (i * rowH);
       Rectangle rowRect = {0, ry, SCREEN_WIDTH, rowH};
 
-      if (CheckCollisionPointRec(mouse, rowRect)) {
-        static float lastClickTime = 0;
-        float now = GetTime();
-
-        if (r->State->CursorPos == i && (now - lastClickTime < 0.3f)) {
-          // Double click or confirmed select on item
-          SettingItem *clickedItem = &r->State->Items[idx];
-          if (clickedItem->Type == SETTING_TYPE_ACTION) {
-            if (r->OnAction)
-              r->OnAction(r->callbackCtx, idx);
-          }
+      if (CheckCollisionPointRec(mouse, rowRect) && fabsf(r->State->TouchDragAccumulator) < 10.0f) {
+        r->State->CursorPos = i; 
+        
+        SettingItem *clickedItem = &r->State->Items[idx];
+        if (clickedItem->Type == SETTING_TYPE_ACTION) {
+           if (r->OnAction)
+             r->OnAction(r->callbackCtx, idx);
+        } else if (clickedItem->Type == SETTING_TYPE_LIST) {
+            r->State->IsDropdownOpen = true;
+            r->State->DropdownItemIdx = idx;
+            r->State->DropdownScroll = 0;
+            return 1;
         }
-        r->State->CursorPos = i;
-        lastClickTime = now;
       }
     }
   }
@@ -90,12 +167,20 @@ static int Settings_Update(Component *base) {
           item->Current--;
         else
           item->Current = item->OptionsCount - 1;
+        if (r->OnApply) r->OnApply(r->callbackCtx);
       }
       if (IsKeyPressed(KEY_RIGHT)) {
         if (item->Current < item->OptionsCount - 1)
           item->Current++;
         else
           item->Current = 0;
+        if (r->OnApply) r->OnApply(r->callbackCtx);
+      }
+      if (IsKeyPressed(KEY_ENTER)) {
+          r->State->IsDropdownOpen = true;
+          r->State->DropdownItemIdx = idx;
+          r->State->DropdownScroll = 0;
+          return 0;
       }
     } else if (item->Type == SETTING_TYPE_KNOB) {
       float step = (item->Max - item->Min) / 20.0f; // 5% steps
@@ -108,6 +193,10 @@ static int Settings_Update(Component *base) {
         item->Value += step * GetFrameTime() * 10.0f;
         if (item->Value > item->Max)
           item->Value = item->Max;
+      }
+      
+      if (IsKeyReleased(KEY_LEFT) || IsKeyReleased(KEY_RIGHT)) {
+          if (r->OnApply) r->OnApply(r->callbackCtx);
       }
     } else if (item->Type == SETTING_TYPE_ACTION) {
       if (IsKeyPressed(KEY_ENTER)) {
@@ -135,7 +224,8 @@ static void Settings_Draw(Component *base) {
   if (!r->State->IsActive)
     return;
 
-  DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ColorBGUtil);
+  float viewH = SCREEN_HEIGHT - DECK_STR_H;
+  DrawRectangle(0, 0, SCREEN_WIDTH, viewH, ColorBGUtil);
 
   Font faceXS = UIFonts_GetFace(S(9));
   Font faceSm = UIFonts_GetFace(S(11));
@@ -194,11 +284,11 @@ static void Settings_Draw(Component *base) {
   DrawScrollbar(r->State->ItemsCount, r->State->Scroll + r->State->CursorPos,
                 visibleRows);
 
-  float divY = SCREEN_HEIGHT - S(28.0f);
+  float divY = viewH - S(28.0f);
   DrawLine(S(4), divY, SCREEN_WIDTH - S(4), divY, ColorDark1);
 
   DrawRectangle(S(30), divY + S(4), S(80), S(18), ColorDGreen);
-  UIDrawText("APPLY", faceSm, S(44), divY + S(7), S(11), ColorBlack);
+  UIDrawText("DONE", faceSm, S(48), divY + S(7), S(11), ColorBlack);
 
   char countStr[32];
   sprintf(countStr, "%d / %d", r->State->Scroll + r->State->CursorPos + 1,
@@ -211,6 +301,51 @@ static void Settings_Draw(Component *base) {
                      ColorShadow);
   UIDrawText("CLOSE", faceSm, SCREEN_WIDTH - S(90), divY + S(7), S(11),
              ColorWhite);
+
+  // Draw Dropdown Overlay
+  if (r->State->IsDropdownOpen) {
+      DrawRectangle(0, 0, SCREEN_WIDTH, viewH, (Color){ 0, 0, 0, 200 }); // Dim BG
+      
+      SettingItem *item = &r->State->Items[r->State->DropdownItemIdx];
+      float winW = GetScreenWidth();
+      float dropdownW = S(200.0f);
+      float opHeight = S(40.0f);
+      float contentH = item->OptionsCount * opHeight;
+      float dropdownH = contentH > (viewH * 0.7f) ? (viewH * 0.7f) : contentH;
+      float dropdownX = (winW - dropdownW) / 2.0f;
+      float dropdownY = (viewH - dropdownH) / 2.0f;
+      
+      Rectangle dropRect = { dropdownX, dropdownY, dropdownW, dropdownH };
+      
+      BeginScissorMode(dropRect.x, dropRect.y, dropRect.width, dropRect.height);
+      DrawRectangleRec(dropRect, ColorBGUtil);
+      
+      float cy = dropdownY - r->State->DropdownScroll;
+      for(int i=0; i<item->OptionsCount; i++) {
+          Rectangle opRect = { dropdownX, cy, dropdownW, opHeight };
+          
+          if (cy + opHeight > dropdownY && cy < dropdownY + dropdownH) {
+              if (item->Current == i) {
+                  DrawRectangleRec(opRect, ColorGray);
+              } else {
+                  DrawRectangleRec(opRect, ColorDark1);
+              }
+              DrawRectangleLinesEx(opRect, 1, ColorShadow);
+              UIDrawText(item->Options[i], faceMd, dropdownX + S(20), cy + S(12), S(15), (item->Current == i) ? ColorOrange : ColorWhite);
+          }
+          cy += opHeight;
+      }
+      EndScissorMode();
+      
+      DrawRectangleLinesEx(dropRect, 2, ColorOrange);
+      
+      // Draw dropdown scrollbar if needed
+      if (contentH > dropdownH) {
+          float sbY = dropdownY + (r->State->DropdownScroll / contentH) * dropdownH;
+          float sbH = (dropdownH / contentH) * dropdownH;
+          DrawRectangle(dropdownX + dropdownW - S(4), sbY, S(4), sbH, ColorOrange);
+      }
+  }
 }
 
 void SettingsRenderer_Init(SettingsRenderer *r, SettingsState *state) {
