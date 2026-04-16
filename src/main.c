@@ -484,6 +484,43 @@ int main(void) {
   globalAudioEngine = &audioEngine;
 
   while (!WindowShouldClose()) {
+    // --- Sync Audio Engine State to UI State ---
+    if (audioEngine.Decks[0].PCMBuffer) {
+      // Position is already frame-based (L+R pair = 1 frame)
+      double playheadFrames = audioEngine.Decks[0].Position;
+      double srA = (double)audioEngine.Decks[0].SampleRate;
+      if (srA < 8000)
+        srA = 44100.0;
+
+      app.deckA.Position = (playheadFrames * 150.0) / srA;
+      app.deckA.IsTouching = audioEngine.Decks[0].IsTouching;
+      app.deckA.IsPlaying = audioEngine.Decks[0].IsPlaying;
+
+      double posSec = playheadFrames / srA;
+      app.deckA.PositionMs = (long long)(posSec * 1000.0);
+
+      double lenSec =
+          ((double)audioEngine.Decks[0].TotalSamples / (double)CHANNELS) / srA;
+      app.deckA.TrackLengthMs = (long long)(lenSec * 1000.0);
+    }
+    if (audioEngine.Decks[1].PCMBuffer) {
+      double playheadFrames = audioEngine.Decks[1].Position;
+      double srB = (double)audioEngine.Decks[1].SampleRate;
+      if (srB < 8000)
+        srB = 44100.0;
+
+      app.deckB.Position = (playheadFrames * 150.0) / srB;
+      app.deckB.IsTouching = audioEngine.Decks[1].IsTouching;
+      app.deckB.IsPlaying = audioEngine.Decks[1].IsPlaying;
+
+      double posSec = playheadFrames / srB;
+      app.deckB.PositionMs = (long long)(posSec * 1000.0);
+
+      double lenSec =
+          ((double)audioEngine.Decks[1].TotalSamples / (double)CHANNELS) / srB;
+      app.deckB.TrackLengthMs = (long long)(lenSec * 1000.0);
+    }
+
     // Cache scale for this frame based on current window size
     UI_UpdateScale();
 
@@ -644,42 +681,7 @@ int main(void) {
           1.0f / ((ds->Waveform.VinylStopMs / 1000.0f) * blocksPerSec + 1.0f);
     }
 
-    // --- Sync Audio Engine State to UI State ---
-    if (audioEngine.Decks[0].PCMBuffer) {
-      // Position is already frame-based (L+R pair = 1 frame)
-      double playheadFrames = audioEngine.Decks[0].Position;
-      double srA = (double)audioEngine.Decks[0].SampleRate;
-      if (srA < 8000)
-        srA = 44100.0;
 
-      app.deckA.Position = (playheadFrames * 150.0) / srA;
-      app.deckA.IsTouching = audioEngine.Decks[0].IsTouching;
-      app.deckA.IsPlaying = audioEngine.Decks[0].IsPlaying;
-
-      double posSec = playheadFrames / srA;
-      app.deckA.PositionMs = (long long)(posSec * 1000.0);
-
-      double lenSec =
-          ((double)audioEngine.Decks[0].TotalSamples / (double)CHANNELS) / srA;
-      app.deckA.TrackLengthMs = (long long)(lenSec * 1000.0);
-    }
-    if (audioEngine.Decks[1].PCMBuffer) {
-      double playheadFrames = audioEngine.Decks[1].Position;
-      double srB = (double)audioEngine.Decks[1].SampleRate;
-      if (srB < 8000)
-        srB = 44100.0;
-
-      app.deckB.Position = (playheadFrames * 150.0) / srB;
-      app.deckB.IsTouching = audioEngine.Decks[1].IsTouching;
-      app.deckB.IsPlaying = audioEngine.Decks[1].IsPlaying;
-
-      double posSec = playheadFrames / srB;
-      app.deckB.PositionMs = (long long)(posSec * 1000.0);
-
-      double lenSec =
-          ((double)audioEngine.Decks[1].TotalSamples / (double)CHANNELS) / srB;
-      app.deckB.TrackLengthMs = (long long)(lenSec * 1000.0);
-    }
 
     if (IsKeyPressed(app.keyMap.toggleInfo)) {
       if (app.screen == ScreenInfo) {
