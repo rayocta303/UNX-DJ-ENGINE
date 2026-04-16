@@ -6,9 +6,12 @@
 
 typedef struct {
     char Name[128];
+    char BackendName[32];
     void* ID; // Pointer to ma_device_id internals
+    int NativeChannels;
     int MinChannels;
     int MaxChannels;
+    int PreferredSampleRate;
     bool IsDefault;
 } AudioDeviceInfo;
 
@@ -23,6 +26,9 @@ typedef struct {
 } AudioBackendConfig;
 
 typedef void (*AudioBackendCallback)(float* buffer, unsigned int frames);
+
+// Returns actual hardware configuration of the currently active device.
+void AudioBackend_GetActiveInfo(int* outChannels, int* outSampleRate, char* outBackendName);
 
 bool AudioBackend_Init(void);
 void AudioBackend_Terminate(void);

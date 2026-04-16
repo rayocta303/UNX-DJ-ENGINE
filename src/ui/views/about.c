@@ -1,4 +1,5 @@
 #include "ui/views/about.h"
+#include "version.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
@@ -42,7 +43,7 @@ static void About_Draw(Component *base) {
 
   // Main Card Layout
   float cardW = S(320);
-  float cardH = S(210);
+  float cardH = S(235); // Increased height for driver info
   float cardX = centerX - (cardW / 2.0f);
   float cardY = centerY - (cardH / 2.0f) + S(10);
 
@@ -53,10 +54,8 @@ static void About_Draw(Component *base) {
                        ColorGray);
 
   // Brand Section (Top part of card)
-  UIDrawText("UNX DJ ENGINE", faceLg, centerX - S(55), cardY + S(25), S(18),
-             ColorOrange);
-  UIDrawText(r->State->Version, faceSm, centerX - S(30), cardY + S(50), S(10),
-             ColorShadow);
+  UIDrawText(APP_NAME " DJ ENGINE", faceLg, centerX - S(55), cardY + S(25), S(18), ColorOrange);
+  UIDrawText(r->State->Version, faceSm, centerX - S(30), cardY + S(50), S(10), ColorShadow);
 
   DrawLine(cardX + S(20), cardY + S(75), cardX + cardW - S(20), cardY + S(75),
            ColorGray);
@@ -84,12 +83,14 @@ static void About_Draw(Component *base) {
              startY + rowSpacing + S(6), S(13), ColorOrange);
 
   // System Info
-  UIDrawText("\xef\x90\xbc", iconMain, labelX - S(10), startY + rowSpacing * 2,
-             S(14), ColorShadow); // Microchip icon
-  UIDrawText("PLATFORM", faceXS, labelX + S(15), startY + rowSpacing * 2 - S(6),
-             S(8), ColorShadow);
-  UIDrawText("Native (Pico Engine)", faceMd, labelX + S(15),
-             startY + rowSpacing * 2 + S(6), S(13), ColorWhite);
+  UIDrawText("\xef\x90\xbc", iconMain, labelX - S(10), startY + rowSpacing * 2, S(14), ColorShadow); // Microchip icon
+  UIDrawText("PLATFORM", faceXS, labelX + S(15), startY + rowSpacing * 2 - S(6), S(8), ColorShadow);
+  UIDrawText(APP_PLATFORM, faceMd, labelX + S(15), startY + rowSpacing * 2 + S(6), S(13), ColorWhite);
+
+  // Audio Driver Info
+  UIDrawText("\xef\x80\x81", iconMain, labelX - S(10), startY + rowSpacing * 3, S(14), ColorShadow); // Music icon
+  UIDrawText("DRIVER", faceXS, labelX + S(15), startY + rowSpacing * 3 - S(6), S(8), ColorShadow);
+  UIDrawText(r->State->AudioDriver, faceMd, labelX + S(15), startY + rowSpacing * 3 + S(6), S(13), ColorOrange);
 
   // Bottom text hints
   UIDrawText("Build for everyone.", faceXS, centerX - S(40),

@@ -62,71 +62,31 @@ static void TopBar_Draw(Component *base) {
   t->btnInfoX = t->btnMixerX + t->btnMixerW + btnSpacing;
   t->btnSettingsX = t->btnInfoX + t->btnInfoW + btnSpacing;
 
-  Font iconFace = UIFonts_GetIcon(S(8));
+  Font faceBold = UIFonts_GetBoldFace(S(9));
 
   // Draw BROWSE
   DrawRectangle(t->btnBrowseX, btnY, t->btnBrowseW, btnH,
                 t->ActiveScreen == ScreenBrowser ? ColorBlue : ColorDark1);
   DrawRectangleLines(t->btnBrowseX, btnY, t->btnBrowseW, btnH, ColorShadow);
-  {
-    float iconW = MeasureTextEx(iconFace, "\xef\x80\x82", S(8), 1.0f).x; // f002
-    float textW = MeasureTextEx(faceSm, "BROWSE", S(9), 1.0f).x;
-    float spacing = S(4);
-    float totalW = iconW + spacing + textW;
-    float startX = t->btnBrowseX + (t->btnBrowseW - totalW) / 2.0f;
-    // UIDrawText("\xef\x80\x82", iconFace, startX, btnY + S(3), S(8),
-    // ColorWhite);
-    UIDrawText("BROWSE", faceSm, startX + iconW + spacing, btnY + S(2.5f), S(9),
-               ColorWhite);
-  }
+  DrawCentredText("BROWSE", faceBold, t->btnBrowseX, t->btnBrowseW, btnY + S(2.5f), S(9), ColorWhite);
 
   // Draw MIXER
   DrawRectangle(t->btnMixerX, btnY, t->btnMixerW, btnH,
                 t->ActiveScreen == ScreenMixer ? ColorBlue : ColorDark1);
   DrawRectangleLines(t->btnMixerX, btnY, t->btnMixerW, btnH, ColorShadow);
-  {
-    float iconW = MeasureTextEx(iconFace, "\xef\x87\xde", S(8), 1.0f).x; // f1de
-    float textW = MeasureTextEx(faceSm, "MIXER", S(9), 1.0f).x;
-    float spacing = S(4);
-    float totalW = iconW + spacing + textW;
-    float startX = t->btnMixerX + (t->btnMixerW - totalW) / 2.0f;
-    // UIDrawText("\xef\x87\xde", iconFace, startX, btnY + S(3), S(8),
-    // ColorWhite);
-    UIDrawText("MIXER", faceSm, startX + iconW + spacing, btnY + S(2.5f), S(9),
-               ColorWhite);
-  }
+  DrawCentredText("MIXER", faceBold, t->btnMixerX, t->btnMixerW, btnY + S(2.5f), S(9), ColorWhite);
 
   // Draw INFO
   DrawRectangle(t->btnInfoX, btnY, t->btnInfoW, btnH,
                 t->ActiveScreen == ScreenInfo ? ColorBlue : ColorDark1);
   DrawRectangleLines(t->btnInfoX, btnY, t->btnInfoW, btnH, ColorShadow);
-  {
-    float iconW = MeasureTextEx(iconFace, "\xef\x84\xa9", S(8), 1.0f).x; // f129
-    float textW = MeasureTextEx(faceSm, "INFO", S(9), 1.0f).x;
-    float spacing = S(4);
-    float totalW = iconW + spacing + textW;
-    float startX = t->btnInfoX + (t->btnInfoW - totalW) / 2.0f;
-    // UIDrawText("\xef\x84\xa9", iconFace, startX, btnY + S(3), S(8),
-    // ColorWhite);
-    UIDrawText("INFO", faceSm, startX + iconW + spacing, btnY + S(2.5f), S(9),
-               ColorWhite);
-  }
+  DrawCentredText("INFO", faceBold, t->btnInfoX, t->btnInfoW, btnY + S(2.5f), S(9), ColorWhite);
 
   // Draw MENU
   DrawRectangle(t->btnSettingsX, btnY, t->btnSettingsW, btnH,
                 t->ActiveScreen == ScreenSettings ? ColorBlue : ColorDark1);
   DrawRectangleLines(t->btnSettingsX, btnY, t->btnSettingsW, btnH, ColorShadow);
-  {
-    float iconW = MeasureTextEx(iconFace, "\xef\x80\x93", S(8), 1.0f).x; // f013
-    float textW = MeasureTextEx(faceSm, "MENU", S(9), 1.0f).x;
-    float spacing = S(4);
-    float totalW = iconW + spacing + textW;
-    float startX = t->btnSettingsX + (t->btnSettingsW - totalW) / 2.0f;
-    // UIDrawText("\xef\x80\x93", iconFace, startX, btnY + S(3), S(8),
-    // ColorWhite);
-    UIDrawText("MENU", faceSm, startX + iconW + spacing, btnY + S(2.5f), S(9),
-               ColorWhite);
-  }
+  DrawCentredText("MENU", faceBold, t->btnSettingsX, t->btnSettingsW, btnY + S(2.5f), S(9), ColorWhite);
 
   // 3. Right Status & Battery
   float batW = S(20);

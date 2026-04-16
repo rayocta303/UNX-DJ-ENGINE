@@ -1,4 +1,5 @@
 #include "ui/views/splash.h"
+#include "version.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
@@ -43,8 +44,10 @@ static void Splash_Draw(Component *base) {
   }
 
   Font face = UIFonts_GetFace(14);
-  DrawCentredText("Developed by @unxchr", face, 0, SCREEN_WIDTH,
-                  SCREEN_HEIGHT - 60, 14, ColorWhite);
+  char devInfo[128];
+  sprintf(devInfo, "Developed by %s", APP_INSTAGRAM);
+  DrawCentredText(devInfo, face, 0, SCREEN_WIDTH, SCREEN_HEIGHT - 60, 14,
+                  ColorWhite);
 
   // Loading Progress Bar
   if (s->Progress) {
@@ -70,7 +73,7 @@ static void Splash_Draw(Component *base) {
     Color textClr = ColorWhite;
     textClr.a = (unsigned char)(150 + 105 * sinf(pulse));
 
-    UIDrawText("LOADING SYSTEM...", UIFonts_GetFace(S(7.5f)), barX,
+    UIDrawText("LOADING " APP_NAME "...", UIFonts_GetFace(S(7.5f)), barX,
                barY - S(10), S(7.5f), textClr);
   }
 }

@@ -22,12 +22,13 @@ float UI_OffsetY = 0.0f;
 bool UI_BoldEnabled = true;
 
 void UI_UpdateScale(void) {
-    float scaleX = (float)GetScreenWidth() / REF_WIDTH;
-    float scaleY = (float)GetScreenHeight() / REF_HEIGHT;
-    UI_CurrScale = (scaleX < scaleY) ? scaleX : scaleY; // Keep 16:10 fit
+    // Primary scaling anchor is height to maintain consistent vertical layout density.
+    // Horizontal layout becomes responsive (waveforms stretch/contract).
+    UI_CurrScale = (float)GetScreenHeight() / REF_HEIGHT;
     
-    UI_OffsetX = (GetScreenWidth() - (REF_WIDTH * UI_CurrScale)) / 2.0f;
-    UI_OffsetY = (GetScreenHeight() - (REF_HEIGHT * UI_CurrScale)) / 2.0f;
+    // In responsive mode, we occupy the full window native area.
+    UI_OffsetX = 0;
+    UI_OffsetY = 0;
 }
 
 Vector2 UIGetMousePosition(void) {

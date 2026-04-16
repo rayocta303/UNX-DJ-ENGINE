@@ -8,8 +8,8 @@
 #define REF_HEIGHT      400
 
 // Dynamic resolution (Internal scaled reference)
-#define SCREEN_WIDTH    (REF_WIDTH * UI_CurrScale)
-#define SCREEN_HEIGHT   (REF_HEIGHT * UI_CurrScale)
+#define SCREEN_WIDTH    ((float)GetScreenWidth())
+#define SCREEN_HEIGHT   ((float)GetScreenHeight())
 
 // Waveform geometry
 #define DYN_WFM_WIDTH   30000

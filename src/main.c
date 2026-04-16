@@ -17,6 +17,7 @@
 #include "ui/views/settings.h"
 #include "ui/views/splash.h"
 #include "ui/views/topbar.h"
+#include "version.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -117,6 +118,9 @@ void OnSettingsApply(void *ctx) {
     printf("[SETTINGS] Audio Hardware config changed, restarting backend...\n");
     AudioBackend_Start(aconf, AudioProcessCallback);
     a->activeAudioConfig = aconf;
+    
+    // Update active driver info in About screen
+    AudioBackend_GetActiveInfo(NULL, NULL, a->aboutState.AudioDriver);
   }
 
   Settings_Save(a->deckA.Waveform, a->deckB.Waveform);
@@ -366,9 +370,9 @@ void App_Init(App *a) {
   // Init About State
   memset(&a->aboutState, 0, sizeof(AboutState));
   a->aboutState.IsActive = false;
-  strcpy(a->aboutState.Version, "v1.2.0-Alpha");
-  strcpy(a->aboutState.Developer, "Hanif Bagus Saputra Hadi");
-  strcpy(a->aboutState.Instagram, "@unxchr");
+  strcpy(a->aboutState.Version, APP_VERSION);
+  strcpy(a->aboutState.Developer, APP_DEVELOPER);
+  strcpy(a->aboutState.Instagram, APP_INSTAGRAM);
 
   // Init Components
   TopBar_Init(&a->topbar);
@@ -414,11 +418,11 @@ int main(void) {
 #if defined(__ANDROID__)
   // Android is always fullscreen and uses device resolution natively in
   // NativeActivity
-  InitWindow(0, 0, "XDJ UNX - C Port Test");
+  InitWindow(0, 0, APP_NAME " - C Port Test");
   SetTargetFPS(60); // Optionally limit to 60 or let Android handle VSync
 #else
   SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
-  InitWindow(startWidth, startHeight, "XDJ UNX - C Port Test");
+  InitWindow(startWidth, startHeight, APP_NAME " - C Port Test");
   SetWindowMinSize(REF_WIDTH, REF_HEIGHT);
   SetTargetFPS(60);
 #endif
@@ -442,6 +446,9 @@ int main(void) {
                                         .SampleRate = 48000,
                                         .BufferSizeFrames = 256};
   AudioBackend_Start(initialAudioCfg, AudioProcessCallback);
+  
+  // Set initial Audio Driver name for the UI
+  AudioBackend_GetActiveInfo(NULL, NULL, app.aboutState.AudioDriver);
 
   AudioEngine audioEngine;
   AudioEngine_Init(&audioEngine);
@@ -493,7 +500,6 @@ int main(void) {
         srA = 44100.0;
 
       app.deckA.Position = (playheadFrames * 150.0) / srA;
-      app.deckA.IsTouching = audioEngine.Decks[0].IsTouching;
       app.deckA.IsPlaying = audioEngine.Decks[0].IsPlaying;
 
       double posSec = playheadFrames / srA;
@@ -510,7 +516,6 @@ int main(void) {
         srB = 44100.0;
 
       app.deckB.Position = (playheadFrames * 150.0) / srB;
-      app.deckB.IsTouching = audioEngine.Decks[1].IsTouching;
       app.deckB.IsPlaying = audioEngine.Decks[1].IsPlaying;
 
       double posSec = playheadFrames / srB;
