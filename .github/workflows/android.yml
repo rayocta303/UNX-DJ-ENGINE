@@ -1,0 +1,127 @@
+name: Android Build
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v2
+
+    - name: Cache NDK
+      uses: actions/cache@v3
+      id: cache-ndk
+      with:
+        path: /usr/local/lib/android/sdk/ndk/25.1.8937393
+        key: ${{ runner.os }}-ndk-25.1.8937393
+
+    - name: Install NDK
+      if: steps.cache-ndk.outputs.cache-hit != 'true'
+      run: echo "y" | sudo /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --install "ndk;25.1.8937393"
+
+    - name: Checkout Raylib
+      run: |
+        git clone https://github.com/raysan5/raylib.git raylib-src
+        cd raylib-src
+        git checkout 5.0
+
+    - name: Build Raylib Android (arm64-v8a)
+      run: |
+        cd raylib-src/src
+        make PLATFORM=PLATFORM_ANDROID ANDROID_NDK=/usr/local/lib/android/sdk/ndk/25.1.8937393 ANDROID_ARCH=arm64 ANDROID_API_VERSION=26
+        mkdir -p ../../platform/android/app/src/main/jniLibs/arm64-v8a
+        cp libraylib.a ../../platform/android/app/src/main/jniLibs/arm64-v8a/
+
+    - name: Build Raylib Android (armeabi-v7a)
+      run: |
+        cd raylib-src/src
+        make clean
+        make PLATFORM=PLATFORM_ANDROID ANDROID_NDK=/usr/local/lib/android/sdk/ndk/25.1.8937393 ANDROID_ARCH=arm ANDROID_API_VERSION=26
+        mkdir -p ../../platform/android/app/src/main/jniLibs/armeabi-v7a
+        cp libraylib.a ../../platform/android/app/src/main/jniLibs/armeabi-v7a/
+
+    - name: Build Raylib Android (x86_64)
+      run: |
+        cd raylib-src/src
+        make clean
+        make PLATFORM=PLATFORM_ANDROID ANDROID_NDK=/usr/local/lib/android/sdk/ndk/25.1.8937393 ANDROID_ARCH=x86_64 ANDROID_API_VERSION=26
+        mkdir -p ../../platform/android/app/src/main/jniLibs/x86_64
+        cp libraylib.a ../../platform/android/app/src/main/jniLibs/x86_64/
+
+    - name: Copy Android NDK Glue
+      run: |
+        mkdir -p platform/android/app/src/main/cpp
+        cp raylib-src/src/native_app_glue/android_native_app_glue.c platform/android/app/src/main/cpp/
+        cp raylib-src/src/native_app_glue/android_native_app_glue.h platform/android/app/src/main/cpp/
+
+    - name: Create CMakeLists.txt for App
+      run: |
+        cat << 'EOF' > platform/android/app/CMakeLists.txt
+        cmake_minimum_required(VERSION 3.18.1)
+        project(xdjunx)
+
+        set(CMAKE_CXX_STANDARD 17)
+        set(CMAKE_C_STANDARD 11)
+
+        set(PROJECT_SRC_DIR "../../../../src")
+        set(PROJECT_LIB_DIR "../../../../lib")
+
+        include_directories(
+            ${PROJECT_SRC_DIR}
+            ${PROJECT_SRC_DIR}/core
+            ${PROJECT_SRC_DIR}/engine
+            ${PROJECT_LIB_DIR}
+            ${PROJECT_LIB_DIR}/kaitai
+            ${PROJECT_LIB_DIR}/rekordbox-metadata
+            ../../../../raylib-src/src
+            src/main/cpp
+        )
+
+        file(GLOB_RECURSE SRC_FILES 
+            "${PROJECT_SRC_DIR}/*.c" 
+            "${PROJECT_SRC_DIR}/*.cpp"
+            "${PROJECT_LIB_DIR}/kaitai/kaitai/kaitaistream.cpp"
+            "${PROJECT_LIB_DIR}/rekordbox-metadata/*.cpp"
+            "${PROJECT_LIB_DIR}/serato/*.cpp"
+        )
+        
+        # Exclude platform specific
+        list(FILTER SRC_FILES EXCLUDE REGEX "midi_backend_win.c")
+        
+        add_library(xdjunx SHARED ${SRC_FILES} src/main/cpp/android_native_app_glue.c)
+
+        find_library(log-lib log)
+        find_library(android-lib android)
+        find_library(egl-lib EGL)
+        find_library(gles-lib GLESv2)
+
+        target_link_libraries(xdjunx ${log-lib} ${android-lib} ${egl-lib} ${gles-lib} -L${CMAKE_CURRENT_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI} raylib)
+        EOF
+
+    - name: Build APK with Gradle
+      run: |
+        cd platform/android
+        chmod +x ./gradlew || echo "Setting up gradlew..."
+        gradle wrapper --gradle-version 8.1.0
+        ./gradlew assembleDebug
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: XDJ-UNX-Android-Universal-Build
+        path: platform/android/app/build/outputs/apk/debug/app-debug.apk
