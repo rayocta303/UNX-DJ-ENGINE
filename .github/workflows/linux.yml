@@ -15,6 +15,11 @@ jobs:
         with:
           version: 0.11.0
 
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libx11-dev libxcursor-dev libxinerama-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+
       - name: Build with build.sh
         run: |
           chmod +x build.sh
