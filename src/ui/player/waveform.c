@@ -289,10 +289,21 @@ static void Waveform_Draw(Component *base) {
 
   if (r->State->LoadedTrack == NULL) {
     if (r->Logo.id != 0) {
-      float logoScale = (waveH * 0.7f) / r->Logo.height;
+      float logoH = waveH * 0.6f;
+      float logoScale = logoH / r->Logo.height;
       float lw = r->Logo.width * logoScale;
       float lh = r->Logo.height * logoScale;
-      DrawTextureEx(r->Logo, (Vector2){wfLeft + (wfW - lw) / 2.0f, wfY + (waveH - lh) / 2.0f}, 0.0f, logoScale, Fade(WHITE, 0.3f));
+      
+      if (lw > wfW * 0.8f) {
+        logoScale = (wfW * 0.8f) / r->Logo.width;
+        lw = r->Logo.width * logoScale;
+        lh = r->Logo.height * logoScale;
+      }
+
+      DrawTextureEx(r->Logo, (Vector2){wfLeft + (wfW - lw) / 2.0f, wfY + (waveH - lh) / 2.0f}, 0.0f, logoScale, WHITE);
+    } else {
+      // Fallback if logo failed to load
+      UIDrawText("UNX-DJ", UIFonts_GetFace(S(12)), wfLeft + (wfW / 2.0f) - S(30), wfY + (waveH / 2.0f) - S(6), S(12), ColorGray);
     }
     EndScissorMode(); 
     return;
