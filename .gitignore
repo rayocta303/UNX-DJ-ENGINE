@@ -9,6 +9,13 @@ build_out.txt
 bin/
 build/
 tools/bin2c.exe
+.gradle/
+.cxx/
+local.properties
+*.apk
+*.aar
+*.ap_
+*.dex
 
 tests
 
