@@ -98,8 +98,8 @@ jobs:
         set(CMAKE_CXX_STANDARD 17)
         set(CMAKE_C_STANDARD 11)
 
-        set(PROJECT_SRC_DIR "../../../../src")
-        set(PROJECT_LIB_DIR "../../../../lib")
+        set(PROJECT_SRC_DIR "../../../src")
+        set(PROJECT_LIB_DIR "../../../lib")
 
         include_directories(
             ${PROJECT_SRC_DIR}
@@ -108,7 +108,7 @@ jobs:
             ${PROJECT_LIB_DIR}
             ${PROJECT_LIB_DIR}/kaitai
             ${PROJECT_LIB_DIR}/rekordbox-metadata
-            ../../../../raylib-src/src
+            ../../../raylib-src/src
             src/main/cpp
         )
 
