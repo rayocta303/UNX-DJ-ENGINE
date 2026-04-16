@@ -39,17 +39,31 @@ static AudioBackendConfig g_currentConfig;
 static ma_device_info g_deviceInfos[MAX_AUDIO_DEVICES];
 static int g_deviceCount = 0;
 
-void AudioBackend_GetActiveInfo(int* outChannels, int* outSampleRate, char* outBackendName) {
+void AudioBackend_GetActiveInfo(int* outChannels, int* outSampleRate, char* outBackendName, char* outDeviceName) {
     if (g_isDeviceInitialized) {
         if (outChannels) *outChannels = g_maDevice.playback.channels;
         if (outSampleRate) *outSampleRate = g_maDevice.sampleRate;
         if (outBackendName) {
             strcpy(outBackendName, ma_backend_to_string(g_maContext.backend));
         }
+        if (outDeviceName) {
+            if (g_currentConfig.DeviceIndex == -1) {
+                strcpy(outDeviceName, "System Default");
+            } else {
+                // Return the actual name of the opened hardware
+                ma_device_info info;
+                if (ma_context_get_device_info(&g_maContext, ma_device_type_playback, &g_maDevice.playback.id, &info) == MA_SUCCESS) {
+                    strcpy(outDeviceName, info.name);
+                } else {
+                    strcpy(outDeviceName, "Hardware Link");
+                }
+            }
+        }
     } else {
         if (outChannels) *outChannels = 0;
         if (outSampleRate) *outSampleRate = 0;
         if (outBackendName) strcpy(outBackendName, "None");
+        if (outDeviceName) strcpy(outDeviceName, "Not connected");
     }
 }
 

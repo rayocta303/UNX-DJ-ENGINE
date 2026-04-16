@@ -97,8 +97,9 @@ void OnSettingsApply(void *ctx) {
           a->settingsState.Items[8].Current - 1, // 0 is System Default
       .MasterOutL = a->settingsState.Items[9].Current,
       .MasterOutR = a->settingsState.Items[10].Current,
-      .CueOutL = a->settingsState.Items[11].Current,
-      .CueOutR = a->settingsState.Items[12].Current,
+      // Cue items have "Blank" at index 0, so subtract 1 for physical channel
+      .CueOutL = a->settingsState.Items[11].Current - 1, 
+      .CueOutR = a->settingsState.Items[12].Current - 1,
       .SampleRate = (a->settingsState.Items[14].Current == 0) ? 44100 : 48000,
   };
   int bufMap[] = {128, 256, 512, 1024};
@@ -120,11 +121,69 @@ void OnSettingsApply(void *ctx) {
     a->activeAudioConfig = aconf;
     
     // Update active driver info in About screen
-    AudioBackend_GetActiveInfo(NULL, NULL, a->aboutState.AudioDriver);
+    AudioBackend_GetActiveInfo(NULL, NULL, a->aboutState.AudioDriver, a->aboutState.AudioDevice);
   }
 
-  Settings_Save(a->deckA.Waveform, a->deckB.Waveform);
+  Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig);
   OnSettingsClose(ctx);
+}
+
+void UpdateChannelOptions(App *a, int deviceIdx) {
+  AudioDeviceInfo devs[MAX_AUDIO_DEVICES];
+  int devCount = AudioBackend_GetDevices(devs, MAX_AUDIO_DEVICES);
+
+  int channels = 2; // Fallback for System Default
+  if (deviceIdx >= 0 && deviceIdx < devCount) {
+    channels = devs[deviceIdx].NativeChannels;
+  }
+
+  // Common init for channel items
+  strcpy(a->settingsState.Items[9].Label, "MASTER LEFT");
+  a->settingsState.Items[9].Type = SETTING_TYPE_LIST;
+  strcpy(a->settingsState.Items[10].Label, "MASTER RIGHT");
+  a->settingsState.Items[10].Type = SETTING_TYPE_LIST;
+  strcpy(a->settingsState.Items[11].Label, "CUE LEFT");
+  a->settingsState.Items[11].Type = SETTING_TYPE_LIST;
+  strcpy(a->settingsState.Items[12].Label, "CUE RIGHT");
+  a->settingsState.Items[12].Type = SETTING_TYPE_LIST;
+
+  // Master L/R: CH 1..N
+  a->settingsState.Items[9].OptionsCount = channels;
+  a->settingsState.Items[10].OptionsCount = channels;
+  for (int i = 0; i < channels && i < MAX_SETTING_OPTIONS; i++) {
+    sprintf(a->settingsState.Items[9].Options[i], "CH %d", i + 1);
+    sprintf(a->settingsState.Items[10].Options[i], "CH %d", i + 1);
+  }
+
+  // Cue L/R: Blank, CH 1..N
+  a->settingsState.Items[11].OptionsCount = channels + 1;
+  a->settingsState.Items[12].OptionsCount = channels + 1;
+  strcpy(a->settingsState.Items[11].Options[0], "Blank");
+  strcpy(a->settingsState.Items[12].Options[0], "Blank");
+  for (int i = 0; i < channels && (i + 1) < MAX_SETTING_OPTIONS; i++) {
+    sprintf(a->settingsState.Items[11].Options[i + 1], "CH %d", i + 1);
+    sprintf(a->settingsState.Items[12].Options[i + 1], "CH %d", i + 1);
+  }
+
+  // Auto-Select defaults
+  if (channels >= 4) {
+    a->settingsState.Items[9].Current = 0;  // CH1
+    a->settingsState.Items[10].Current = 1; // CH2
+    a->settingsState.Items[11].Current = 3; // CH3 (idx 3 is Blank + CH1 + CH2 + CH3)
+    a->settingsState.Items[12].Current = 4; // CH4 (idx 4)
+  } else {
+    a->settingsState.Items[9].Current = 0;
+    a->settingsState.Items[10].Current = (channels > 1) ? 1 : 0;
+    a->settingsState.Items[11].Current = 0; // Blank
+    a->settingsState.Items[12].Current = 0; // Blank
+  }
+}
+
+void OnSettingsValueChanged(void *ctx, int idx) {
+  App *a = (App *)ctx;
+  if (idx == 8) { // AUDIO DEVICE changed
+    UpdateChannelOptions(a, a->settingsState.Items[8].Current - 1);
+  }
 }
 
 void OnSettingsAction(void *ctx, int idx) {
@@ -242,7 +301,7 @@ void App_Init(App *a) {
   a->settingsState.Items[1].OptionsCount = 2;
 
   // Load persisted settings
-  Settings_Load(&a->deckA.Waveform, &a->deckB.Waveform);
+  Settings_Load(&a->deckA.Waveform, &a->deckB.Waveform, &a->activeAudioConfig);
 
   strcpy(a->settingsState.Items[2].Label, "WFM STYLE");
   strcpy(a->settingsState.Items[2].Options[0], "BLUE");
@@ -301,38 +360,28 @@ void App_Init(App *a) {
   a->settingsState.Items[8].OptionsCount = devCount + 1;
   strcpy(a->settingsState.Items[8].Options[0], "System Default");
   for (int i = 0; i < devCount && i < 31; i++) {
-    snprintf(a->settingsState.Items[8].Options[i + 1], 32, "%.31s",
-             devs[i].Name);
+    // 31 characters limit for options. Format: "2CH Output Name"
+    snprintf(a->settingsState.Items[8].Options[i + 1], 32, "%dCH %s",
+             devs[i].NativeChannels, devs[i].Name);
   }
-  a->settingsState.Items[8].Current = 0;
-
-  strcpy(a->settingsState.Items[9].Label, "MASTER LEFT");
-  a->settingsState.Items[9].Type = SETTING_TYPE_LIST;
-  a->settingsState.Items[9].OptionsCount = 8;
-  for (int i = 0; i < 8; i++)
-    sprintf(a->settingsState.Items[9].Options[i], "CH %d", i + 1);
-  a->settingsState.Items[9].Current = 0;
-
-  strcpy(a->settingsState.Items[10].Label, "MASTER RIGHT");
-  a->settingsState.Items[10].Type = SETTING_TYPE_LIST;
-  a->settingsState.Items[10].OptionsCount = 8;
-  for (int i = 0; i < 8; i++)
-    sprintf(a->settingsState.Items[10].Options[i], "CH %d", i + 1);
-  a->settingsState.Items[10].Current = 1;
-
-  strcpy(a->settingsState.Items[11].Label, "CUE LEFT");
-  a->settingsState.Items[11].Type = SETTING_TYPE_LIST;
-  a->settingsState.Items[11].OptionsCount = 8;
-  for (int i = 0; i < 8; i++)
-    sprintf(a->settingsState.Items[11].Options[i], "CH %d", i + 1);
-  a->settingsState.Items[11].Current = 2;
-
-  strcpy(a->settingsState.Items[12].Label, "CUE RIGHT");
-  a->settingsState.Items[12].Type = SETTING_TYPE_LIST;
-  a->settingsState.Items[12].OptionsCount = 8;
-  for (int i = 0; i < 8; i++)
-    sprintf(a->settingsState.Items[12].Options[i], "CH %d", i + 1);
-  a->settingsState.Items[12].Current = 3;
+  
+  // Initial population based on loaded config
+  UpdateChannelOptions(a, a->activeAudioConfig.DeviceIndex);
+  
+  // Back-sync from loaded config to UI selection items
+  a->settingsState.Items[8].Current = a->activeAudioConfig.DeviceIndex + 1;
+  a->settingsState.Items[9].Current = a->activeAudioConfig.MasterOutL;
+  a->settingsState.Items[10].Current = a->activeAudioConfig.MasterOutR;
+  a->settingsState.Items[11].Current = a->activeAudioConfig.CueOutL + 1;
+  a->settingsState.Items[12].Current = a->activeAudioConfig.CueOutR + 1;
+  
+  int bufMap[] = {128, 256, 512, 1024};
+  a->settingsState.Items[13].Current = 1; // Default 256
+  for (int i = 0; i < 4; i++) {
+    if (a->activeAudioConfig.BufferSizeFrames == bufMap[i])
+      a->settingsState.Items[13].Current = i;
+  }
+  a->settingsState.Items[14].Current = (a->activeAudioConfig.SampleRate == 44100) ? 0 : 1;
 
   strcpy(a->settingsState.Items[13].Label, "BUFFER SIZE");
   a->settingsState.Items[13].Type = SETTING_TYPE_LIST;
@@ -391,6 +440,7 @@ void App_Init(App *a) {
   a->settings.OnApply = OnSettingsApply;
   a->settings.OnClose = OnSettingsClose;
   a->settings.OnAction = OnSettingsAction;
+  a->settings.OnValueChanged = OnSettingsValueChanged;
   a->settings.callbackCtx = a;
 
   // Default active audio config (matches main's initialAudioCfg)
@@ -430,25 +480,29 @@ int main(void) {
 
   UIFonts_Init();
 
+  // Initialize Audio Backend FIRST so App_Init can enumerate real devices
+  AudioBackend_Init();
+
   App app;
   App_Init(&app);
 
   MIDI_Init(&app.midiCtx);
 
-  // Initialize Audio Backend
-  AudioBackend_Init();
+  int bufMap[] = {128, 256, 512, 1024};
+  AudioBackendConfig initialAudioCfg = {
+      .DeviceIndex = app.settingsState.Items[8].Current - 1,
+      .MasterOutL = app.settingsState.Items[9].Current,
+      .MasterOutR = app.settingsState.Items[10].Current,
+      .CueOutL = app.settingsState.Items[11].Current - 1,
+      .CueOutR = app.settingsState.Items[12].Current - 1,
+      .SampleRate = (app.settingsState.Items[14].Current == 0) ? 44100 : 48000,
+      .BufferSizeFrames = bufMap[app.settingsState.Items[13].Current]};
 
-  AudioBackendConfig initialAudioCfg = {.DeviceIndex = -1,
-                                        .MasterOutL = 0,
-                                        .MasterOutR = 1,
-                                        .CueOutL = 2,
-                                        .CueOutR = 3,
-                                        .SampleRate = 48000,
-                                        .BufferSizeFrames = 256};
   AudioBackend_Start(initialAudioCfg, AudioProcessCallback);
+  app.activeAudioConfig = initialAudioCfg;
   
   // Set initial Audio Driver name for the UI
-  AudioBackend_GetActiveInfo(NULL, NULL, app.aboutState.AudioDriver);
+  AudioBackend_GetActiveInfo(NULL, NULL, app.aboutState.AudioDriver, app.aboutState.AudioDevice);
 
   AudioEngine audioEngine;
   AudioEngine_Init(&audioEngine);

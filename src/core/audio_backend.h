@@ -28,7 +28,7 @@ typedef struct {
 typedef void (*AudioBackendCallback)(float* buffer, unsigned int frames);
 
 // Returns actual hardware configuration of the currently active device.
-void AudioBackend_GetActiveInfo(int* outChannels, int* outSampleRate, char* outBackendName);
+void AudioBackend_GetActiveInfo(int* outChannels, int* outSampleRate, char* outBackendName, char* outDeviceName);
 
 bool AudioBackend_Init(void);
 void AudioBackend_Terminate(void);

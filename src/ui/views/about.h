@@ -9,6 +9,7 @@ typedef struct {
   char Developer[64];
   char Instagram[32];
   char AudioDriver[32];
+  char AudioDevice[64];
 } AboutState;
 
 typedef struct AboutRenderer AboutRenderer;

@@ -21,8 +21,10 @@ static void About_Draw(Component *base) {
   if (!r->State->IsActive)
     return;
 
+  float viewH = SCREEN_HEIGHT - DECK_STR_H;
+
   // Background overlay
-  DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ColorBGUtil);
+  DrawRectangle(0, 0, SCREEN_WIDTH, viewH, ColorBGUtil);
 
   // Header section
   DrawRectangle(0, 0, SCREEN_WIDTH, TOP_BAR_H, ColorDark1);
@@ -39,13 +41,13 @@ static void About_Draw(Component *base) {
              ColorWhite);
 
   float centerX = SCREEN_WIDTH / 2.0f;
-  float centerY = SCREEN_HEIGHT / 2.0f;
+  float centerY = viewH / 2.0f;
 
   // Main Card Layout
   float cardW = S(320);
-  float cardH = S(235); // Increased height for driver info
+  float cardH = S(275); // Increased height for more labels
   float cardX = centerX - (cardW / 2.0f);
-  float cardY = centerY - (cardH / 2.0f) + S(10);
+  float cardY = centerY - (cardH / 2.0f) + (TOP_BAR_H / 2.0f);
 
   // Card Shadow Effect
   DrawRectangle(cardX + S(2), cardY + S(2), cardW, cardH, ColorBlack);
@@ -56,6 +58,7 @@ static void About_Draw(Component *base) {
   // Brand Section (Top part of card)
   UIDrawText(APP_NAME " DJ ENGINE", faceLg, centerX - S(55), cardY + S(25), S(18), ColorOrange);
   UIDrawText(r->State->Version, faceSm, centerX - S(30), cardY + S(50), S(10), ColorShadow);
+
 
   DrawLine(cardX + S(20), cardY + S(75), cardX + cardW - S(20), cardY + S(75),
            ColorGray);
@@ -92,11 +95,16 @@ static void About_Draw(Component *base) {
   UIDrawText("DRIVER", faceXS, labelX + S(15), startY + rowSpacing * 3 - S(6), S(8), ColorShadow);
   UIDrawText(r->State->AudioDriver, faceMd, labelX + S(15), startY + rowSpacing * 3 + S(6), S(13), ColorOrange);
 
+  // Audio Device Info
+  UIDrawText("\xef\x8a\x93", iconMain, labelX - S(10), startY + rowSpacing * 4, S(14), ColorShadow); // Speaker icon
+  UIDrawText("DEVICE", faceXS, labelX + S(15), startY + rowSpacing * 4 - S(6), S(8), ColorShadow);
+  UIDrawText(r->State->AudioDevice, faceMd, labelX + S(15), startY + rowSpacing * 4 + S(6), S(13), ColorWhite);
+
   // Bottom text hints
   UIDrawText("Build for everyone.", faceXS, centerX - S(40),
-             SCREEN_HEIGHT - S(25), S(8), ColorDark1);
+             viewH - S(25), S(8), ColorDark1);
   UIDrawText("Press BACK to return", faceXS, SCREEN_WIDTH - S(110),
-             SCREEN_HEIGHT - S(25), S(8), ColorShadow);
+             viewH - S(25), S(8), ColorShadow);
 }
 
 void AboutRenderer_Init(AboutRenderer *r, AboutState *state) {

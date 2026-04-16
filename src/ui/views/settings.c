@@ -51,6 +51,7 @@ static int Settings_Update(Component *base) {
                       if (fabsf(r->State->TouchDragAccumulator) < 10.0f) {
                           item->Current = i;
                           r->State->IsDropdownOpen = false;
+                          if (r->OnValueChanged) r->OnValueChanged(r->callbackCtx, r->State->DropdownItemIdx);
                           if (r->OnApply) r->OnApply(r->callbackCtx);
                       }
                   }
@@ -69,7 +70,8 @@ static int Settings_Update(Component *base) {
     Vector2 delta = GetMouseDelta();
     r->State->TouchDragAccumulator += delta.y;
     
-    int visibleRows = 12;
+    float viewH = SCREEN_HEIGHT - DECK_STR_H;
+    int visibleRows = (int)((viewH - S(28.0f)) / S(28.0f));
     float threshold = S(20.0f);
     if (r->State->TouchDragAccumulator < -threshold) { 
       if (r->State->Scroll + visibleRows < r->State->ItemsCount) {
@@ -90,7 +92,8 @@ static int Settings_Update(Component *base) {
       if (wheel > 0) {
           if (r->State->Scroll > 0) r->State->Scroll--;
       } else {
-          int visibleRows = 12;
+          float viewH = SCREEN_HEIGHT - DECK_STR_H;
+          int visibleRows = (int)((viewH - S(28.0f)) / S(28.0f));
           if (r->State->Scroll + visibleRows < r->State->ItemsCount) {
               r->State->Scroll++;
           }
@@ -159,7 +162,12 @@ static int Settings_Update(Component *base) {
     }
   }
   if (IsKeyPressed(KEY_DOWN)) {
-    int visibleRows = 12;
+    float viewH = SCREEN_HEIGHT - DECK_STR_H;
+    float bottomH = S(28.0f);
+    float divY = viewH - bottomH;
+    float rowH = S(28.0f);
+    int visibleRows = (int)(divY / rowH);
+
     if (r->State->CursorPos < visibleRows - 1 &&
         r->State->Scroll + r->State->CursorPos < r->State->ItemsCount - 1) {
       r->State->CursorPos++;
@@ -177,6 +185,7 @@ static int Settings_Update(Component *base) {
           item->Current--;
         else
           item->Current = item->OptionsCount - 1;
+        if (r->OnValueChanged) r->OnValueChanged(r->callbackCtx, idx);
         if (r->OnApply) r->OnApply(r->callbackCtx);
       }
       if (IsKeyPressed(KEY_RIGHT)) {
@@ -184,6 +193,7 @@ static int Settings_Update(Component *base) {
           item->Current++;
         else
           item->Current = 0;
+        if (r->OnValueChanged) r->OnValueChanged(r->callbackCtx, idx);
         if (r->OnApply) r->OnApply(r->callbackCtx);
       }
       if (IsKeyPressed(KEY_ENTER)) {
@@ -241,8 +251,10 @@ static void Settings_Draw(Component *base) {
   Font faceSm = UIFonts_GetFace(S(11));
   Font faceMd = UIFonts_GetFace(S(13));
 
+  float bottomH = S(28.0f);
+  float divY = viewH - bottomH;
   float rowH = S(28.0f);
-  int visibleRows = 12;
+  int visibleRows = (int)(divY / rowH);
 
   for (int i = 0; i < visibleRows; i++) {
     int idx = r->State->Scroll + i;
@@ -291,11 +303,8 @@ static void Settings_Draw(Component *base) {
     }
   }
 
-  float bottomH = S(28.0f);
-  DrawScrollbar(SCREEN_WIDTH - S(2.5f), TOP_BAR_H, S(2), viewH - TOP_BAR_H - bottomH,
+  DrawScrollbar(SCREEN_WIDTH - S(2.5f), TOP_BAR_H, S(2), divY - TOP_BAR_H,
                 r->State->ItemsCount, r->State->Scroll, visibleRows);
-
-  float divY = viewH - bottomH;
 
   // Bottom Background
   DrawRectangle(0, divY, SCREEN_WIDTH, bottomH, ColorDark1);

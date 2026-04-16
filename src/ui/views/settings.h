@@ -48,6 +48,7 @@ struct SettingsRenderer {
   void (*OnClose)(void *);
   void (*OnApply)(void *);
   void (*OnAction)(void *, int);
+  void (*OnValueChanged)(void *, int);
   void *callbackCtx;
 };
 
