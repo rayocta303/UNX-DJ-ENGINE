@@ -88,6 +88,9 @@ typedef struct DeckState {
   void *bpmCtx;
 
   WaveformSettings Waveform;
+  int TimeMode; // 0=Elapsed, 1=Remaining
+  long long SeekMs;
+  bool HasSeekRequest;
 } DeckState;
 
 typedef struct BeatFXState {

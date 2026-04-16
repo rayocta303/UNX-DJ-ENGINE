@@ -48,6 +48,10 @@ typedef struct {
     float TouchDragAccumulator;
     bool ShowLoadPopup;
     int PopupTrackIdx;
+
+    // Animation for Marquee
+    float MarqueeScrollX;
+    double LastAnimTime;
 } BrowserState;
 
 void Browser_RefreshStorages(BrowserState *s);

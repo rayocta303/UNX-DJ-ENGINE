@@ -118,6 +118,15 @@ static int DeckStrip_Update(Component *base) {
     d->State->SyncMode = (d->State->SyncMode + 1) % 3;
   }
 
+  // Time Mode Toggle
+  float tx = mtX + S(40) + S(8);
+  bool isHoverTime = (mouse.x >= tx && mouse.x <= tx + S(80) &&
+                      mouse.y >= midY && mouse.y <= midY + S(28));
+
+  if (isHoverTime && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+    d->State->TimeMode = (d->State->TimeMode + 1) % 2;
+  }
+
   if (isHoverWaveform && IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
       d->State->LoadedTrack != NULL) {
     float msRatio = (mouse.x - wx) / ww;
@@ -127,9 +136,8 @@ static int DeckStrip_Update(Component *base) {
       msRatio = 1.0f;
 
     long long newMs = (long long)(msRatio * d->State->TrackLengthMs);
-    d->State->PositionMs = newMs;
-    // Update playhead position in half-frames (150Hz = 0.15 * ms)
-    d->State->Position = (double)newMs * 0.15;
+    d->State->SeekMs = newMs;
+    d->State->HasSeekRequest = true;
   }
 
   if (isHoverTempoArea) {
@@ -228,16 +236,36 @@ static void DeckStrip_Draw(Component *base) {
   DrawCentredText("MT", faceXXS, badgeX, badgeW, midY + S(26.5f), S(7), mtClr);
 
   float timeX = mx + badgeW + S(8);
-  DrawCentredText("REMAIN / TIME", faceXXS, timeX, S(80), midY, S(7),
-                  ColorShadow);
+  
+  // REMAIN / TIME Indicators
+  Font elFace = (d->State->TimeMode == 0) ? UIFonts_GetBoldFace(S(7)) : faceXXS;
+  Font rmFace = (d->State->TimeMode == 1) ? UIFonts_GetBoldFace(S(7)) : faceXXS;
+  Color elClr = (d->State->TimeMode == 0) ? ColorWhite : ColorShadow;
+  Color rmClr = (d->State->TimeMode == 1) ? ColorWhite : ColorShadow;
+  
+  UIDrawText("TIME", elFace, timeX + S(50), midY, S(7), elClr);
+  UIDrawText("/", faceXXS, timeX + S(43), midY, S(7), ColorShadow);
+  UIDrawText("REMAIN", rmFace, timeX + S(7), midY, S(7), rmClr);
 
-  long long playedMs = d->State->PositionMs;
-  int minutes = (playedMs / 1000) / 60;
-  int seconds = (playedMs / 1000) % 60;
-  int subSec = playedMs % 1000;
+  long long displayMs = d->State->PositionMs;
+  if (d->State->TimeMode == 1 && d->State->LoadedTrack != NULL) {
+    displayMs = (long long)d->State->TrackLengthMs - d->State->PositionMs;
+  }
+
+  bool isNeg = displayMs < 0;
+  long long absMs = isNeg ? -displayMs : displayMs;
+
+  int minutes = (int)((absMs / 1000) / 60);
+  int seconds = (int)((absMs / 1000) % 60);
+  int subSec = (int)(absMs % 1000);
 
   char timeStr[16];
-  sprintf(timeStr, "%02d:%02d", minutes, seconds);
+  if (isNeg) {
+    sprintf(timeStr, "-%02d:%02d", minutes, seconds);
+  } else {
+    sprintf(timeStr, "%02d:%02d", minutes, seconds);
+  }
+
   float timeValY = midY + S(9);
   UIDrawText(timeStr, faceLg, timeX, timeValY, S(18), ColorWhite);
 

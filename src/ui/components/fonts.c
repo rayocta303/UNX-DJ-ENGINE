@@ -5,6 +5,7 @@
 #include "ui/components/assets_bundle.h"
 
 static Font defaultFace;
+static Font boldFace;
 static Font iconSolid;
 static Font iconRegular;
 static Font iconBrand;
@@ -15,17 +16,30 @@ void UIFonts_Init(void) {
     // Attempt to load standard font. Use Arial on Windows as requested.
     // TODO: Embed a primary UI font to avoid OS dependencies.
     // Attempt to load standard font from assets first, then fallback.
-    const char* fontPathBundled = UI_BoldEnabled ? "assets/fonts/Inter-Bold.ttf" : "assets/fonts/Inter-Regular.ttf";
+    const char* fontPathBundled = "assets/fonts/Inter-Regular.ttf";
+    const char* boldPathBundled = "assets/fonts/Inter-Bold.ttf";
+    
     defaultFace = LoadFontEx(fontPathBundled, 64, 0, 0);
+    boldFace = LoadFontEx(boldPathBundled, 64, 0, 0);
     
     if (defaultFace.texture.id == 0) {
 #ifdef _WIN32
-        const char* winFont = UI_BoldEnabled ? "C:/Windows/Fonts/arialbd.ttf" : "C:/Windows/Fonts/arial.ttf";
+        const char* winFont = "C:/Windows/Fonts/arial.ttf";
         defaultFace = LoadFontEx(winFont, 64, 0, 0);
 #endif
         if (defaultFace.texture.id == 0) {
             printf("[FONT] Failed to load fonts, using default raylib font\n");
             defaultFace = GetFontDefault();
+        }
+    }
+
+    if (boldFace.texture.id == 0) {
+#ifdef _WIN32
+        const char* winBold = "C:/Windows/Fonts/arialbd.ttf";
+        boldFace = LoadFontEx(winBold, 64, 0, 0);
+#endif
+        if (boldFace.texture.id == 0) {
+            boldFace = defaultFace; // Fallback to regular if bold fails
         }
     }
 
@@ -65,6 +79,7 @@ void UIFonts_Init(void) {
 
 void UIFonts_Unload(void) {
     UnloadFont(defaultFace);
+    UnloadFont(boldFace);
     UnloadFont(iconSolid);
     UnloadFont(iconRegular);
     UnloadFont(iconBrand);
@@ -73,6 +88,11 @@ void UIFonts_Unload(void) {
 Font UIFonts_GetFace(float size) {
     (void)size; // Handled directly in DrawTextEx scaling
     return defaultFace;
+}
+
+Font UIFonts_GetBoldFace(float size) {
+    (void)size;
+    return boldFace;
 }
 
 Font UIFonts_GetIcon(float size) {

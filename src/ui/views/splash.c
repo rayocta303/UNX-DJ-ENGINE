@@ -43,8 +43,8 @@ static void Splash_Draw(Component *base) {
   }
 
   Font face = UIFonts_GetFace(14);
-  DrawCentredText("Developed by @unxchr", face, 0, SCREEN_WIDTH, SCREEN_HEIGHT - 60,
-                  14, ColorWhite);
+  DrawCentredText("Developed by @unxchr", face, 0, SCREEN_WIDTH,
+                  SCREEN_HEIGHT - 60, 14, ColorWhite);
 
   // Loading Progress Bar
   if (s->Progress) {

@@ -41,18 +41,18 @@ void DrawSelectionTriangle(float x, float y, Color col) {
     DrawLine(x, y+10, x+5, y+5, col);
 }
 
-void DrawScrollbar(int totalItems, int currentPos, int visibleItems) {
+void DrawScrollbar(float x, float y, float w, float h, int totalItems, int currentPos, int visibleItems) {
     if (totalItems <= visibleItems) {
         return;
     }
-    float trackH = 240.0f;
-    float thumbH = trackH * (float)visibleItems / (float)totalItems;
-    if (thumbH < 5.0f) {
-        thumbH = 5.0f;
-    }
-    float thumbY = trackH * (float)currentPos / (float)totalItems;
-    DrawRectangle(3, 20, 3, trackH, ColorDark1);
-    DrawRectangle(3, 20 + thumbY, 3, thumbH, ColorPaper);
+    float thumbH = h * (float)visibleItems / (float)totalItems;
+    if (thumbH < S(10)) thumbH = S(10);
+    
+    // Scale currentPos (offset) to the track
+    float thumbY = h * (float)currentPos / (float)totalItems;
+    
+    DrawRectangle(x, y, w, h, ColorDark1);
+    DrawRectangle(x, y + thumbY, w, thumbH, ColorWhite);
 }
 
 void DrawBadge(float x, float y, float w, float h, Color bg, Color textClr, const char* label) {

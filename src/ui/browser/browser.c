@@ -114,7 +114,8 @@ static int Browser_Update(Component *base) {
     // Mouse Interaction
     Vector2 mousePos = UIGetMousePosition();
     float sidebarW = S(40);
-    float rowH = S(26);
+    float rowH = S(28.0f);
+    int totalVisible = 10;
     float listW = SCREEN_WIDTH - sidebarW - S(8);
     if (s->InfoEnabled) listW = SCREEN_WIDTH - sidebarW - S(160);
 
@@ -164,8 +165,28 @@ static int Browser_Update(Component *base) {
         }
     }
 
+    // Mouse Wheel Scroll
+    float wheel = GetMouseWheelMove();
+    if (wheel != 0 && !s->ShowLoadPopup) {
+        if (wheel > 0) {
+            if (s->CursorPos > 0) s->CursorPos--;
+            else if (s->ScrollOffset > 0) s->ScrollOffset--;
+        } else {
+            int total = 0;
+            if (s->BrowseLevel == 3) total = s->StorageCount;
+            else if (s->BrowseLevel == 2) total = 5;
+            else if (s->BrowseLevel == 1) total = s->DB ? s->DB->PlaylistCount : 0;
+            else total = s->ActiveTrackCount;
+
+            if (s->CursorPos < totalVisible - 1 && s->CursorPos + s->ScrollOffset < total - 1) {
+                s->CursorPos++;
+            } else if (s->ScrollOffset + totalVisible < total) {
+                s->ScrollOffset++;
+            }
+        }
+    }
+
     // 2. List Item Interaction
-    int totalVisible = 9;
     int totalItems = 0;
     if (s->IsTagList) totalItems = s->TagListCount;
     else {
@@ -193,15 +214,26 @@ static int Browser_Update(Component *base) {
                         s->DraggingIdx = idx;
                         s->DraggingType = 1;
                     }
-                    s->CursorPos = i;
+                    if (s->CursorPos != i) {
+                        s->CursorPos = i;
+                        s->MarqueeScrollX = 0; // Reset marquee on selection change
+                    }
                 }
+                
+                // Check if internal "LOAD" button area was clicked (only for tracks)
+                float loadBtnW = S(45);
+                Rectangle loadBtnRect = { sidebarW + listW - loadBtnW - S(5), TOP_BAR_H + i * rowH + S(4), loadBtnW, rowH - S(8) };
+                bool isLoadClick = (s->BrowseLevel == 0) && CheckCollisionPointRec(mousePos, loadBtnRect);
+
                 if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && !s->IsDragging) {
                     if (fabsf(s->TouchDragAccumulator) < 10.0f) { // Not a drag
-                        if (s->BrowseLevel > 0 && !s->IsTagList) {
-                            triggerEnter = true;
-                        } else {
+                        if (isLoadClick) {
                             s->ShowLoadPopup = true;
                             s->PopupTrackIdx = idx;
+                        } else if (s->BrowseLevel > 0 && !s->IsTagList) {
+                            triggerEnter = true;
+                        } else {
+                            // Just select (already handled in Pressed)
                         }
                     }
                 }
@@ -297,6 +329,7 @@ static int Browser_Update(Component *base) {
             
             if (CheckCollisionPointRec(mousePos, deckARect)) loadToDeck = 0;
             else if (CheckCollisionPointRec(mousePos, deckBRect)) loadToDeck = 1;
+            else if (!CheckCollisionPointRec(mousePos, (Rectangle){px, py, pw, ph})) s->ShowLoadPopup = false;
             
             if (loadToDeck != -1) {
                 targetIdx = s->PopupTrackIdx;
@@ -549,19 +582,24 @@ static void Browser_Draw(Component *base) {
         headerClr = ColorBlue; titleText = "SOURCE"; 
         sprintf(countText, "TOTAL %d", s->StorageCount); 
     }
-    else { sprintf(countText, "TOTAL %d", s->DB ? s->DB->TrackCount : 0); }
+    else { 
+        // Track level (Playlist or Global)
+        int total = s->ActiveTrackCount;
+        sprintf(countText, "TOTAL %d", total); 
+    }
 
     UIDrawText(titleText, faceSm, sidebarW + S(8), TOP_BAR_H - S(14), S(13), headerClr);
     if (countText[0]) {
         UIDrawText(countText, faceXS, SCREEN_WIDTH - S(80), TOP_BAR_H - S(14), S(10), headerClr);
     }
 
-    float listX = sidebarW + S(4);
+    float rowH = S(28.0f);
+    int totalVisible = 10;
+    float listX = sidebarW;
     float listW = SCREEN_WIDTH - sidebarW - S(8);
     if (s->InfoEnabled) listW = SCREEN_WIDTH - sidebarW - S(160);
-    float rowH = S(26);
 
-    for (int i = 0; i < 9; i++) {
+    for (int i = 0; i < totalVisible; i++) {
         int idx = s->ScrollOffset + i;
         const char* title = "";
         const char* artist = "";
@@ -612,16 +650,48 @@ static void Browser_Draw(Component *base) {
         else if (s->BrowseLevel > 0) textX = listX + S(20);
 
         float textY = ry + (artist[0] == '\0' ? S(6) : S(2));
-        UIDrawText(title, faceSm, textX, textY, S(13), ColorWhite);
+        
+        // Marquee Logic for Title
+        float maxTitleW = listW - (textX - listX) - S(90); // Space for BPM/Key/LOAD
+        Vector2 fullSize = MeasureTextEx(faceSm, title, S(13), 1.0f);
+        
+        if (isCursor && fullSize.x > maxTitleW) {
+            // Animation
+            double now = GetTime();
+            if (s->LastAnimTime == 0) s->LastAnimTime = now;
+            float dt = (float)(now - s->LastAnimTime);
+            s->LastAnimTime = now;
+            
+            s->MarqueeScrollX += dt * S(40.0f); // 40px per second
+            if (s->MarqueeScrollX > fullSize.x + S(40.0f)) s->MarqueeScrollX = -S(20.0f); // Loop with gap
+            
+            BeginScissorMode(textX, ry, maxTitleW, rowH);
+            UIDrawText(title, faceSm, textX - s->MarqueeScrollX, textY, S(13), ColorWhite);
+            EndScissorMode();
+        } else {
+            // Normal truncated display
+            BeginScissorMode(textX, ry, maxTitleW, rowH);
+            UIDrawText(title, faceSm, textX, textY, S(13), ColorWhite);
+            EndScissorMode();
+        }
 
         if (artist[0] != '\0' && s->BrowseLevel == 0 && !s->InfoEnabled) {
             UIDrawText(artist, faceXS, textX, ry + S(15), S(10), isCursor ? ColorWhite : ColorShadow);
         }
 
-        // BPM & Key
+        // BPM & Key & LOAD Button
         if (s->BrowseLevel == 0 && !s->InfoEnabled) {
-            UIDrawText(bpmText, faceXS, listX + listW - S(80), ry + S(4), S(10), isCursor ? ColorWhite : ColorShadow);
-            UIDrawText(keyStr, faceXS, listX + listW - S(30), ry + S(4), S(10), isCursor ? ColorWhite : ColorShadow);
+            UIDrawText(bpmText, faceXS, listX + listW - S(125), ry + S(4), S(10), isCursor ? ColorWhite : ColorShadow);
+            UIDrawText(keyStr, faceXS, listX + listW - S(85), ry + S(4), S(10), isCursor ? ColorWhite : ColorShadow);
+            
+            // LOAD Button
+            float loadW = S(45);
+            Rectangle loadRect = { listX + listW - loadW - S(5), ry + S(4), loadW, rowH - S(8) };
+            bool hoverLoad = CheckCollisionPointRec(mPos, loadRect);
+            
+            DrawRectangleRec(loadRect, hoverLoad ? ColorBlue : ColorDark3);
+            DrawRectangleLinesEx(loadRect, 1.0f, ColorShadow);
+            DrawCentredText("LOAD", faceXS, loadRect.x, loadRect.width, loadRect.y + S(2), S(10), ColorWhite);
         }
 
         // Storage icons
@@ -635,17 +705,12 @@ static void Browser_Draw(Component *base) {
     // Scrollbar
     int maxItems = 0;
     if (s->BrowseLevel == 0) maxItems = s->ActiveTrackCount;
-    else if (s->BrowseLevel == 1) maxItems = s->DB ? s->DB->PlaylistCount : 0;
+    else if (s->BrowseLevel == 1) maxItems = s->DB ? (int)s->DB->PlaylistCount : 0;
     else if (s->BrowseLevel == 2) maxItems = 5;
     else if (s->BrowseLevel == 3) maxItems = s->StorageCount;
 
-    if (maxItems > 9) {
-        float listAreaH = SCREEN_HEIGHT - TOP_BAR_H - DECK_STR_H;
-        float thumbH = (9.0f / maxItems) * listAreaH;
-        if (thumbH < S(10)) thumbH = S(10);
-        float thumbY = TOP_BAR_H + ((float)s->ScrollOffset / maxItems) * listAreaH;
-        DrawRectangle(SCREEN_WIDTH - S(4), thumbY, S(2), thumbH, ColorWhite);
-    }
+    DrawScrollbar(SCREEN_WIDTH - S(4), TOP_BAR_H, S(2), viewH - TOP_BAR_H,
+                maxItems, s->ScrollOffset, totalVisible);
 
     // Drag and Drop Preview
     if (s->IsDragging) {

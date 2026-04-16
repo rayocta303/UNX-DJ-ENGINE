@@ -4,7 +4,6 @@
 #include "ui/components/theme.h"
 #include <stdio.h>
 
-
 static int TopBar_Update(Component *base) {
   TopBar *t = (TopBar *)base;
   if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
@@ -15,8 +14,7 @@ static int TopBar_Update(Component *base) {
         if (t->OnBrowse)
           t->OnBrowse(t->callbackCtx);
       }
-      if (mouse.x >= t->btnMixerX &&
-          mouse.x <= t->btnMixerX + t->btnMixerW) {
+      if (mouse.x >= t->btnMixerX && mouse.x <= t->btnMixerX + t->btnMixerW) {
         if (t->OnMixer)
           t->OnMixer(t->callbackCtx);
       }
@@ -67,7 +65,7 @@ static void TopBar_Draw(Component *base) {
   Font iconFace = UIFonts_GetIcon(S(8));
 
   // Draw BROWSE
-  DrawRectangle(t->btnBrowseX, btnY, t->btnBrowseW, btnH, 
+  DrawRectangle(t->btnBrowseX, btnY, t->btnBrowseW, btnH,
                 t->ActiveScreen == ScreenBrowser ? ColorBlue : ColorDark1);
   DrawRectangleLines(t->btnBrowseX, btnY, t->btnBrowseW, btnH, ColorShadow);
   {
@@ -76,13 +74,14 @@ static void TopBar_Draw(Component *base) {
     float spacing = S(4);
     float totalW = iconW + spacing + textW;
     float startX = t->btnBrowseX + (t->btnBrowseW - totalW) / 2.0f;
-    UIDrawText("\xef\x80\x82", iconFace, startX, btnY + S(3), S(8), ColorWhite);
+    // UIDrawText("\xef\x80\x82", iconFace, startX, btnY + S(3), S(8),
+    // ColorWhite);
     UIDrawText("BROWSE", faceSm, startX + iconW + spacing, btnY + S(2.5f), S(9),
                ColorWhite);
   }
 
   // Draw MIXER
-  DrawRectangle(t->btnMixerX, btnY, t->btnMixerW, btnH, 
+  DrawRectangle(t->btnMixerX, btnY, t->btnMixerW, btnH,
                 t->ActiveScreen == ScreenMixer ? ColorBlue : ColorDark1);
   DrawRectangleLines(t->btnMixerX, btnY, t->btnMixerW, btnH, ColorShadow);
   {
@@ -91,13 +90,14 @@ static void TopBar_Draw(Component *base) {
     float spacing = S(4);
     float totalW = iconW + spacing + textW;
     float startX = t->btnMixerX + (t->btnMixerW - totalW) / 2.0f;
-    UIDrawText("\xef\x87\xde", iconFace, startX, btnY + S(3), S(8), ColorWhite);
-    UIDrawText("MIXER", faceSm, startX + iconW + spacing, btnY + S(2.5f),
-               S(9), ColorWhite);
+    // UIDrawText("\xef\x87\xde", iconFace, startX, btnY + S(3), S(8),
+    // ColorWhite);
+    UIDrawText("MIXER", faceSm, startX + iconW + spacing, btnY + S(2.5f), S(9),
+               ColorWhite);
   }
 
   // Draw INFO
-  DrawRectangle(t->btnInfoX, btnY, t->btnInfoW, btnH, 
+  DrawRectangle(t->btnInfoX, btnY, t->btnInfoW, btnH,
                 t->ActiveScreen == ScreenInfo ? ColorBlue : ColorDark1);
   DrawRectangleLines(t->btnInfoX, btnY, t->btnInfoW, btnH, ColorShadow);
   {
@@ -106,13 +106,14 @@ static void TopBar_Draw(Component *base) {
     float spacing = S(4);
     float totalW = iconW + spacing + textW;
     float startX = t->btnInfoX + (t->btnInfoW - totalW) / 2.0f;
-    UIDrawText("\xef\x84\xa9", iconFace, startX, btnY + S(3), S(8), ColorWhite);
+    // UIDrawText("\xef\x84\xa9", iconFace, startX, btnY + S(3), S(8),
+    // ColorWhite);
     UIDrawText("INFO", faceSm, startX + iconW + spacing, btnY + S(2.5f), S(9),
                ColorWhite);
   }
 
   // Draw MENU
-  DrawRectangle(t->btnSettingsX, btnY, t->btnSettingsW, btnH, 
+  DrawRectangle(t->btnSettingsX, btnY, t->btnSettingsW, btnH,
                 t->ActiveScreen == ScreenSettings ? ColorBlue : ColorDark1);
   DrawRectangleLines(t->btnSettingsX, btnY, t->btnSettingsW, btnH, ColorShadow);
   {
@@ -121,7 +122,8 @@ static void TopBar_Draw(Component *base) {
     float spacing = S(4);
     float totalW = iconW + spacing + textW;
     float startX = t->btnSettingsX + (t->btnSettingsW - totalW) / 2.0f;
-    UIDrawText("\xef\x80\x93", iconFace, startX, btnY + S(3), S(8), ColorWhite);
+    // UIDrawText("\xef\x80\x93", iconFace, startX, btnY + S(3), S(8),
+    // ColorWhite);
     UIDrawText("MENU", faceSm, startX + iconW + spacing, btnY + S(2.5f), S(9),
                ColorWhite);
   }

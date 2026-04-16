@@ -57,6 +57,12 @@ void AudioProcessCallback(float *buffer, unsigned int frames) {
   }
 }
 
+void OnSettingsClose(void *ctx) {
+  App *a = (App *)ctx;
+  a->screen = ScreenPlayer;
+  a->settingsState.IsActive = false;
+}
+
 void OnSettingsApply(void *ctx) {
   App *a = (App *)ctx;
 
@@ -114,12 +120,7 @@ void OnSettingsApply(void *ctx) {
   }
 
   Settings_Save(a->deckA.Waveform, a->deckB.Waveform);
-}
-
-void OnSettingsClose(void *ctx) {
-  App *a = (App *)ctx;
-  a->screen = ScreenPlayer;
-  a->settingsState.IsActive = false;
+  OnSettingsClose(ctx);
 }
 
 void OnSettingsAction(void *ctx, int idx) {
@@ -651,16 +652,16 @@ int main(void) {
       if (srA < 8000)
         srA = 44100.0;
 
-      app.deckA.Position = (playheadFrames * 105.0) / srA;
+      app.deckA.Position = (playheadFrames * 150.0) / srA;
       app.deckA.IsTouching = audioEngine.Decks[0].IsTouching;
       app.deckA.IsPlaying = audioEngine.Decks[0].IsPlaying;
 
       double posSec = playheadFrames / srA;
-      app.deckA.PositionMs = (uint32_t)(posSec * 1000.0);
+      app.deckA.PositionMs = (long long)(posSec * 1000.0);
 
       double lenSec =
           ((double)audioEngine.Decks[0].TotalSamples / (double)CHANNELS) / srA;
-      app.deckA.TrackLengthMs = (uint32_t)(lenSec * 1000.0);
+      app.deckA.TrackLengthMs = (long long)(lenSec * 1000.0);
     }
     if (audioEngine.Decks[1].PCMBuffer) {
       double playheadFrames = audioEngine.Decks[1].Position;
@@ -668,16 +669,16 @@ int main(void) {
       if (srB < 8000)
         srB = 44100.0;
 
-      app.deckB.Position = (playheadFrames * 105.0) / srB;
+      app.deckB.Position = (playheadFrames * 150.0) / srB;
       app.deckB.IsTouching = audioEngine.Decks[1].IsTouching;
       app.deckB.IsPlaying = audioEngine.Decks[1].IsPlaying;
 
       double posSec = playheadFrames / srB;
-      app.deckB.PositionMs = (uint32_t)(posSec * 1000.0);
+      app.deckB.PositionMs = (long long)(posSec * 1000.0);
 
       double lenSec =
           ((double)audioEngine.Decks[1].TotalSamples / (double)CHANNELS) / srB;
-      app.deckB.TrackLengthMs = (uint32_t)(lenSec * 1000.0);
+      app.deckB.TrackLengthMs = (long long)(lenSec * 1000.0);
     }
 
     if (IsKeyPressed(app.keyMap.toggleInfo)) {
@@ -764,6 +765,16 @@ int main(void) {
       app.stripA.base.Update((Component *)&app.stripA);
       app.stripB.base.Update((Component *)&app.stripB);
       app.topbar.base.Update((Component *)&app.topbar);
+
+      // --- Handle Seek Requests from UI ---
+      if (app.deckA.HasSeekRequest) {
+        DeckAudio_JumpToMs(&audioEngine.Decks[0], app.deckA.SeekMs);
+        app.deckA.HasSeekRequest = false;
+      }
+      if (app.deckB.HasSeekRequest) {
+        DeckAudio_JumpToMs(&audioEngine.Decks[1], app.deckB.SeekMs);
+        app.deckB.HasSeekRequest = false;
+      }
     }
 
     BeginDrawing();
@@ -799,13 +810,13 @@ int main(void) {
       break;
     }
 
-    // if (app.screen != ScreenSplash) {
-    //     app.stripA.base.Draw((Component*)&app.stripA);
-    //     app.stripB.base.Draw((Component*)&app.stripB);
-    //     app.topbar.base.Draw((Component*)&app.topbar);
-    //     DrawText("SPACE: Browser | I: Info | TAB: Settings | M: Mixer", 10,
-    //     Si(REF_HEIGHT) - 20, 10, GRAY);
-    // }
+    if (app.screen != ScreenSplash) {
+      app.stripA.base.Draw((Component *)&app.stripA);
+      app.stripB.base.Draw((Component *)&app.stripB);
+      app.topbar.base.Draw((Component *)&app.topbar);
+      //   DrawText("SPACE: Browser | I: Info | TAB: Settings | M: Mixer", 10,
+      //            Si(REF_HEIGHT) - 20, 10, GRAY);
+    }
 
     // Exit Confirmation Popup
     if (app.showExitConfirm) {

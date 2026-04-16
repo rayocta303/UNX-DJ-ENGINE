@@ -3,6 +3,8 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include <stdio.h>
+#include <math.h>
+#include <stdlib.h>
 
 static Texture2D crownTex = {0};
 
@@ -76,12 +78,12 @@ static void DeckInfo_Draw(Component *base) {
     char barsVal[32] = "---.-";
 
     if (d->State->LoadedTrack != NULL) {
-        unsigned int posMs = (unsigned int)d->State->PositionMs;
+        long long posMs = d->State->PositionMs;
         int beatIdx = -1;
 
         for (int i = 0; i < 1024; i++) {
-            unsigned int bMs = d->State->LoadedTrack->BeatGrid[i].Time;
-            if (bMs == 0 || bMs == 0xFFFFFFFF) break;
+            long long bMs = (long long)d->State->LoadedTrack->BeatGrid[i].Time;
+            if (bMs == 0xFFFFFFFF) break;
             if (bMs <= posMs) beatIdx = i;
             else break;
         }
@@ -96,12 +98,31 @@ static void DeckInfo_Draw(Component *base) {
                     currentBar++;
                 }
             }
-            // If we somehow didn't hit a 1 yet, fallback to 1 (e.g., intro before first bar, not strictly necessary, but helpful)
+            // If we somehow didn't hit a 1 yet, fallback to 1 
             if (currentBar == 0) currentBar = 1;
             
             sprintf(barsVal, "%02d.%d", currentBar, currentBeat);
         } else {
-            sprintf(barsVal, "01.1");
+            // Negative position or before first beat
+            if (posMs < 0) {
+                // Determine BPM from first two beats to extrapolate lead-in bars
+                double firstBeatMs = (double)d->State->LoadedTrack->BeatGrid[0].Time;
+                double secondBeatMs = (double)d->State->LoadedTrack->BeatGrid[1].Time;
+                double beatLen = secondBeatMs - firstBeatMs;
+                if (beatLen <= 0) beatLen = 500.0; // 120 BPM fallback
+
+                double msFromFirst = (double)posMs - firstBeatMs;
+                int totalBeatsBefore = (int)floor(msFromFirst / beatLen); 
+                // e.g. -500ms from start = -1 beat.
+                // -1 beat relative to 1.1 -> 0.4? No, usually it counts as -01.1
+                
+                int absBeats = abs(totalBeatsBefore);
+                int bars = (absBeats / 4) + 1;
+                int beats = (absBeats % 4) + 1;
+                sprintf(barsVal, "-%02d.%d", bars, beats);
+            } else {
+                sprintf(barsVal, "01.1");
+            }
         }
     }
 

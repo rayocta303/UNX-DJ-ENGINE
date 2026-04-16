@@ -15,6 +15,8 @@ void UIFonts_Unload(void);
 
 // Returns standard raylib font configured for default face
 Font UIFonts_GetFace(float size);
+// Returns bold version of the UI face
+Font UIFonts_GetBoldFace(float size);
 // Returns standard raylib font configured for solid icon face
 Font UIFonts_GetIcon(float size);
 // Returns standard raylib font configured for regular icon face

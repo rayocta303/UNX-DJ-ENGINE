@@ -108,7 +108,7 @@ void DeckAudio_InstantPlay(DeckAudioState *deck); // Start without vinyl ramp
 // Called when jog wheel is moved during touch
 void DeckAudio_SetJogRate(DeckAudioState *deck, double delta); 
 void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching);
-void DeckAudio_JumpToMs(DeckAudioState *deck, uint32_t ms);
+void DeckAudio_JumpToMs(DeckAudioState *deck, int64_t ms);
 void DeckAudio_QueueJumpMs(DeckAudioState *deck, uint32_t targetMs, uint32_t waitMs);
 void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch);
 

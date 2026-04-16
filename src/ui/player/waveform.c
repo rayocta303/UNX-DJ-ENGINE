@@ -24,8 +24,8 @@ static int Waveform_Update(Component *base) {
                 (r->cachedTrack->WaveformType == 2) ? 2 : 1;
       r->dynWfmFrames = r->cachedTrack->DynamicWaveformLen / bpf;
 
-      // Calculate data density: how many data frames exist per UI frame (105Hz)
-      float totalUIFrames = (float)r->State->TrackLengthMs * 0.105f;
+      // Calculate data density: how many data frames exist per UI frame (150Hz)
+      float totalUIFrames = (float)r->State->TrackLengthMs * 0.15f;
       if (totalUIFrames > 0) {
         r->dataDensity = (float)r->dynWfmFrames / totalUIFrames;
       } else {
@@ -428,7 +428,7 @@ static void Waveform_Draw(Component *base) {
       uint16_t beatNum = r->State->LoadedTrack->BeatGrid[i].BeatNumber;
       if (originalMs == 0xFFFFFFFF || originalMs == 0) break;
 
-      double beatPosHF = (double)originalMs * 0.105;
+      double beatPosHF = (double)originalMs * 0.15;
       float px = (float)((beatPosHF - elapsedHalfFrames) / (double)effectiveZoom);
       float bx = playheadX + px;
 

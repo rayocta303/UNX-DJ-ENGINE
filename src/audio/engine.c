@@ -400,9 +400,8 @@ void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching) {
     }
 }
 
-void DeckAudio_JumpToMs(DeckAudioState *deck, uint32_t ms) {
-    deck->Position = (double)ms * (44100.0 / 1000.0);
-    if (deck->Position < 0) deck->Position = 0;
+void DeckAudio_JumpToMs(DeckAudioState *deck, int64_t ms) {
+    deck->Position = (double)ms * ((double)deck->SampleRate / 1000.0);
     if (deck->Position * 2 >= (double)deck->TotalSamples) {
         deck->Position = (double)(deck->TotalSamples / 2) - 1.0;
     }

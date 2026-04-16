@@ -123,7 +123,6 @@ static void Mixer_Draw(Component *base) {
 
     Font fTitle = UIFonts_GetFace(S(12));
     Font fSub = UIFonts_GetFace(S(8));
-    Font fXXS = UIFonts_GetFace(S(7));
 
     // Title Bar
     DrawRectangle(wx, wy, ww, S(24), ColorDark3);

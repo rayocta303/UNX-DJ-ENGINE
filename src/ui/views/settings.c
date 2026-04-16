@@ -84,33 +84,43 @@ static int Settings_Update(Component *base) {
     }
   }
 
+  // Mouse Wheel Scroll
+  float wheel = GetMouseWheelMove();
+  if (wheel != 0) {
+      if (wheel > 0) {
+          if (r->State->Scroll > 0) r->State->Scroll--;
+      } else {
+          int visibleRows = 12;
+          if (r->State->Scroll + visibleRows < r->State->ItemsCount) {
+              r->State->Scroll++;
+          }
+      }
+  }
+
   if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
       r->State->TouchDragAccumulator = 0;
   }
 
   if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
     Vector2 mouse = UIGetMousePosition();
-    float divY = SCREEN_HEIGHT - S(28.0f);
+    float bottomH = S(28.0f);
+    float divY = SCREEN_HEIGHT - DECK_STR_H - bottomH;
 
-    // Buttons in Reference Space (using Si to convert mouse to ref or scaled to
-    // scaled) Actually UIGetMousePosition returns reference-like space (offset
-    // subtracted) but it's not divided by scale. So we should compare against
-    // scaled values.
-
-    // APPLY Button: DrawRectangle(S(30), divY + S(4), S(80), S(18), ...)
-    if (mouse.x >= S(30) && mouse.x <= S(110) && mouse.y >= divY + S(4) &&
-        mouse.y <= divY + S(22)) {
+    // DONE Button: DrawRectangle(S(15), divY + S(5), S(90), S(18), ...)
+    if (mouse.x >= S(15) && mouse.x <= S(105) && mouse.y >= divY + S(5) &&
+        mouse.y <= divY + S(23)) {
       if (r->OnApply)
         r->OnApply(r->callbackCtx);
-      else if (r->OnClose)
-        r->OnClose(r->callbackCtx);
-    }
-    // CANCEL Button: DrawRectangle(SCREEN_WIDTH - S(110), divY + S(4), S(80),
-    // S(18), ...)
-    if (mouse.x >= SCREEN_WIDTH - S(110) && mouse.x <= SCREEN_WIDTH - S(30) &&
-        mouse.y >= divY + S(4) && mouse.y <= divY + S(22)) {
       if (r->OnClose)
         r->OnClose(r->callbackCtx);
+      return 1;
+    }
+    // CLOSE Button: DrawRectangle(SCREEN_WIDTH - S(105), divY + S(5), S(90), S(18), ...)
+    if (mouse.x >= SCREEN_WIDTH - S(105) && mouse.x <= SCREEN_WIDTH - S(15) &&
+        mouse.y >= divY + S(5) && mouse.y <= divY + S(23)) {
+      if (r->OnClose)
+        r->OnClose(r->callbackCtx);
+      return 1;
     }
 
     // List Item Selection & Action Clicking
@@ -281,26 +291,32 @@ static void Settings_Draw(Component *base) {
     }
   }
 
-  DrawScrollbar(r->State->ItemsCount, r->State->Scroll + r->State->CursorPos,
-                visibleRows);
+  float bottomH = S(28.0f);
+  DrawScrollbar(SCREEN_WIDTH - S(2.5f), TOP_BAR_H, S(2), viewH - TOP_BAR_H - bottomH,
+                r->State->ItemsCount, r->State->Scroll, visibleRows);
 
-  float divY = viewH - S(28.0f);
-  DrawLine(S(4), divY, SCREEN_WIDTH - S(4), divY, ColorDark1);
+  float divY = viewH - bottomH;
 
-  DrawRectangle(S(30), divY + S(4), S(80), S(18), ColorDGreen);
-  UIDrawText("DONE", faceSm, S(48), divY + S(7), S(11), ColorBlack);
+  // Bottom Background
+  DrawRectangle(0, divY, SCREEN_WIDTH, bottomH, ColorDark1);
+  DrawLine(0, divY, SCREEN_WIDTH, divY, ColorGray);
+
+  // DONE Button (Blue)
+  DrawRectangle(S(15), divY + S(5), S(90), S(18), ColorBlue);
+  DrawRectangleLines(S(15), divY + S(5), S(90), S(18), ColorShadow);
+  DrawCentredText("DONE", faceSm, S(15), S(90), divY + S(8), S(11), ColorWhite);
 
   char countStr[32];
   sprintf(countStr, "%d / %d", r->State->Scroll + r->State->CursorPos + 1,
           r->State->ItemsCount);
-  UIDrawText(countStr, faceXS, SCREEN_WIDTH / 2.0f - S(24.0f), divY + S(7),
+  UIDrawText(countStr, faceXS, SCREEN_WIDTH / 2.0f - S(24.0f), divY + S(8),
              S(9), ColorShadow);
 
-  DrawRectangle(SCREEN_WIDTH - S(110), divY + S(4), S(80), S(18), ColorDark1);
-  DrawRectangleLines(SCREEN_WIDTH - S(110), divY + S(4), S(80), S(18),
+  // CLOSE Button
+  DrawRectangle(SCREEN_WIDTH - S(105), divY + S(5), S(90), S(18), ColorDark2);
+  DrawRectangleLines(SCREEN_WIDTH - S(105), divY + S(5), S(90), S(18),
                      ColorShadow);
-  UIDrawText("CLOSE", faceSm, SCREEN_WIDTH - S(90), divY + S(7), S(11),
-             ColorWhite);
+  DrawCentredText("CLOSE", faceSm, SCREEN_WIDTH - S(105), S(90), divY + S(8), S(11), ColorWhite);
 
   // Draw Dropdown Overlay
   if (r->State->IsDropdownOpen) {
