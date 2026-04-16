@@ -350,11 +350,25 @@ static void Waveform_Draw(Component *base) {
             smHi += (rH - smHi) * ((rH > smHi) ? ATK : REL);
         } else {
             Color col; int h;
-            if (wfType == 2) { int64_t bf = GetPWV4PeakFrame(wfData, wfFrames, pA, pB); h = (bf >= 0) ? PWV4_Decode(wfData, bf, &col) : 0; }
-            else { unsigned char sv = GetPWV2Peak(wfData, wfFrames, pA, pB); h = PWV2_Decode(sv, &col); }
-            float rawH = h * PWV2_HSCALE * gLow;
-            float coef = (rawH > smLo) ? ATK : REL;
-            smLo += (rawH - smLo) * coef;
+            if (wfType == 2) h = PWV4_Decode(wfData, (int64_t)floor(pA + 0.5), &col);
+            else h = PWV2_Decode(wfData[(int64_t)floor(pA + 0.5)], &col);
+
+            float rL, rM, rH;
+            if (userStyle == WAVEFORM_STYLE_3BAND) {
+                float baseH = h * PWV2_HSCALE;
+                if (col.r > col.b && col.r > col.g) { rL=baseH*0.4f; rM=baseH*0.9f; rH=baseH*0.2f; }
+                else if (col.b > col.r && col.b > col.g) { rL=baseH*0.95f; rM=baseH*0.6f; rH=baseH*0.1f; }
+                else { rL=baseH*0.8f; rM=baseH*0.8f; rH=baseH*0.6f; }
+                rL *= gLow; rM *= gMid; rH *= gHigh;
+            } else {
+                rL = h * PWV2_HSCALE * gLow; rM = 0; rH = 0;
+            }
+
+            smLo += (rL - smLo) * ((rL > smLo) ? ATK : REL);
+            smMi += (rM - smMi) * ((rM > smMi) ? ATK : REL);
+            smHi += (rH - smHi) * ((rH > smHi) ? ATK : REL);
+
+            float coef = (rL > smLo) ? ATK : REL; // Use low for color smoothing
             smCol.r = (unsigned char)(smCol.r + (col.r - smCol.r) * coef);
             smCol.g = (unsigned char)(smCol.g + (col.g - smCol.g) * coef);
             smCol.b = (unsigned char)(smCol.b + (col.b - smCol.b) * coef);
@@ -400,7 +414,16 @@ static void Waveform_Draw(Component *base) {
       int h;
       if (wfType == 2) h = PWV4_Decode(wfData, i, &colRaw);
       else h = PWV2_Decode(wfData[i], &colRaw);
-      rL = h * PWV2_HSCALE * gLow;
+      
+      if (userStyle == WAVEFORM_STYLE_3BAND) {
+        float baseH = h * PWV2_HSCALE;
+        if (colRaw.r > colRaw.b && colRaw.r > colRaw.g) { rL=baseH*0.4f; rM=baseH*0.9f; rH=baseH*0.2f; }
+        else if (colRaw.b > colRaw.r && colRaw.b > colRaw.g) { rL=baseH*0.95f; rM=baseH*0.6f; rH=baseH*0.1f; }
+        else { rL=baseH*0.8f; rM=baseH*0.8f; rH=baseH*0.6f; }
+        rL *= gLow; rM *= gMid; rH *= gHigh;
+      } else {
+        rL = h * PWV2_HSCALE * gLow;
+      }
     }
 
     // Update smoothed state
