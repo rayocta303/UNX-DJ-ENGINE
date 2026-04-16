@@ -75,6 +75,7 @@ jobs:
     - name: Bundle Assets
       run: |
         gcc tools/bin2c.c -o tools/bin2c
+        gcc tools/gen_splash_bundle.c -o tools/gen_splash_bundle
         rm -f src/ui/components/assets_bundle.h
         echo "#ifndef ASSETS_BUNDLE_H" > src/ui/components/assets_bundle.h
         echo "#define ASSETS_BUNDLE_H" >> src/ui/components/assets_bundle.h
@@ -82,6 +83,9 @@ jobs:
         ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Free-Regular-400.otf" src/ui/components/assets_bundle.h font_awesome_regular append
         ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Brands-Regular-400.otf" src/ui/components/assets_bundle.h font_awesome_brand append
         ./tools/bin2c "assets/splash.png" src/ui/components/assets_bundle.h unx_logo append
+        ./tools/bin2c "assets/icons/crown.png" src/ui/components/assets_bundle.h icon_crown append
+        ./tools/gen_splash_bundle assets/splash src/ui/components/splash_bundle_tmp.h
+        cat src/ui/components/splash_bundle_tmp.h >> src/ui/components/assets_bundle.h
         echo "#endif" >> src/ui/components/assets_bundle.h
 
     - name: Prepare Android Assets
