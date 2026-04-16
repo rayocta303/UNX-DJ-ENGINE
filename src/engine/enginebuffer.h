@@ -1,9 +1,15 @@
 #pragma once
 
+#ifndef __ANDROID__
 #include <gtest/gtest_prod.h>
+#endif
 
+#if !defined(__ANDROID__)
 #include <QAtomicInt>
 #include <QMutex>
+#else
+#include "engine/shim.h"
+#endif
 #include <initializer_list>
 
 #include "audio/frame.h"
@@ -24,7 +30,7 @@
 #endif
 
 //for the writer
-#ifdef __SCALER_DEBUG__
+#if defined(__SCALER_DEBUG__) && !defined(__ANDROID__)
 #include <QFile>
 #include <QTextStream>
 #endif

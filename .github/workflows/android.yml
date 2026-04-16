@@ -95,8 +95,9 @@ jobs:
         cmake_minimum_required(VERSION 3.18.1)
         project(xdjunx)
 
-        set(CMAKE_CXX_STANDARD 17)
+        set(CMAKE_CXX_STANDARD 20)
         set(CMAKE_C_STANDARD 11)
+
 
         set(PROJECT_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../src")
         set(PROJECT_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../lib")

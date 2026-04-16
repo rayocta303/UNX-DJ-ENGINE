@@ -1,5 +1,9 @@
 #pragma once
+#if !defined(__ANDROID__)
 #include <Qt>
+#else
+#include "engine/shim.h"
+#endif
 
 // Maximum buffer length to each EngineObject::process call.
 // Note: MAX_BUFFER_LEN shouldn't be use for audio processing,
