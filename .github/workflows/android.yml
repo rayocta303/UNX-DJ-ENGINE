@@ -98,8 +98,8 @@ jobs:
         set(CMAKE_CXX_STANDARD 17)
         set(CMAKE_C_STANDARD 11)
 
-        set(PROJECT_SRC_DIR "../../../src")
-        set(PROJECT_LIB_DIR "../../../lib")
+        set(PROJECT_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../src")
+        set(PROJECT_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../lib")
 
         include_directories(
             ${PROJECT_SRC_DIR}
@@ -108,7 +108,7 @@ jobs:
             ${PROJECT_LIB_DIR}
             ${PROJECT_LIB_DIR}/kaitai
             ${PROJECT_LIB_DIR}/rekordbox-metadata
-            ../../../raylib-src/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../../raylib-src/src
             src/main/cpp
         )
 
@@ -130,7 +130,7 @@ jobs:
         find_library(egl-lib EGL)
         find_library(gles-lib GLESv2)
 
-        target_link_libraries(xdjunx ${log-lib} ${android-lib} ${egl-lib} ${gles-lib} ${CMAKE_CURRENT_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI}/libraylib.a)
+        target_link_libraries(xdjunx ${log-lib} ${android-lib} ${egl-lib} ${gles-lib} m ${CMAKE_CURRENT_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI}/libraylib.a)
         EOF
 
     - name: Setup Gradle
