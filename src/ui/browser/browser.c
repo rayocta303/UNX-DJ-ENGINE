@@ -23,6 +23,7 @@
 #undef NOGDI
 #else
 #include <unistd.h>
+#include <dirent.h>
 #endif
 
 static const char* categories[] = {"FILENAME", "FOLDER", "PLAYLIST", "TRACK", "SEARCH"};
@@ -102,6 +103,39 @@ void Browser_RefreshStorages(BrowserState *s) {
             if (s->StorageCount >= 8) break;
         }
     }
+#else
+    // 2. Scan Android / Linux /storage directory for OTG / SD Cards
+    if (s->StorageCount < 8) {
+        if (stat("/storage/emulated/0/PIONEER/rekordbox/export.pdb", &st) == 0) {
+            strcpy(s->AvailableStorages[s->StorageCount].Name, "Internal Storage");
+            strcpy(s->AvailableStorages[s->StorageCount].Path, "/storage/emulated/0");
+            strcpy(s->AvailableStorages[s->StorageCount].Type, "SD");
+            s->StorageCount++;
+        }
+    }
+
+    DIR *d = opendir("/storage");
+    if (d) {
+        struct dirent *dir;
+        while ((dir = readdir(d)) != NULL) {
+            if (s->StorageCount >= 8) break;
+            if (strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0 || strcmp(dir->d_name, "self") == 0 || strcmp(dir->d_name, "emulated") == 0) continue;
+
+            char fullPath[512];
+            char testPath[512];
+            snprintf(fullPath, sizeof(fullPath), "/storage/%s", dir->d_name);
+            snprintf(testPath, sizeof(testPath), "%s/PIONEER/rekordbox/export.pdb", fullPath);
+            
+            if (stat(testPath, &st) == 0) {
+                const char *type = (strchr(dir->d_name, '-') != NULL) ? "SD" : "USB";
+                snprintf(s->AvailableStorages[s->StorageCount].Name, sizeof(s->AvailableStorages[0].Name), "Drive (%s)", dir->d_name);
+                snprintf(s->AvailableStorages[s->StorageCount].Path, sizeof(s->AvailableStorages[0].Path), "%s", fullPath);
+                strcpy(s->AvailableStorages[s->StorageCount].Type, type);
+                s->StorageCount++;
+            }
+        }
+        closedir(d);
+    }
 #endif
 }
 
@@ -169,18 +203,24 @@ static int Browser_Update(Component *base) {
         if (CheckCollisionPointRec(mousePos, boxRect)) {
             if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                 if (i < 4) {
-                    // Navigate to categories (Playlist, Folder, Search, History)
-                    s->BrowseLevel = 2; // Categories level
-                    s->CursorPos = i; 
                     s->ScrollOffset = 0;
-                    // Trigger "Enter" logic for the category
-                    if (s->CursorPos == 2) { s->BrowseLevel = 1; } // Playlists
-                    else if (s->CursorPos == 3 || s->CursorPos == 0) { 
-                        s->BrowseLevel = 0; // Tracks
-                        s->CurrentPlaylistIdx = -1;
-                        Browser_UpdateActiveTracks(s);
+                    if (i == 3) {
+                        // Navigate to Drive / Source
+                        s->BrowseLevel = 3; 
+                        s->CursorPos = 0;
+                    } else {
+                        // Navigate to categories (Playlist, Folder, Search)
+                        s->BrowseLevel = 2; // Categories level
+                        s->CursorPos = i; 
+                        // Trigger "Enter" logic for the category
+                        if (s->CursorPos == 2) { s->BrowseLevel = 1; } // Playlists
+                        else if (s->CursorPos == 0) { 
+                            s->BrowseLevel = 0; // Tracks
+                            s->CurrentPlaylistIdx = -1;
+                            Browser_UpdateActiveTracks(s);
+                        }
+                        s->CursorPos = 0;
                     }
-                    s->CursorPos = 0;
                 } else {
                     // Playlist Bank Jump
                     int bankIdx = i - 4;
@@ -572,7 +612,7 @@ static void Browser_Draw(Component *base) {
         
         if (!isBank) {
             // Icon / Symbol for main navigation
-            const char* sidIcons[] = {"\uf03c", "\uf07b", "\uf002", "\uf017"}; // Playlist, Folder, Search, History
+            const char* sidIcons[] = {"\uf03c", "\uf07b", "\uf002", "\uf287"}; // Playlist, Folder, Search, Drive (USB)
             UIDrawText(sidIcons[i], faceIcon, S(12), boxY + S(12), S(16), ColorWhite);
         } else {
             // Playlist Bank Placeholders (1-3)
