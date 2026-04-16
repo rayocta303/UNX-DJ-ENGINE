@@ -1,8 +1,8 @@
 #include "input/keyboard.h"
 #include "raylib.h"
 
-#include "logic/quantize.h"
-#include "logic/sync.h"
+#include "core/logic/quantize.h"
+#include "core/logic/sync.h"
 
 KeyboardMapping GetDefaultMapping() {
     KeyboardMapping m = {0};

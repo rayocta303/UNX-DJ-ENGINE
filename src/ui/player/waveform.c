@@ -1,5 +1,5 @@
 #include "ui/player/waveform.h"
-#include "logic/quantize.h"
+#include "core/logic/quantize.h"
 #include "rlgl.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"

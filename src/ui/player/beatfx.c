@@ -2,7 +2,7 @@
 #include "ui/components/theme.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
-#include "logic/quantize.h"
+#include "core/logic/quantize.h"
 #include <stdio.h>
 
 static const char* AllFXNames[] = {

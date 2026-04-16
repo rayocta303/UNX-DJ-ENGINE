@@ -1,5 +1,5 @@
 #include "audio/engine.h"
-#include "mixxx_engine.h"
+#include "engine/util/engine_math.h"
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
@@ -36,10 +36,10 @@ void AudioEngine_Init(AudioEngine *engine) {
         engine->Decks[i].EqLow = 0.5f;
         engine->Decks[i].EqMid = 0.5f;
         engine->Decks[i].EqHigh = 0.5f;
-        MixxxLR4_Init(&engine->Decks[i].EqLowStateL);
-        MixxxLR4_Init(&engine->Decks[i].EqLowStateR);
-        MixxxLR4_Init(&engine->Decks[i].EqHighStateL);
-        MixxxLR4_Init(&engine->Decks[i].EqHighStateR);
+        EngineLR4_Init(&engine->Decks[i].EqLowStateL);
+        EngineLR4_Init(&engine->Decks[i].EqLowStateR);
+        EngineLR4_Init(&engine->Decks[i].EqHighStateL);
+        EngineLR4_Init(&engine->Decks[i].EqHighStateR);
         ColorFXManager_Init(&engine->Decks[i].ColorFX);
         engine->Decks[i].IsMotorOn = false;
         engine->Decks[i].IsPlaying = false;
@@ -177,7 +177,7 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
     deck->IsPlaying = (fabs(deck->OutlinedRate) > 0.001);
 }
 
-// Mixxx Hermite4 and LR4 are now provided via mixxx_engine.h
+// Engine Hermite4 and LR4 are now provided via Engine_engine.h
 
 static inline void AudioEngine_GetSample(DeckAudioState* deck, double pos, float* l, float* r) {
     if (pos < 2.0) { *l = 0; *r = 0; return; }
@@ -185,8 +185,8 @@ static inline void AudioEngine_GetSample(DeckAudioState* deck, double pos, float
     float f = (float)(pos - i);
     if (i >= (int)((deck->TotalSamples / 2) - 3)) { *l = 0; *r = 0; return; }
 
-    *l = Mixxx_InterpolateHermite4(f, deck->PCMBuffer[(i - 1) * 2], deck->PCMBuffer[i * 2], deck->PCMBuffer[(i + 1) * 2], deck->PCMBuffer[(i + 2) * 2]);
-    *r = Mixxx_InterpolateHermite4(f, deck->PCMBuffer[(i - 1) * 2 + 1], deck->PCMBuffer[i * 2 + 1], deck->PCMBuffer[(i + 1) * 2 + 1], deck->PCMBuffer[(i + 2) * 2 + 1]);
+    *l = Engine_InterpolateHermite4(f, deck->PCMBuffer[(i - 1) * 2], deck->PCMBuffer[i * 2], deck->PCMBuffer[(i + 1) * 2], deck->PCMBuffer[(i + 2) * 2]);
+    *r = Engine_InterpolateHermite4(f, deck->PCMBuffer[(i - 1) * 2 + 1], deck->PCMBuffer[i * 2 + 1], deck->PCMBuffer[(i + 1) * 2 + 1], deck->PCMBuffer[(i + 2) * 2 + 1]);
 }
 
 #define INTERP_SAMPLES_PRO(pos, l, r) AudioEngine_GetSample(deck, pos, &l, &r)
@@ -218,17 +218,17 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
     bool mtActive = deck->MasterTempoActive;
     float fs = (deck->SampleRate > 0) ? (float)deck->SampleRate : (float)SAMPLE_RATE;
 
-    // --- Rate Smoothing (Mixxx Port) ---
+    // --- Rate Smoothing (Engine Port) ---
     if (deck->LastRate == 0) deck->LastRate = deck->OutlinedRate;
     double currentRate = deck->LastRate;
     double targetRate = deck->OutlinedRate;
     double rateDelta = (targetRate - currentRate) / (double)frames;
 
-    // --- Linkwitz-Riley 4th Order EQ Crossovers (Mixxx Standard) ---
-    MixxxLR4_SetLowpass(&deck->EqLowStateL, 350.0f, 44100);
-    MixxxLR4_SetLowpass(&deck->EqLowStateR, 350.0f, 44100);
-    MixxxLR4_SetHighpass(&deck->EqHighStateL, 2500.0f, 44100);
-    MixxxLR4_SetHighpass(&deck->EqHighStateR, 2500.0f, 44100);
+    // --- Linkwitz-Riley 4th Order EQ Crossovers (Engine Standard) ---
+    EngineLR4_SetLowpass(&deck->EqLowStateL, 350.0f, 44100);
+    EngineLR4_SetLowpass(&deck->EqLowStateR, 350.0f, 44100);
+    EngineLR4_SetHighpass(&deck->EqHighStateL, 2500.0f, 44100);
+    EngineLR4_SetHighpass(&deck->EqHighStateR, 2500.0f, 44100);
 
     float maxL = 0, maxR = 0;
 
@@ -297,14 +297,14 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
         float gainM = (deck->EqMid < 0.5f) ? (deck->EqMid * 2.0f) : (1.0f + (deck->EqMid - 0.5f) * 4.0f);
         float gainH = (deck->EqHigh < 0.5f) ? (deck->EqHigh * 2.0f) : (1.0f + (deck->EqHigh - 0.5f) * 4.0f);
 
-        // professional Mixxx Linkwitz-Riley EQ Extraction
-        float lowL = MixxxLR4_Process(&deck->EqLowStateL, l_sample);
-        float highL = MixxxLR4_Process(&deck->EqHighStateL, l_sample);
+        // professional Engine Linkwitz-Riley EQ Extraction
+        float lowL = EngineLR4_Process(&deck->EqLowStateL, l_sample);
+        float highL = EngineLR4_Process(&deck->EqHighStateL, l_sample);
         float midL = l_sample - lowL - highL;
         l_sample = (lowL * gainL) + (midL * gainM) + (highL * gainH);
 
-        float lowR = MixxxLR4_Process(&deck->EqLowStateR, r_sample);
-        float highR = MixxxLR4_Process(&deck->EqHighStateR, r_sample);
+        float lowR = EngineLR4_Process(&deck->EqLowStateR, r_sample);
+        float highR = EngineLR4_Process(&deck->EqHighStateR, r_sample);
         float midR = r_sample - lowR - highR;
         r_sample = (lowR * gainL) + (midR * gainM) + (highR * gainH);
 

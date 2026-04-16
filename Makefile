@@ -43,15 +43,16 @@ SRC_C = src/main.c \
         src/audio/engine.c \
         src/input/keyboard.c \
         src/ui/browser/browser.c \
-        src/logic/quantize.c \
-        src/logic/sync.c \
-        src/logic/settings_io.c \
-        src/logic/control_object.c \
-        src/audio/fx/dsp_utils.c \
-        src/midi/midi_handler.c \
-        src/midi/midi_mapper.c \
-        $(wildcard src/audio/fx/colorfx/*.c) \
-        $(wildcard src/audio/fx/beatfx/*.c)
+        src/core/logic/quantize.c \
+        src/core/logic/sync.c \
+        src/core/logic/settings_io.c \
+        src/core/logic/control_object.c \
+        src/engine/fx/dsp_utils.c \
+        src/core/midi/midi_handler.c \
+        src/core/midi/midi_mapper.c \
+        src/core/midi/midi_backend_win.c \
+        $(wildcard src/engine/fx/colorfx/*.c) \
+        $(wildcard src/engine/fx/beatfx/*.c)
 
 SRC_CXX = lib/kaitai/kaitai/kaitaistream.cpp \
           lib/rekordbox-metadata/rekordbox_anlz.cpp \

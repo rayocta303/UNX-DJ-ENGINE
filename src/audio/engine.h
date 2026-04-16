@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "fx/colorfx/colorfx_manager.h"
-#include "fx/beatfx/beatfx_manager.h"
+#include "engine/fx/colorfx/colorfx_manager.h"
+#include "engine/fx/beatfx/beatfx_manager.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,7 +58,7 @@ typedef struct DeckAudioState {
     float VinylStartAccel;
     float VinylStopAccel;
     
-    // Mixxx EngineBufferScaleLinear state
+    // Engine EngineBufferScaleLinear state
     float BaseRate;             // Determined by pitch slider
     float OutlinedRate;         // Final calculated rate including scratch offsets
     bool MasterTempoActive;     // Key lock
@@ -76,8 +76,8 @@ typedef struct DeckAudioState {
     float EqMid;   // 0.0 to 1.0 (default 0.5)
     float EqHigh;  // 0.0 to 1.0 (default 0.5)
     
-    MixxxLR4 EqLowStateL, EqLowStateR;
-    MixxxLR4 EqHighStateL, EqHighStateR;
+    EngineLR4 EqLowStateL, EqLowStateR;
+    EngineLR4 EqHighStateL, EqHighStateR;
 
     float LastRate;
 

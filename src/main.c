@@ -13,11 +13,11 @@
 #include "ui/player/player.h"
 #include "ui/browser/browser.h"
 #include "input/keyboard.h"
-#include "logic/sync.h"
-#include "logic/settings_io.h"
+#include "core/logic/sync.h"
+#include "core/logic/settings_io.h"
 #include "ui/components/helpers.h"
-#include "midi/midi_handler.h"
-#include "logic/control_object.h"
+#include "core/midi/midi_handler.h"
+#include "core/logic/control_object.h"
 
 typedef enum {
     ScreenPlayer,

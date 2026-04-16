@@ -38,19 +38,19 @@ if "%PLATFORM%"=="linux" (
     set TARGET=xdjunx.exe
 )
 
-set CFLAGS=-Wall -Wextra -Isrc -Ilib -O2 %TARGET_FLAGS%
-set CXXFLAGS=-Wall -Wextra -Isrc -Ilib -Ilib/kaitai -Ilib/rekordbox-metadata -O2 -std=c++17 %TARGET_FLAGS%
+set CFLAGS=-Wall -Wextra -Isrc -Isrc/core -Isrc/engine -Ilib -O2 %TARGET_FLAGS%
+set CXXFLAGS=-Wall -Wextra -Isrc -Isrc/core -Isrc/engine -Ilib -Ilib/kaitai -Ilib/rekordbox-metadata -O2 -std=c++17 %TARGET_FLAGS%
 
 echo Building C files...
-for %%f in (src/main.c src/ui/components/theme.c src/ui/components/fonts.c src/ui/components/helpers.c src/ui/views/topbar.c src/ui/views/info.c src/ui/views/splash.c src/ui/views/settings.c src/ui/views/about.c src/ui/views/mixer.c src/ui/player/bottomstrip.c src/ui/player/beatfx.c src/ui/player/deckinfo.c src/ui/player/deckstrip.c src/ui/player/waveform.c src/ui/player/player.c src/audio/engine.c src/input/keyboard.c src/ui/browser/browser.c src/logic/quantize.c src/logic/sync.c src/logic/settings_io.c) do (
+for %%f in (src/main.c src/ui/components/theme.c src/ui/components/fonts.c src/ui/components/helpers.c src/ui/views/topbar.c src/ui/views/info.c src/ui/views/splash.c src/ui/views/settings.c src/ui/views/about.c src/ui/views/mixer.c src/ui/player/bottomstrip.c src/ui/player/beatfx.c src/ui/player/deckinfo.c src/ui/player/deckstrip.c src/ui/player/waveform.c src/ui/player/player.c src/audio/engine.c src/input/keyboard.c src/ui/browser/browser.c src/core/logic/quantize.c src/core/logic/sync.c src/core/logic/settings_io.c src/core/logic/control_object.c src/core/midi/midi_handler.c src/core/midi/midi_mapper.c src/core/midi/midi_backend_win.c) do (
     %CC% %CFLAGS% -c %%f -o %%~pf%%~nf.o || exit /b 1
 )
 
-for %%f in (src/audio/fx/dsp_utils.c src/audio/fx/colorfx/space.c src/audio/fx/colorfx/dub_echo.c src/audio/fx/colorfx/sweep.c src/audio/fx/colorfx/noise.c src/audio/fx/colorfx/crush.c src/audio/fx/colorfx/filter.c src/audio/fx/colorfx/colorfx_manager.c) do (
+for %%f in (src/engine/fx/dsp_utils.c src/engine/fx/colorfx/space.c src/engine/fx/colorfx/dub_echo.c src/engine/fx/colorfx/sweep.c src/engine/fx/colorfx/noise.c src/engine/fx/colorfx/crush.c src/engine/fx/colorfx/filter.c src/engine/fx/colorfx/colorfx_manager.c) do (
     %CC% %CFLAGS% -c %%f -o %%~pf%%~nf.o || exit /b 1
 )
 
-for %%f in (src/audio/fx/beatfx/delay.c src/audio/fx/beatfx/echo.c src/audio/fx/beatfx/pingpong.c src/audio/fx/beatfx/spiral.c src/audio/fx/beatfx/roll.c src/audio/fx/beatfx/sliproll.c src/audio/fx/beatfx/reverb.c src/audio/fx/beatfx/helix.c src/audio/fx/beatfx/flanger.c src/audio/fx/beatfx/phaser.c src/audio/fx/beatfx/bfilter.c src/audio/fx/beatfx/trans.c src/audio/fx/beatfx/pitch.c src/audio/fx/beatfx/vinylbrake.c src/audio/fx/beatfx/beatfx_manager.c) do (
+for %%f in (src/engine/fx/beatfx/delay.c src/engine/fx/beatfx/echo.c src/engine/fx/beatfx/pingpong.c src/engine/fx/beatfx/spiral.c src/engine/fx/beatfx/roll.c src/engine/fx/beatfx/sliproll.c src/engine/fx/beatfx/reverb.c src/engine/fx/beatfx/helix.c src/engine/fx/beatfx/flanger.c src/engine/fx/beatfx/phaser.c src/engine/fx/beatfx/bfilter.c src/engine/fx/beatfx/trans.c src/engine/fx/beatfx/pitch.c src/engine/fx/beatfx/vinylbrake.c src/engine/fx/beatfx/beatfx_manager.c) do (
     %CC% %CFLAGS% -c %%f -o %%~pf%%~nf.o || exit /b 1
 )
 
@@ -62,7 +62,7 @@ echo Building C++ files...
 %CXX% %CXXFLAGS% -c lib/serato/serato_waveform.cpp -o lib/serato/serato_waveform.o || exit /b 1
 %CXX% %CXXFLAGS% -c src/library/rekordbox_reader.cpp -o src/library/rekordbox_reader.o || exit /b 1
 %CXX% %CXXFLAGS% -c src/library/serato_reader.cpp -o src/library/serato_reader.o || exit /b 1
-%CXX% %CXXFLAGS% -c src/audio/mixxx_engine.cpp -o src/audio/mixxx_engine.o || exit /b 1
+%CXX% %CXXFLAGS% -c src/engine/util/engine_math.cpp -o src/engine/util/engine_math.o || exit /b 1
 
 if "%2"=="check" (
     echo [Check Only] Compilation successful.
@@ -70,7 +70,7 @@ if "%2"=="check" (
 )
 
 echo Linking...
-%CXX% %CXXFLAGS% src/main.o src/ui/components/theme.o src/ui/components/fonts.o src/ui/components/helpers.o src/ui/views/topbar.o src/ui/views/info.o src/ui/views/splash.o src/ui/views/settings.o src/ui/views/about.o src/ui/views/mixer.o src/ui/player/bottomstrip.o src/ui/player/beatfx.o src/ui/player/deckinfo.o src/ui/player/deckstrip.o src/ui/player/waveform.o src/ui/player/player.o src/audio/engine.o src/audio/mixxx_engine.o src/audio/fx/dsp_utils.o src/audio/fx/colorfx/space.o src/audio/fx/colorfx/dub_echo.o src/audio/fx/colorfx/sweep.o src/audio/fx/colorfx/noise.o src/audio/fx/colorfx/crush.o src/audio/fx/colorfx/filter.o src/audio/fx/colorfx/colorfx_manager.o src/audio/fx/beatfx/delay.o src/audio/fx/beatfx/echo.o src/audio/fx/beatfx/pingpong.o src/audio/fx/beatfx/spiral.o src/audio/fx/beatfx/roll.o src/audio/fx/beatfx/sliproll.o src/audio/fx/beatfx/reverb.o src/audio/fx/beatfx/helix.o src/audio/fx/beatfx/flanger.o src/audio/fx/beatfx/phaser.o src/audio/fx/beatfx/bfilter.o src/audio/fx/beatfx/trans.o src/audio/fx/beatfx/pitch.o src/audio/fx/beatfx/vinylbrake.o src/audio/fx/beatfx/beatfx_manager.o src/input/keyboard.o src/ui/browser/browser.o src/logic/quantize.o src/logic/sync.o src/logic/settings_io.o lib/kaitai/kaitai/kaitaistream.o lib/rekordbox-metadata/rekordbox_anlz.o lib/rekordbox-metadata/rekordbox_pdb.o lib/serato/serato_parser.o lib/serato/serato_waveform.o src/library/rekordbox_reader.o src/library/serato_reader.o %LDFLAGS% -o %TARGET% || exit /b 1
+%CXX% %CXXFLAGS% src/main.o src/ui/components/theme.o src/ui/components/fonts.o src/ui/components/helpers.o src/ui/views/topbar.o src/ui/views/info.o src/ui/views/splash.o src/ui/views/settings.o src/ui/views/about.o src/ui/views/mixer.o src/ui/player/bottomstrip.o src/ui/player/beatfx.o src/ui/player/deckinfo.o src/ui/player/deckstrip.o src/ui/player/waveform.o src/ui/player/player.o src/audio/engine.o src/engine/util/engine_math.o src/engine/fx/dsp_utils.o src/engine/fx/colorfx/space.o src/engine/fx/colorfx/dub_echo.o src/engine/fx/colorfx/sweep.o src/engine/fx/colorfx/noise.o src/engine/fx/colorfx/crush.o src/engine/fx/colorfx/filter.o src/engine/fx/colorfx/colorfx_manager.o src/engine/fx/beatfx/delay.o src/engine/fx/beatfx/echo.o src/engine/fx/beatfx/pingpong.o src/engine/fx/beatfx/spiral.o src/engine/fx/beatfx/roll.o src/engine/fx/beatfx/sliproll.o src/engine/fx/beatfx/reverb.o src/engine/fx/beatfx/helix.o src/engine/fx/beatfx/flanger.o src/engine/fx/beatfx/phaser.o src/engine/fx/beatfx/bfilter.o src/engine/fx/beatfx/trans.o src/engine/fx/beatfx/pitch.o src/engine/fx/beatfx/vinylbrake.o src/engine/fx/beatfx/beatfx_manager.o src/input/keyboard.o src/ui/browser/browser.o src/core/logic/quantize.o src/core/logic/sync.o src/core/logic/settings_io.o src/core/logic/control_object.o src/core/midi/midi_handler.o src/core/midi/midi_mapper.o src/core/midi/midi_backend_win.o lib/kaitai/kaitai/kaitaistream.o lib/rekordbox-metadata/rekordbox_anlz.o lib/rekordbox-metadata/rekordbox_pdb.o lib/serato/serato_parser.o lib/serato/serato_waveform.o src/library/rekordbox_reader.o src/library/serato_reader.o %LDFLAGS% -o %TARGET% || exit /b 1
 
 :end
 echo Done.
