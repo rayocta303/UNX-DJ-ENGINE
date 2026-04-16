@@ -1,4 +1,6 @@
 #include "ui/player/player.h"
+#include <stddef.h>
+#include <stdlib.h>
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
