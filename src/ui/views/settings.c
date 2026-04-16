@@ -302,10 +302,8 @@ static void Settings_Draw(Component *base) {
                  ColorOrange);
 
       if (selected && item->OptionsCount > 1) {
-        UIDrawText("\xe2\x97\x84", faceXS, SCREEN_WIDTH - S(150), ry + S(6),
-                   S(9), ColorShadow); // ◄
-        UIDrawText("\xe2\x96\xba", faceXS, SCREEN_WIDTH - S(15), ry + S(6),
-                   S(9), ColorShadow); // ►
+        DrawSelectionTriangleEx(SCREEN_WIDTH - S(150), ry + S(9), S(8), 1, ColorShadow); // Left
+        DrawSelectionTriangleEx(SCREEN_WIDTH - S(18), ry + S(9), S(8), 0, ColorShadow); // Right
       }
     } else if (item->Type == SETTING_TYPE_KNOB) {
       UIDrawKnob(SCREEN_WIDTH - S(80), ry + (rowH / 2.0f), S(9), item->Value,

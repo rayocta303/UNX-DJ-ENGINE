@@ -35,10 +35,20 @@ void DrawTopBar(int remainMin, int remainSec, int clockMin, int clockSec, bool s
     UIDrawText("INFO", faceXS, 449, 2, S(8), ColorPaper);
 }
 
+void DrawSelectionTriangleEx(float x, float y, float size, int direction, Color col) {
+    if (direction == 0) { // Right
+        DrawLine(x, y, x, y + size, col);
+        DrawLine(x, y, x + size / 2.0f, y + size / 2.0f, col);
+        DrawLine(x, y + size, x + size / 2.0f, y + size / 2.0f, col);
+    } else { // Left
+        DrawLine(x + size / 2.0f, y, x + size / 2.0f, y + size, col);
+        DrawLine(x + size / 2.0f, y, x, y + size / 2.0f, col);
+        DrawLine(x + size / 2.0f, y + size, x, y + size / 2.0f, col);
+    }
+}
+
 void DrawSelectionTriangle(float x, float y, Color col) {
-    DrawLine(x, y, x, y+10, col);
-    DrawLine(x, y, x+5, y+5, col);
-    DrawLine(x, y+10, x+5, y+5, col);
+    DrawSelectionTriangleEx(x, y, 10.0f, 0, col);
 }
 
 void DrawScrollbar(float x, float y, float w, float h, int totalItems, int currentPos, int visibleItems) {
