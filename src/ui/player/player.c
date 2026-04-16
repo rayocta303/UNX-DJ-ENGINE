@@ -72,7 +72,12 @@ static void Player_Draw(Component *base) {
       lh = p->Logo.height * logoScale;
     }
 
-    DrawTextureEx(p->Logo, (Vector2){waveAreaX + (waveAreaW - lw) / 2.0f, waveAreaY + (waveAreaH - lh) / 2.0f}, 0.0f, logoScale, Fade(WHITE, 0.2f));
+    float logoOpacity = 0.3f;
+    if (p->DeckA->LoadedTrack != NULL || p->DeckB->LoadedTrack != NULL) {
+      logoOpacity = 0.1f;
+    }
+
+    DrawTextureEx(p->Logo, (Vector2){waveAreaX + (waveAreaW - lw) / 2.0f, waveAreaY + (waveAreaH - lh) / 2.0f}, 0.0f, logoScale, Fade(WHITE, logoOpacity));
   }
 
   p->InfoA.base.Draw((Component *)&p->InfoA);
