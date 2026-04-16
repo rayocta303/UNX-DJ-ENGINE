@@ -6,6 +6,7 @@
 
 #include "engine/fx/colorfx/colorfx_manager.h"
 #include "engine/fx/beatfx/beatfx_manager.h"
+#include "audio/scalers.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,11 +64,8 @@ typedef struct DeckAudioState {
     float OutlinedRate;         // Final calculated rate including scratch offsets
     bool MasterTempoActive;     // Key lock
     
-    // OLA (Master Tempo) State
-    double MTOffset;
-    float MTPhaseOffset[2]; // Synchronization offsets for SOLA
-    bool MTSearchTrigger[2]; // Flags to perform search once per wrap
-    int MTSampleCount;
+    // Master Tempo (WSOLA) State
+    WSOLA MTState;
 
     float Trim;
     float Fader; // Channel Fader (0.0 to 1.0)
