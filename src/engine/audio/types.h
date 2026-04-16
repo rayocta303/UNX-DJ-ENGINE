@@ -1,6 +1,11 @@
 #pragma once
 
+#if !defined(__ANDROID__)
 #include <QtDebug>
+#else
+#include "engine/shim.h"
+#endif
+
 #include <cstdint>
 #include <limits>
 

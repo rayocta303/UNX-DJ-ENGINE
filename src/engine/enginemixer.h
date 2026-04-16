@@ -1,7 +1,13 @@
 #pragma once
 
+#if !defined(__ANDROID__)
 #include <QObject>
+#else
+#include "engine/shim.h"
+#endif
+#if !defined(__ANDROID__)
 #include <QVarLengthArray>
+#endif
 #include <atomic>
 #include <gsl/pointers>
 #include <memory>

@@ -1,8 +1,12 @@
 #pragma once
 
+#if !defined(__ANDROID__)
 #include <QObject>
 #include <QSharedPointer>
 #include <QString>
+#else
+#include "engine/shim.h"
+#endif
 
 #include "control/control.h"
 #include "preferences/usersettings.h"

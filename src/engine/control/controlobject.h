@@ -1,7 +1,11 @@
 #pragma once
 
+#if !defined(__ANDROID__)
 #include <QObject>
 #include <QEvent>
+#else
+#include "engine/shim.h"
+#endif
 
 #include "preferences/usersettings.h"
 #include "controllers/midi/midimessage.h"

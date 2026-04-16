@@ -123,6 +123,8 @@ jobs:
         # Exclude platform specific
         list(FILTER SRC_FILES EXCLUDE REGEX "midi_backend_win.c")
         
+        add_definitions(-DKS_STR_ENCODING_NONE)
+        
         add_library(xdjunx SHARED ${SRC_FILES} src/main/cpp/android_native_app_glue.c)
 
         find_library(log-lib log)

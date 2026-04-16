@@ -1,9 +1,14 @@
 #pragma once
 
+#if !defined(__ANDROID__)
 #include <QHash>
 #include <QString>
 #include <QVarLengthArray>
 #include <QtDebug>
+#else
+#include "engine/shim.h"
+#endif
+
 #include <memory>
 
 #include "engine/util/assert.h"
