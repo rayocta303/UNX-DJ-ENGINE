@@ -4,8 +4,11 @@
 #include <string.h>
 
 #if defined(__linux__) && !defined(__ANDROID__)
+#if __has_include(<alsa/asoundlib.h>)
 #include <alsa/asoundlib.h>
-static snd_seq_t *seq_handle;
+#define HAS_ALSA
+#endif
+static void* seq_handle; // Generic pointer if no ALSA
 static int in_port;
 #elif defined(_WIN32)
 // Forward declarations for win backend
@@ -37,11 +40,15 @@ bool MIDI_Init(MidiContext *ctx) {
     char deviceName[256] = "Generic MIDI";
 
 #if defined(__linux__) && !defined(__ANDROID__)
-    if (snd_seq_open(&seq_handle, "default", SND_SEQ_OPEN_INPUT, 0) < 0) return false;
-    snd_seq_set_client_name(seq_handle, "UNX-DJ-OS MIDI");
-    in_port = snd_seq_create_simple_port(seq_handle, "Input",
+#ifdef HAS_ALSA
+    if (snd_seq_open((snd_seq_t**)&seq_handle, "default", SND_SEQ_OPEN_INPUT, 0) < 0) return false;
+    snd_seq_set_client_name((snd_seq_t*)seq_handle, "UNX-DJ-OS MIDI");
+    in_port = snd_seq_create_simple_port((snd_seq_t*)seq_handle, "Input",
                 SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE,
                 SND_SEQ_PORT_TYPE_MIDI_GENERIC | SND_SEQ_PORT_TYPE_APPLICATION);
+#else
+    return false; // No ALSA support in this build
+#endif
 #elif defined(_WIN32)
     if (!WinMIDI_Init(EnqueueMIDI, deviceName)) {
         // Fallback or silence
@@ -69,7 +76,9 @@ bool MIDI_Init(MidiContext *ctx) {
 void MIDI_Close(MidiContext *ctx) {
     if (!ctx->initialized) return;
 #if defined(__linux__) && !defined(__ANDROID__)
-    snd_seq_close(seq_handle);
+#ifdef HAS_ALSA
+    snd_seq_close((snd_seq_t*)seq_handle);
+#endif
 #elif defined(_WIN32)
     WinMIDI_Close();
 #elif defined(__ANDROID__)
@@ -83,9 +92,10 @@ void MIDI_Update(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine *en
     if (!ctx->initialized) return;
 
 #if defined(__linux__) && !defined(__ANDROID__)
+#ifdef HAS_ALSA
     snd_seq_event_t *ev;
-    while (snd_seq_event_input_pending(seq_handle, 1) > 0) {
-        snd_seq_event_input(seq_handle, &ev);
+    while (snd_seq_event_input_pending((snd_seq_t*)seq_handle, 1) > 0) {
+        snd_seq_event_input((snd_seq_t*)seq_handle, &ev);
         if (ev->type == SND_SEQ_EVENT_CONTROLLER) {
             EnqueueMIDI(0xB0 | ev->data.control.channel, ev->data.control.param, ev->data.control.value);
         } else if (ev->type == SND_SEQ_EVENT_NOTEON) {
@@ -93,6 +103,7 @@ void MIDI_Update(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine *en
         }
         snd_seq_free_event(ev);
     }
+#endif
 #endif
 
     while (queueTail != queueHead) {
