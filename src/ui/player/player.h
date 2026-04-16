@@ -23,6 +23,7 @@ struct PlayerRenderer {
   WaveformRenderer WaveB;
   BeatFXPanel BeatFX;
   BeatFXSelectBar FXBar;
+  Texture2D Logo;
 };
 
 void PlayerRenderer_Init(PlayerRenderer *r, DeckState *a, DeckState *b,

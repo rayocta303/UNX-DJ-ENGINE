@@ -24,6 +24,7 @@ echo #define ASSETS_BUNDLE_H >> src\ui\components\assets_bundle.h
 ".\tools\bin2c.exe" "assets\fonts\otfs\Font Awesome 5 Free-Regular-400.otf" src\ui\components\assets_bundle.h font_awesome_regular append
 ".\tools\bin2c.exe" "assets\fonts\otfs\Font Awesome 5 Brands-Regular-400.otf" src\ui\components\assets_bundle.h font_awesome_brand append
 ".\tools\bin2c.exe" "assets\splash.png" src\ui\components\assets_bundle.h unx_logo append
+".\tools\bin2c.exe" "assets\icons\crown.png" src\ui\components\assets_bundle.h icon_crown append
 echo #endif >> src\ui\components\assets_bundle.h
 
 if "%PLATFORM%"=="linux" (

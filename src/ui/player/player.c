@@ -2,6 +2,7 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
+#include "ui/components/assets_bundle.h"
 
 
 static int Player_Update(Component *base) {
@@ -51,6 +52,27 @@ static void Player_Draw(Component *base) {
 
   DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ColorBlack);
 
+  // Draw shared background logo behind waveforms
+  if (p->Logo.id != 0) {
+    float waveAreaY = TOP_BAR_H;
+    float waveAreaH = SCREEN_HEIGHT - TOP_BAR_H - FX_BAR_H - DECK_STR_H;
+    float waveAreaW = SCREEN_WIDTH - SIDE_PANEL_W * 2.0f;
+    float waveAreaX = SIDE_PANEL_W;
+
+    float logoH = waveAreaH * 0.5f;
+    float logoScale = logoH / p->Logo.height;
+    float lw = p->Logo.width * logoScale;
+    float lh = p->Logo.height * logoScale;
+
+    if (lw > waveAreaW * 0.8f) {
+      logoScale = (waveAreaW * 0.8f) / p->Logo.width;
+      lw = p->Logo.width * logoScale;
+      lh = p->Logo.height * logoScale;
+    }
+
+    DrawTextureEx(p->Logo, (Vector2){waveAreaX + (waveAreaW - lw) / 2.0f, waveAreaY + (waveAreaH - lh) / 2.0f}, 0.0f, logoScale, Fade(WHITE, 0.2f));
+  }
+
   p->InfoA.base.Draw((Component *)&p->InfoA);
   p->InfoB.base.Draw((Component *)&p->InfoB);
 
@@ -78,4 +100,13 @@ void PlayerRenderer_Init(PlayerRenderer *r, DeckState *a, DeckState *b,
 
   BeatFXPanel_Init(&r->BeatFX, fx, a, b);
   BeatFXSelectBar_Init(&r->FXBar, fx, a, b, r->AudioPlugin);
+
+  // Load shared logo from memory bundle
+  Image img = LoadImageFromMemory(".png", unx_logo, unx_logo_size);
+  if (img.data != NULL) {
+    r->Logo = LoadTextureFromImage(img);
+    UnloadImage(img);
+  } else {
+    r->Logo = (Texture2D){0};
+  }
 }

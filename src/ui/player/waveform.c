@@ -281,30 +281,11 @@ static void Waveform_Draw(Component *base) {
   int sh = (int)waveH;
   BeginScissorMode(sx, sy, sw, sh);
 
-  // Background — always fill, even without a track
-  Color bgColor = {10, 10, 10, 255};
-  DrawRectangle(wfLeft, wfY, wfW, waveH, bgColor);
-  // Subtle center guide — drawn once here, never again
+  // Background — Skip filling to allow global logo to show through
+  // Subtle center guide — drawn once here
   DrawRectangle(wfLeft, (int)(wfY + waveCenter), (int)wfW, 1, (Color){35, 35, 35, 255});
 
   if (r->State->LoadedTrack == NULL) {
-    if (r->Logo.id != 0) {
-      float logoH = waveH * 0.6f;
-      float logoScale = logoH / r->Logo.height;
-      float lw = r->Logo.width * logoScale;
-      float lh = r->Logo.height * logoScale;
-      
-      if (lw > wfW * 0.8f) {
-        logoScale = (wfW * 0.8f) / r->Logo.width;
-        lw = r->Logo.width * logoScale;
-        lh = r->Logo.height * logoScale;
-      }
-
-      DrawTextureEx(r->Logo, (Vector2){wfLeft + (wfW - lw) / 2.0f, wfY + (waveH - lh) / 2.0f}, 0.0f, logoScale, WHITE);
-    } else {
-      // Fallback if logo failed to load
-      UIDrawText("UNX-DJ", UIFonts_GetFace(S(12)), wfLeft + (wfW / 2.0f) - S(30), wfY + (waveH / 2.0f) - S(6), S(12), ColorGray);
-    }
     EndScissorMode(); 
     return;
   }
@@ -558,13 +539,4 @@ void WaveformRenderer_Init(WaveformRenderer *r, int id, DeckState *state,
   r->cachedTrack = NULL;
   r->dynWfmFrames = 480;
   r->lastMouseX = 0;
-
-  // Load logo from memory bundle
-  Image img = LoadImageFromMemory(".png", unx_logo, unx_logo_size);
-  if (img.data != NULL) {
-    r->Logo = LoadTextureFromImage(img);
-    UnloadImage(img);
-  } else {
-    r->Logo = (Texture2D){0};
-  }
 }

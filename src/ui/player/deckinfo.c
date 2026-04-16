@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
+#include "ui/components/assets_bundle.h"
 
 static Texture2D crownTex = {0};
 
@@ -18,10 +19,16 @@ static void DeckInfo_Draw(Component *base) {
     
     if (crownTex.id == 0) {
         Image img = LoadImage("assets/icons/crown.png");
-        ImageResize(&img, (int)S(9), (int)S(9));
-        crownTex = LoadTextureFromImage(img);
-        UnloadImage(img);
-        SetTextureFilter(crownTex, TEXTURE_FILTER_BILINEAR);
+        if (img.data == NULL) {
+            img = LoadImageFromMemory(".png", icon_crown, icon_crown_size);
+        }
+        
+        if (img.data != NULL) {
+            ImageResize(&img, (int)S(9), (int)S(9));
+            crownTex = LoadTextureFromImage(img);
+            UnloadImage(img);
+            SetTextureFilter(crownTex, TEXTURE_FILTER_BILINEAR);
+        }
     }
     
     float deckInfoW = SIDE_PANEL_W;
