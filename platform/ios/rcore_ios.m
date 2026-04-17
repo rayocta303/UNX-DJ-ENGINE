@@ -4,6 +4,7 @@
 #import <OpenGLES/ES2/gl.h>
 #import <QuartzCore/QuartzCore.h>
 #import <Foundation/Foundation.h>
+#import <AVFoundation/AVFoundation.h>
 #include <mach/mach_time.h>
 #include <unistd.h>
 
@@ -62,6 +63,14 @@ static CADisplayLink    *_displayLink   = nil;
    ============================================================ */
 
 int InitPlatform(void) {
+    /* Set up Audio Session */
+    AVAudioSession *session = [AVAudioSession sharedInstance];
+    NSError *error = nil;
+    [session setCategory:AVAudioSessionCategoryPlayback error:&error];
+    if (error) NSLog(@"[rcore_ios] Failed to set audio category: %@", error);
+    [session setActive:YES error:&error];
+    if (error) NSLog(@"[rcore_ios] Failed to activate audio session: %@", error);
+
     /* Set working directory to the app bundle so assets/ can be found */
     NSString *resourcePath = [[NSBundle mainBundle] resourcePath];
     chdir([resourcePath UTF8String]);
