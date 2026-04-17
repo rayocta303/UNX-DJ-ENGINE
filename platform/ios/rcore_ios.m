@@ -180,17 +180,33 @@ int InitPlatform(void) {
 
     glGenRenderbuffers(1, &_colorRBO);
     glBindRenderbuffer(GL_RENDERBUFFER, _colorRBO);
-    [_glContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:(id<EAGLDrawable>)glLayer];
+    
+    if (![_glContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:(id<EAGLDrawable>)glLayer]) {
+        NSLog(@"[rcore_ios] FAILED to set renderbuffer storage");
+        return -1;
+    }
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, _colorRBO);
 
     CGSize sz    = [UIScreen mainScreen].bounds.size;
     float  scale = [UIScreen mainScreen].nativeScale;
     int    w     = (int)(sz.width  * scale);
     int    h     = (int)(sz.height * scale);
+    
     glGenRenderbuffers(1, &_depthRBO);
     glBindRenderbuffer(GL_RENDERBUFFER, _depthRBO);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, w, h);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, _depthRBO);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        NSLog(@"[rcore_ios] FAILED to complete framebuffer: %x", glCheckFramebufferStatus(GL_FRAMEBUFFER));
+        return -1;
+    }
+
+    // Crucial: Set initial viewport and scissor for Retina resolution
+    glViewport(0, 0, w, h);
+    glScissor(0, 0, w, h);
+    
+    NSLog(@"[rcore_ios] Platform initialized. Screen: %dx%d (scale %.1f)", w, h, scale);
 
     return 0;
 }
@@ -224,7 +240,11 @@ void SwapScreenBuffer(void) {
     }
 }
 
-void PollInputEvents(void) {}
+void PollInputEvents(void) {
+    // Crucial: Raylib might unbind our FBO (setting it to 0) during its internal updates.
+    // We force it back to our platform FBO here at the start of every frame.
+    if (_fbo > 0) glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
+}
 void MaximizeWindow(void)           {}
 void MinimizeWindow(void)           {}
 void SetWindowMinSize(int w, int h) { (void)w; (void)h; }
