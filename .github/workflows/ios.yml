@@ -34,6 +34,29 @@ jobs:
           -e 's|<GLES2/gl2\.h>|<OpenGLES/ES2/gl.h>|g' \
           -e 's|<GLES2/gl2ext\.h>|<OpenGLES/ES2/glext.h>|g'
 
+        # Inject missing GLES extension typedefs for iOS.
+        # iOS SDK glext.h does NOT define PFNGLGENVERTEXARRAYSOESPROC etc.
+        # that rlgl.h uses at lines ~1051-1058.
+        # Use printf (not heredoc) to avoid YAML indentation being written into the file.
+        printf '%s\n' \
+          '#ifndef GLES_FIX_H' \
+          '#define GLES_FIX_H' \
+          '#include <OpenGLES/ES2/gl.h>' \
+          '#include <OpenGLES/ES2/glext.h>' \
+          'typedef void (*PFNGLGENVERTEXARRAYSOESPROC)(GLsizei n, GLuint *arrays);' \
+          'typedef void (*PFNGLBINDVERTEXARRAYOESPROC)(GLuint array);' \
+          'typedef void (*PFNGLDELETEVERTEXARRAYSOESPROC)(GLsizei n, const GLuint *arrays);' \
+          'typedef void (*PFNGLDRAWARRAYSINSTANCEDEXTPROC)(GLenum mode, GLint first, GLsizei count, GLsizei primcount);' \
+          'typedef void (*PFNGLDRAWELEMENTSINSTANCEDEXTPROC)(GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei primcount);' \
+          'typedef void (*PFNGLVERTEXATTRIBDIVISOREXTPROC)(GLuint index, GLuint divisor);' \
+          '#endif' \
+          > gles_fix.h
+        echo "=== gles_fix.h written ==="
+        cat gles_fix.h
+
+        # Prepend #include "gles_fix.h" at line 1 of rlgl.h
+        sed -i '' '1s|^|#include "gles_fix.h"\n|' rlgl.h
+
         # Common iOS clang flags (no -x flag here — set per-file below)
         IOS_FLAGS="-target arm64-apple-ios14.0 -isysroot $SDK_PATH \
           -DPLATFORM_IOS -DGRAPHICS_API_OPENGL_ES2 \
