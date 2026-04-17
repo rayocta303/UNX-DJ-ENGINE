@@ -32,6 +32,23 @@ jobs:
         find . -name "*.h" -o -name "*.c" | xargs sed -i '' 's|<GLES2/gl2.h>|<OpenGLES/ES2/gl.h>|g'
         find . -name "*.h" -o -name "*.c" | xargs sed -i '' 's|<GLES2/gl2ext.h>|<OpenGLES/ES2/glext.h>|g'
         
+        # Inject missing GLES extension typedefs for iOS into rlgl.h
+        cat <<EOF > gles_fix.h
+#ifndef GLES_FIX_H
+#define GLES_FIX_H
+#include <OpenGLES/ES2/gl.h>
+#include <OpenGLES/ES2/glext.h>
+typedef void (*PFNGLGENVERTEXARRAYSOESPROC) (GLsizei n, GLuint *arrays);
+typedef void (*PFNGLBINDVERTEXARRAYOESPROC) (GLuint array);
+typedef void (*PFNGLDELETEVERTEXARRAYSOESPROC) (GLsizei n, const GLuint *arrays);
+typedef void (*PFNGLDRAWARRAYSINSTANCEDEXTPROC) (GLenum mode, GLint first, GLsizei count, GLsizei primcount);
+typedef void (*PFNGLDRAWELEMENTSINSTANCEDEXTPROC) (GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei primcount);
+typedef void (*PFNGLVERTEXATTRIBDIVISOREXTPROC) (GLuint index, GLuint divisor);
+#endif
+EOF
+        sed -i '' '1i\
+#include "gles_fix.h"' rlgl.h
+
         # Explicitly passing SDK path and architecture to the Makefile
         make PLATFORM=PLATFORM_IOS IOS_SDK=iphoneos RAYLIB_LIBTYPE=STATIC GRAPHICS=GRAPHICS_API_OPENGL_ES2 \
              CC=clang CFLAGS="-isysroot $SDK_PATH -arch arm64 -DPLATFORM_IOS -DGRAPHICS_API_OPENGL_ES2 -DGLES_SILENCE_DEPRECATION -DGL_GLEXT_PROTOTYPES -Wno-implicit-function-declaration"
