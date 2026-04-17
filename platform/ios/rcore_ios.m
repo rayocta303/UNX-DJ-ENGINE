@@ -65,12 +65,51 @@ void ios_log_callback(int logLevel, const char *text, va_list args) {
 @end
 
 /* ============================================================
-   Platform Function Implementations
+   iOS Path Helpers
+   ============================================================ */
+
+const char* ios_get_documents_path(void) {
+    static char path[1024] = {0};
+    if (path[0] == '\0') {
+        NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+        if (docs) strcpy(path, [docs UTF8String]);
+    }
+    return path;
+}
+
+const char* ios_get_media_path(void) {
+    return "/var/mobile/Media";
+}
+
+const char* ios_get_bundle_path(const char* filename) {
+    static char path[1024];
+    NSString* nsFilename = [NSString stringWithUTF8String:filename];
+    NSString* baseName = [nsFilename stringByDeletingPathExtension];
+    NSString* extension = [nsFilename pathExtension];
+    NSString* directory = nil;
+    if ([baseName containsString:@"/"]) {
+        directory = [baseName stringByDeletingLastPathComponent];
+        baseName = [baseName lastPathComponent];
+    }
+    NSString* nsPath = [[NSBundle mainBundle] pathForResource:baseName ofType:extension inDirectory:directory];
+    if (nsPath) {
+        strncpy(path, [nsPath UTF8String], sizeof(path) - 1);
+        return path;
+    }
+    return filename;
+}
+
+void ios_init_audio_session(void) {
+    AVAudioSession *session = [AVAudioSession sharedInstance];
+    [session setCategory:AVAudioSessionCategoryPlayback error:nil];
+    [session setActive:YES error:nil];
+}
+
+/* ============================================================
+   Platform Function Implementations (Raylib)
    ============================================================ */
 
 int InitPlatform(void) {
-    // ios_get_documents_path is provided by ios_utils.m
-    extern const char* ios_get_documents_path(void);
     const char *docsPath = ios_get_documents_path();
     if (docsPath && docsPath[0] != '\0') {
         char logPath[1024];
@@ -85,10 +124,7 @@ int InitPlatform(void) {
         }
     }
 
-    AVAudioSession *session = [AVAudioSession sharedInstance];
-    NSError *error = nil;
-    [session setCategory:AVAudioSessionCategoryPlayback error:&error];
-    [session setActive:YES error:&error];
+    ios_init_audio_session();
 
     NSString *resourcePath = [[NSBundle mainBundle] resourcePath];
     chdir([resourcePath UTF8String]);
@@ -142,7 +178,10 @@ int InitPlatform(void) {
     return 0;
 }
 
-// GetScreenWidth/Height/DPI are provided by libraylib.a(rcore.o)
+Vector2 GetWindowScaleDPI(void) {
+    float s = [UIScreen mainScreen].nativeScale;
+    return (Vector2){ s, s };
+}
 
 void ClosePlatform(void) {
     [_displayLink invalidate];
