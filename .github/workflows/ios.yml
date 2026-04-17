@@ -33,14 +33,19 @@ jobs:
         echo "=== raylib-src/src contents ==="
         ls -la .
 
-        # Fix OpenGL ES include paths for iOS SDK
+        # Fix ALL OpenGL ES include paths for iOS SDK.
+        # ghera/raylib-iOS uses non-standard libGLESv2/* and GLES2/* paths.
+        # Replace everything with the correct Apple iOS SDK paths.
         find . \( -name "*.h" -o -name "*.c" -o -name "*.m" \) | xargs sed -i '' \
+          -e 's|<libGLESv2/GLES2/gl2\.h>|<OpenGLES/ES3/gl.h>|g' \
+          -e 's|<libGLESv2/GLES2/gl2ext\.h>|<OpenGLES/ES3/gl.h>|g' \
+          -e 's|<libGLESv2/GLES/glext\.h>|<OpenGLES/ES3/gl.h>|g' \
+          -e 's|<libGLESv2/GLES/gl\.h>|<OpenGLES/ES3/gl.h>|g' \
+          -e 's|<libGLESv2/[^>]*>|<OpenGLES/ES3/gl.h>|g' \
           -e 's|<GLES2/gl2\.h>|<OpenGLES/ES3/gl.h>|g' \
           -e 's|<GLES2/gl2ext\.h>|<OpenGLES/ES3/gl.h>|g' \
           -e 's|<GLES3/gl3\.h>|<OpenGLES/ES3/gl.h>|g' \
-          -e 's|<GLES3/gl3ext\.h>|<OpenGLES/ES3/gl.h>|g' \
-          -e 's|<libGLESv2/GLES/glext\.h>|<OpenGLES/ES3/gl.h>|g' \
-          -e 's|<libGLESv2/GLES/gl\.h>|<OpenGLES/ES3/gl.h>|g'
+          -e 's|<GLES3/gl3ext\.h>|<OpenGLES/ES3/gl.h>|g'
 
         # Inject missing GLES extension typedefs for iOS.
         # iOS SDK glext.h does NOT define PFNGLGENVERTEXARRAYSOESPROC etc.
