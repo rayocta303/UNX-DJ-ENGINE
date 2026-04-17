@@ -106,20 +106,25 @@ jobs:
           -DGLES_SILENCE_DEPRECATION"
 
         # audio_backend: ObjC
+        echo "=== Compiling src/core/audio_backend.c (ObjC) ==="
         clang -x objective-c $IOS_BASE -fobjc-arc -c src/core/audio_backend.c -o build/ios/obj/src_core_audio_backend.c.o
 
         # C files
+        echo "=== Compiling C files ==="
         C_FILES=$(find src lib -name "*.c" | grep -v "midi_backend_win.c" | grep -v "src/core/audio_backend.c" | grep -v "lib/linux_arm64" | grep -v "lib/qm-dsp/hmm" | grep -v "lib/qm-dsp/dsp/segmentation" | grep -v "/tests/" | grep -v "/test/")
         for f in $C_FILES; do
           obj="build/ios/obj/$(echo $f | tr '/' '_').o"
-          clang -x c $IOS_BASE -c "$f" -o "$obj"
+          echo "Compiling $f ..."
+          clang -x c $IOS_BASE -c "$f" -o "$obj" || exit 1
         done
 
         # C++ files
+        echo "=== Compiling C++ files ==="
         CPP_FILES=$(find src lib -name "*.cpp" -o -name "*.cc" | grep -v "lib/linux_arm64" | grep -v "/tests/" | grep -v "/test/" | grep -v "lib/qm-dsp/hmm" | grep -v "lib/qm-dsp/dsp/segmentation" || true)
         for f in $CPP_FILES; do
           obj="build/ios/obj/$(echo $f | tr '/' '_').o"
-          clang++ $IOS_BASE -std=c++17 -Ilib/kaitai -Ilib/rekordbox-metadata -c "$f" -o "$obj"
+          echo "Compiling $f ..."
+          clang++ $IOS_BASE -std=c++17 -Ilib/kaitai -Ilib/rekordbox-metadata -c "$f" -o "$obj" || exit 1
         done
 
         # Platform: ObjC++ (Better for QuartzCore compatibility)
