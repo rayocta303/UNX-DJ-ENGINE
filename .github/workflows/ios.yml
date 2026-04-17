@@ -75,10 +75,12 @@ jobs:
         done
         
         # Link executable
+        # Including CoreVideo as it is often required by Raylib's iOS backend
         clang++ -target arm64-apple-ios14.0 -isysroot $SDK_PATH \
           build/ios/obj/*.o \
           platform/ios/libs/libraylib.a \
-          -framework UIKit -framework QuartzCore -framework CoreGraphics -framework CoreAudio -framework AudioToolbox -framework AVFoundation -framework CoreFoundation -framework OpenGLES \
+          -framework UIKit -framework QuartzCore -framework CoreGraphics -framework CoreAudio -framework AudioToolbox -framework AVFoundation -framework CoreFoundation -framework OpenGLES -framework CoreVideo \
+          -stdlib=libc++ \
           -o build/ios/xdjunx
 
     - name: Package IPA
