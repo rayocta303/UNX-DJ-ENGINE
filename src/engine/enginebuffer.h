@@ -1,6 +1,6 @@
 #pragma once
 
-#ifndef __ANDROID__
+#if !defined(__ANDROID__) && !defined(PLATFORM_IOS)
 #include <gtest/gtest_prod.h>
 #endif
 
@@ -30,7 +30,7 @@
 #endif
 
 //for the writer
-#if defined(__SCALER_DEBUG__) && !defined(__ANDROID__)
+#if defined(__SCALER_DEBUG__) && !defined(__ANDROID__) && !defined(PLATFORM_IOS)
 #include <QFile>
 #include <QTextStream>
 #endif

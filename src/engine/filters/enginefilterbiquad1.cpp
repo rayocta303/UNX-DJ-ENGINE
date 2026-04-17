@@ -1,6 +1,6 @@
 #include "engine/filters/enginefilterbiquad1.h"
 
-#ifndef __ANDROID__
+#if !defined(__ANDROID__) && !defined(PLATFORM_IOS)
 #include "moc_enginefilterbiquad1.cpp"
 #endif
 

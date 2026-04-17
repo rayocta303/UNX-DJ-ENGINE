@@ -1,6 +1,6 @@
 #include "engine/filters/enginefilterlinkwitzriley4.h"
 
-#ifndef __ANDROID__
+#if !defined(__ANDROID__) && !defined(PLATFORM_IOS)
 #include "moc_enginefilterlinkwitzriley4.cpp"
 #endif
 

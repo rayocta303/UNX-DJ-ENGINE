@@ -1,7 +1,7 @@
 #include "engine/scalers/enginebufferscale.h"
 
 #include "engine/engine.h"
-#ifndef __ANDROID__
+#if !defined(__ANDROID__) && !defined(PLATFORM_IOS)
 #include "moc_enginebufferscale.cpp"
 #endif
 #include "soundio/soundmanagerconfig.h"
