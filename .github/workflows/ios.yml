@@ -108,6 +108,7 @@ jobs:
 
         IOS_BASE="-target arm64-apple-ios14.0 -isysroot $SDK_PATH \
           -Isrc -Isrc/core -Isrc/engine -Ilib -Iraylib-src/src \
+          -Ilib/qm-dsp -Ilib/soundtouch -Ilib/fidlib \
           -O2 -DPLATFORM_IOS -DKS_STR_ENCODING_NONE"
 
         # --- audio_backend.c: compile as Objective-C ---
