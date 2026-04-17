@@ -16,8 +16,14 @@ void UIFonts_Init(void) {
     // Attempt to load standard font. Use Arial on Windows as requested.
     // TODO: Embed a primary UI font to avoid OS dependencies.
     // Attempt to load standard font from assets first, then fallback.
+#if defined(PLATFORM_IOS)
+    const char* ios_get_bundle_path(const char* filename);
+    const char* fontPathBundled = ios_get_bundle_path("assets/fonts/Inter-Regular.ttf");
+    const char* boldPathBundled = ios_get_bundle_path("assets/fonts/Inter-Bold.ttf");
+#else
     const char* fontPathBundled = "assets/fonts/Inter-Regular.ttf";
     const char* boldPathBundled = "assets/fonts/Inter-Bold.ttf";
+#endif
     
     defaultFace = LoadFontEx(fontPathBundled, 64, 0, 0);
     boldFace = LoadFontEx(boldPathBundled, 64, 0, 0);

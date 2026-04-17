@@ -455,7 +455,11 @@ void App_Init(App *a) {
   memset(&a->midiCtx, 0, sizeof(MidiContext));
 }
 
+#if defined(PLATFORM_IOS)
+int raylib_main(int argc, char *argv[]) {
+#else
 int main(void) {
+#endif
   // We start with the reference size or common 16:10 resolution
   // Standard XDJ-XZ screen is actually 7.0-inch 60Hz 1280x800 or similar
   // The user wants max width 1080, which implies 1080x675 (16:10)
@@ -476,6 +480,11 @@ int main(void) {
   SetExitKey(KEY_NULL); // ESC is for 'back'
 
   UIFonts_Init();
+
+#if defined(PLATFORM_IOS)
+  void ios_init_audio_session();
+  ios_init_audio_session();
+#endif
 
   // Initialize Audio Backend FIRST so App_Init can enumerate real devices
   AudioBackend_Init();

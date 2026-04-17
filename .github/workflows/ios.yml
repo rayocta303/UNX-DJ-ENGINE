@@ -80,6 +80,7 @@ EOF
         # Discover all C and C++ files, excluding Windows/Android specifics
         C_FILES=$(find src -name "*.c" | grep -v "midi_backend_win.c")
         CPP_FILES=$(find src -name "*.cpp" && find lib -name "*.cpp")
+        M_FILES=$(find src -name "*.m" && find platform/ios -name "*.m")
         
         # Compile C
         for f in $C_FILES; do
@@ -95,6 +96,13 @@ EOF
            clang++ -target arm64-apple-ios14.0 -isysroot $SDK_PATH -Isrc -Isrc/core -Isrc/engine -Ilib -Ilib/kaitai -Ilib/rekordbox-metadata -Iraylib-src/src -O2 -DPLATFORM_IOS -std=c++17 -c $f -o $obj
         done
         
+        # Compile Objective-C
+        for f in $M_FILES; do
+           obj="build/ios/obj/$(echo $f | tr '/' '_').o"
+           echo "Compiling $f -> $obj"
+           clang -target arm64-apple-ios14.0 -isysroot $SDK_PATH -Isrc -Isrc/core -Isrc/engine -Ilib -Iraylib-src/src -O2 -DPLATFORM_IOS -fobjc-arc -c $f -o $obj
+        done
+        
         # Link executable
         # Using -force_load to ensure Raylib's Objective-C AppController is included
         clang++ -target arm64-apple-ios14.0 -isysroot $SDK_PATH \
@@ -103,6 +111,9 @@ EOF
           -framework UIKit -framework QuartzCore -framework CoreGraphics -framework CoreAudio -framework AudioToolbox -framework AVFoundation -framework CoreFoundation -framework OpenGLES -framework CoreVideo \
           -stdlib=libc++ \
           -o build/ios/xdjunx
+        
+        # Fake sign the binary (necessary for some iOS versions even on TrollStore)
+        codesign -s - --force --entitlements platform/ios/Entitlements.plist build/ios/xdjunx
 
     - name: Package IPA
       run: |
