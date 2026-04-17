@@ -136,10 +136,8 @@ jobs:
         for f in $CPP_FILES; do
           obj="build/ios/obj/$(echo $f | tr '/' '_').o"
           echo "Compiling (C++) $f -> $obj"
-          clang++ -target arm64-apple-ios14.0 -isysroot $SDK_PATH \
-            -Isrc -Isrc/core -Isrc/engine -Ilib -Ilib/kaitai \
-            -Ilib/rekordbox-metadata -Iraylib-src/src \
-            -O2 -DPLATFORM_IOS -std=c++17 -c "$f" -o "$obj"
+          clang++ $IOS_BASE -std=c++17 -Ilib/kaitai -Ilib/rekordbox-metadata \
+            -c "$f" -o "$obj"
         done
 
         # --- Compile Objective-C .m files (platform/ios entry points) ---
