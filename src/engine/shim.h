@@ -27,7 +27,7 @@ namespace Qt {
 
 
 #define Q_OBJECT 
-#define Q_DECLARE_FLAGS(name, type) typedef int name;
+#define Q_ENUM(x)
 #define Q_UNUSED(x) (void)x
 #define Q_DECLARE_METATYPE(x)
 #define Q_DECLARE_TYPEINFO(x, y)
@@ -35,10 +35,25 @@ namespace Qt {
 #define signals public
 #define tr(x) x
 
+template<typename Enum>
+class QFlags {
+    int m_val;
+public:
+    constexpr QFlags(int val = 0) : m_val(val) {}
+    constexpr QFlags(Enum val) : m_val(static_cast<int>(val)) {}
+    constexpr operator int() const { return m_val; }
+    constexpr bool operator!() const { return !m_val; }
+};
+
+#define Q_DECLARE_FLAGS(Flags, Enum) typedef QFlags<Enum> Flags;
+#define Q_DECLARE_OPERATORS_FOR_FLAGS(Flags) 
+#define Q_PRIMITIVE_TYPE 0
+#define Q_MOVABLE_TYPE 0
+
 class QDebug {
 public:
     template<typename T>
-    QDebug& operator<<(const T& t) { return *this; }
+    QDebug& operator<<(const T&) { return *this; }
 };
 
 class QEvent {
@@ -93,7 +108,7 @@ class QObject {
 public:
     virtual ~QObject() {}
     template<typename T, typename Func>
-    static void connect(T* sender, Func signal, void* receiver, Func slot) {}
+    static void connect(T*, Func, void*, Func) {}
 };
 
 #endif

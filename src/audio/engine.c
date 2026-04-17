@@ -45,6 +45,7 @@ void AudioEngine_Init(AudioEngine *engine) {
         engine->Decks[i].IsMotorOn = false;
         engine->Decks[i].IsPlaying = false;
         WSOLA_Init(&engine->Decks[i].MTState, SAMPLE_RATE);
+        engine->Decks[i].cppEngine = EngineBridge_Create();
     }
     
     BeatFXManager_Init(&engine->BeatFX);
@@ -66,6 +67,7 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
     deck->OutlinedRate = 0;
     deck->JogRate = 0;
     WSOLA_Init(&deck->MTState, deck->SampleRate > 0 ? deck->SampleRate : SAMPLE_RATE);
+    EngineBridge_InitializeWithPCM(deck->cppEngine, NULL, 0, 0); // Reset old
 
     if (!filePath || strlen(filePath) == 0) return;
 
@@ -96,6 +98,7 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
                 deck->TotalSamples = totalPCMFrameCount * channels;
             }
             deck->SampleRate = sampleRate;
+            EngineBridge_InitializeWithPCM(deck->cppEngine, deck->PCMBuffer, deck->TotalSamples, deck->SampleRate);
         } else {
             printf("Failed to load WAV/AIFF file: %s\n", filePath);
         }
@@ -122,6 +125,7 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
                 deck->TotalSamples = info.samples;
             }
             deck->SampleRate = info.hz;
+            EngineBridge_InitializeWithPCM(deck->cppEngine, deck->PCMBuffer, deck->TotalSamples, deck->SampleRate);
         } else {
             printf("Failed to load audio file: %s (Error %d)\n", filePath, res);
         }
@@ -232,8 +236,7 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
         float tempOut[128 * 2];
 
         if (mtActive && fabs(deck->OutlinedRate) > 0.001) {
-            WSOLA_Process(&deck->MTState, NULL, tempOut, chunk, deck->OutlinedRate, 
-                         (void (*)(void*, double, float*, float*))AudioEngine_GetSample, deck, deck->Position);
+            EngineBridge_Process(deck->cppEngine, tempOut, (uint32_t)chunk, (double)deck->OutlinedRate);
             for (int j = 0; j < chunk; j++) {
                 tempL[j] = tempOut[j*2];
                 tempR[j] = tempOut[j*2+1];
@@ -276,8 +279,10 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
                 BeatFXManager_Process(&engine->BeatFX, &l_sample, &r_sample, l_sample, r_sample, SAMPLE_RATE);
             }
 
-            maxL = fmaxf(maxL, fabsf(l_sample)); maxR = fmaxf(maxR, fabsf(r_sample));
-            
+            // Safety Clamp for High Fidelity (Clean Sound)
+            l_sample = l_sample > 1.0f ? 1.0f : (l_sample < -1.0f ? -1.0f : l_sample);
+            r_sample = r_sample > 1.0f ? 1.0f : (r_sample < -1.0f ? -1.0f : r_sample);
+
             // Output to Master
             outMaster[(i + j) * 2] += l_sample; 
             outMaster[(i + j) * 2 + 1] += r_sample;
@@ -363,4 +368,9 @@ void DeckAudio_JumpToMs(DeckAudioState *deck, int64_t ms) {
     if (deck->Position * 2 >= (double)deck->TotalSamples) {
         deck->Position = (double)(deck->TotalSamples / 2) - 1.0;
     }
+    EngineBridge_Seek(deck->cppEngine, deck->Position);
+}
+
+void DeckAudio_SetMasterTempo(DeckAudioState *deck, bool active) {
+    deck->MasterTempoActive = active;
 }

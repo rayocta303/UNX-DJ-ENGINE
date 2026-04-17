@@ -1,10 +1,8 @@
 #pragma once
 
-#if !defined(__ANDROID__)
-#include <QDebug>
-#else
 #include "engine/shim.h"
-#endif
+#include "engine/audio/types.h"
+#include "engine/audio/signalinfo.h"
 #include <cmath>
 #include <limits>
 

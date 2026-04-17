@@ -1,10 +1,6 @@
 #pragma once
 
-#if !defined(__ANDROID__)
-#include <QObject>
-#else
 #include "engine/shim.h"
-#endif
 
 #include "engine/util/types.h"
 

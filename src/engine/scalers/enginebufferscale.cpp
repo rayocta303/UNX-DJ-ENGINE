@@ -1,14 +1,13 @@
 #include "engine/scalers/enginebufferscale.h"
 
 #include "engine/engine.h"
+#include "engine/audio/signalinfo.h"
 // MOC disabled in XDJ-UNX-C
-#include "soundio/soundmanagerconfig.h"
 
 EngineBufferScale::EngineBufferScale()
         : m_signal(
-                  unx::audio::SignalInfo(
-                          unx::kEngineChannelOutputCount,
-                          unx::audio::SampleRate())),
+                  unx::audio::ChannelCount(unx::kEngineChannelOutputCount),
+                  unx::audio::SampleRate()),
           m_dBaseRate(1.0),
           m_bSpeedAffectsPitch(false),
           m_dTempoRatio(1.0),

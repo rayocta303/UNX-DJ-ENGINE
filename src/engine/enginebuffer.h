@@ -1,15 +1,8 @@
 #pragma once
 
-#ifndef __ANDROID__
-#include <gtest/gtest_prod.h>
-#endif
-
-#if !defined(__ANDROID__)
-#include <QAtomicInt>
-#include <QMutex>
-#else
 #include "engine/shim.h"
-#endif
+
+// Shimmed in shim.h
 #include <initializer_list>
 
 #include "audio/frame.h"
@@ -139,6 +132,9 @@ class EngineBuffer : public EngineObject {
             bool enabled);
     // Sets pointer to other engine buffer/channel
     void setEngineMixer(EngineMixer*);
+
+    void setSpeed(double speed);
+    void initializeWithPCM(float* pBuffer, uint32_t totalSamples, uint32_t sampleRate);
 
     // Queues a new seek position. Use SEEK_EXACT or SEEK_STANDARD as seekType
     void queueNewPlaypos(unx::audio::FramePos newpos, enum SeekRequest seekType);
