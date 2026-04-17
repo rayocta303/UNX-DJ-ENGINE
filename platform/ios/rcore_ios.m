@@ -53,6 +53,30 @@ static void              *_loopArg          = NULL;
 static _RLDisplayTarget *_displayTarget = nil;
 static CADisplayLink    *_displayLink   = nil;
 
+/* ---- Logging Helper ---- */
+static FILE *_logFile = NULL;
+void ios_log_callback(int logLevel, const char *text, va_list args) {
+    if (!_logFile) return;
+    
+    const char *levelStr = "INFO";
+    switch (logLevel) {
+        case 2: levelStr = "INFO"; break;    // LOG_INFO
+        case 3: levelStr = "WARNING"; break; // LOG_WARNING
+        case 4: levelStr = "ERROR"; break;   // LOG_ERROR
+        case 5: levelStr = "FATAL"; break;   // LOG_FATAL
+        case 6: levelStr = "DEBUG"; break;   // LOG_DEBUG
+    }
+    
+    fprintf(_logFile, "[%s] ", levelStr);
+    vfprintf(_logFile, text, args);
+    fprintf(_logFile, "\n");
+    fflush(_logFile);
+    
+    // Also print to system console for Xcode/TrollStore logs
+    vprintf(text, args);
+    printf("\n");
+}
+
 @implementation _RLDisplayTarget
 + (instancetype)shared {
     static _RLDisplayTarget *s = nil;
@@ -69,6 +93,24 @@ static CADisplayLink    *_displayLink   = nil;
    ============================================================ */
 
 int InitPlatform(void) {
+    /* Set up Logging to Documents/log.txt */
+    const char *docsPath = ios_get_documents_path();
+    if (docsPath && docsPath[0] != '\0') {
+        char logPath[1024];
+        snprintf(logPath, sizeof(logPath), "%s/log.txt", docsPath);
+        _logFile = fopen(logPath, "w"); // Overwrite log each launch
+        if (_logFile) {
+            fprintf(_logFile, "=== XDJ-UNX iOS LOG START ===\n");
+            // Redirect stdout/stderr to log file as well
+            dup2(fileno(_logFile), STDOUT_FILENO);
+            dup2(fileno(_logFile), STDERR_FILENO);
+            
+            // Register raylib log callback
+            void SetTraceLogCallback(void (*callback)(int, const char *, va_list));
+            SetTraceLogCallback(ios_log_callback);
+        }
+    }
+
     /* Set up Audio Session */
     AVAudioSession *session = [AVAudioSession sharedInstance];
     NSError *error = nil;
