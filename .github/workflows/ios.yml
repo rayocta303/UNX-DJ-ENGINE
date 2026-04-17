@@ -110,10 +110,20 @@ jobs:
           -Isrc -Isrc/core -Isrc/engine -Ilib -Iraylib-src/src \
           -O2 -DPLATFORM_IOS -DKS_STR_ENCODING_NONE"
 
-        # --- Compile .c files as plain C (NOT as objective-c) ---
-        # Note: project .c files do not include AVFoundation, so plain C is correct.
-        # Only raylib's raudio.c needed -x objective-c, handled above.
-        C_FILES=$(find src -name "*.c" | grep -v "midi_backend_win.c")
+        # --- audio_backend.c: compile as Objective-C ---
+        # This file defines MINIAUDIO_IMPLEMENTATION which causes miniaudio.h
+        # to include AVFoundation — same issue as raylib's raudio.c.
+        # -x objective-c MUST come before the filename.
+        echo "Compiling (ObjC) src/core/audio_backend.c"
+        clang -x objective-c $IOS_BASE \
+          -c src/core/audio_backend.c \
+          -o build/ios/obj/src_core_audio_backend.c.o
+
+        # --- Compile remaining .c files as plain C ---
+        # Exclude: Windows-only backend, audio_backend.c (handled above as ObjC)
+        C_FILES=$(find src -name "*.c" \
+          | grep -v "midi_backend_win.c" \
+          | grep -v "src/core/audio_backend.c")
         for f in $C_FILES; do
           obj="build/ios/obj/$(echo $f | tr '/' '_').o"
           echo "Compiling (C) $f -> $obj"
