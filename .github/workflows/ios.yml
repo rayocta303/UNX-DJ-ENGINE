@@ -27,9 +27,8 @@ jobs:
     - name: Build Raylib for iOS (arm64)
       run: |
         cd raylib-src/src
-        # We use the official iOS SDK provided by the macOS runner
-        # PLATFORM_IOS uses the internal iOS AppController.m/h
-        make PLATFORM=PLATFORM_IOS IOS_SDK=iphoneos
+        # Providing RAYLIB_LIBTYPE=STATIC to avoid empty -D flag error
+        make PLATFORM=PLATFORM_IOS IOS_SDK=iphoneos RAYLIB_LIBTYPE=STATIC
         mkdir -p ../../platform/ios/libs
         cp libraylib.a ../../platform/ios/libs/
 
