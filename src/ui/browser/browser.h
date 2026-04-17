@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "library/rekordbox_reader.h"
+#include "library/serato_reader.h"
 
 typedef struct {
     char Name[64];
@@ -26,9 +27,12 @@ typedef struct {
     int StorageCount;
     StorageDevice *SelectedStorage;
     RBDatabase *DB;
+    SeratoDatabase *SeratoDB;
+    int DatabaseType; // 0=Rekordbox, 1=Serato
 
     // Filtered view
     RBTrack **TrackPointers;
+    SeratoTrack **SeratoTrackPointers;
     int ActiveTrackCount;
     
     // Core Engine Reference

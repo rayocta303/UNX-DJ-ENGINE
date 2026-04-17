@@ -31,21 +31,19 @@ UNX DJ ENGINE is an experimental DJ Media Player firmware subset, ported to C an
 - Windows (x64): Native development and simulation.
 - Linux (ARM64): Optimized for embedded targets using DRM-KMS and GLES2.
 - Android (ARM64): Experimental builds for mobile devices.
-- iOS (ARM64): Experimental builds (TrollStore / Sideloading).
 
 - More Sound Color FX and Beat FX.
 - Integrated Audio Recording (WAV/FLAC).
 - Pro DJ Link / Networking for multi-player synchronization.
 
-## Project Status
+## Project Status / Plans
 
 - [x] **Professional Audio Engine**: High-fidelity SoundTouch & Mixxx DSP integration.
 - [x] **Mixer & DSP**: 3-band ISO EQs, Filters, and FX pipeline functional.
 - [x] **Rekordbox Integration**: Full PDB/ANLZ metadata and waveform support.
-- [x] **Cross-platform UI**: High-performance Raylib rendering on Win/Linux/Android/iOS.
+- [x] **Cross-platform UI**: High-performance Raylib rendering on Win/Linux/Android.
 - [/] **MIDI/HID Support**: Logic implemented, full integration in progress.
-- [ ] **Serato Support**: Metadata parsing and database integration (Planned).
-- [ ] **Hardware Abstraction**: Comprehensive SPI/I2C mapping for embedded targets.
+- [/] **Serato Support**: Metadata parsing and database integration functional, waveforms in progress.
 
 ## Build Instructions
 
@@ -69,11 +67,6 @@ Automated builds are available via GitHub Actions. For manual builds, ensure And
 make -f android/Makefile.android
 ```
 
-### iOS
-Requires macOS and Xcode. Automated builds are available via GitHub Actions.
-```bash
-make -f ios/Makefile.ios
-```
 
 ## Credits
 

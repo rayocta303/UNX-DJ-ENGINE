@@ -32,42 +32,71 @@ static const char *categories[] = {"FILENAME", "FOLDER", "PLAYLIST", "TRACK",
                                    "SEARCH"};
 
 static void Browser_UpdateActiveTracks(BrowserState *s) {
-  if (!s->DB) {
-    s->ActiveTrackCount = 0;
-    return;
-  }
+  if (s->DatabaseType == 0) { // Rekordbox
+    if (!s->DB) {
+      s->ActiveTrackCount = 0;
+      return;
+    }
 
-  if (s->IsTagList) {
-    s->ActiveTrackCount = s->TagListCount;
-    for (int i = 0; i < s->TagListCount; i++) {
-      // Find track by ID
-      s->TrackPointers[i] = NULL;
-      for (uint32_t j = 0; j < s->DB->TrackCount; j++) {
-        if (s->DB->Tracks[j].ID == s->TagList[i]) {
-          s->TrackPointers[i] = &s->DB->Tracks[j];
-          break;
+    if (s->IsTagList) {
+      s->ActiveTrackCount = s->TagListCount;
+      for (int i = 0; i < s->TagListCount; i++) {
+        s->TrackPointers[i] = NULL;
+        for (uint32_t j = 0; j < s->DB->TrackCount; j++) {
+          if (s->DB->Tracks[j].ID == s->TagList[i]) {
+            s->TrackPointers[i] = &s->DB->Tracks[j];
+            break;
+          }
         }
       }
-    }
-  } else if (s->CurrentPlaylistIdx >= 0 &&
-             s->CurrentPlaylistIdx < (int)s->DB->PlaylistCount) {
-    RBPlaylist *pl = &s->DB->Playlists[s->CurrentPlaylistIdx];
-    s->ActiveTrackCount = pl->TrackCount;
-    for (uint32_t i = 0; i < pl->TrackCount; i++) {
-      uint32_t tid = pl->TrackIDs[i];
-      s->TrackPointers[i] = NULL;
-      // Map ID to pointer
-      for (uint32_t j = 0; j < s->DB->TrackCount; j++) {
-        if (s->DB->Tracks[j].ID == tid) {
-          s->TrackPointers[i] = &s->DB->Tracks[j];
-          break;
+    } else if (s->CurrentPlaylistIdx >= 0 &&
+               s->CurrentPlaylistIdx < (int)s->DB->PlaylistCount) {
+      RBPlaylist *pl = &s->DB->Playlists[s->CurrentPlaylistIdx];
+      s->ActiveTrackCount = pl->TrackCount;
+      for (uint32_t i = 0; i < pl->TrackCount; i++) {
+        uint32_t tid = pl->TrackIDs[i];
+        s->TrackPointers[i] = NULL;
+        for (uint32_t j = 0; j < s->DB->TrackCount; j++) {
+          if (s->DB->Tracks[j].ID == tid) {
+            s->TrackPointers[i] = &s->DB->Tracks[j];
+            break;
+          }
         }
       }
+    } else {
+      s->ActiveTrackCount = s->DB->TrackCount;
+      for (uint32_t i = 0; i < s->DB->TrackCount; i++) {
+        s->TrackPointers[i] = &s->DB->Tracks[i];
+      }
     }
-  } else {
-    s->ActiveTrackCount = s->DB->TrackCount;
-    for (uint32_t i = 0; i < s->DB->TrackCount; i++) {
-      s->TrackPointers[i] = &s->DB->Tracks[i];
+  } else { // Serato
+    if (!s->SeratoDB) {
+      s->ActiveTrackCount = 0;
+      return;
+    }
+
+    if (s->IsTagList) {
+      // Tags not implemented for Serato yet
+      s->ActiveTrackCount = 0;
+    } else if (s->CurrentPlaylistIdx >= 0 &&
+               s->CurrentPlaylistIdx < (int)s->SeratoDB->PlaylistCount) {
+      SeratoPlaylist *pl = &s->SeratoDB->Playlists[s->CurrentPlaylistIdx];
+      s->ActiveTrackCount = pl->TrackCount;
+      for (uint32_t i = 0; i < pl->TrackCount; i++) {
+        uint32_t tid = pl->TrackIDs[i];
+        s->SeratoTrackPointers[i] = NULL;
+        for (uint32_t j = 0; j < s->SeratoDB->TrackCount; j++) {
+          if (s->SeratoDB->Tracks[j].ID == tid) {
+            s->SeratoTrackPointers[i] = &s->SeratoDB->Tracks[j];
+            break;
+          }
+        }
+      }
+    } else {
+      s->ActiveTrackCount = s->SeratoDB->TrackCount;
+      for (uint32_t i = 0; i < s->SeratoDB->TrackCount; i++) {
+        s->SeratoTrackPointers[i] = &s->SeratoDB->Tracks[i];
+      }
     }
   }
 }
@@ -88,9 +117,14 @@ void Browser_RefreshStorages(BrowserState *s) {
   // 1. Check for testing storage
   struct stat st;
   if (stat("usb_test/PIONEER/rekordbox/export.pdb", &st) == 0) {
-    strcpy(s->AvailableStorages[s->StorageCount].Name, "Testing USB");
+    strcpy(s->AvailableStorages[s->StorageCount].Name, "Testing USB (RB)");
     strcpy(s->AvailableStorages[s->StorageCount].Path, "usb_test");
-    strcpy(s->AvailableStorages[s->StorageCount].Type, "Testing");
+    strcpy(s->AvailableStorages[s->StorageCount].Type, "Rekordbox");
+    s->StorageCount++;
+  } else if (stat("usb_test/_Serato_/database V2", &st) == 0) {
+    strcpy(s->AvailableStorages[s->StorageCount].Name, "Testing USB (Serato)");
+    strcpy(s->AvailableStorages[s->StorageCount].Path, "usb_test");
+    strcpy(s->AvailableStorages[s->StorageCount].Type, "Serato");
     s->StorageCount++;
   }
 
@@ -100,12 +134,19 @@ void Browser_RefreshStorages(BrowserState *s) {
     char path[32];
     sprintf(path, "%c:/PIONEER/rekordbox/export.pdb", drive);
     if (stat(path, &st) == 0) {
-      sprintf(s->AvailableStorages[s->StorageCount].Name, "USB (%c:)", drive);
+      sprintf(s->AvailableStorages[s->StorageCount].Name, "USB (%c:) RB", drive);
       sprintf(s->AvailableStorages[s->StorageCount].Path, "%c:/", drive);
-      strcpy(s->AvailableStorages[s->StorageCount].Type, "USB");
+      strcpy(s->AvailableStorages[s->StorageCount].Type, "Rekordbox");
       s->StorageCount++;
-      if (s->StorageCount >= 8)
-        break;
+      if (s->StorageCount >= 8) break;
+    }
+    sprintf(path, "%c:/_Serato_/database V2", drive);
+    if (stat(path, &st) == 0) {
+      sprintf(s->AvailableStorages[s->StorageCount].Name, "USB (%c:) Serato", drive);
+      sprintf(s->AvailableStorages[s->StorageCount].Path, "%c:/", drive);
+      strcpy(s->AvailableStorages[s->StorageCount].Type, "Serato");
+      s->StorageCount++;
+      if (s->StorageCount >= 8) break;
     }
   }
 #else
@@ -430,21 +471,31 @@ static int Browser_Update(Component *base) {
       int idx = s->ScrollOffset + s->CursorPos;
       if (idx < s->StorageCount) {
         s->SelectedStorage = &s->AvailableStorages[idx];
-        if (s->DB)
-          RB_FreeDatabase(s->DB);
+        if (s->DB) RB_FreeDatabase(s->DB);
+        if (s->SeratoDB) Serato_FreeDatabase(s->SeratoDB);
+        s->DB = NULL;
+        s->SeratoDB = NULL;
+
+        // Try Rekordbox first
         s->DB = RB_LoadDatabase(s->SelectedStorage->Path);
         if (s->DB) {
-          if (s->TrackPointers)
-            free(s->TrackPointers);
-          s->TrackPointers =
-              (RBTrack **)malloc(s->DB->TrackCount * sizeof(RBTrack *));
-
-          s->BrowseLevel = 2; // Source to Categories (Only if DB loaded)
+          s->DatabaseType = 0;
+          if (s->TrackPointers) free(s->TrackPointers);
+          s->TrackPointers = (RBTrack **)malloc(s->DB->TrackCount * sizeof(RBTrack *));
+          s->BrowseLevel = 2;
           s->CursorPos = s->ScrollOffset = 0;
         } else {
-          printf("[BROWSER] Failed to load Rekordbox database from %s\n",
-                 s->SelectedStorage->Path);
-          // Stay on Source level if no DB found
+          // Try Serato
+          s->SeratoDB = Serato_LoadDatabase(s->SelectedStorage->Path);
+          if (s->SeratoDB) {
+            s->DatabaseType = 1;
+            if (s->SeratoTrackPointers) free(s->SeratoTrackPointers);
+            s->SeratoTrackPointers = (SeratoTrack **)malloc(s->SeratoDB->TrackCount * sizeof(SeratoTrack *));
+            s->BrowseLevel = 2;
+            s->CursorPos = s->ScrollOffset = 0;
+          } else {
+            printf("[BROWSER] Failed to load database from %s\n", s->SelectedStorage->Path);
+          }
         }
       }
     } else if (s->BrowseLevel == 2) {
@@ -458,11 +509,20 @@ static int Browser_Update(Component *base) {
       s->CursorPos = s->ScrollOffset = 0;
     } else if (s->BrowseLevel == 1) {
       int idx = s->ScrollOffset + s->CursorPos;
-      if (s->DB && idx < (int)s->DB->PlaylistCount) {
-        s->CurrentPlaylistIdx = idx;
-        s->BrowseLevel = 0; // Playlists to Tracks
-        Browser_UpdateActiveTracks(s);
-        s->CursorPos = s->ScrollOffset = 0;
+      if (s->DatabaseType == 0) {
+        if (s->DB && idx < (int)s->DB->PlaylistCount) {
+          s->CurrentPlaylistIdx = idx;
+          s->BrowseLevel = 0;
+          Browser_UpdateActiveTracks(s);
+          s->CursorPos = s->ScrollOffset = 0;
+        }
+      } else {
+        if (s->SeratoDB && idx < (int)s->SeratoDB->PlaylistCount) {
+          s->CurrentPlaylistIdx = idx;
+          s->BrowseLevel = 0;
+          Browser_UpdateActiveTracks(s);
+          s->CursorPos = s->ScrollOffset = 0;
+        }
       }
     } else if (s->BrowseLevel == 0) {
       // Track selected -> Show Load Popup
@@ -488,166 +548,106 @@ static int Browser_Update(Component *base) {
     }
 
     int idx = targetIdx;
-    if (idx < s->ActiveTrackCount && s->TrackPointers[idx]) {
-      RBTrack *t = s->TrackPointers[idx];
-      printf("[BROWSER] Loading track: %s to Deck %c\n", t->Title,
-             loadToDeck == 0 ? 'A' : 'B');
-
-      // Load analysis data (.DAT/.EXT)
-      if (s->SelectedStorage) {
-        RB_LoadTrackData(t, s->SelectedStorage->Path);
-        printf("[BROWSER] Loaded %d cues and beatgrid for %s\n", t->CueCount,
-               t->Title);
-
-        if (s->AudioPlugin) {
-          char fullPath[1024];
-          const char *relPath = t->FilePath;
-          if (relPath[0] == '/' || relPath[0] == '\\')
-            relPath++;
-          snprintf(fullPath, sizeof(fullPath), "%s/%s",
-                   s->SelectedStorage->Path, relPath);
-          printf("[BROWSER] Audio Path: %s\n", fullPath);
-
-          DeckAudio_LoadTrack(&s->AudioPlugin->Decks[loadToDeck], fullPath);
-          // Do not auto-play, let user press Play/Pause
-        }
-
-        struct DeckState *targetDeck = loadToDeck == 0 ? s->DeckA : s->DeckB;
-        if (targetDeck) {
-          strcpy(targetDeck->TrackTitle, t->Title);
-          strcpy(targetDeck->ArtistName, t->Artist);
-          strcpy(targetDeck->TrackKey, t->Key);
-
-          // Setup Artwork Path
-          if (t->ArtworkPath[0] != '\0') {
-            const char *artRel = t->ArtworkPath;
-            if (artRel[0] == '/' || artRel[0] == '\\')
-              artRel++;
-            snprintf(targetDeck->ArtworkPath, sizeof(targetDeck->ArtworkPath),
-                     "%s/%s", s->SelectedStorage->Path, artRel);
-          } else {
-            targetDeck->ArtworkPath[0] = '\0';
+    if (s->DatabaseType == 0) { // Rekordbox
+      if (idx < s->ActiveTrackCount && s->TrackPointers[idx]) {
+        RBTrack *t = s->TrackPointers[idx];
+        printf("[BROWSER] Loading RB track: %s to Deck %c\n", t->Title, loadToDeck == 0 ? 'A' : 'B');
+        
+        if (s->SelectedStorage) {
+          RB_LoadTrackData(t, s->SelectedStorage->Path);
+          
+          if (s->AudioPlugin) {
+            char fullPath[1024];
+            const char *relPath = t->FilePath;
+            if (relPath[0] == '/' || relPath[0] == '\\') relPath++;
+            snprintf(fullPath, sizeof(fullPath), "%s/%s", s->SelectedStorage->Path, relPath);
+            DeckAudio_LoadTrack(&s->AudioPlugin->Decks[loadToDeck], fullPath);
           }
 
-          targetDeck->OriginalBPM = t->BPM;
-          targetDeck->CurrentBPM = t->BPM;
+          struct DeckState *targetDeck = loadToDeck == 0 ? s->DeckA : s->DeckB;
+          if (targetDeck) {
+            strcpy(targetDeck->TrackTitle, t->Title);
+            strcpy(targetDeck->ArtistName, t->Artist);
+            strcpy(targetDeck->TrackKey, t->Key);
+            targetDeck->OriginalBPM = t->BPM;
+            targetDeck->CurrentBPM = t->BPM;
+            
+            // Artwork
+            if (t->ArtworkPath[0] != '\0') {
+                const char *artRel = t->ArtworkPath;
+                if (artRel[0] == '/' || artRel[0] == '\\') artRel++;
+                snprintf(targetDeck->ArtworkPath, sizeof(targetDeck->ArtworkPath), "%s/%s", s->SelectedStorage->Path, artRel);
+            } else targetDeck->ArtworkPath[0] = '\0';
 
-          // Safe re-allocation for UI thread stability
-          TrackState *newTrack = (TrackState *)malloc(sizeof(TrackState));
-          if (!newTrack) {
-            printf("[BROWSER] Error: Failed to allocate TrackState\n");
-          } else {
-            memset(newTrack, 0, sizeof(TrackState));
-
-            // Copy Static Waveform
-            newTrack->StaticWaveformLen = t->StaticWaveformLen;
-            newTrack->StaticWaveformType = t->StaticWaveformType;
-            int copyLen =
-                t->StaticWaveformLen > 8192 ? 8192 : t->StaticWaveformLen;
-            memcpy(newTrack->StaticWaveform, t->StaticWaveform, copyLen);
-
-            // Assign Dynamic Waveform Reference
-            newTrack->DynamicWaveform = t->DynamicWaveform;
-            newTrack->DynamicWaveformLen = t->DynamicWaveformLen;
-            newTrack->WaveformType = t->WaveformType;
-
-            // Copy Beatgrid
-            newTrack->GridOffset = 0;
-            newTrack->BeatGridCount =
-                t->BeatGridCount > 1024 ? 1024 : t->BeatGridCount;
-            for (int i = 0; i < newTrack->BeatGridCount; i++) {
-              newTrack->BeatGrid[i] = t->BeatGrid[i];
-            }
-
-            // Copy Cues
-            for (uint32_t i = 0; i < t->CueCount; i++) {
-              if (t->Cues[i].ID >= 1 && t->Cues[i].ID <= 8) {
-                if (newTrack->HotCuesCount < 8) {
-                  newTrack->HotCues[newTrack->HotCuesCount].ID = t->Cues[i].ID;
-                  newTrack->HotCues[newTrack->HotCuesCount].Start =
-                      t->Cues[i].Time;
-                  newTrack->HotCues[newTrack->HotCuesCount].Color[0] =
-                      t->Cues[i].Color[0];
-                  newTrack->HotCues[newTrack->HotCuesCount].Color[1] =
-                      t->Cues[i].Color[1];
-                  newTrack->HotCues[newTrack->HotCuesCount].Color[2] =
-                      t->Cues[i].Color[2];
-                  newTrack->HotCuesCount++;
+            // Allocate and setup TrackState
+            TrackState *newTrack = (TrackState *)malloc(sizeof(TrackState));
+            if (newTrack) {
+                memset(newTrack, 0, sizeof(TrackState));
+                newTrack->StaticWaveformLen = t->StaticWaveformLen;
+                memcpy(newTrack->StaticWaveform, t->StaticWaveform, t->StaticWaveformLen > 8192 ? 8192 : t->StaticWaveformLen);
+                newTrack->DynamicWaveform = t->DynamicWaveform;
+                newTrack->DynamicWaveformLen = t->DynamicWaveformLen;
+                newTrack->WaveformType = t->WaveformType;
+                
+                // Cues and Beats
+                newTrack->BeatGridCount = t->BeatGridCount > 1024 ? 1024 : t->BeatGridCount;
+                for (int i = 0; i < newTrack->BeatGridCount; i++) newTrack->BeatGrid[i] = t->BeatGrid[i];
+                
+                for (uint32_t i = 0; i < t->CueCount && i < 32; i++) {
+                    if (t->Cues[i].ID >= 1 && t->Cues[i].ID <= 8) {
+                        newTrack->HotCues[newTrack->HotCuesCount].ID = t->Cues[i].ID;
+                        newTrack->HotCues[newTrack->HotCuesCount].Start = t->Cues[i].Time;
+                        memcpy(newTrack->HotCues[newTrack->HotCuesCount].Color, t->Cues[i].Color, 3);
+                        newTrack->HotCuesCount++;
+                    } else if (t->Cues[i].ID == 0) {
+                        newTrack->Cues[newTrack->CuesCount].Start = t->Cues[i].Time;
+                        memcpy(newTrack->Cues[newTrack->CuesCount].Color, t->Cues[i].Color, 3);
+                        newTrack->CuesCount++;
+                    }
                 }
-              } else if (t->Cues[i].ID == 0) {
-                if (newTrack->CuesCount < 32) {
-                  newTrack->Cues[newTrack->CuesCount].ID = 0;
-                  newTrack->Cues[newTrack->CuesCount].Start = t->Cues[i].Time;
-                  newTrack->Cues[newTrack->CuesCount].Color[0] =
-                      t->Cues[i].Color[0];
-                  newTrack->Cues[newTrack->CuesCount].Color[1] =
-                      t->Cues[i].Color[1];
-                  newTrack->Cues[newTrack->CuesCount].Color[2] =
-                      t->Cues[i].Color[2];
-                  newTrack->CuesCount++;
-                }
-              }
+
+                TrackState *oldTrack = targetDeck->LoadedTrack;
+                targetDeck->LoadedTrack = newTrack;
+                if (oldTrack) free(oldTrack);
+                targetDeck->PositionMs = (newTrack->CuesCount > 0) ? newTrack->Cues[0].Start : (newTrack->BeatGridCount > 0 ? newTrack->BeatGrid[0].Time : 0);
+                DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck], (uint32_t)targetDeck->PositionMs);
             }
+          }
+        }
+      }
+    } else { // Serato
+      if (idx < s->ActiveTrackCount && s->SeratoTrackPointers[idx]) {
+        SeratoTrack *t = s->SeratoTrackPointers[idx];
+        printf("[BROWSER] Loading Serato track: %s to Deck %c\n", t->Title, loadToDeck == 0 ? 'A' : 'B');
+        
+        if (s->SelectedStorage) {
+          if (s->AudioPlugin) {
+            char fullPath[1024];
+            const char *relPath = t->FilePath;
+            // Serato locations can be absolute or relative. Let's assume relative to root if it starts with /
+            if (relPath[0] == '/' || relPath[0] == '\\') relPath++;
+            snprintf(fullPath, sizeof(fullPath), "%s/%s", s->SelectedStorage->Path, relPath);
+            DeckAudio_LoadTrack(&s->AudioPlugin->Decks[loadToDeck], fullPath);
+          }
 
-            // Copy Phrases
-            newTrack->PhraseCount = 0;
-            if (t->Phrases && t->PhraseCount > 0) {
-              for (uint32_t i = 0; i < t->PhraseCount && i < 64; i++) {
-                newTrack->Phrases[i].Index = t->Phrases[i].Index;
-                newTrack->Phrases[i].Beat = t->Phrases[i].Beat;
-                newTrack->Phrases[i].KindID = t->Phrases[i].KindID;
-                strcpy(newTrack->Phrases[i].Kind, t->Phrases[i].Kind);
-                newTrack->PhraseCount++;
-              }
-            }
+          struct DeckState *targetDeck = loadToDeck == 0 ? s->DeckA : s->DeckB;
+          if (targetDeck) {
+            strcpy(targetDeck->TrackTitle, t->Title);
+            strcpy(targetDeck->ArtistName, t->Artist);
+            strcpy(targetDeck->TrackKey, t->Key);
+            targetDeck->OriginalBPM = t->BPM;
+            targetDeck->CurrentBPM = t->BPM;
+            targetDeck->ArtworkPath[0] = '\0'; // Serato artwork not implemented yet
 
-            // Atomic-like swap
-            TrackState *oldTrack = targetDeck->LoadedTrack;
-            targetDeck->LoadedTrack = newTrack;
-            if (oldTrack)
-              free(oldTrack);
-
-            // Reset playhead for new track
-            targetDeck->Position = 0;
-            targetDeck->PositionMs = 0;
-            if (targetDeck->IsPlaying) {
-              targetDeck->IsPlaying = false;
-            }
-
-            // Auto-Cue: Find the absolute first cue point across all types
-            uint32_t firstMs = 0;
-            bool foundCue = false;
-
-            // Check Memory Cues
-            for (int i = 0; i < newTrack->CuesCount; i++) {
-              if (!foundCue || newTrack->Cues[i].Start < firstMs) {
-                firstMs = newTrack->Cues[i].Start;
-                foundCue = true;
-              }
-            }
-            // Check Hot Cues
-            for (int i = 0; i < newTrack->HotCuesCount; i++) {
-              if (!foundCue || newTrack->HotCues[i].Start < firstMs) {
-                firstMs = newTrack->HotCues[i].Start;
-                foundCue = true;
-              }
-            }
-            // Fallback to first BeatGrid if no cues
-            if (!foundCue && newTrack->BeatGridCount > 0) {
-              firstMs = newTrack->BeatGrid[0].Time;
-            }
-
-            targetDeck->PositionMs = firstMs;
-            if (s->AudioPlugin) {
-              DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck], firstMs);
-
-              // Sync back the generated fractional frame position right away
-              // for the UI
-              double sr = (double)s->AudioPlugin->Decks[loadToDeck].SampleRate;
-              if (sr < 8000)
-                sr = 44100.0;
-              targetDeck->Position =
-                  (s->AudioPlugin->Decks[loadToDeck].Position * 150.0) / sr;
+            TrackState *newTrack = (TrackState *)malloc(sizeof(TrackState));
+            if (newTrack) {
+                memset(newTrack, 0, sizeof(TrackState));
+                // Basic Serato TrackState setup (no waveforms/cues yet)
+                TrackState *oldTrack = targetDeck->LoadedTrack;
+                targetDeck->LoadedTrack = newTrack;
+                if (oldTrack) free(oldTrack);
+                targetDeck->PositionMs = 0;
+                DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck], 0);
             }
           }
         }
@@ -739,7 +739,10 @@ static void Browser_Draw(Component *base) {
   if (s->BrowseLevel == 1) {
     headerClr = ColorDGreen;
     titleText = "PLAYLIST";
-    sprintf(countText, "TOTAL %d", s->DB ? s->DB->PlaylistCount : 0);
+    int totalPl = 0;
+    if (s->DatabaseType == 0) totalPl = s->DB ? s->DB->PlaylistCount : 0;
+    else totalPl = s->SeratoDB ? s->SeratoDB->PlaylistCount : 0;
+    sprintf(countText, "TOTAL %d", totalPl);
   } else if (s->BrowseLevel == 2) {
     headerClr = ColorOrange;
     titleText = "BROWSE";
@@ -779,19 +782,36 @@ static void Browser_Draw(Component *base) {
 
     switch (s->BrowseLevel) {
     case 0:
-      if (idx < s->ActiveTrackCount && s->TrackPointers[idx]) {
-        RBTrack *t = s->TrackPointers[idx];
-        title = t->Title;
-        artist = t->Artist;
-        static char bpmBuf[16];
-        sprintf(bpmBuf, "%.1f", t->BPM);
-        bpmText = bpmBuf;
-        keyStr = t->Key;
+      if (s->DatabaseType == 0) {
+        if (idx < s->ActiveTrackCount && s->TrackPointers[idx]) {
+          RBTrack *t = s->TrackPointers[idx];
+          title = t->Title;
+          artist = t->Artist;
+          static char bpmBuf[16];
+          sprintf(bpmBuf, "%.1f", t->BPM);
+          bpmText = bpmBuf;
+          keyStr = t->Key;
+        }
+      } else {
+        if (idx < s->ActiveTrackCount && s->SeratoTrackPointers[idx]) {
+          SeratoTrack *t = s->SeratoTrackPointers[idx];
+          title = t->Title;
+          artist = t->Artist;
+          static char bpmBuf[16];
+          sprintf(bpmBuf, "%.1f", t->BPM);
+          bpmText = bpmBuf;
+          keyStr = t->Key;
+        }
       }
       break;
     case 1:
-      if (s->DB && idx >= 0 && (uint32_t)idx < s->DB->PlaylistCount)
-        title = s->DB->Playlists[idx].Name;
+      if (s->DatabaseType == 0) {
+        if (s->DB && idx >= 0 && (uint32_t)idx < s->DB->PlaylistCount)
+          title = s->DB->Playlists[idx].Name;
+      } else {
+        if (s->SeratoDB && idx >= 0 && (uint32_t)idx < s->SeratoDB->PlaylistCount)
+          title = s->SeratoDB->Playlists[idx].Name;
+      }
       break;
     case 2:
       if (idx < 5)
@@ -890,9 +910,10 @@ static void Browser_Draw(Component *base) {
   int maxItems = 0;
   if (s->BrowseLevel == 0)
     maxItems = s->ActiveTrackCount;
-  else if (s->BrowseLevel == 1)
-    maxItems = s->DB ? (int)s->DB->PlaylistCount : 0;
-  else if (s->BrowseLevel == 2)
+  else if (s->BrowseLevel == 1) {
+    if (s->DatabaseType == 0) maxItems = s->DB ? (int)s->DB->PlaylistCount : 0;
+    else maxItems = s->SeratoDB ? (int)s->SeratoDB->PlaylistCount : 0;
+  } else if (s->BrowseLevel == 2)
     maxItems = 5;
   else if (s->BrowseLevel == 3)
     maxItems = s->StorageCount;
@@ -903,9 +924,14 @@ static void Browser_Draw(Component *base) {
   // Drag and Drop Preview
   if (s->IsDragging) {
     const char *dragTitle = "Playlist Item";
-    if (s->DraggingType == 1 && s->DB && s->DraggingIdx >= 0 &&
-        (uint32_t)s->DraggingIdx < s->DB->PlaylistCount) {
-      dragTitle = s->DB->Playlists[s->DraggingIdx].Name;
+    if (s->DatabaseType == 0) {
+        if (s->DraggingType == 1 && s->DB && s->DraggingIdx >= 0 && (uint32_t)s->DraggingIdx < s->DB->PlaylistCount) {
+            dragTitle = s->DB->Playlists[s->DraggingIdx].Name;
+        }
+    } else {
+        if (s->DraggingType == 1 && s->SeratoDB && s->DraggingIdx >= 0 && (uint32_t)s->DraggingIdx < s->SeratoDB->PlaylistCount) {
+            dragTitle = s->SeratoDB->Playlists[s->DraggingIdx].Name;
+        }
     }
     DrawRectangle(mPos.x, mPos.y, S(120), rowH, Fade(ColorBlue, 0.6f));
     UIDrawText(dragTitle, faceSm, mPos.x + S(8), mPos.y + S(6), S(13),
@@ -929,9 +955,12 @@ static void Browser_Draw(Component *base) {
     DrawCentredText("LOAD TRACK TO...", faceMd, px, pw, py + S(15), S(15),
                     ColorWhite);
     const char *trackName = "Unknown";
-    if (s->PopupTrackIdx >= 0 && s->PopupTrackIdx < s->ActiveTrackCount &&
-        s->TrackPointers[s->PopupTrackIdx]) {
-      trackName = s->TrackPointers[s->PopupTrackIdx]->Title;
+    if (s->PopupTrackIdx >= 0 && s->PopupTrackIdx < s->ActiveTrackCount) {
+        if (s->DatabaseType == 0) {
+            if (s->TrackPointers[s->PopupTrackIdx]) trackName = s->TrackPointers[s->PopupTrackIdx]->Title;
+        } else {
+            if (s->SeratoTrackPointers[s->PopupTrackIdx]) trackName = s->SeratoTrackPointers[s->PopupTrackIdx]->Title;
+        }
     }
     DrawCentredText(trackName, faceXS, px, pw, py + S(35), S(10), ColorShadow);
 
