@@ -26,12 +26,16 @@ jobs:
 
     - name: Build Raylib for iOS (arm64)
       run: |
+        SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
         cd raylib-src/src
         # Fix the include path for OpenGL ES on iOS
         sed -i '' 's|<GLES2/gl2.h>|<OpenGLES/ES2/gl.h>|g' rlgl.h
         sed -i '' 's|<GLES2/glext.h>|<OpenGLES/ES2/glext.h>|g' rlgl.h
         
-        make PLATFORM=PLATFORM_IOS IOS_SDK=iphoneos RAYLIB_LIBTYPE=STATIC GRAPHICS=GRAPHICS_API_OPENGL_ES2
+        # Explicitly passing SDK path and architecture to the Makefile
+        make PLATFORM=PLATFORM_IOS IOS_SDK=iphoneos RAYLIB_LIBTYPE=STATIC GRAPHICS=GRAPHICS_API_OPENGL_ES2 \
+             CC=clang CFLAGS="-isysroot $SDK_PATH -arch arm64 -DPLATFORM_IOS -DGRAPHICS_API_OPENGL_ES2"
+        
         mkdir -p ../../platform/ios/libs
         cp libraylib.a ../../platform/ios/libs/
 
