@@ -78,6 +78,15 @@ jobs:
         cp libraylib.a ../../platform/ios/libs/
         cd ../..
 
+    - name: Generate Assets Bundle
+      run: |
+        mkdir -p src/ui/components
+        # Convert fonts to C headers for embedding
+        # Note: We use 'append' for subsequent files
+        ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Free-Solid-900.otf" src/ui/components/assets_bundle.h font_awesome_solid
+        ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Free-Regular-400.otf" src/ui/components/assets_bundle.h font_awesome_regular append
+        ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Brands-Regular-400.otf" src/ui/components/assets_bundle.h font_awesome_brand append
+
     - name: Build XDJ-UNX App
       run: |
         mkdir -p build/ios/obj
