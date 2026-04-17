@@ -28,68 +28,72 @@ jobs:
         sed -i '' 's|<GLES2/gl2.h>|<OpenGLES/ES2/gl.h>|g' rlgl.h
         sed -i '' 's|<GLES2/gl2ext.h>|<OpenGLES/ES2/glext.h>|g' rlgl.h
         
-        # Create gles_fix.h for missing extension defines
-        cat > gles_fix.h <<EOF
-        #ifndef GLES_FIX_H
-        #define GLES_FIX_H
-        #include <OpenGLES/ES2/gl.h>
-        #include <OpenGLES/ES2/glext.h>
-        typedef void (*PFNGLGENVERTEXARRAYSOESPROC)(GLsizei n, GLuint *arrays);
-        typedef void (*PFNGLBINDVERTEXARRAYOESPROC)(GLuint array);
-        typedef void (*PFNGLDELETEVERTEXARRAYSOESPROC)(GLsizei n, const GLuint *arrays);
-        typedef void (*PFNGLDRAWARRAYSINSTANCEDEXTPROC)(GLenum mode, GLint first, GLsizei count, GLsizei primcount);
-        typedef void (*PFNGLDRAWELEMENTSINSTANCEDEXTPROC)(GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei primcount);
-        typedef void (*PFNGLVERTEXATTRIBDIVISOREXTPROC)(GLuint index, GLuint divisor);
-        #define GL_DEPTH_COMPONENT32_OES 0x81A7
-        #define GL_DEPTH_COMPONENT24_OES 0x81A6
-        #define GL_RED_EXT 0x1903
-        #define GL_RG_EXT 0x8227
-        #define GL_R8_EXT 0x8229
-        #define GL_RG8_EXT 0x822B
-        #define GL_R32F_EXT 0x822E
-        #define GL_RG32F_EXT 0x8230
-        #define GL_RGBA32F_EXT 0x8814
-        #define GL_COLOR_ATTACHMENT7_EXT 0x8CE7
-        #endif
-        EOF
+        # Create gles_fix.h for missing extension defines (As per commit b23c18a)
+        printf '%s\n' \
+          '#ifndef GLES_FIX_H' \
+          '#define GLES_FIX_H' \
+          '#include <OpenGLES/ES2/gl.h>' \
+          '#include <OpenGLES/ES2/glext.h>' \
+          'typedef void (*PFNGLGENVERTEXARRAYSOESPROC)(GLsizei n, GLuint *arrays);' \
+          'typedef void (*PFNGLBINDVERTEXARRAYOESPROC)(GLuint array);' \
+          'typedef void (*PFNGLDELETEVERTEXARRAYSOESPROC)(GLsizei n, const GLuint *arrays);' \
+          'typedef void (*PFNGLDRAWARRAYSINSTANCEDEXTPROC)(GLenum mode, GLint first, GLsizei count, GLsizei primcount);' \
+          'typedef void (*PFNGLDRAWELEMENTSINSTANCEDEXTPROC)(GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei primcount);' \
+          'typedef void (*PFNGLVERTEXATTRIBDIVISOREXTPROC)(GLuint index, GLuint divisor);' \
+          '#define GL_DEPTH_COMPONENT32_OES 0x81A7' \
+          '#define GL_DEPTH_COMPONENT24_OES 0x81A6' \
+          '#define GL_RED_EXT 0x1903' \
+          '#define GL_R32F_EXT 0x822E' \
+          '#define GL_RGB32F_EXT 0x8815' \
+          '#define GL_RGBA32F_EXT 0x8814' \
+          '#define GL_R16F_EXT 0x822D' \
+          '#define GL_RGB16F_EXT 0x881B' \
+          '#define GL_RGBA16F_EXT 0x881A' \
+          '#define GL_COLOR_ATTACHMENT7_EXT 0x8CE7' \
+          '#endif' \
+          > gles_fix.h
 
         # Inject fix into rlgl.h
         sed -i '' '1i\
         #include "gles_fix.h"
         ' rlgl.h
 
-        # Common iOS clang flags
         IOS_FLAGS="-target arm64-apple-ios14.0 -isysroot $SDK_PATH \
           -DPLATFORM_IOS -DGRAPHICS_API_OPENGL_ES2 \
           -DGLES_SILENCE_DEPRECATION -DGL_GLEXT_PROTOTYPES \
           -Wno-implicit-function-declaration -Wno-macro-redefined \
           -I. -O2"
 
-        # Compile each raylib source file (EXCLUDING raudio.c to avoid audio conflicts)
         for src in rcore.c rshapes.c rtextures.c rtext.c utils.c rmodels.c; do
-          echo "=== Compiling $src ==="
           clang -x c $IOS_FLAGS -c $src -o ${src%.c}.o
         done
 
-        # Pack into static library
         ar rcs libraylib.a rcore.o rshapes.o rtextures.o rtext.o utils.o rmodels.o
-        
         mkdir -p ../../platform/ios/libs
         cp libraylib.a ../../platform/ios/libs/
-        cd ../..
 
-    - name: Generate Assets Bundle
+    - name: Bundle Assets
       run: |
-        mkdir -p src/ui/components
-        # Compile bin2c for the runner OS (macOS)
+        # Compile tools for macOS
         gcc tools/bin2c.c -o tools/bin2c
-        chmod +x tools/bin2c
-        # Convert fonts to C headers
-        ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Free-Solid-900.otf" src/ui/components/assets_bundle.h font_awesome_solid
+        gcc tools/gen_splash_bundle.c -o tools/gen_splash_bundle
+        chmod +x tools/bin2c tools/gen_splash_bundle
+        
+        # Build assets_bundle.h (As per commit b23c18a)
+        mkdir -p src/ui/components
+        rm -f src/ui/components/assets_bundle.h
+        echo "#ifndef ASSETS_BUNDLE_H" > src/ui/components/assets_bundle.h
+        echo "#define ASSETS_BUNDLE_H" >> src/ui/components/assets_bundle.h
+        ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Free-Solid-900.otf" src/ui/components/assets_bundle.h font_awesome_solid append
         ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Free-Regular-400.otf" src/ui/components/assets_bundle.h font_awesome_regular append
         ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Brands-Regular-400.otf" src/ui/components/assets_bundle.h font_awesome_brand append
         ./tools/bin2c "assets/splash.png" src/ui/components/assets_bundle.h unx_logo append
         ./tools/bin2c "assets/icons/crown.png" src/ui/components/assets_bundle.h icon_crown append
+        
+        # Embed all splash frames
+        ./tools/gen_splash_bundle assets/splash src/ui/components/splash_bundle_tmp.h
+        cat src/ui/components/splash_bundle_tmp.h >> src/ui/components/assets_bundle.h
+        echo "#endif" >> src/ui/components/assets_bundle.h
 
     - name: Build XDJ-UNX App
       run: |
@@ -101,93 +105,54 @@ jobs:
           -O2 -DPLATFORM_IOS -DKS_STR_ENCODING_NONE -Dkiss_fft_scalar=double -DT_LINUX \
           -DGLES_SILENCE_DEPRECATION"
 
-        # --- audio_backend.c: Objective-C ---
-        clang -x objective-c $IOS_BASE -fobjc-arc \
-          -c src/core/audio_backend.c \
-          -o build/ios/obj/src_core_audio_backend.c.o
+        # audio_backend: ObjC
+        clang -x objective-c $IOS_BASE -fobjc-arc -c src/core/audio_backend.c -o build/ios/obj/src_core_audio_backend.c.o
 
-        # --- Compile all other .c files ---
-        C_FILES=$(find src lib -name "*.c" \
-          | grep -v "midi_backend_win.c" \
-          | grep -v "src/core/audio_backend.c" \
-          | grep -v "lib/linux_arm64" \
-          | grep -v "lib/qm-dsp/hmm" \
-          | grep -v "lib/qm-dsp/dsp/segmentation" \
-          | grep -v "/tests/" \
-          | grep -v "/test/")
+        # C files
+        C_FILES=$(find src lib -name "*.c" | grep -v "midi_backend_win.c" | grep -v "src/core/audio_backend.c" | grep -v "lib/linux_arm64" | grep -v "lib/qm-dsp/hmm" | grep -v "lib/qm-dsp/dsp/segmentation" | grep -v "/tests/" | grep -v "/test/")
         for f in $C_FILES; do
           obj="build/ios/obj/$(echo $f | tr '/' '_').o"
-          echo "Compiling (C) $f -> $obj"
           clang -x c $IOS_BASE -c "$f" -o "$obj"
         done
 
-        # --- Compile .cpp and .cc files ---
-        CPP_FILES=$(find src lib -name "*.cpp" -o -name "*.cc" 2>/dev/null \
-          | grep -v "lib/linux_arm64" \
-          | grep -v "/tests/" \
-          | grep -v "/test/" \
-          | grep -v "lib/qm-dsp/hmm" \
-          | grep -v "lib/qm-dsp/dsp/segmentation" || true)
+        # C++ files
+        CPP_FILES=$(find src lib -name "*.cpp" -o -name "*.cc" | grep -v "lib/linux_arm64" | grep -v "/tests/" | grep -v "/test/" | grep -v "lib/qm-dsp/hmm" | grep -v "lib/qm-dsp/dsp/segmentation" || true)
         for f in $CPP_FILES; do
           obj="build/ios/obj/$(echo $f | tr '/' '_').o"
-          echo "Compiling (C++) $f -> $obj"
-          clang++ $IOS_BASE -std=c++17 -Ilib/kaitai -Ilib/rekordbox-metadata \
-            -c "$f" -o "$obj"
+          clang++ $IOS_BASE -std=c++17 -Ilib/kaitai -Ilib/rekordbox-metadata -c "$f" -o "$obj"
         done
 
-        # --- Platform: Objective-C++ ---
-        echo "=== Compiling AppController.m ==="
-        clang++ -x objective-c++ $IOS_BASE -fobjc-arc -v -c platform/ios/AppController.m -o build/ios/obj/platform_ios_AppController.m.o
-        
-        echo "=== Compiling rcore_ios.m ==="
-        clang++ -x objective-c++ $IOS_BASE -fobjc-arc -v -c platform/ios/rcore_ios.m -o build/ios/obj/platform_ios_rcore_ios.m.o
+        # Platform: ObjC++ (Better for QuartzCore compatibility)
+        clang++ -x objective-c++ $IOS_BASE -fobjc-arc -c platform/ios/AppController.m -o build/ios/obj/platform_ios_AppController.m.o
+        clang++ -x objective-c++ $IOS_BASE -fobjc-arc -c platform/ios/rcore_ios.m -o build/ios/obj/platform_ios_rcore_ios.m.o
 
-        # --- Compile other .m files (EXCLUDING ios_utils.m to avoid conflict) ---
+        # Other .m
         M_FILES=$(find src -name "*.m" | grep -v "ios_utils.m")
         for f in $M_FILES; do
           obj="build/ios/obj/$(echo $f | tr '/' '_').o"
-          echo "Compiling (ObjC) $f -> $obj"
           clang -x objective-c $IOS_BASE -fobjc-arc -c "$f" -o "$obj"
         done
 
-        # --- Link ---
+        # Link (As per commit b23c18a with -force_load)
         clang++ -target arm64-apple-ios14.0 -isysroot $SDK_PATH \
           build/ios/obj/*.o \
-          -Lplatform/ios/libs -lraylib \
+          -Wl,-force_load,platform/ios/libs/libraylib.a \
           -framework UIKit -framework QuartzCore -framework CoreGraphics \
           -framework CoreAudio -framework AudioToolbox -framework AVFoundation \
           -framework Foundation -framework CoreFoundation -framework OpenGLES \
           -framework CoreVideo -framework CoreText -framework CoreMedia \
+          -stdlib=libc++ \
           -o build/ios/xdjunx
 
     - name: Package IPA
       run: |
-        # Create a clean app bundle structure
         rm -rf Payload
-        mkdir -p Payload/xdjunx.app
-        
-        # Copy the executable and set permissions
+        mkdir -p Payload/xdjunx.app/assets
         cp build/ios/xdjunx Payload/xdjunx.app/
         chmod +x Payload/xdjunx.app/xdjunx
-        
-        # Copy config files
         cp platform/ios/Info.plist Payload/xdjunx.app/
-        
-        # Copy the ENTIRE assets folder (including the folder itself)
-        # This results in Payload/xdjunx.app/assets/...
-        cp -R assets Payload/xdjunx.app/
-        
-        # Log the content for verification
-        echo "=== Bundled Assets ==="
-        find Payload/xdjunx.app/assets -maxdepth 2
-        echo "=== Splash Frames Check ==="
-        find Payload/xdjunx.app/assets/splash -maxdepth 1 | head -n 10
-        echo "... and more"
-        
-        # Sign the binary with entitlements
+        cp -R assets/* Payload/xdjunx.app/assets/
         ldid -Splatform/ios/Entitlements.plist Payload/xdjunx.app/xdjunx
-        
-        # Zip into IPA
         zip -r xdjunx.ipa Payload
 
     - name: Upload Artifact
