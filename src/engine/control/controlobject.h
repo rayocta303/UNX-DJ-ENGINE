@@ -1,6 +1,6 @@
 #pragma once
 
-#if !defined(__ANDROID__)
+#if !defined(__ANDROID__) && !defined(PLATFORM_IOS)
 #include <QObject>
 #include <QEvent>
 #else

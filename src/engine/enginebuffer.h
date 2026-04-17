@@ -4,7 +4,7 @@
 #include <gtest/gtest_prod.h>
 #endif
 
-#if !defined(__ANDROID__)
+#if !defined(__ANDROID__) && !defined(PLATFORM_IOS)
 #include <QAtomicInt>
 #include <QMutex>
 #else

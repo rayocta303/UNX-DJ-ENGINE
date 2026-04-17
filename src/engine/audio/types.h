@@ -1,9 +1,9 @@
 #pragma once
 
-#if !defined(__ANDROID__)
-#include <QtDebug>
-#else
+#if defined(__ANDROID__) || defined(PLATFORM_IOS)
 #include "engine/shim.h"
+#else
+#include <QtDebug>
 #endif
 
 #include <cstdint>

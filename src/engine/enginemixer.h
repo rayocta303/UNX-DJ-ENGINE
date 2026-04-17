@@ -1,11 +1,11 @@
 #pragma once
 
-#if !defined(__ANDROID__)
+#if !defined(__ANDROID__) && !defined(PLATFORM_IOS)
 #include <QObject>
 #else
 #include "engine/shim.h"
 #endif
-#if !defined(__ANDROID__)
+#if !defined(__ANDROID__) && !defined(PLATFORM_IOS)
 #include <QVarLengthArray>
 #endif
 #include <atomic>
