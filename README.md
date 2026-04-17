@@ -9,8 +9,8 @@ UNX DJ ENGINE is an experimental DJ Media Player firmware subset, ported to C an
 ### Audio Engine
 - High-fidelity 32-bit float internal mixing pipeline.
 - Multi-format decoding support: MP3 (minimp3), WAV, and AIFF (dr_wav).
-- Advanced Master Tempo and Pitch-shifting using professional SoundTouch and Mixxx-based processing engine.
-- Sophisticated Read-Ahead Manager with cross-fading seek logic for artifact-free performance.
+- Integrated Master Tempo and Pitch-shifting using high-fidelity WSOLA processing logic.
+- Efficient real-time interpolation for artifact-free vinyl-mode scratching.
 - Professional 3-Band ISO EQs and Filters (Biquad).
 - Integrated Sound Color FX and BPM-synced Beat FX.
 - Reliable mono-to-stereo automatic upmixing and lock-free parameter synchronization.
@@ -38,7 +38,7 @@ UNX DJ ENGINE is an experimental DJ Media Player firmware subset, ported to C an
 
 ## Project Status / Plans
 
-- [x] **Professional Audio Engine**: High-fidelity SoundTouch & Mixxx DSP integration.
+- [/] **Audio Engine**: WSOLA-based Master Tempo integration (Functional but not yet perfect).
 - [x] **Mixer & DSP**: 3-band ISO EQs, Filters, and FX pipeline functional.
 - [x] **Rekordbox Integration**: Full PDB/ANLZ metadata and waveform support.
 - [x] **Cross-platform UI**: High-performance Raylib rendering on Win/Linux/Android.

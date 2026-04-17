@@ -1,6 +1,10 @@
 #pragma once
 
+#if !defined(__ANDROID__)
+#include <QFlags>
+#else
 #include "engine/shim.h"
+#endif
 #include <algorithm>
 #include <cstring> // memset
 

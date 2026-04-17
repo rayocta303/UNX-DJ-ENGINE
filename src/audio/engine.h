@@ -12,13 +12,6 @@
 extern "C" {
 #endif
 
-// Bridge for Mixxx Engine (C++)
-void* EngineBridge_Create();
-void EngineBridge_Destroy(void* instance);
-void EngineBridge_InitializeWithPCM(void* instance, float* pBuffer, uint32_t totalSamples, uint32_t sampleRate);
-void EngineBridge_Process(void* instance, float* pOut, uint32_t frames, double rate);
-void EngineBridge_Seek(void* instance, double pos);
-
 #define SAMPLE_RATE 44100
 #define CHANNELS 2
 #define MAX_DECKS 2
@@ -74,9 +67,6 @@ typedef struct DeckAudioState {
     // Master Tempo (WSOLA) State
     WSOLA MTState;
 
-    // Master Tempo (Mixxx Port) Instance
-    void* cppEngine;
-
     float Trim;
     float Fader; // Channel Fader (0.0 to 1.0)
 
@@ -120,7 +110,6 @@ void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching);
 void DeckAudio_JumpToMs(DeckAudioState *deck, int64_t ms);
 void DeckAudio_QueueJumpMs(DeckAudioState *deck, uint32_t targetMs, uint32_t waitMs);
 void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch);
-void DeckAudio_SetMasterTempo(DeckAudioState *deck, bool active);
 
 #ifdef __cplusplus
 }

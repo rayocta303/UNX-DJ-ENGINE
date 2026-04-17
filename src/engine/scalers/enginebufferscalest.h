@@ -1,33 +1,21 @@
-#ifndef ENGINEBUFFERSCALEST_H
-#define ENGINEBUFFERSCALEST_H
-
-#include <memory>
+#pragma once
 #include "engine/scalers/enginebufferscale.h"
-#include "engine/readaheadmanager.h"
-#include "soundtouch/SoundTouch.h"
+
+class ReadAheadManager;
+class EngineBufferScaleSTPrivate;
 
 class EngineBufferScaleST : public EngineBufferScale {
 public:
-    explicit EngineBufferScaleST(ReadAheadManager* pReadAheadManager);
+    EngineBufferScaleST(ReadAheadManager* pReadAheadManager);
     ~EngineBufferScaleST() override;
 
-    void setScaleParameters(double base_rate,
-                            double* pTempoRatio,
-                            double* pPitchRatio) override;
-
-    double scaleBuffer(CSAMPLE* pOutputBuffer,
-                       SINT iOutputBufferSize) override;
-
     void clear() override;
+    double scaleBuffer(CSAMPLE* pOutputBuffer, SINT iOutputBufferSize) override;
 
-private:
+protected:
     void onSignalChanged() override;
 
+private:
     ReadAheadManager* m_pReadAheadManager;
-    std::unique_ptr<soundtouch::SoundTouch> m_pSoundTouch;
-    CSAMPLE* m_bufferBack;
-    uint32_t m_bufferBackSize;
-    bool m_bBackwards;
+    EngineBufferScaleSTPrivate* d;
 };
-
-#endif // ENGINEBUFFERSCALEST_H
