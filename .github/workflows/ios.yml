@@ -70,14 +70,16 @@ jobs:
           clang -x c $IOS_FLAGS -c $src -o ${src%.c}.o
         done
 
-        # raudio.c MUST be compiled as Objective-C because miniaudio.h
-        # pulls in AVFoundation, which uses @class / @protocol syntax.
-        # The -x objective-c flag MUST come BEFORE the source filename.
+        # raudio.c MUST be compiled as Objective-C
         echo "=== Compiling raudio.c as Objective-C ==="
         clang -x objective-c $IOS_FLAGS -c raudio.c -o raudio.o
 
+        # iOS Platform Support (rcore_ios.m)
+        echo "=== Compiling rcore_ios.m ==="
+        clang -x objective-c $IOS_FLAGS -c platforms/rcore_ios.m -o rcore_ios.o
+
         # Pack all object files into a static library
-        ar rcs libraylib.a rcore.o rshapes.o rtextures.o rtext.o utils.o rmodels.o raudio.o
+        ar rcs libraylib.a rcore.o rshapes.o rtextures.o rtext.o utils.o rmodels.o raudio.o rcore_ios.o
 
         echo "=== libraylib.a built successfully ==="
         ls -lh libraylib.a
@@ -125,13 +127,14 @@ jobs:
         # - Windows-only midi backend
         # - audio_backend.c (handled as ObjC)
         # - raylib's linux-specific lib folder
-        # - qm-dsp hmm (requires clapack which is not present)
+        # - qm-dsp hmm/segmentation (unused and missing deps)
         # - any tests/test folders
         C_FILES=$(find src lib -name "*.c" \
           | grep -v "midi_backend_win.c" \
           | grep -v "src/core/audio_backend.c" \
           | grep -v "lib/linux_arm64" \
           | grep -v "lib/qm-dsp/hmm" \
+          | grep -v "lib/qm-dsp/dsp/segmentation" \
           | grep -v "/tests/" \
           | grep -v "/test/")
         for f in $C_FILES; do
@@ -141,12 +144,13 @@ jobs:
         done
 
         # --- Compile .cpp and .cc files as C++ ---
-        # Exclude: linux platform, tests, and qm-dsp hmm
+        # Exclude: linux platform, tests, and qm-dsp hmm/segmentation
         CPP_FILES=$(find src lib -name "*.cpp" -o -name "*.cc" 2>/dev/null \
           | grep -v "lib/linux_arm64" \
           | grep -v "/tests/" \
           | grep -v "/test/" \
-          | grep -v "lib/qm-dsp/hmm" || true)
+          | grep -v "lib/qm-dsp/hmm" \
+          | grep -v "lib/qm-dsp/dsp/segmentation" || true)
         for f in $CPP_FILES; do
           obj="build/ios/obj/$(echo $f | tr '/' '_').o"
           echo "Compiling (C++) $f -> $obj"
@@ -172,9 +176,12 @@ jobs:
           -framework CoreAudio \
           -framework AudioToolbox \
           -framework AVFoundation \
+          -framework Foundation \
           -framework CoreFoundation \
           -framework OpenGLES \
           -framework CoreVideo \
+          -framework CoreText \
+          -framework CoreMedia \
           -stdlib=libc++ \
           -o build/ios/xdjunx
 
