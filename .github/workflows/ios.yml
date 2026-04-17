@@ -24,11 +24,11 @@ jobs:
       run: |
         cd raylib-src/src
         
-        # Patch rlgl.h for iOS OpenGLES headers
+        # Patch rlgl.h for iOS OpenGLES headers (As per successful references)
         sed -i '' 's|<GLES2/gl2.h>|<OpenGLES/ES2/gl.h>|g' rlgl.h
         sed -i '' 's|<GLES2/gl2ext.h>|<OpenGLES/ES2/glext.h>|g' rlgl.h
         
-        # Create gles_fix.h for missing extension defines (As per commit b23c18a)
+        # Inject missing GLES extension typedefs and defines for iOS.
         printf '%s\n' \
           '#ifndef GLES_FIX_H' \
           '#define GLES_FIX_H' \
@@ -53,7 +53,7 @@ jobs:
           '#endif' \
           > gles_fix.h
 
-        # Inject fix into rlgl.h
+        # Prepend #include "gles_fix.h" at line 1 of rlgl.h
         sed -i '' '1i\
         #include "gles_fix.h"
         ' rlgl.h
@@ -74,12 +74,10 @@ jobs:
 
     - name: Bundle Assets
       run: |
-        # Compile tools for macOS
         gcc tools/bin2c.c -o tools/bin2c
         gcc tools/gen_splash_bundle.c -o tools/gen_splash_bundle
         chmod +x tools/bin2c tools/gen_splash_bundle
         
-        # Build assets_bundle.h (As per commit b23c18a)
         mkdir -p src/ui/components
         rm -f src/ui/components/assets_bundle.h
         echo "#ifndef ASSETS_BUNDLE_H" > src/ui/components/assets_bundle.h
@@ -90,7 +88,6 @@ jobs:
         ./tools/bin2c "assets/splash.png" src/ui/components/assets_bundle.h unx_logo append
         ./tools/bin2c "assets/icons/crown.png" src/ui/components/assets_bundle.h icon_crown append
         
-        # Embed all splash frames
         ./tools/gen_splash_bundle assets/splash src/ui/components/splash_bundle_tmp.h
         cat src/ui/components/splash_bundle_tmp.h >> src/ui/components/assets_bundle.h
         echo "#endif" >> src/ui/components/assets_bundle.h
@@ -105,12 +102,11 @@ jobs:
           -O2 -DPLATFORM_IOS -DKS_STR_ENCODING_NONE -Dkiss_fft_scalar=double -DT_LINUX \
           -DGLES_SILENCE_DEPRECATION"
 
-        # audio_backend: ObjC
-        echo "=== Compiling src/core/audio_backend.c (ObjC) ==="
+        # audio_backend
+        echo "Compiling (ObjC) src/core/audio_backend.c"
         clang -x objective-c $IOS_BASE -fobjc-arc -c src/core/audio_backend.c -o build/ios/obj/src_core_audio_backend.c.o
 
-        # C files
-        echo "=== Compiling C files ==="
+        # C files (with verbose logging)
         C_FILES=$(find src lib -name "*.c" | grep -v "midi_backend_win.c" | grep -v "src/core/audio_backend.c" | grep -v "lib/linux_arm64" | grep -v "lib/qm-dsp/hmm" | grep -v "lib/qm-dsp/dsp/segmentation" | grep -v "/tests/" | grep -v "/test/")
         for f in $C_FILES; do
           obj="build/ios/obj/$(echo $f | tr '/' '_').o"
@@ -119,7 +115,6 @@ jobs:
         done
 
         # C++ files
-        echo "=== Compiling C++ files ==="
         CPP_FILES=$(find src lib -name "*.cpp" -o -name "*.cc" | grep -v "lib/linux_arm64" | grep -v "/tests/" | grep -v "/test/" | grep -v "lib/qm-dsp/hmm" | grep -v "lib/qm-dsp/dsp/segmentation" || true)
         for f in $CPP_FILES; do
           obj="build/ios/obj/$(echo $f | tr '/' '_').o"
@@ -127,18 +122,21 @@ jobs:
           clang++ $IOS_BASE -std=c++17 -Ilib/kaitai -Ilib/rekordbox-metadata -c "$f" -o "$obj" || exit 1
         done
 
-        # Platform: ObjC++ (Better for QuartzCore compatibility)
-        clang++ -x objective-c++ $IOS_BASE -fobjc-arc -c platform/ios/AppController.m -o build/ios/obj/platform_ios_AppController.m.o
-        clang++ -x objective-c++ $IOS_BASE -fobjc-arc -c platform/ios/rcore_ios.m -o build/ios/obj/platform_ios_rcore_ios.m.o
+        # Platform files (ObjC)
+        echo "Compiling platform/ios/AppController.m ..."
+        clang -x objective-c $IOS_BASE -fobjc-arc -c platform/ios/AppController.m -o build/ios/obj/platform_ios_AppController.m.o
+        echo "Compiling platform/ios/rcore_ios.m ..."
+        clang -x objective-c $IOS_BASE -fobjc-arc -c platform/ios/rcore_ios.m -o build/ios/obj/platform_ios_rcore_ios.m.o
 
         # Other .m
         M_FILES=$(find src -name "*.m" | grep -v "ios_utils.m")
         for f in $M_FILES; do
           obj="build/ios/obj/$(echo $f | tr '/' '_').o"
-          clang -x objective-c $IOS_BASE -fobjc-arc -c "$f" -o "$obj"
+          echo "Compiling $f ..."
+          clang -x objective-c $IOS_BASE -fobjc-arc -c "$f" -o "$obj" || exit 1
         done
 
-        # Link (As per commit b23c18a with -force_load)
+        # Link (As per references)
         clang++ -target arm64-apple-ios14.0 -isysroot $SDK_PATH \
           build/ios/obj/*.o \
           -Wl,-force_load,platform/ios/libs/libraylib.a \
