@@ -74,17 +74,14 @@ jobs:
           -I. -O2"
 
         # Compile each raylib source file as plain C (no -x override needed)
+        # NOTE: raudio.c is EXCLUDED to avoid duplicate miniaudio symbols with the app's audio backend.
         for src in rcore.c rshapes.c rtextures.c rtext.c utils.c rmodels.c; do
           echo "=== Compiling $src ==="
           clang -x c $IOS_FLAGS -c $src -o ${src%.c}.o
         done
 
-        # raudio.c MUST be compiled as Objective-C
-        echo "=== Compiling raudio.c as Objective-C ==="
-        clang -x objective-c $IOS_FLAGS -c raudio.c -o raudio.o
-
         # Pack all object files into a static library
-        ar rcs libraylib.a rcore.o rshapes.o rtextures.o rtext.o utils.o rmodels.o raudio.o
+        ar rcs libraylib.a rcore.o rshapes.o rtextures.o rtext.o utils.o rmodels.o
 
         echo "=== libraylib.a built successfully ==="
         ls -lh libraylib.a
@@ -116,7 +113,8 @@ jobs:
         IOS_BASE="-target arm64-apple-ios14.0 -isysroot $SDK_PATH \
           -Isrc -Isrc/core -Isrc/engine -Ilib -Iraylib-src/src \
           -Ilib/qm-dsp -Ilib/soundtouch -Ilib/fidlib \
-          -O2 -DPLATFORM_IOS -DKS_STR_ENCODING_NONE -Dkiss_fft_scalar=double -DT_LINUX"
+          -O2 -DPLATFORM_IOS -DKS_STR_ENCODING_NONE -Dkiss_fft_scalar=double -DT_LINUX \
+          -DGLES_SILENCE_DEPRECATION"
 
         # --- audio_backend.c: compile as Objective-C ---
         # This file defines MINIAUDIO_IMPLEMENTATION which causes miniaudio.h
