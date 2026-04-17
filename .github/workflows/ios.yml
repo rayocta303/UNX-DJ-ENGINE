@@ -26,11 +26,12 @@ jobs:
 
     - name: Build Raylib for iOS (arm64)
       run: |
-        cd raylib-src/src
-        # Providing RAYLIB_LIBTYPE=STATIC to avoid empty -D flag error
-        make PLATFORM=PLATFORM_IOS IOS_SDK=iphoneos RAYLIB_LIBTYPE=STATIC
+        cd raylib-src
+        mkdir build && cd build
+        cmake -DPLATFORM=IOS -DDEPLOYMENT_TARGET=14.0 ..
+        make
         mkdir -p ../../platform/ios/libs
-        cp libraylib.a ../../platform/ios/libs/
+        cp raylib/libraylib.a ../../platform/ios/libs/
 
     - name: Bundle Assets
       run: |
@@ -53,12 +54,9 @@ jobs:
         SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
         mkdir -p build/ios/obj
         
-        # Define source files lists (matches build.bat but excludes Windows-specific)
-        C_FILES="src/main.c src/ui/components/theme.c src/ui/components/fonts.c src/ui/components/helpers.c src/ui/views/topbar.c src/ui/views/info.c src/ui/views/splash.c src/ui/views/settings.c src/ui/views/about.c src/ui/views/mixer.c src/ui/player/bottomstrip.c src/ui/player/beatfx.c src/ui/player/deckinfo.c src/ui/player/deckstrip.c src/ui/player/waveform.c src/ui/player/player.c src/audio/engine.c src/input/keyboard.c src/ui/browser/browser.c src/core/audio_backend.c src/core/logic/quantize.c src/core/logic/sync.c src/core/logic/settings_io.c src/core/logic/control_object.c src/core/midi/midi_handler.c src/core/midi/midi_mapper.c \
-                 src/engine/fx/dsp_utils.c src/engine/fx/colorfx/space.c src/engine/fx/colorfx/dub_echo.c src/engine/fx/colorfx/sweep.c src/engine/fx/colorfx/noise.c src/engine/fx/colorfx/crush.c src/engine/fx/colorfx/filter.c src/engine/fx/colorfx/colorfx_manager.c \
-                 src/engine/fx/beatfx/delay.c src/engine/fx/beatfx/echo.c src/engine/fx/beatfx/pingpong.c src/engine/fx/beatfx/spiral.c src/engine/fx/beatfx/roll.c src/engine/fx/beatfx/sliproll.c src/engine/fx/beatfx/reverb.c src/engine/fx/beatfx/helix.c src/engine/fx/beatfx/flanger.c src/engine/fx/beatfx/phaser.c src/engine/fx/beatfx/bfilter.c src/engine/fx/beatfx/trans.c src/engine/fx/beatfx/pitch.c src/engine/fx/beatfx/vinylbrake.c src/engine/fx/beatfx/beatfx_manager.c"
-        
-        CPP_FILES="lib/kaitai/kaitai/kaitaistream.cpp lib/rekordbox-metadata/rekordbox_anlz.cpp lib/rekordbox-metadata/rekordbox_pdb.cpp lib/serato/serato_parser.cpp lib/serato/serato_waveform.cpp src/library/rekordbox_reader.cpp src/library/serato_reader.cpp src/engine/util/engine_math.cpp"
+        # Discover all C and C++ files, excluding Windows/Android specifics
+        C_FILES=$(find src -name "*.c" | grep -v "midi_backend_win.c")
+        CPP_FILES=$(find src -name "*.cpp" && find lib -name "*.cpp")
         
         # Compile C
         for f in $C_FILES; do
