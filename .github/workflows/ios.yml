@@ -50,8 +50,9 @@ jobs:
         #include "gles_fix.h"' rlgl.h
 
         # Explicitly passing SDK path and architecture to the Makefile
+        # Using -x objective-c because raudio.c includes AVFoundation (Objective-C)
         make PLATFORM=PLATFORM_IOS IOS_SDK=iphoneos RAYLIB_LIBTYPE=STATIC GRAPHICS=GRAPHICS_API_OPENGL_ES2 \
-             CC=clang CFLAGS="-isysroot $SDK_PATH -arch arm64 -DPLATFORM_IOS -DGRAPHICS_API_OPENGL_ES2 -DGLES_SILENCE_DEPRECATION -DGL_GLEXT_PROTOTYPES -Wno-implicit-function-declaration"
+             CC=clang CFLAGS="-isysroot $SDK_PATH -arch arm64 -DPLATFORM_IOS -DGRAPHICS_API_OPENGL_ES2 -DGLES_SILENCE_DEPRECATION -DGL_GLEXT_PROTOTYPES -Wno-implicit-function-declaration -x objective-c"
         
         mkdir -p ../../platform/ios/libs
         cp libraylib.a ../../platform/ios/libs/
@@ -86,7 +87,7 @@ jobs:
         for f in $C_FILES; do
            obj="build/ios/obj/$(echo $f | tr '/' '_').o"
            echo "Compiling $f -> $obj"
-           clang -target arm64-apple-ios14.0 -isysroot $SDK_PATH -Isrc -Isrc/core -Isrc/engine -Ilib -Iraylib-src/src -O2 -DPLATFORM_IOS -DKS_STR_ENCODING_NONE -c $f -o $obj
+           clang -target arm64-apple-ios14.0 -isysroot $SDK_PATH -Isrc -Isrc/core -Isrc/engine -Ilib -Iraylib-src/src -O2 -DPLATFORM_IOS -DKS_STR_ENCODING_NONE -x objective-c -c $f -o $obj
         done
         
         # Compile C++
