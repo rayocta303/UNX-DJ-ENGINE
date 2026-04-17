@@ -64,16 +64,20 @@ jobs:
           -Wno-implicit-function-declaration -Wno-macro-redefined \
           -I. -O2"
 
-        # Fix OpenGL ES include paths for iOS
-        find . -name "*.h" -o -name "*.c" | xargs sed -i '' 's|<GLES2/gl2.h>|<OpenGLES/ES2/gl.h>|g'
-        find . -name "*.h" -o -name "*.c" | xargs sed -i '' 's|<GLES2/gl2ext.h>|<OpenGLES/ES2/glext.h>|g'
-        
-        # Build raylib using its Makefile (much safer than manual clang calls)
-        # We need to pass the SDK path and platform
-        make PLATFORM=PLATFORM_IOS \
-             IOS_SDK_PATH=$SDK_PATH \
-             RAYLIB_RELEASE_PATH=. \
-             -j$(sysctl -n hw.ncpu)
+        # Compile each raylib source file as plain C (no -x override needed)
+        for src in rcore.c rshapes.c rtextures.c rtext.c utils.c rmodels.c; do
+          echo "=== Compiling $src ==="
+          clang -x c $IOS_FLAGS -c $src -o ${src%.c}.o
+        done
+
+        # raudio.c MUST be compiled as Objective-C because miniaudio.h
+        # pulls in AVFoundation, which uses @class / @protocol syntax.
+        # The -x objective-c flag MUST come BEFORE the source filename.
+        echo "=== Compiling raudio.c as Objective-C ==="
+        clang -x objective-c $IOS_FLAGS -c raudio.c -o raudio.o
+
+        # Pack all object files into a static library
+        ar rcs libraylib.a rcore.o rshapes.o rtextures.o rtext.o utils.o rmodels.o raudio.o
 
         echo "=== libraylib.a built successfully ==="
         ls -lh libraylib.a
