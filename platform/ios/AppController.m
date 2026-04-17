@@ -24,11 +24,24 @@ extern int raylib_main(int argc, char *argv[]);
 
 @end
 
+@interface RaylibView : UIView
+@end
+
+@implementation RaylibView
++ (Class)layerClass { return [CAEAGLLayer class]; }
+@end
+
 @implementation RaylibViewController
 
 - (void)loadView {
-    // Raylib's internal iOS logic will attach to the root view controller's view
-    self.view = [[UIView alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
+    RaylibView *rv = [[RaylibView alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
+    CAEAGLLayer *eaglLayer = (CAEAGLLayer *)rv.layer;
+    eaglLayer.opaque = YES;
+    eaglLayer.drawableProperties = @{
+        kEAGLDrawablePropertyRetainedBacking: @NO,
+        kEAGLDrawablePropertyColorFormat: kEAGLColorFormatRGBA8
+    };
+    self.view = rv;
 }
 
 - (BOOL)prefersStatusBarHidden { return YES; }

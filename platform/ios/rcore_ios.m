@@ -1,20 +1,11 @@
-/*******************************************************************************
- *  platform/ios/rcore_ios.m
- *
- *  iOS Platform Backend for Raylib 5.0
- *  Implements the external platform symbols required by rcore.c on PLATFORM_IOS.
- *
- *  Uses Apple EAGL (not EGL/ANGLE) for OpenGL ES 3.0.
- *  The main application loop is driven by CADisplayLink via
- *  emscripten_set_main_loop_arg() — same pattern used by AppController.m.
- ******************************************************************************/
-
+#define GLES_SILENCE_DEPRECATION
 #import <UIKit/UIKit.h>
 #import <OpenGLES/ES3/gl.h>
-#import <OpenGLES/ES3/gl.h>
+#import <OpenGLES/ES2/gl.h>
 #import <QuartzCore/QuartzCore.h>
 #import <Foundation/Foundation.h>
 #include <mach/mach_time.h>
+#include <unistd.h>
 
 /* ---- Raylib types we need (avoid including full raylib.h) ---- */
 #ifndef RAYLIB_H
@@ -58,6 +49,10 @@ static CADisplayLink    *_displayLink   = nil;
    ============================================================ */
 
 int InitPlatform(void) {
+    /* Set working directory to the app bundle so assets/ can be found */
+    NSString *resourcePath = [[NSBundle mainBundle] resourcePath];
+    chdir([resourcePath UTF8String]);
+
     /* Time */
     mach_timebase_info(&_timebase);
     _startTime = mach_absolute_time();
@@ -66,16 +61,32 @@ int InitPlatform(void) {
     _glContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES3];
     if (!_glContext)
         _glContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
-    if (!_glContext || ![EAGLContext setCurrentContext:_glContext])
+    
+    if (!_glContext || ![EAGLContext setCurrentContext:_glContext]) {
+        NSLog(@"[rcore_ios] Failed to create EAGLContext");
         return -1;
+    }
+
+    /* Get the layer from the app's root view controller */
+    // AppController sets RaylibViewController as root
+    UIView *rootView = [UIApplication sharedApplication].keyWindow.rootViewController.view;
+    if (!rootView) {
+        NSLog(@"[rcore_ios] Failed to find root view");
+        return -1;
+    }
+    CAEAGLLayer *glLayer = (CAEAGLLayer *)rootView.layer;
 
     /* Default framebuffer */
     glGenFramebuffers(1, &_fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
 
-    /* Color renderbuffer */
+    /* Color renderbuffer - Attach to the CAEAGLLayer */
     glGenRenderbuffers(1, &_colorRBO);
     glBindRenderbuffer(GL_RENDERBUFFER, _colorRBO);
+    
+    // This is the magic part that connects OpenGL to the screen
+    [_glContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:(id<EAGLDrawable>)glLayer];
+    
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                               GL_RENDERBUFFER, _colorRBO);
 
@@ -89,6 +100,11 @@ int InitPlatform(void) {
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, w, h);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
                               GL_RENDERBUFFER, _depthRBO);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        NSLog(@"[rcore_ios] Framebuffer is incomplete");
+        return -1;
+    }
 
     return 0;
 }
