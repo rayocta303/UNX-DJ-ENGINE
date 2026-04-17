@@ -7,6 +7,14 @@
 #import <AVFoundation/AVFoundation.h>
 #include <mach/mach_time.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <stdarg.h>
+
+// Safe crash handler for Objective-C exceptions
+void ios_crash_handler(NSException *exception) {
+    NSLog(@"[CRASH] Uncaught exception: %@", exception);
+    NSLog(@"[CRASH] Stack trace: %@", [exception callStackSymbols]);
+}
 
 const char* ios_get_documents_path(void) {
     static char path[1024] = {0};
@@ -63,6 +71,24 @@ static CADisplayLink    *_displayLink   = nil;
    ============================================================ */
 
 int InitPlatform(void) {
+    /* Set up Logging to Documents/log.txt */
+    const char *docsPath = ios_get_documents_path();
+    if (docsPath && docsPath[0] != '\0') {
+        char logPath[1024];
+        snprintf(logPath, sizeof(logPath), "%s/log.txt", docsPath);
+        
+        // Redirect stdout and stderr to log file
+        // This captures ALL printf, fprintf, and NSLog output
+        freopen(logPath, "a", stdout);
+        freopen(logPath, "a", stderr);
+        
+        printf("\n=== XDJ-UNX iOS SESSION START ===\n");
+        setbuf(stdout, NULL); // Disable buffering so logs appear immediately
+    }
+    
+    // Set crash handler
+    NSSetUncaughtExceptionHandler(&ios_crash_handler);
+
     /* Set up Audio Session */
     AVAudioSession *session = [AVAudioSession sharedInstance];
     NSError *error = nil;
