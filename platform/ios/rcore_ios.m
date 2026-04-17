@@ -112,18 +112,33 @@ void ios_init_audio_session(void) {
    ============================================================ */
 
 int InitPlatform(void) {
+    /* Set up Logging to Documents/log.txt */
     const char *docsPath = ios_get_documents_path();
     if (docsPath && docsPath[0] != '\0') {
         char logPath[1024];
         snprintf(logPath, sizeof(logPath), "%s/log.txt", docsPath);
-        _logFile = fopen(logPath, "w");
+        
+        // Open for writing - this will create the file if it doesn't exist
+        _logFile = fopen(logPath, "w"); 
         if (_logFile) {
             fprintf(_logFile, "=== XDJ-UNX iOS LOG START ===\n");
+            fprintf(_logFile, "Documents Path: %s\n", docsPath);
+            fflush(_logFile);
+            
+            // Redirect stdout and stderr to our log file
             dup2(fileno(_logFile), STDOUT_FILENO);
             dup2(fileno(_logFile), STDERR_FILENO);
+            
+            // Register raylib log callback
             void SetTraceLogCallback(void (*callback)(int, const char *, va_list));
             SetTraceLogCallback(ios_log_callback);
+            
+            printf("[rcore_ios] Logging initialized to: %s\n", logPath);
+        } else {
+            NSLog(@"[rcore_ios] FAILED to open log file at: %s", logPath);
         }
+    } else {
+        NSLog(@"[rcore_ios] FAILED to get documents path for logging");
     }
 
     ios_init_audio_session();
