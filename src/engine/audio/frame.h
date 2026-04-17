@@ -12,6 +12,7 @@
 #include "engine/util/compatibility/qhash.h"
 #include "engine/util/fpclassify.h"
 #include "audio/types.h"
+#include "audio/signalinfo.h"
 
 namespace unx {
 namespace audio {
