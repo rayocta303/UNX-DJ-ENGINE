@@ -6,6 +6,8 @@
 #import <AVFoundation/AVFoundation.h>
 #include <mach/mach_time.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <stdarg.h>
 
 /* ---- Raylib types we need ---- */
 #ifndef RAYLIB_H
