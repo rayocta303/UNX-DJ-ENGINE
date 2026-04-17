@@ -33,10 +33,14 @@ jobs:
         echo "=== raylib-src/src contents ==="
         ls -la .
 
-        # Fix OpenGL ES include paths for iOS SDK (GLES2/ -> OpenGLES/ES2/)
+        # Fix OpenGL ES include paths for iOS SDK
         find . \( -name "*.h" -o -name "*.c" -o -name "*.m" \) | xargs sed -i '' \
-          -e 's|<GLES2/gl2\.h>|<OpenGLES/ES2/gl.h>|g' \
-          -e 's|<GLES2/gl2ext\.h>|<OpenGLES/ES2/glext.h>|g'
+          -e 's|<GLES2/gl2\.h>|<OpenGLES/ES3/gl.h>|g' \
+          -e 's|<GLES2/gl2ext\.h>|<OpenGLES/ES3/gl.h>|g' \
+          -e 's|<GLES3/gl3\.h>|<OpenGLES/ES3/gl.h>|g' \
+          -e 's|<GLES3/gl3ext\.h>|<OpenGLES/ES3/gl.h>|g' \
+          -e 's|<libGLESv2/GLES/glext\.h>|<OpenGLES/ES3/gl.h>|g' \
+          -e 's|<libGLESv2/GLES/gl\.h>|<OpenGLES/ES3/gl.h>|g'
 
         # Inject missing GLES extension typedefs for iOS.
         # iOS SDK glext.h does NOT define PFNGLGENVERTEXARRAYSOESPROC etc.
@@ -45,8 +49,8 @@ jobs:
         printf '%s\n' \
           '#ifndef GLES_FIX_H' \
           '#define GLES_FIX_H' \
-          '#include <OpenGLES/ES2/gl.h>' \
-          '#include <OpenGLES/ES2/glext.h>' \
+          '#include <OpenGLES/ES3/gl.h>' \
+          '#include <OpenGLES/ES3/gl.h>' \
           'typedef void (*PFNGLGENVERTEXARRAYSOESPROC)(GLsizei n, GLuint *arrays);' \
           'typedef void (*PFNGLBINDVERTEXARRAYOESPROC)(GLuint array);' \
           'typedef void (*PFNGLDELETEVERTEXARRAYSOESPROC)(GLsizei n, const GLuint *arrays);' \
@@ -63,7 +67,7 @@ jobs:
 
         # Common iOS clang flags
         IOS_FLAGS="-target arm64-apple-ios14.0 -isysroot $SDK_PATH \
-          -DPLATFORM_IOS -DGRAPHICS_API_OPENGL_ES2 \
+          -DPLATFORM_IOS -DGRAPHICS_API_OPENGL_ES3 \
           -DGLES_SILENCE_DEPRECATION -DGL_GLEXT_PROTOTYPES \
           -Wno-implicit-function-declaration -Wno-macro-redefined \
           -I. -O2"
