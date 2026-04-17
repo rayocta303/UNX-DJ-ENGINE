@@ -3,11 +3,11 @@ name: Android Build
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
-on:
-  push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
+# on:
+#   push:
+#     branches: [ "main", "master" ]
+#   pull_request:
+#     branches: [ "main", "master" ]
 
 jobs:
   build:
