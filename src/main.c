@@ -550,23 +550,25 @@ int main(void) {
 
   globalAudioEngine = &audioEngine;
 
+#if defined(PLATFORM_WEB) || defined(PLATFORM_IOS)
 #if defined(PLATFORM_WEB)
   #include <emscripten/emscripten.h>
 #elif defined(PLATFORM_IOS)
   // Raylib iOS provides this wrapper for compatibility
   void emscripten_set_main_loop_arg(void (*func)(void*), void *arg, int fps, int simulate_infinite_loop);
 #endif
-#if defined(PLATFORM_WEB) || defined(PLATFORM_IOS)
   emscripten_set_main_loop_arg((void (*)(void*))UpdateDrawFrame, &app, 0, 1);
+  // On iOS/Web, emscripten_set_main_loop_arg starts a timer and returns immediately,
+  // allowing the OS to manage the event loop.
 #else
   while (!WindowShouldClose()) {
     UpdateDrawFrame(&app);
   }
-#endif
-
+  
   UIFonts_Unload();
   MIDI_Close(&app.midiCtx);
   CloseWindow();
+#endif
 
   return 0;
 }

@@ -41,6 +41,7 @@ extern int raylib_main(int argc, char *argv[]);
         kEAGLDrawablePropertyRetainedBacking: @NO,
         kEAGLDrawablePropertyColorFormat: kEAGLColorFormatRGBA8
     };
+    eaglLayer.contentsScale = [UIScreen mainScreen].nativeScale;
     self.view = rv;
 }
 

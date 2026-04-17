@@ -21,6 +21,12 @@ const char* ios_get_media_path(void) {
     return "/var/mobile/Media";
 }
 
+const char* ios_get_bundle_path(const char* filename) {
+    // Since we chdir() to resourcePath in InitPlatform, 
+    // we can just return the filename as a relative path.
+    return filename;
+}
+
 /* ---- Raylib types we need (avoid including full raylib.h) ---- */
 #ifndef RAYLIB_H
 typedef struct { float x; float y; } Vector2;
@@ -129,6 +135,34 @@ int InitPlatform(void) {
     }
 
     return 0;
+}
+
+/* ---- Screen Info Functions required by rcore.c ---- */
+int GetScreenWidth(void) {
+    CGSize sz = [UIScreen mainScreen].bounds.size;
+    return (int)sz.width;
+}
+
+int GetScreenHeight(void) {
+    CGSize sz = [UIScreen mainScreen].bounds.size;
+    return (int)sz.height;
+}
+
+int GetRenderWidth(void) {
+    CGSize sz    = [UIScreen mainScreen].bounds.size;
+    float  scale = [UIScreen mainScreen].nativeScale;
+    return (int)(sz.width * scale);
+}
+
+int GetRenderHeight(void) {
+    CGSize sz    = [UIScreen mainScreen].bounds.size;
+    float  scale = [UIScreen mainScreen].nativeScale;
+    return (int)(sz.height * scale);
+}
+
+Vector2 GetWindowScaleDPI(void) {
+    float scale = [UIScreen mainScreen].nativeScale;
+    return (Vector2){ scale, scale };
 }
 
 void ClosePlatform(void) {
