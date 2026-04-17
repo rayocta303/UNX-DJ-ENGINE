@@ -28,32 +28,37 @@ jobs:
       run: |
         SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
         cd raylib-src/src
-        # Fix the include path for OpenGL ES on iOS in all relevant files
-        find . -name "*.h" -o -name "*.c" | xargs sed -i '' 's|<GLES2/gl2.h>|<OpenGLES/ES2/gl.h>|g'
-        find . -name "*.h" -o -name "*.c" | xargs sed -i '' 's|<GLES2/gl2ext.h>|<OpenGLES/ES2/glext.h>|g'
-        
-        # Inject missing GLES extension typedefs for iOS into rlgl.h
-        cat <<EOF > gles_fix.h
-        #ifndef GLES_FIX_H
-        #define GLES_FIX_H
-        #include <OpenGLES/ES2/gl.h>
-        #include <OpenGLES/ES2/glext.h>
-        typedef void (*PFNGLGENVERTEXARRAYSOESPROC) (GLsizei n, GLuint *arrays);
-        typedef void (*PFNGLBINDVERTEXARRAYOESPROC) (GLuint array);
-        typedef void (*PFNGLDELETEVERTEXARRAYSOESPROC) (GLsizei n, const GLuint *arrays);
-        typedef void (*PFNGLDRAWARRAYSINSTANCEDEXTPROC) (GLenum mode, GLint first, GLsizei count, GLsizei primcount);
-        typedef void (*PFNGLDRAWELEMENTSINSTANCEDEXTPROC) (GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei primcount);
-        typedef void (*PFNGLVERTEXATTRIBDIVISOREXTPROC) (GLuint index, GLuint divisor);
-        #endif
-        EOF
-        sed -i '' '1i\
-        #include "gles_fix.h"' rlgl.h
 
-        # Explicitly passing SDK path and architecture to the Makefile
-        # Using -x objective-c because raudio.c includes AVFoundation (Objective-C)
-        make PLATFORM=PLATFORM_IOS IOS_SDK=iphoneos RAYLIB_LIBTYPE=STATIC GRAPHICS=GRAPHICS_API_OPENGL_ES2 \
-             CC=clang CFLAGS="-isysroot $SDK_PATH -arch arm64 -DPLATFORM_IOS -DGRAPHICS_API_OPENGL_ES2 -DGLES_SILENCE_DEPRECATION -DGL_GLEXT_PROTOTYPES -Wno-implicit-function-declaration -x objective-c"
-        
+        # Fix OpenGL ES include paths for iOS SDK (GLES2/ -> OpenGLES/ES2/)
+        find . \( -name "*.h" -o -name "*.c" \) | xargs sed -i '' \
+          -e 's|<GLES2/gl2\.h>|<OpenGLES/ES2/gl.h>|g' \
+          -e 's|<GLES2/gl2ext\.h>|<OpenGLES/ES2/glext.h>|g'
+
+        # Common iOS clang flags (no -x flag here — set per-file below)
+        IOS_FLAGS="-target arm64-apple-ios14.0 -isysroot $SDK_PATH \
+          -DPLATFORM_IOS -DGRAPHICS_API_OPENGL_ES2 \
+          -DGLES_SILENCE_DEPRECATION -DGL_GLEXT_PROTOTYPES \
+          -Wno-implicit-function-declaration -Wno-macro-redefined \
+          -I. -O2"
+
+        # Compile each raylib source file as plain C (no -x override needed)
+        for src in rcore.c rshapes.c rtextures.c rtext.c utils.c rmodels.c; do
+          echo "=== Compiling $src ==="
+          clang -x c $IOS_FLAGS -c $src -o ${src%.c}.o
+        done
+
+        # raudio.c MUST be compiled as Objective-C because miniaudio.h
+        # pulls in AVFoundation, which uses @class / @protocol syntax.
+        # The -x objective-c flag MUST come BEFORE the source filename.
+        echo "=== Compiling raudio.c as Objective-C ==="
+        clang -x objective-c $IOS_FLAGS -c raudio.c -o raudio.o
+
+        # Pack all object files into a static library
+        ar rcs libraylib.a rcore.o rshapes.o rtextures.o rtext.o utils.o rmodels.o raudio.o
+
+        echo "=== libraylib.a built successfully ==="
+        ls -lh libraylib.a
+
         mkdir -p ../../platform/ios/libs
         cp libraylib.a ../../platform/ios/libs/
 
@@ -77,43 +82,57 @@ jobs:
       run: |
         SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
         mkdir -p build/ios/obj
-        
-        # Discover all C and C++ files, excluding Windows/Android specifics
+
+        IOS_BASE="-target arm64-apple-ios14.0 -isysroot $SDK_PATH \
+          -Isrc -Isrc/core -Isrc/engine -Ilib -Iraylib-src/src \
+          -O2 -DPLATFORM_IOS -DKS_STR_ENCODING_NONE"
+
+        # --- Compile .c files as plain C (NOT as objective-c) ---
+        # Note: project .c files do not include AVFoundation, so plain C is correct.
+        # Only raylib's raudio.c needed -x objective-c, handled above.
         C_FILES=$(find src -name "*.c" | grep -v "midi_backend_win.c")
-        CPP_FILES=$(find src -name "*.cpp" && find lib -name "*.cpp")
-        M_FILES=$(find src -name "*.m" && find platform/ios -name "*.m")
-        
-        # Compile C
         for f in $C_FILES; do
-           obj="build/ios/obj/$(echo $f | tr '/' '_').o"
-           echo "Compiling $f -> $obj"
-           clang -target arm64-apple-ios14.0 -isysroot $SDK_PATH -Isrc -Isrc/core -Isrc/engine -Ilib -Iraylib-src/src -O2 -DPLATFORM_IOS -DKS_STR_ENCODING_NONE -x objective-c -c $f -o $obj
+          obj="build/ios/obj/$(echo $f | tr '/' '_').o"
+          echo "Compiling (C) $f -> $obj"
+          clang -x c $IOS_BASE -c "$f" -o "$obj"
         done
-        
-        # Compile C++
+
+        # --- Compile .cpp files as C++ ---
+        CPP_FILES=$(find src lib -name "*.cpp" 2>/dev/null || true)
         for f in $CPP_FILES; do
-           obj="build/ios/obj/$(echo $f | tr '/' '_').o"
-           echo "Compiling $f -> $obj"
-           clang++ -target arm64-apple-ios14.0 -isysroot $SDK_PATH -Isrc -Isrc/core -Isrc/engine -Ilib -Ilib/kaitai -Ilib/rekordbox-metadata -Iraylib-src/src -O2 -DPLATFORM_IOS -std=c++17 -c $f -o $obj
+          obj="build/ios/obj/$(echo $f | tr '/' '_').o"
+          echo "Compiling (C++) $f -> $obj"
+          clang++ -target arm64-apple-ios14.0 -isysroot $SDK_PATH \
+            -Isrc -Isrc/core -Isrc/engine -Ilib -Ilib/kaitai \
+            -Ilib/rekordbox-metadata -Iraylib-src/src \
+            -O2 -DPLATFORM_IOS -std=c++17 -c "$f" -o "$obj"
         done
-        
-        # Compile Objective-C
+
+        # --- Compile Objective-C .m files (platform/ios entry points) ---
+        M_FILES=$(find src platform/ios -name "*.m" 2>/dev/null || true)
         for f in $M_FILES; do
-           obj="build/ios/obj/$(echo $f | tr '/' '_').o"
-           echo "Compiling $f -> $obj"
-           clang -target arm64-apple-ios14.0 -isysroot $SDK_PATH -Isrc -Isrc/core -Isrc/engine -Ilib -Iraylib-src/src -O2 -DPLATFORM_IOS -fobjc-arc -c $f -o $obj
+          obj="build/ios/obj/$(echo $f | tr '/' '_').o"
+          echo "Compiling (ObjC) $f -> $obj"
+          clang -x objective-c $IOS_BASE -fobjc-arc -c "$f" -o "$obj"
         done
-        
-        # Link executable
-        # Using -force_load to ensure Raylib's Objective-C AppController is included
+
+        # --- Link ---
         clang++ -target arm64-apple-ios14.0 -isysroot $SDK_PATH \
           build/ios/obj/*.o \
           -Wl,-force_load,platform/ios/libs/libraylib.a \
-          -framework UIKit -framework QuartzCore -framework CoreGraphics -framework CoreAudio -framework AudioToolbox -framework AVFoundation -framework CoreFoundation -framework OpenGLES -framework CoreVideo \
+          -framework UIKit \
+          -framework QuartzCore \
+          -framework CoreGraphics \
+          -framework CoreAudio \
+          -framework AudioToolbox \
+          -framework AVFoundation \
+          -framework CoreFoundation \
+          -framework OpenGLES \
+          -framework CoreVideo \
           -stdlib=libc++ \
           -o build/ios/xdjunx
-        
-        # Fake sign the binary (necessary for some iOS versions even on TrollStore)
+
+        # Fake-sign for TrollStore / jailbreak sideloading
         codesign -s - --force --entitlements platform/ios/Entitlements.plist build/ios/xdjunx
 
     - name: Package IPA
@@ -123,12 +142,12 @@ jobs:
         cp platform/ios/Info.plist Payload/xdjunx.app/
         mkdir -p Payload/xdjunx.app/assets
         cp -r assets/* Payload/xdjunx.app/assets/
-        
-        # Create dummy icons if they don't exist
+
+        # Create dummy icon placeholder if missing
         touch Payload/xdjunx.app/Icon.png
-        
+
         zip -r xdjunx-unsigned.ipa Payload
-        
+
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
