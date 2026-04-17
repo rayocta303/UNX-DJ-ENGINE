@@ -30,7 +30,7 @@ jobs:
         cd raylib-src/src
         # Fix the include path for OpenGL ES on iOS
         sed -i '' 's|<GLES2/gl2.h>|<OpenGLES/ES2/gl.h>|g' rlgl.h
-        sed -i '' 's|<GLES2/glext.h>|<OpenGLES/ES2/glext.h>|g' rlgl.h
+        sed -i '' 's|<GLES2/gl2ext.h>|<OpenGLES/ES2/glext.h>|g' rlgl.h
         
         # Explicitly passing SDK path and architecture to the Makefile
         make PLATFORM=PLATFORM_IOS IOS_SDK=iphoneos RAYLIB_LIBTYPE=STATIC GRAPHICS=GRAPHICS_API_OPENGL_ES2 \
