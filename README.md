@@ -9,10 +9,11 @@ UNX DJ ENGINE is an experimental DJ Media Player firmware subset, ported to C an
 ### Audio Engine
 - High-fidelity 32-bit float internal mixing pipeline.
 - Multi-format decoding support: MP3 (minimp3), WAV, and AIFF (dr_wav).
-- Advanced Master Tempo using SOLA-lite time-stretching algorithm.
+- Advanced Master Tempo and Pitch-shifting using professional SoundTouch and Mixxx-based processing engine.
+- Sophisticated Read-Ahead Manager with cross-fading seek logic for artifact-free performance.
 - Professional 3-Band ISO EQs and Filters (Biquad).
 - Integrated Sound Color FX and BPM-synced Beat FX.
-- Reliable mono-to-stereo automatic upmixing.
+- Reliable mono-to-stereo automatic upmixing and lock-free parameter synchronization.
 
 ### User Interface
 - Ultra-responsive UI rendered with Raylib and OpenGL.
@@ -32,20 +33,23 @@ UNX DJ ENGINE is an experimental DJ Media Player firmware subset, ported to C an
 - Android (ARM64): Experimental builds for mobile devices.
 - iOS (ARM64): Experimental builds (TrollStore / Sideloading).
 
-## Upcoming Features (TODO)
-- ColorFX Tab (UI)
-- Mixer View Section (UI)
-- Integrated Audio Recording (WAV/FLAC).
-- Comprehensive Hardware Mapping (MIDI/HID over SPI).
-- Pro DJ Link / Networking for multi-player synchronization.
-- Enhanced Library Management (Tagging and advanced search).
 - More Sound Color FX and Beat FX.
-- Serato Library integration into browser.
-- Load tracks directly from Serato database.
+- Integrated Audio Recording (WAV/FLAC).
+- Pro DJ Link / Networking for multi-player synchronization.
+
+## Project Status
+
+- [x] **Professional Audio Engine**: High-fidelity SoundTouch & Mixxx DSP integration.
+- [x] **Mixer & DSP**: 3-band ISO EQs, Filters, and FX pipeline functional.
+- [x] **Rekordbox Integration**: Full PDB/ANLZ metadata and waveform support.
+- [x] **Cross-platform UI**: High-performance Raylib rendering on Win/Linux/Android/iOS.
+- [/] **MIDI/HID Support**: Logic implemented, full integration in progress.
+- [ ] **Serato Support**: Metadata parsing and database integration (Planned).
+- [ ] **Hardware Abstraction**: Comprehensive SPI/I2C mapping for embedded targets.
 
 ## Build Instructions
 
-The project uses Zig as a C/C++ compiler for seamless cross-compilation.
+The project uses Zig as a C/C++ compiler for seamless cross-compilation, integrating C logic with C++ audio processing via a robust bridge.
 
 ### Windows
 Run the provided build script:
@@ -77,11 +81,11 @@ Developed as part of the UNX DJ ENGINE project ecosystem.
 
 Special thanks to:
 - [Mixxx](https://mixxx.org/) development team for architectural insights and DSP logic.
+- [SoundTouch](https://www.surina.net/soundtouch/) library for high-quality time-stretching.
 - [Raylib](https://www.raylib.com/), [minimp3](https://github.com/lieff/minimp3), and [dr_libs](https://github.com/mackron/dr_libs) contributors.
 
 ## Social Media and Links
 
-Follow the project progress:
 Follow the project progress:
 - GitHub: [github.com/unxchr](https://github.com/rayocta303)
 - YouTube: [youtube.com/@unxchr](https://youtube.com/@unxchr)
@@ -91,7 +95,7 @@ Follow the project progress:
 
 If you find this project useful and would like to support its development:
 - PayPal: [paypal.me/unxchr](https://paypal.me/unxchr)
-- Trakteer: [saweria.co/patradev](https://saweria.co/patradev)
+- Saweria: [saweria.co/patradev](https://saweria.co/patradev)
 
 ---
 Disclaimer: This project is for educational and experimental purposes only.
