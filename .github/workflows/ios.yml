@@ -28,7 +28,7 @@ jobs:
       run: |
         cd raylib-src
         mkdir build && cd build
-        cmake -DPLATFORM=IOS -DDEPLOYMENT_TARGET=14.0 ..
+        cmake -DPLATFORM=IOS -DDEPLOYMENT_TARGET=14.0 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 ..
         make
         mkdir -p ../../platform/ios/libs
         cp raylib/libraylib.a ../../platform/ios/libs/
