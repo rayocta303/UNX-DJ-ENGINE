@@ -88,6 +88,7 @@ jobs:
         ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Free-Solid-900.otf" src/ui/components/assets_bundle.h font_awesome_solid
         ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Free-Regular-400.otf" src/ui/components/assets_bundle.h font_awesome_regular append
         ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Brands-Regular-400.otf" src/ui/components/assets_bundle.h font_awesome_brand append
+        ./tools/bin2c "assets/splash.png" src/ui/components/assets_bundle.h unx_logo append
 
     - name: Build XDJ-UNX App
       run: |
