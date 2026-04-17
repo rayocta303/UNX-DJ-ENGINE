@@ -20,10 +20,9 @@ jobs:
 
     - name: Checkout Raylib
       run: |
-        # Use ghera/raylib-iOS fork: provides iOS platform backend
-        # (InitPlatform, GetTime, SwapScreenBuffer, emscripten_set_main_loop_arg, etc.)
-        # that are completely absent in the official raylib 5.0 release.
-        git clone https://github.com/ghera/raylib-iOS.git raylib-src
+        git clone https://github.com/raysan5/raylib.git raylib-src
+        cd raylib-src && git checkout 5.0
+
 
     - name: Build Raylib for iOS (arm64)
       run: |
