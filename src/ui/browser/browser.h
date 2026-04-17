@@ -7,9 +7,9 @@
 #include "library/serato_reader.h"
 
 typedef struct {
-    char Name[64];
-    char Path[256];
-    char Type[16]; // "Testing", "USB", "SD"
+    char Name[128];
+    char Path[512];
+    char Type[32]; // "Testing", "USB", "SD", "RB/Serato"
 } StorageDevice;
 
 typedef struct {
@@ -23,7 +23,7 @@ typedef struct {
     uint16_t TagList[256];
     int TagListCount;
 
-    StorageDevice AvailableStorages[8];
+    StorageDevice AvailableStorages[16];
     int StorageCount;
     StorageDevice *SelectedStorage;
     RBDatabase *DB;

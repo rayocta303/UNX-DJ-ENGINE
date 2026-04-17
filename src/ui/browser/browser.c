@@ -138,7 +138,7 @@ void Browser_RefreshStorages(BrowserState *s) {
       sprintf(s->AvailableStorages[s->StorageCount].Path, "%c:/", drive);
       strcpy(s->AvailableStorages[s->StorageCount].Type, "Rekordbox");
       s->StorageCount++;
-      if (s->StorageCount >= 8) break;
+      if (s->StorageCount >= 16) break;
     }
     sprintf(path, "%c:/_Serato_/database V2", drive);
     if (stat(path, &st) == 0) {
@@ -146,7 +146,7 @@ void Browser_RefreshStorages(BrowserState *s) {
       sprintf(s->AvailableStorages[s->StorageCount].Path, "%c:/", drive);
       strcpy(s->AvailableStorages[s->StorageCount].Type, "Serato");
       s->StorageCount++;
-      if (s->StorageCount >= 8) break;
+      if (s->StorageCount >= 16) break;
     }
   }
 #else
@@ -154,35 +154,37 @@ void Browser_RefreshStorages(BrowserState *s) {
   if (s->StorageCount < 8) {
     strcpy(s->AvailableStorages[s->StorageCount].Name, "Internal Storage");
     strcpy(s->AvailableStorages[s->StorageCount].Path, "/storage/emulated/0");
-    strcpy(s->AvailableStorages[s->StorageCount].Type, "SD");
+    strcpy(s->AvailableStorages[s->StorageCount].Type, "Internal");
     s->StorageCount++;
   }
 
-  const char *scanDirs[] = {"/storage", "/mnt", "/media"};
-  for (int i = 0; i < 3; i++) {
+  const char *scanDirs[] = {"/storage", "/mnt", "/media", "/run/media"};
+  for (int i = 0; i < 4; i++) {
     DIR *d = opendir(scanDirs[i]);
     if (d) {
       struct dirent *dir;
       while ((dir = readdir(d)) != NULL) {
-        if (s->StorageCount >= 8)
+        if (s->StorageCount >= 16)
           break;
 
-        // Skip system and common non-storage folders
         if (dir->d_name[0] == '.')
           continue;
+        
+        // Skip system folders
         if (strcmp(dir->d_name, "self") == 0 ||
             strcmp(dir->d_name, "emulated") == 0 ||
             strcmp(dir->d_name, "knox-emulated") == 0 ||
-            strcmp(dir->d_name, "container") == 0)
+            strcmp(dir->d_name, "container") == 0 ||
+            strcmp(dir->d_name, "secure") == 0 ||
+            strcmp(dir->d_name, "asec") == 0 ||
+            strcmp(dir->d_name, "obb") == 0)
           continue;
 
         char fullPath[512];
         snprintf(fullPath, sizeof(fullPath), "%s/%s", scanDirs[i], dir->d_name);
 
-        // Check if it's a directory
         struct stat st_dir;
         if (stat(fullPath, &st_dir) == 0 && S_ISDIR(st_dir.st_mode)) {
-          // Avoid duplicates (e.g. if something is in /storage and /mnt)
           bool exists = false;
           for (int j = 0; j < s->StorageCount; j++) {
             if (strcmp(s->AvailableStorages[j].Path, fullPath) == 0) {
@@ -190,14 +192,27 @@ void Browser_RefreshStorages(BrowserState *s) {
               break;
             }
           }
-          if (exists)
-            continue;
+          if (exists) continue;
 
-          // It's a potential drive
-          const char *type = (strchr(dir->d_name, '-') != NULL) ? "SD" : "USB";
+          // Check for DB type
+          char dbPath[1024];
+          bool hasRB = false;
+          bool hasSerato = false;
+          
+          snprintf(dbPath, sizeof(dbPath), "%s/PIONEER/rekordbox/export.pdb", fullPath);
+          if (stat(dbPath, &st) == 0) hasRB = true;
+          
+          snprintf(dbPath, sizeof(dbPath), "%s/_Serato_/database V2", fullPath);
+          if (stat(dbPath, &st) == 0) hasSerato = true;
+
+          const char *type = "USB";
+          if (hasRB && hasSerato) type = "RB/Serato";
+          else if (hasRB) type = "Rekordbox";
+          else if (hasSerato) type = "Serato";
+          else if (strchr(dir->d_name, '-') != NULL) type = "SD";
+
           snprintf(s->AvailableStorages[s->StorageCount].Name,
-                   sizeof(s->AvailableStorages[0].Name), "%s (%s)", type,
-                   dir->d_name);
+                   sizeof(s->AvailableStorages[0].Name), "%s", dir->d_name);
           snprintf(s->AvailableStorages[s->StorageCount].Path,
                    sizeof(s->AvailableStorages[0].Path), "%s", fullPath);
           strcpy(s->AvailableStorages[s->StorageCount].Type, type);
