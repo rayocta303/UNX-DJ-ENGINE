@@ -29,79 +29,65 @@ jobs:
         SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
         cd raylib-src/src
 
-        echo "=== raylib-src/src contents ==="
-        ls -la .
+        # Fix OpenGL ES include paths for iOS SDK (GLES2/ -> OpenGLES/ES2/)
+        find . \( -name "*.h" -o -name "*.c" \) | xargs sed -i '' \
+          -e 's|<GLES2/gl2\.h>|<OpenGLES/ES2/gl.h>|g' \
+          -e 's|<GLES2/gl2ext\.h>|<OpenGLES/ES2/glext.h>|g'
 
-        # Fix ALL OpenGL ES include paths for iOS SDK.
-        # ghera/raylib-iOS uses non-standard libGLESv2/* and GLES2/* paths.
-        # Replace everything with the correct Apple iOS SDK paths.
-        find . \( -name "*.h" -o -name "*.c" -o -name "*.m" \) | xargs sed -i '' \
-          -e 's|<libGLESv2/GLES2/gl2\.h>|<OpenGLES/ES3/gl.h>|g' \
-          -e 's|<libGLESv2/GLES2/gl2ext\.h>|<OpenGLES/ES3/gl.h>|g' \
-          -e 's|<libGLESv2/GLES/glext\.h>|<OpenGLES/ES3/gl.h>|g' \
-          -e 's|<libGLESv2/GLES/gl\.h>|<OpenGLES/ES3/gl.h>|g' \
-          -e 's|<libGLESv2/[^>]*>|<OpenGLES/ES3/gl.h>|g' \
-          -e 's|<GLES2/gl2\.h>|<OpenGLES/ES3/gl.h>|g' \
-          -e 's|<GLES2/gl2ext\.h>|<OpenGLES/ES3/gl.h>|g' \
-          -e 's|<GLES3/gl3\.h>|<OpenGLES/ES3/gl.h>|g' \
-          -e 's|<GLES3/gl3ext\.h>|<OpenGLES/ES3/gl.h>|g'
-
-        # Inject missing GLES extension typedefs for iOS.
+        # Inject missing GLES extension typedefs and defines for iOS.
         # iOS SDK glext.h does NOT define PFNGLGENVERTEXARRAYSOESPROC etc.
-        # that rlgl.h uses at lines ~1051-1058.
-        # Use printf (not heredoc) to avoid YAML indentation being written into the file.
+        # or some specific ES2/ES3 extension constants used by rlgl.h.
         printf '%s\n' \
           '#ifndef GLES_FIX_H' \
           '#define GLES_FIX_H' \
-          '#include <OpenGLES/ES3/gl.h>' \
-          '#include <OpenGLES/ES3/gl.h>' \
+          '#include <OpenGLES/ES2/gl.h>' \
+          '#include <OpenGLES/ES2/glext.h>' \
           'typedef void (*PFNGLGENVERTEXARRAYSOESPROC)(GLsizei n, GLuint *arrays);' \
           'typedef void (*PFNGLBINDVERTEXARRAYOESPROC)(GLuint array);' \
           'typedef void (*PFNGLDELETEVERTEXARRAYSOESPROC)(GLsizei n, const GLuint *arrays);' \
           'typedef void (*PFNGLDRAWARRAYSINSTANCEDEXTPROC)(GLenum mode, GLint first, GLsizei count, GLsizei primcount);' \
           'typedef void (*PFNGLDRAWELEMENTSINSTANCEDEXTPROC)(GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei primcount);' \
           'typedef void (*PFNGLVERTEXATTRIBDIVISOREXTPROC)(GLuint index, GLuint divisor);' \
+          '#define GL_DEPTH_COMPONENT32_OES 0x81A7' \
+          '#define GL_DEPTH_COMPONENT24_OES 0x81A6' \
+          '#define GL_RED_EXT 0x1903' \
+          '#define GL_R32F_EXT 0x822E' \
+          '#define GL_RGB32F_EXT 0x8815' \
+          '#define GL_RGBA32F_EXT 0x8814' \
+          '#define GL_R16F_EXT 0x822D' \
+          '#define GL_RGB16F_EXT 0x881B' \
+          '#define GL_RGBA16F_EXT 0x881A' \
+          '#define GL_COLOR_ATTACHMENT7_EXT 0x8CE7' \
           '#endif' \
           > gles_fix.h
         echo "=== gles_fix.h written ==="
         cat gles_fix.h
 
-        # Prepend gles_fix.h into rlgl.h
+        # Prepend #include "gles_fix.h" at line 1 of rlgl.h
         sed -i '' '1s|^|#include "gles_fix.h"\n|' rlgl.h
 
-        # Common iOS clang flags
+        # Common iOS clang flags (no -x flag here — set per-file below)
         IOS_FLAGS="-target arm64-apple-ios14.0 -isysroot $SDK_PATH \
-          -DPLATFORM_IOS -DGRAPHICS_API_OPENGL_ES3 \
+          -DPLATFORM_IOS -DGRAPHICS_API_OPENGL_ES2 \
           -DGLES_SILENCE_DEPRECATION -DGL_GLEXT_PROTOTYPES \
           -Wno-implicit-function-declaration -Wno-macro-redefined \
           -I. -O2"
 
-        # Compile standard raylib C sources
+        # Compile each raylib source file as plain C (no -x override needed)
         for src in rcore.c rshapes.c rtextures.c rtext.c utils.c rmodels.c; do
           echo "=== Compiling $src ==="
           clang -x c $IOS_FLAGS -c $src -o ${src%.c}.o
         done
 
-        # raudio.c must be Objective-C (AVFoundation via miniaudio)
+        # raudio.c MUST be compiled as Objective-C
         echo "=== Compiling raudio.c as Objective-C ==="
         clang -x objective-c $IOS_FLAGS -c raudio.c -o raudio.o
 
-        # Compile ALL Objective-C .m files from the ghera/raylib-iOS fork.
-        # These provide the iOS platform backend:
-        # InitPlatform, GetTime, SwapScreenBuffer, emscripten_set_main_loop_arg, etc.
-        find . -name "*.m" | while read src; do
-          objname=$(echo "$src" | tr '/' '_' | sed 's/\.m$/.o/')
-          echo "=== Compiling ObjC $src -> $objname ==="
-          clang -x objective-c $IOS_FLAGS -fobjc-arc -c "$src" -o "$objname"
-        done
-
-        # Pack all object files (including iOS platform backend)
-        ar rcs libraylib.a *.o
+        # Pack all object files into a static library
+        ar rcs libraylib.a rcore.o rshapes.o rtextures.o rtext.o utils.o rmodels.o raudio.o
 
         echo "=== libraylib.a built successfully ==="
         ls -lh libraylib.a
-        echo "=== Symbols in libraylib.a ==="
-        nm libraylib.a 2>/dev/null | grep -E "InitPlatform|GetTime|SwapScreen" | head -20 || true
 
         mkdir -p ../../platform/ios/libs
         cp libraylib.a ../../platform/ios/libs/
