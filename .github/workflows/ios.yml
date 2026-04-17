@@ -135,12 +135,12 @@ jobs:
             -c "$f" -o "$obj"
         done
 
-        # --- Platform: Objective-C (ONLY AppController and rcore_ios) ---
+        # --- Platform: Objective-C++ ---
         echo "=== Compiling AppController.m ==="
-        clang -x objective-c $IOS_BASE -fobjc-arc -c platform/ios/AppController.m -o build/ios/obj/platform_ios_AppController.m.o
+        clang++ -x objective-c++ $IOS_BASE -fobjc-arc -v -c platform/ios/AppController.m -o build/ios/obj/platform_ios_AppController.m.o
         
         echo "=== Compiling rcore_ios.m ==="
-        clang -x objective-c $IOS_BASE -fobjc-arc -c platform/ios/rcore_ios.m -o build/ios/obj/platform_ios_rcore_ios.m.o
+        clang++ -x objective-c++ $IOS_BASE -fobjc-arc -v -c platform/ios/rcore_ios.m -o build/ios/obj/platform_ios_rcore_ios.m.o
 
         # --- Compile other .m files (EXCLUDING ios_utils.m to avoid conflict) ---
         M_FILES=$(find src -name "*.m" | grep -v "ios_utils.m")
