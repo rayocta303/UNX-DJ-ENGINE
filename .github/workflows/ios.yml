@@ -28,13 +28,13 @@ jobs:
       run: |
         SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
         cd raylib-src/src
-        # Fix the include path for OpenGL ES on iOS
-        sed -i '' 's|<GLES2/gl2.h>|<OpenGLES/ES2/gl.h>|g' rlgl.h
-        sed -i '' 's|<GLES2/gl2ext.h>|<OpenGLES/ES2/glext.h>|g' rlgl.h
+        # Fix the include path for OpenGL ES on iOS in all relevant files
+        find . -name "*.h" -o -name "*.c" | xargs sed -i '' 's|<GLES2/gl2.h>|<OpenGLES/ES2/gl.h>|g'
+        find . -name "*.h" -o -name "*.c" | xargs sed -i '' 's|<GLES2/gl2ext.h>|<OpenGLES/ES2/glext.h>|g'
         
         # Explicitly passing SDK path and architecture to the Makefile
         make PLATFORM=PLATFORM_IOS IOS_SDK=iphoneos RAYLIB_LIBTYPE=STATIC GRAPHICS=GRAPHICS_API_OPENGL_ES2 \
-             CC=clang CFLAGS="-isysroot $SDK_PATH -arch arm64 -DPLATFORM_IOS -DGRAPHICS_API_OPENGL_ES2"
+             CC=clang CFLAGS="-isysroot $SDK_PATH -arch arm64 -DPLATFORM_IOS -DGRAPHICS_API_OPENGL_ES2 -Wno-implicit-function-declaration"
         
         mkdir -p ../../platform/ios/libs
         cp libraylib.a ../../platform/ios/libs/
@@ -79,10 +79,10 @@ jobs:
         done
         
         # Link executable
-        # Including CoreVideo as it is often required by Raylib's iOS backend
+        # Using -force_load to ensure Raylib's Objective-C AppController is included
         clang++ -target arm64-apple-ios14.0 -isysroot $SDK_PATH \
           build/ios/obj/*.o \
-          platform/ios/libs/libraylib.a \
+          -Wl,-force_load,platform/ios/libs/libraylib.a \
           -framework UIKit -framework QuartzCore -framework CoreGraphics -framework CoreAudio -framework AudioToolbox -framework AVFoundation -framework CoreFoundation -framework OpenGLES -framework CoreVideo \
           -stdlib=libc++ \
           -o build/ios/xdjunx
