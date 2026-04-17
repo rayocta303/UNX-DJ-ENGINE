@@ -7,6 +7,19 @@
 #include <mach/mach_time.h>
 #include <unistd.h>
 
+const char* ios_get_documents_path(void) {
+    static char path[1024] = {0};
+    if (path[0] == '\0') {
+        NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+        if (docs) strcpy(path, [docs UTF8String]);
+    }
+    return path;
+}
+
+const char* ios_get_media_path(void) {
+    return "/var/mobile/Media";
+}
+
 /* ---- Raylib types we need (avoid including full raylib.h) ---- */
 #ifndef RAYLIB_H
 typedef struct { float x; float y; } Vector2;

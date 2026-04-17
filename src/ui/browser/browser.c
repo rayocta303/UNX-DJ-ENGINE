@@ -158,9 +158,32 @@ void Browser_RefreshStorages(BrowserState *s) {
     s->StorageCount++;
   }
 
+#ifdef PLATFORM_IOS
+  extern const char* ios_get_documents_path(void);
+  extern const char* ios_get_media_path(void);
+  const char *scanDirs[] = {
+    "DOCUMENTS_DIR",
+    "/var/mobile/Media",
+    "/storage", "/mnt", "/media", "/run/media"
+  };
+  int scanDirCount = 6;
+#else
   const char *scanDirs[] = {"/storage", "/mnt", "/media", "/run/media"};
-  for (int i = 0; i < 4; i++) {
-    DIR *d = opendir(scanDirs[i]);
+  int scanDirCount = 4;
+#endif
+
+  for (int i = 0; i < scanDirCount; i++) {
+    const char *dirToScan = scanDirs[i];
+    
+#ifdef PLATFORM_IOS
+    if (strcmp(dirToScan, "DOCUMENTS_DIR") == 0) {
+        dirToScan = ios_get_documents_path();
+    }
+#endif
+
+    if (!dirToScan || dirToScan[0] == '\0') continue;
+
+    DIR *d = opendir(dirToScan);
     if (d) {
       struct dirent *dir;
       while ((dir = readdir(d)) != NULL) {
