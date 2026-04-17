@@ -75,8 +75,9 @@ jobs:
         clang -x objective-c $IOS_FLAGS -c raudio.c -o raudio.o
 
         # iOS Platform Support (rcore_ios.m)
-        echo "=== Compiling rcore_ios.m ==="
-        clang -x objective-c $IOS_FLAGS -c platforms/rcore_ios.m -o rcore_ios.o
+        RCORE_IOS=$(find . -name "rcore_ios.m" | head -n 1)
+        echo "=== Compiling $RCORE_IOS ==="
+        clang -x objective-c $IOS_FLAGS -c "$RCORE_IOS" -o rcore_ios.o
 
         # Pack all object files into a static library
         ar rcs libraylib.a rcore.o rshapes.o rtextures.o rtext.o utils.o rmodels.o raudio.o rcore_ios.o
