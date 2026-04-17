@@ -188,24 +188,29 @@ jobs:
           -stdlib=libc++ \
           -o build/ios/xdjunx
 
-        # Fake-sign for TrollStore / jailbreak sideloading
-        codesign -s - --force --entitlements platform/ios/Entitlements.plist build/ios/xdjunx
-
     - name: Package IPA
       run: |
-        mkdir -p Payload/xdjunx.app
-        cp build/ios/xdjunx Payload/xdjunx.app/
-        cp platform/ios/Info.plist Payload/xdjunx.app/
+        # Create a clean app bundle structure
         mkdir -p Payload/xdjunx.app/assets
+        
+        # Copy the executable and set permissions
+        cp build/ios/xdjunx Payload/xdjunx.app/
+        chmod +x Payload/xdjunx.app/xdjunx
+        
+        # Copy config files
+        cp platform/ios/Info.plist Payload/xdjunx.app/
+        
+        # Copy assets while preserving subdirectories (fonts, images, etc.)
         cp -r assets/* Payload/xdjunx.app/assets/
-
-        # Create dummy icon placeholder if missing
-        touch Payload/xdjunx.app/Icon.png
-
-        zip -r xdjunx-unsigned.ipa Payload
+        
+        # Sign the binary with entitlements
+        ldid -Splatform/ios/Entitlements.plist Payload/xdjunx.app/xdjunx
+        
+        # Zip into IPA
+        zip -r xdjunx.ipa Payload
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: XDJ-UNX-iOS-Unsigned
-        path: xdjunx-unsigned.ipa
+        path: xdjunx.ipa
