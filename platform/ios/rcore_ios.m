@@ -10,9 +10,10 @@
 #include <stdarg.h>
 
 /* ---- Raylib types we need ---- */
-#ifndef RAYLIB_H
-typedef struct { float x; float y; } Vector2;
-#endif
+#include "raylib.h"
+
+// Forward declaration for raylib function (since it's not in public headers sometimes)
+void SetTraceLogCallback(void (*callback)(int, const char *, va_list));
 
 /* ---- Platform State ---- */
 static EAGLContext       *_glContext   = nil;
@@ -130,7 +131,6 @@ int InitPlatform(void) {
             dup2(fileno(_logFile), STDERR_FILENO);
             
             // Register raylib log callback
-            void SetTraceLogCallback(void (*callback)(int, const char *, va_list));
             SetTraceLogCallback(ios_log_callback);
             
             printf("[rcore_ios] Logging initialized to: %s\n", logPath);
