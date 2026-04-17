@@ -161,12 +161,29 @@ jobs:
 
     - name: Package IPA
       run: |
-        mkdir -p Payload/xdjunx.app/assets
+        # Create a clean app bundle structure
+        rm -rf Payload
+        mkdir -p Payload/xdjunx.app
+        
+        # Copy the executable and set permissions
         cp build/ios/xdjunx Payload/xdjunx.app/
         chmod +x Payload/xdjunx.app/xdjunx
+        
+        # Copy config files
         cp platform/ios/Info.plist Payload/xdjunx.app/
-        cp -r assets/* Payload/xdjunx.app/assets/
+        
+        # Copy the ENTIRE assets folder (including the folder itself)
+        # This results in Payload/xdjunx.app/assets/...
+        cp -R assets Payload/xdjunx.app/
+        
+        # Log the content for verification
+        echo "=== Bundled Assets ==="
+        find Payload/xdjunx.app/assets -maxdepth 2
+        
+        # Sign the binary with entitlements
         ldid -Splatform/ios/Entitlements.plist Payload/xdjunx.app/xdjunx
+        
+        # Zip into IPA
         zip -r xdjunx.ipa Payload
 
     - name: Upload Artifact
