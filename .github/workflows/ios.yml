@@ -16,23 +16,9 @@ jobs:
         SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
         echo "SDK_PATH=$SDK_PATH" >> $GITHUB_ENV
 
-    - name: Extract Raylib Source
+    - name: Clone Raylib 5.0
       run: |
-        unzip -q raylib.zip -d raylib-temp
-        mkdir -p raylib-src
-        # Move the content of the extracted folder (it might be raylib-5.0 or similar)
-        # We look for where rcore.c is
-        RCORE_PATH=$(find raylib-temp -name "rcore.c")
-        RCORE_DIR=$(dirname "$RCORE_PATH")
-        cp -r "$RCORE_DIR"/* raylib-src/
-        # Check if we have src/ or if we are already in it
-        if [ -f "raylib-src/rcore.c" ]; then
-           mkdir -p raylib-src/src
-           mv raylib-src/*.c raylib-src/*.h raylib-src/src/ 2>/dev/null || true
-           mv raylib-src/external raylib-src/src/ 2>/dev/null || true
-           mv raylib-src/platforms raylib-src/src/ 2>/dev/null || true
-        fi
-        rm -rf raylib-temp
+        git clone --depth 1 --branch 5.0 https://github.com/raysan5/raylib.git raylib-src
 
     - name: Build Raylib 5.0 (iOS ES2)
       run: |
