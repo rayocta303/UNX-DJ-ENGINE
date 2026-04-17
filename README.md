@@ -43,7 +43,18 @@ UNX DJ ENGINE is an experimental DJ Media Player firmware subset, ported to C an
 - [x] **Rekordbox Integration**: Full PDB/ANLZ metadata and waveform support.
 - [x] **Cross-platform UI**: High-performance Raylib rendering on Win/Linux/Android.
 - [/] **MIDI/HID Support**: Logic implemented, full integration in progress.
-- [/] **Serato Support**: Metadata parsing and database integration functional, waveforms in progress.
+- [/] **Serato Support**: Metadata and database integration functional; waveform/cue extraction from file tags in progress.
+- [x] **Android Build**: Compatibility fixes for NDK (C++17) implemented.
+
+## Known Bugs & Limitations
+
+### Audio Engine
+- **Master Tempo**: The current SOLA-based engine may exhibit audible artifacts or "warbling" when pitch is adjusted beyond ±10%.
+- **Reverse Playback**: Master Tempo does not yet support reverse playback (audio will mute or glitch).
+
+### UI & Library
+- **Serato Waveforms**: Currently not displayed as the engine does not yet extract analysis tags from audio files (ID3/MP4).
+- **USB Hot-plugging**: Manual refresh may be required for some devices on Linux.
 
 ## Build Instructions
 

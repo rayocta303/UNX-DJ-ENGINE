@@ -44,7 +44,8 @@ void AudioEngine_Init(AudioEngine *engine) {
         ColorFXManager_Init(&engine->Decks[i].ColorFX);
         engine->Decks[i].IsMotorOn = false;
         engine->Decks[i].IsPlaying = false;
-        WSOLA_Init(&engine->Decks[i].MTState, SAMPLE_RATE);
+        engine->Decks[i].MTSearchTrigger[0] = true;
+        engine->Decks[i].MTSearchTrigger[1] = true;
     }
     
     BeatFXManager_Init(&engine->BeatFX);
@@ -65,7 +66,12 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
     deck->VinylModeEnabled = true; // Default to Vinyl
     deck->OutlinedRate = 0;
     deck->JogRate = 0;
-    WSOLA_Init(&deck->MTState, deck->SampleRate > 0 ? deck->SampleRate : SAMPLE_RATE);
+    deck->MTOffset = 0;
+    deck->MTSampleCount = 0;
+    deck->MTSearchTrigger[0] = true;
+    deck->MTSearchTrigger[1] = true;
+    deck->MTPhaseOffset[0] = 0;
+    deck->MTPhaseOffset[1] = 0;
 
     if (!filePath || strlen(filePath) == 0) return;
 
@@ -217,6 +223,7 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
     if (deck->LastRate == 0) deck->LastRate = deck->OutlinedRate;
     double currentRate = deck->LastRate;
     double targetRate = deck->OutlinedRate;
+    double rateDelta = (targetRate - currentRate) / (double)frames;
 
     // --- Linkwitz-Riley 4th Order EQ Crossovers (Engine Standard) ---
     EngineLR4_SetLowpass(&deck->EqLowStateL, 350.0f, 44100);
@@ -226,68 +233,105 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
 
     float maxL = 0, maxR = 0;
 
-    for (int i = 0; i < frames; i += 128) {
-        int chunk = (frames - i > 128) ? 128 : (frames - i);
-        float tempL[128], tempR[128];
-        float tempOut[128 * 2];
+    for (int i = 0; i < frames; i++) {
+        currentRate += rateDelta;
+        double rate = currentRate;
+        float l_sample = 0, r_sample = 0;
 
-        if (mtActive && fabs(deck->OutlinedRate) > 0.001) {
-            WSOLA_Process(&deck->MTState, NULL, tempOut, chunk, deck->OutlinedRate, 
-                         (void (*)(void*, double, float*, float*))AudioEngine_GetSample, deck, deck->Position);
-            for (int j = 0; j < chunk; j++) {
-                tempL[j] = tempOut[j*2];
-                tempR[j] = tempOut[j*2+1];
+        if (mtActive && fabs(rate) > 0.05) {
+            deck->MTOffset += (1.0 - rate);
+            const double period = 1323.0; // 30ms @ 44.1kHz
+            const double drift = deck->MTOffset;
+            double phase[2];
+            phase[0] = fmod(drift, period); if (phase[0] < 0) phase[0] += period;
+            phase[1] = fmod(drift + period * 0.5, period); if (phase[1] < 0) phase[1] += period;
+
+            for (int k = 0; k < 2; k++) {
+                if (phase[k] < 12.0 && deck->MTSearchTrigger[k]) {
+                    int other = 1 - k;
+                    double refP = deck->Position + (phase[other] - period * 0.5) + deck->MTPhaseOffset[other];
+                    #define S_WIN 256
+                    #define S_RA 640
+                    float refM[S_WIN], refE = 0.001f;
+                    for (int j = 0; j < S_WIN; j++) {
+                        float l, r; INTERP_SAMPLES_PRO(refP + j, l, r);
+                        refM[j] = l + r; refE += fabsf(refM[j]);
+                    }
+                    static float sCache[S_RA * 2 + S_WIN];
+                    double aStart = deck->Position - (period * 0.5) - S_RA;
+                    for (int j = 0; j < S_RA * 2 + S_WIN; j++) {
+                        float l, r; INTERP_SAMPLES_PRO(aStart + j, l, r);
+                        sCache[j] = l + r;
+                    }
+                    float bestScore = 1e30f; int bestOff = S_RA;
+                    for (int o = 0; o < S_RA * 2; o++) {
+                        float sad = 0; for (int j = 0; j < S_WIN; j++) sad += fabsf(sCache[o + j] - refM[j]);
+                        float score = (sad * (1.0f + 0.15f * (float)abs(o - S_RA) / (float)S_RA)) / refE;
+                        if (score < bestScore) { bestScore = score; bestOff = o; }
+                    }
+                    deck->MTPhaseOffset[k] = (float)(bestOff - S_RA);
+                    deck->MTSearchTrigger[k] = false;
+                    #undef S_WIN
+                    #undef S_RA
+                } else if (phase[k] > period * 0.3) {
+                    deck->MTSearchTrigger[k] = true;
+                }
             }
-            deck->Position += deck->OutlinedRate * chunk;
+            double s0 = sin(M_PI * phase[0] / period);
+            double w0 = s0 * s0; double w1 = 1.0 - w0;
+            double rp0 = deck->Position + (phase[0] - period * 0.5) + deck->MTPhaseOffset[0];
+            double rp1 = deck->Position + (phase[1] - period * 0.5) + deck->MTPhaseOffset[1];
+            if (rp0 < 0) rp0 = 0; if (rp1 < 0) rp1 = 0;
+            float l0, r0, l1, r1;
+            INTERP_SAMPLES_PRO(rp0, l0, r0); INTERP_SAMPLES_PRO(rp1, l1, r1);
+            l_sample = (l0 * (float)w0 + l1 * (float)w1);
+            r_sample = (r0 * (float)w0 + r1 * (float)w1);
         } else {
-            for (int j = 0; j < chunk; j++) {
-                AudioEngine_GetSample(deck, deck->Position, &tempL[j], &tempR[j]);
-                deck->Position += deck->OutlinedRate;
-            }
-            deck->MTState.offset = 0;
+            deck->MTOffset = 0;
+            double readPos = deck->Position;
+            if (readPos < 0) readPos = 0;
+            INTERP_SAMPLES_PRO(readPos, l_sample, r_sample);
         }
 
-        for (int j = 0; j < chunk; j++) {
-            float l_sample = tempL[j];
-            float r_sample = tempR[j];
+        // EQ Gains
+        float gainL = (deck->EqLow < 0.5f) ? (deck->EqLow * 2.0f) : (1.0f + (deck->EqLow - 0.5f) * 4.0f);
+        float gainM = (deck->EqMid < 0.5f) ? (deck->EqMid * 2.0f) : (1.0f + (deck->EqMid - 0.5f) * 4.0f);
+        float gainH = (deck->EqHigh < 0.5f) ? (deck->EqHigh * 2.0f) : (1.0f + (deck->EqHigh - 0.5f) * 4.0f);
 
-            // EQ Gains
-            float gainL = (deck->EqLow < 0.5f) ? (deck->EqLow * 2.0f) : (1.0f + (deck->EqLow - 0.5f) * 4.0f);
-            float gainM = (deck->EqMid < 0.5f) ? (deck->EqMid * 2.0f) : (1.0f + (deck->EqMid - 0.5f) * 4.0f);
-            float gainH = (deck->EqHigh < 0.5f) ? (deck->EqHigh * 2.0f) : (1.0f + (deck->EqHigh - 0.5f) * 4.0f);
+        // professional Engine Linkwitz-Riley EQ Extraction
+        float lowL = EngineLR4_Process(&deck->EqLowStateL, l_sample);
+        float highL = EngineLR4_Process(&deck->EqHighStateL, l_sample);
+        float midL = l_sample - lowL - highL;
+        l_sample = (lowL * gainL) + (midL * gainM) + (highL * gainH);
 
-            // Linkwitz-Riley EQ Extraction
-            float lowL = EngineLR4_Process(&deck->EqLowStateL, l_sample);
-            float highL = EngineLR4_Process(&deck->EqHighStateL, l_sample);
-            float midL = l_sample - lowL - highL;
-            l_sample = (lowL * gainL) + (midL * gainM) + (highL * gainH);
+        float lowR = EngineLR4_Process(&deck->EqLowStateR, r_sample);
+        float highR = EngineLR4_Process(&deck->EqHighStateR, r_sample);
+        float midR = r_sample - lowR - highR;
+        r_sample = (lowR * gainL) + (midR * gainM) + (highR * gainH);
 
-            float lowR = EngineLR4_Process(&deck->EqLowStateR, r_sample);
-            float highR = EngineLR4_Process(&deck->EqHighStateR, r_sample);
-            float midR = r_sample - lowR - highR;
-            r_sample = (lowR * gainL) + (midR * gainM) + (highR * gainH);
+        float mixGain = deck->Trim * deck->Fader;
+        l_sample *= mixGain; r_sample *= mixGain;
 
-            float mixGain = deck->Trim * deck->Fader;
-            l_sample *= mixGain; r_sample *= mixGain;
-
-            // Color FX & Beat FX
-            ColorFXManager_Process(&deck->ColorFX, &l_sample, &r_sample, l_sample, r_sample, fs);
-            if (engine->BeatFX.targetChannel == deckIndex + 1) {
-                BeatFXManager_Process(&engine->BeatFX, &l_sample, &r_sample, l_sample, r_sample, SAMPLE_RATE);
-            }
-
-            maxL = fmaxf(maxL, fabsf(l_sample)); maxR = fmaxf(maxR, fabsf(r_sample));
-            
-            // Output to Master
-            outMaster[(i + j) * 2] += l_sample; 
-            outMaster[(i + j) * 2 + 1] += r_sample;
-
-            // Output to Cue
-            if (deck->IsCueActive) {
-                outCue[(i + j) * 2] += l_sample;
-                outCue[(i + j) * 2 + 1] += r_sample;
-            }
+        // Color FX & Beat FX
+        ColorFXManager_Process(&deck->ColorFX, &l_sample, &r_sample, l_sample, r_sample, fs);
+        if (engine->BeatFX.targetChannel == deckIndex + 1) {
+            BeatFXManager_Process(&engine->BeatFX, &l_sample, &r_sample, l_sample, r_sample, SAMPLE_RATE);
         }
+
+        maxL = fmaxf(maxL, fabsf(l_sample)); maxR = fmaxf(maxR, fabsf(r_sample));
+        
+        // Output to Master if volume fader is up (assuming deck index or separate fader logic)
+        // For now, let's assume fader is handled in Trim or separate mixer logic
+        outMaster[i * 2] += l_sample; 
+        outMaster[i * 2 + 1] += r_sample;
+
+        // Output to Cue (Headphones) if Cue is active
+        if (deck->IsCueActive) {
+            outCue[i * 2] += l_sample;
+            outCue[i * 2 + 1] += r_sample;
+        }
+
+        deck->Position += rate;
     }
     deck->LastRate = targetRate;
     deck->VuMeterL = deck->VuMeterL * 0.9f + maxL * 0.1f;

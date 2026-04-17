@@ -11,6 +11,7 @@
 #include "engine/engine.h"
 #include "engine/util/compatibility/qhash.h"
 #include "engine/util/fpclassify.h"
+#include "audio/types.h"
 
 namespace unx {
 namespace audio {

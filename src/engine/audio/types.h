@@ -1,7 +1,7 @@
 #pragma once
 
 #if !defined(__ANDROID__)
-#include "engine/shim.h"
+#include <QtDebug>
 #else
 #include "engine/shim.h"
 #endif

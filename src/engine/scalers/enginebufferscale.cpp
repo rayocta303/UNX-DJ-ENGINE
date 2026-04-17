@@ -1,7 +1,9 @@
 #include "engine/scalers/enginebufferscale.h"
 
 #include "engine/engine.h"
-// MOC disabled in XDJ-UNX-C
+#ifndef __ANDROID__
+#include "moc_enginebufferscale.cpp"
+#endif
 #include "soundio/soundmanagerconfig.h"
 
 EngineBufferScale::EngineBufferScale()

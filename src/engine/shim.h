@@ -34,6 +34,8 @@ namespace Qt {
 #define slots
 #define signals public
 #define tr(x) x
+#define Q_ENUM(x)
+#define Q_DECLARE_OPERATORS_FOR_FLAGS(x)
 
 class QDebug {
 public:
