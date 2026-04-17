@@ -7,24 +7,7 @@
 #include <mach/mach_time.h>
 #include <unistd.h>
 
-const char* ios_get_documents_path(void) {
-    static char path[1024] = {0};
-    if (path[0] == '\0') {
-        NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-        if (docs) strcpy(path, [docs UTF8String]);
-    }
-    return path;
-}
-
-const char* ios_get_media_path(void) {
-    return "/var/mobile/Media";
-}
-
-const char* ios_get_bundle_path(const char* filename) {
-    return filename;
-}
-
-/* ---- Raylib types we need (avoid including full raylib.h) ---- */
+/* ---- Raylib types we need ---- */
 #ifndef RAYLIB_H
 typedef struct { float x; float y; } Vector2;
 #endif
@@ -54,7 +37,6 @@ static CADisplayLink    *_displayLink   = nil;
 static FILE *_logFile = NULL;
 void ios_log_callback(int logLevel, const char *text, va_list args) {
     if (!_logFile) return;
-    
     const char *levelStr = "INFO";
     switch (logLevel) {
         case 2: levelStr = "INFO"; break;
@@ -63,12 +45,10 @@ void ios_log_callback(int logLevel, const char *text, va_list args) {
         case 5: levelStr = "FATAL"; break;
         case 6: levelStr = "DEBUG"; break;
     }
-    
     fprintf(_logFile, "[%s] ", levelStr);
     vfprintf(_logFile, text, args);
     fprintf(_logFile, "\n");
     fflush(_logFile);
-    
     vprintf(text, args);
     printf("\n");
 }
@@ -89,6 +69,8 @@ void ios_log_callback(int logLevel, const char *text, va_list args) {
    ============================================================ */
 
 int InitPlatform(void) {
+    // ios_get_documents_path is provided by ios_utils.m
+    extern const char* ios_get_documents_path(void);
     const char *docsPath = ios_get_documents_path();
     if (docsPath && docsPath[0] != '\0') {
         char logPath[1024];
@@ -120,7 +102,6 @@ int InitPlatform(void) {
     
     if (!_glContext || ![EAGLContext setCurrentContext:_glContext]) return -1;
 
-    // Safer way to get the window and root view on modern iOS
     UIWindow *window = nil;
     if (@available(iOS 13.0, *)) {
         for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
@@ -130,7 +111,12 @@ int InitPlatform(void) {
             }
         }
     }
-    if (!window) window = [UIApplication sharedApplication].keyWindow;
+    if (!window) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        window = [UIApplication sharedApplication].keyWindow;
+#pragma clang diagnostic pop
+    }
     
     UIView *rootView = window.rootViewController.view;
     if (!rootView) return -1;
@@ -156,26 +142,7 @@ int InitPlatform(void) {
     return 0;
 }
 
-int GetScreenWidth(void) {
-    return (int)[UIScreen mainScreen].bounds.size.width;
-}
-
-int GetScreenHeight(void) {
-    return (int)[UIScreen mainScreen].bounds.size.height;
-}
-
-int GetRenderWidth(void) {
-    return (int)([UIScreen mainScreen].bounds.size.width * [UIScreen mainScreen].nativeScale);
-}
-
-int GetRenderHeight(void) {
-    return (int)([UIScreen mainScreen].bounds.size.height * [UIScreen mainScreen].nativeScale);
-}
-
-Vector2 GetWindowScaleDPI(void) {
-    float s = [UIScreen mainScreen].nativeScale;
-    return (Vector2){ s, s };
-}
+// GetScreenWidth/Height/DPI are provided by libraylib.a(rcore.o)
 
 void ClosePlatform(void) {
     [_displayLink invalidate];
