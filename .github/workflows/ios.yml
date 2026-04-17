@@ -125,10 +125,15 @@ jobs:
         # - Windows-only midi backend
         # - audio_backend.c (handled as ObjC)
         # - raylib's linux-specific lib folder
+        # - qm-dsp hmm (requires clapack which is not present)
+        # - any tests/test folders
         C_FILES=$(find src lib -name "*.c" \
           | grep -v "midi_backend_win.c" \
           | grep -v "src/core/audio_backend.c" \
-          | grep -v "lib/linux_arm64")
+          | grep -v "lib/linux_arm64" \
+          | grep -v "lib/qm-dsp/hmm" \
+          | grep -v "/tests/" \
+          | grep -v "/test/")
         for f in $C_FILES; do
           obj="build/ios/obj/$(echo $f | tr '/' '_').o"
           echo "Compiling (C) $f -> $obj"
@@ -136,8 +141,12 @@ jobs:
         done
 
         # --- Compile .cpp and .cc files as C++ ---
+        # Exclude: linux platform, tests, and qm-dsp hmm
         CPP_FILES=$(find src lib -name "*.cpp" -o -name "*.cc" 2>/dev/null \
-          | grep -v "lib/linux_arm64" || true)
+          | grep -v "lib/linux_arm64" \
+          | grep -v "/tests/" \
+          | grep -v "/test/" \
+          | grep -v "lib/qm-dsp/hmm" || true)
         for f in $CPP_FILES; do
           obj="build/ios/obj/$(echo $f | tr '/' '_').o"
           echo "Compiling (C++) $f -> $obj"
