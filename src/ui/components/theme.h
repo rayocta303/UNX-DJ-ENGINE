@@ -3,8 +3,8 @@
 #include "raylib.h"
 #include <stdbool.h>
 
-// Reference resolution - 640x400 (16:10)
-#define REF_WIDTH       640
+// Reference resolution - 16:9 Ratio
+#define REF_WIDTH       711
 #define REF_HEIGHT      400
 
 // Dynamic resolution (Internal scaled reference)

@@ -494,11 +494,9 @@ int raylib_main(int argc, char *argv[]) {
 #else
 int main(void) {
 #endif
-  // We start with the reference size or common 16:10 resolution
-  // Standard XDJ-XZ screen is actually 7.0-inch 60Hz 1280x800 or similar
-  // The user wants max width 1080, which implies 1080x675 (16:10)
-  int startWidth = 1080;
-  int startHeight = 675;
+  // Standard 1080p 16:9 Resolution (iPhone 8 Plus Native)
+  int startWidth = 1920;
+  int startHeight = 1080;
 
 #if !defined(PLATFORM_IOS)
   #if defined(__ANDROID__)
@@ -506,7 +504,7 @@ int main(void) {
     SetTargetFPS(60); 
   #else
     SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
-    InitWindow(startWidth, startHeight, APP_NAME " - C Port Test");
+    InitWindow(startWidth, startHeight, APP_NAME);
     SetWindowMinSize(REF_WIDTH, REF_HEIGHT);
     SetTargetFPS(60);
   #endif
