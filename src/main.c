@@ -62,9 +62,21 @@ void UpdateDrawFrame(App *app);
 #if defined(PLATFORM_IOS)
 // ghera/raylib-iOS callbacks
 void ios_ready(void) {
-    // This is called by the iOS platform layer when it's ready to init raylib
-    // We already initialized most things in raylib_main, but we can ensure app is ready
-    UNX_LOG_INFO("[IOS] ios_ready called.");
+    UNX_LOG_INFO("[IOS] ios_ready: Initializing Raylib and Audio...");
+    
+    // 1. Initialize Window (0,0 gets native screen size)
+    InitWindow(0, 0, APP_NAME);
+    SetTargetFPS(60);
+    
+    // 2. Initialize Fonts
+    UIFonts_Init();
+    
+    // 3. Start Audio Backend
+    if (globalApp) {
+        AudioBackend_Start(globalApp->activeAudioConfig, AudioProcessCallback);
+    }
+    
+    UNX_LOG_INFO("[IOS] ios_ready: Setup complete. Window size: %dx%d", GetScreenWidth(), GetScreenHeight());
 }
 
 void ios_update(void) {
@@ -487,28 +499,26 @@ int main(void) {
   int startWidth = 1080;
   int startHeight = 675;
 
-#if defined(__ANDROID__)
-  // Android is always fullscreen and uses device resolution natively in
-  // NativeActivity
-  InitWindow(0, 0, APP_NAME " - C Port Test");
-  SetTargetFPS(60); // Optionally limit to 60 or let Android handle VSync
-#else
-  SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
-#if defined(PLATFORM_IOS)
-  InitWindow(0, 0, APP_NAME); // 0,0 for full screen detection on mobile
-#else
-  InitWindow(startWidth, startHeight, APP_NAME " - C Port Test");
-#endif
-  SetWindowMinSize(REF_WIDTH, REF_HEIGHT);
-  SetTargetFPS(60);
+#if !defined(PLATFORM_IOS)
+  #if defined(__ANDROID__)
+    InitWindow(GetScreenWidth(), GetScreenHeight(), APP_NAME);
+    SetTargetFPS(60); 
+  #else
+    SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
+    InitWindow(startWidth, startHeight, APP_NAME " - C Port Test");
+    SetWindowMinSize(REF_WIDTH, REF_HEIGHT);
+    SetTargetFPS(60);
+  #endif
 #endif
   SetExitKey(KEY_NULL); // ESC is for 'back'
 
   Log_Init();
   UNX_LOG_INFO("Application starting...");
   
+#if !defined(PLATFORM_IOS)
   UIFonts_Init();
   UNX_LOG_INFO("Fonts initialized.");
+#endif
 
 #if defined(PLATFORM_IOS)
   void ios_init_audio_session();
@@ -604,22 +614,24 @@ int main(void) {
 
   globalAudioEngine = audioEngine;
 
+#if !defined(PLATFORM_IOS)
+  UIFonts_Init();
+  UNX_LOG_INFO("[MAIN] Fonts initialized.");
+
   UNX_LOG_INFO("[MAIN] Starting audio backend...");
   AudioBackend_Start(initialAudioCfg, AudioProcessCallback);
   UNX_LOG_INFO("[MAIN] Audio backend started.");
   
   UNX_LOG_INFO("[MAIN] Setting main loop (FPS: 60)...");
+#endif
 
-#if defined(PLATFORM_WEB) || defined(PLATFORM_IOS)
 #if defined(PLATFORM_WEB)
   #include <emscripten/emscripten.h>
-#elif defined(PLATFORM_IOS)
-  // Raylib iOS provides this wrapper for compatibility
-  void emscripten_set_main_loop_arg(void (*func)(void*), void *arg, int fps, int simulate_infinite_loop);
-#endif
   emscripten_set_main_loop_arg((void (*)(void*))UpdateDrawFrame, app, 0, 1);
-  // On iOS/Web, emscripten_set_main_loop_arg starts a timer and returns immediately,
-  // allowing the OS to manage the event loop.
+#elif defined(PLATFORM_IOS)
+  // On iOS, we return here and let the platform layer call ios_ready/ios_update.
+  return 0;
+#endif
 #else
   while (!WindowShouldClose()) {
     UpdateDrawFrame(app);
