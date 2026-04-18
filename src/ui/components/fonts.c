@@ -13,6 +13,10 @@ static Font iconBrand;
 // We define a helper that loads font with full Unicode support if needed.
 // For now, we allow raylib to fallback to default loading or we load specific ranges.
 void UIFonts_Init(void) {
+    static bool isInitialized = false;
+    if (isInitialized) return;
+    isInitialized = true;
+
     // Attempt to load standard font. Use Arial on Windows as requested.
     // TODO: Embed a primary UI font to avoid OS dependencies.
     // Attempt to load standard font from assets first, then fallback.

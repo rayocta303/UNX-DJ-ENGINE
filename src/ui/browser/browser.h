@@ -67,3 +67,4 @@ typedef struct {
 } BrowserRenderer;
 
 void BrowserRenderer_Init(BrowserRenderer *r, BrowserState *state);
+

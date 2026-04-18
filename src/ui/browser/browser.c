@@ -1032,3 +1032,4 @@ void BrowserRenderer_Init(BrowserRenderer *r, BrowserState *state) {
   r->base.Draw = Browser_Draw;
   r->State = state;
 }
+

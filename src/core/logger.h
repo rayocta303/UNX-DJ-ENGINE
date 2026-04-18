@@ -15,6 +15,8 @@ void Log_Init(void);
 
 // Closes logging
 void Log_Close(void);
+void Log_Flush(void);
+
 
 // Standard formatted logging
 void Log_Write(LogLevel level, const char* fmt, ...);

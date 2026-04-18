@@ -4,20 +4,30 @@
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
+
 
 #if defined(_WIN32)
     #include <windows.h>
     #include <psapi.h>
-#elif defined(__APPLE__)
-    #include <TargetConditionals.h>
-    #include <mach/mach.h>
+    static CRITICAL_SECTION g_logLock;
+    static bool g_lockInitialized = false;
 #else
     #include <unistd.h>
+    #include <pthread.h>
+    static pthread_mutex_t g_logLock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
 static FILE* g_logFile = NULL;
 
 void Log_Init(void) {
+#if defined(_WIN32)
+    if (!g_lockInitialized) {
+        InitializeCriticalSection(&g_logLock);
+        g_lockInitialized = true;
+    }
+#endif
+
     const char* logPath = "xdjunx.log";
     
 #if defined(PLATFORM_IOS)
@@ -29,7 +39,8 @@ void Log_Init(void) {
     g_logFile = fopen(logPath, "a");
     if (g_logFile) {
         time_t now = time(NULL);
-        fprintf(g_logFile, "\n--- SESSION START: %s", ctime(&now));
+        char* timeStr = ctime(&now);
+        if (timeStr) fprintf(g_logFile, "\n--- SESSION START: %s", timeStr);
         fflush(g_logFile);
     }
     
@@ -51,6 +62,28 @@ void Log_Close(void) {
         fclose(g_logFile);
         g_logFile = NULL;
     }
+#if defined(_WIN32)
+    if (g_lockInitialized) {
+        DeleteCriticalSection(&g_logLock);
+        g_lockInitialized = false;
+    }
+#endif
+}
+
+void Log_Flush(void) {
+    if (g_logFile) {
+#if defined(_WIN32)
+        EnterCriticalSection(&g_logLock);
+#else
+        pthread_mutex_lock(&g_logLock);
+#endif
+        fflush(g_logFile);
+#if defined(_WIN32)
+        LeaveCriticalSection(&g_logLock);
+#else
+        pthread_mutex_unlock(&g_logLock);
+#endif
+    }
 }
 
 void Log_Write(LogLevel level, const char* fmt, ...) {
@@ -62,12 +95,24 @@ void Log_Write(LogLevel level, const char* fmt, ...) {
         default: break;
     }
 
+#if defined(_WIN32)
+    if (!g_lockInitialized) return;
+    EnterCriticalSection(&g_logLock);
+#else
+    pthread_mutex_lock(&g_logLock);
+#endif
+
     char timestamp[32];
     time_t now = time(NULL);
-    struct tm* tm_info = localtime(&now);
-    strftime(timestamp, sizeof(timestamp), "%H:%M:%S", tm_info);
+    struct tm tm_info;
+#if defined(_WIN32)
+    localtime_s(&tm_info, &now);
+#else
+    localtime_r(&now, &tm_info);
+#endif
+    strftime(timestamp, sizeof(timestamp), "%H:%M:%S", &tm_info);
 
-    char buffer[1024];
+    char buffer[2048];
     va_list args;
     va_start(args, fmt);
     vsnprintf(buffer, sizeof(buffer), fmt, args);
@@ -79,8 +124,15 @@ void Log_Write(LogLevel level, const char* fmt, ...) {
     // Print to file
     if (g_logFile) {
         fprintf(g_logFile, "[%s] [%s] %s\n", timestamp, levelStr, buffer);
-        fflush(g_logFile);
+        // Only flush on errors to maintain performance, otherwise let OS buffer it
+        if (level == UNX_LEVEL_ERROR) fflush(g_logFile);
     }
+
+#if defined(_WIN32)
+    LeaveCriticalSection(&g_logLock);
+#else
+    pthread_mutex_unlock(&g_logLock);
+#endif
 }
 
 float Log_GetRAMUsage(void) {
@@ -109,5 +161,6 @@ float Log_GetRAMUsage(void) {
 #endif
     return 0.0f;
 }
+
 
 

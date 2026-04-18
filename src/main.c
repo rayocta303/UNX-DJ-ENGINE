@@ -25,6 +25,22 @@
 #include <string.h>
 #include <math.h>
 
+#ifdef _WIN32
+  #define WIN32_LEAN_AND_MEAN
+  #define NOGDI
+  #define NOUSER
+  #define Rectangle WinRectangle
+  #define CloseWindow WinCloseWindow
+  #define ShowCursor WinShowCursor
+  #define DrawText WinDrawText
+  #include <windows.h>
+  #undef Rectangle
+  #undef CloseWindow
+  #undef ShowCursor
+  #undef DrawText
+#endif
+
+
 typedef struct {
   CurrentScreen screen;
   int splashCounter;
@@ -129,12 +145,12 @@ void OnSettingsApply(void *ctx) {
   a->deckA.Waveform.VinylStopMs = a->settingsState.Items[7].Value;
   a->deckB.Waveform = a->deckA.Waveform;
 
-  printf("[SETTINGS] Applied Style: %d, Gains: L%.2f M%.2f H%.2f, Start: %.0f, "
-         "Stop: %.0f, Lock: %d\n",
-         a->deckA.Waveform.Style, a->deckA.Waveform.GainLow,
-         a->deckA.Waveform.GainMid, a->deckA.Waveform.GainHigh,
-         a->deckA.Waveform.VinylStartMs, a->deckA.Waveform.VinylStopMs,
-         a->deckA.Waveform.LoadLock);
+  UNX_LOG_INFO("[SETTINGS] Applied Style: %d, Gains: L%.2f M%.2f H%.2f, Start: %.0f, "
+               "Stop: %.0f, Lock: %d",
+               a->deckA.Waveform.Style, a->deckA.Waveform.GainLow,
+               a->deckA.Waveform.GainMid, a->deckA.Waveform.GainHigh,
+               a->deckA.Waveform.VinylStartMs, a->deckA.Waveform.VinylStopMs,
+               a->deckA.Waveform.LoadLock);
 
   // Apply Audio backend settings
   AudioBackendConfig aconf = {
@@ -161,7 +177,7 @@ void OnSettingsApply(void *ctx) {
       (aconf.CueOutR != a->activeAudioConfig.CueOutR);
 
   if (audioChanged) {
-    printf("[SETTINGS] Audio Hardware config changed, restarting backend...\n");
+    UNX_LOG_INFO("[SETTINGS] Audio Hardware config changed, restarting backend...");
     AudioBackend_Start(aconf, AudioProcessCallback);
     a->activeAudioConfig = aconf;
     
@@ -503,9 +519,23 @@ int raylib_main(int argc, char *argv[]) {
 #else
 int main(void) {
 #endif
+#if defined(_WIN32)
+  // Disable QuickEdit mode to prevent application from freezing when console is clicked
+  HANDLE hInput = GetStdHandle(STD_INPUT_HANDLE);
+  DWORD prev_mode;
+  if (GetConsoleMode(hInput, &prev_mode)) {
+      SetConsoleMode(hInput, prev_mode & ~ENABLE_QUICK_EDIT_MODE);
+  }
+#endif
+
   // Standard 1080p 16:9 Resolution (iPhone 8 Plus Native)
+#if defined(_WIN32)
+  int startWidth = 1280;
+  int startHeight = 720;
+#else
   int startWidth = 1920;
   int startHeight = 1080;
+#endif
 
 #if !defined(PLATFORM_IOS)
   #if defined(__ANDROID__)
@@ -632,16 +662,8 @@ int main(void) {
 
   globalAudioEngine = audioEngine;
 
-#if !defined(PLATFORM_IOS)
-  UIFonts_Init();
-  UNX_LOG_INFO("[MAIN] Fonts initialized.");
-
-  UNX_LOG_INFO("[MAIN] Starting audio backend...");
-  AudioBackend_Start(initialAudioCfg, AudioProcessCallback);
-  UNX_LOG_INFO("[MAIN] Audio backend started.");
-  
   UNX_LOG_INFO("[MAIN] Setting main loop (FPS: 60)...");
-#endif
+
 
 #if defined(PLATFORM_WEB) || defined(PLATFORM_IOS)
   #if defined(PLATFORM_WEB)
@@ -656,12 +678,29 @@ int main(void) {
     UpdateDrawFrame(app);
   }
   
+  UNX_LOG_INFO("[MAIN] Shutting down...");
   UIFonts_Unload();
+  
+  // Browser Cleanup (Inline to reduce external functions)
+  if (app->browserState.DB) RB_FreeDatabase(app->browserState.DB);
+  if (app->browserState.SeratoDB) Serato_FreeDatabase(app->browserState.SeratoDB);
+  if (app->browserState.TrackPointers) free(app->browserState.TrackPointers);
+  if (app->browserState.SeratoTrackPointers) free(app->browserState.SeratoTrackPointers);
+  
   MIDI_Close(&app->midiCtx);
+  AudioBackend_Terminate();
   CloseWindow();
   
-  if (audioEngine) free(audioEngine);
+  if (audioEngine) {
+    for (int i = 0; i < MAX_DECKS; i++) {
+        if (audioEngine->Decks[i].PCMBuffer) free(audioEngine->Decks[i].PCMBuffer);
+    }
+    free(audioEngine);
+  }
   if (app) free(app);
+  
+  UNX_LOG_INFO("[MAIN] Exit.");
+  Log_Close();
 #endif
 
   return 0;
@@ -696,9 +735,9 @@ void UpdateDrawFrame(App *app) {
 
   static int lastScreen = -1;
   
-  if (lastScreen != app->screen) {
-      UNX_LOG_INFO("[MAIN] Screen changed to: %d", app->screen);
-      lastScreen = app->screen;
+  if (lastScreen != (int)app->screen) {
+      UNX_LOG_INFO("[MAIN] Screen changed to: %d", (int)app->screen);
+      lastScreen = (int)app->screen;
   }
 
   // --- Sync Audio Engine State to UI State ---
@@ -999,7 +1038,7 @@ void UpdateDrawFrame(App *app) {
       }
     }
 
-    if (!IsWindowReady() || !IsWindowFocused()) return;
+    if (!IsWindowReady()) return;
 
     BeginDrawing();
     ClearBackground(BLACK);
