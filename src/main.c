@@ -64,21 +64,29 @@ void UpdateDrawFrame(App *app);
 #if defined(PLATFORM_IOS)
 // ghera/raylib-iOS callbacks
 void ios_ready(void) {
-    UNX_LOG_INFO("[IOS] ios_ready: Initializing Raylib and Audio...");
+    UNX_LOG_INFO("[IOS] ios_ready: Starting Force Init...");
     
-    // 1. Initialize Window (0,0 gets native screen size)
+    // 1. Initialize Window
     InitWindow(0, 0, APP_NAME);
     SetTargetFPS(60);
     
-    // 2. Initialize Fonts
+    // 2. Initialize Fonts (Optional in Debug)
+    #ifndef DEBUG_IOS_GUI
     UIFonts_Init();
+    #endif
     
     // 3. Start Audio Backend
-    if (globalApp) {
+    if (globalApp && globalApp->activeAudioConfig.SampleRate > 0) {
         AudioBackend_Start(globalApp->activeAudioConfig, AudioProcessCallback);
     }
     
-    UNX_LOG_INFO("[IOS] ios_ready: Setup complete. Window size: %dx%d", GetScreenWidth(), GetScreenHeight());
+    // 4. Force a clear frame to bind GPU surface
+    BeginDrawing();
+    ClearBackground(ORANGE); // Bright orange to signal success
+    DrawText("INITIALIZING...", 20, 20, 20, BLACK);
+    EndDrawing();
+    
+    UNX_LOG_INFO("[IOS] ios_ready: Final Window Size: %dx%d", GetScreenWidth(), GetScreenHeight());
 }
 
 void ios_update(void) {
@@ -668,6 +676,7 @@ void UpdateDrawFrame(App *app) {
   }
 
 #if defined(PLATFORM_IOS)
+#ifndef DEBUG_IOS_GUI
   // Safety: If window dimensions are not yet available, skip this frame.
   if (GetScreenWidth() <= 0 || GetScreenHeight() <= 0) {
       static double lastWarn = 0;
@@ -677,11 +686,9 @@ void UpdateDrawFrame(App *app) {
       }
       return;
   }
-
-  // Grace period: ignore Hidden/Minimized for the first 2 seconds to allow transition
-  if (GetTime() > 2.0) {
-      if (IsWindowHidden() || IsWindowMinimized()) return;
-  }
+  // Grace period for non-debug mode
+  if (GetTime() > 2.0 && (IsWindowHidden() || IsWindowMinimized())) return;
+#endif
 #endif
 
   AudioEngine *audioEngine = globalAudioEngine;
@@ -1001,10 +1008,8 @@ void UpdateDrawFrame(App *app) {
     rlPushMatrix();
     rlTranslatef(UI_OffsetX, UI_OffsetY, 0);
 
+    // High-level Screen Router
     switch (app->screen) {
-    case ScreenSplash:
-      app->splash.base.Draw((Component *)&app->splash);
-      break;
     case ScreenPlayer:
       app->player.base.Draw((Component *)&app->player);
       break;
@@ -1023,11 +1028,27 @@ void UpdateDrawFrame(App *app) {
     case ScreenMixer:
       app->mixer.base.Draw((Component *)&app->mixer);
       break;
+    case ScreenSplash:
+      app->splash.base.Draw((Component *)&app->splash);
+      break;
     case ScreenDebug:
       app->debugView.base.Draw((Component *)&app->debugView);
       break;
     default:
+      ClearBackground(MAGENTA); // Fail-safe color
+      DrawText("UNKNOWN SCREEN", 10, 10, 20, WHITE);
       break;
+    }
+
+    // Draw Global Overlays
+    if (app->showExitConfirm) {
+      DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Fade(BLACK, 0.5f));
+      DrawRectangle(SCREEN_WIDTH / 2 - 150, SCREEN_HEIGHT / 2 - 50, 300, 100,
+                    ColorDark2);
+      DrawText("EXIT APP?", SCREEN_WIDTH / 2 - 50, SCREEN_HEIGHT / 2 - 30, 20,
+               WHITE);
+      DrawText("PRESS PLAY TO CONFIRM", SCREEN_WIDTH / 2 - 100,
+               SCREEN_HEIGHT / 2 + 10, 15, GRAY);
     }
 
     if (app->screen != ScreenSplash) {
@@ -1036,7 +1057,6 @@ void UpdateDrawFrame(App *app) {
       app->topbar.base.Draw((Component *)&app->topbar);
     }
 
-    // Exit Confirmation Popup
     if (app->showExitConfirm) {
       float pw = S(200);
       float ph = S(100);
