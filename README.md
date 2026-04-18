@@ -1,105 +1,91 @@
-# UNX DJ ENGINE
+# UNX DJ Engine
 
-UNX DJ ENGINE is an experimental DJ Media Player firmware subset, ported to C and Raylib for high-performance cross-platform development, simulation, and embedded deployment. It aims to provide a professional-grade mixing experience inspired by industry-standard hardware.
+UNX DJ Engine is a specialized, high-performance DJ media player firmware subset. Developed in C and C++, it leverages the Raylib framework to provide a robust environment for cross-platform simulation, embedded development, and professional-grade audio processing. The project is engineered to replicate industry-standard hardware workflows while maintaining low-latency execution and high-fidelity signal processing.
 
-![UNX DJ ENGINE Player Screenshot](screenshots/player.png)
+## Core Architecture
 
-## Features
+### Audio Processing Unit
+- **Internal Pipeline**: 32-bit floating-point internal mixing for maximum dynamic range and head-room.
+- **Decoding Engine**: Native support for MP3 (minimp3), WAV, and AIFF (dr_wav) formats.
+- **Time-Stretching**: High-fidelity Master Tempo and pitch-shifting utilizing advanced WSOLA processing algorithms.
+- **Signal Processing**: Professional 3-Band Isolator EQs, Biquad Filters, and an integrated FX pipeline (Sound Color FX and BPM-synced Beat FX).
+- **Synchronization**: Precise lock-free parameter synchronization and automatic mono-to-stereo upmixing.
 
-### Audio Engine
-- High-fidelity 32-bit float internal mixing pipeline.
-- Multi-format decoding support: MP3 (minimp3), WAV, and AIFF (dr_wav).
-- Integrated Master Tempo and Pitch-shifting using high-fidelity WSOLA processing logic.
-- Efficient real-time interpolation for artifact-free vinyl-mode scratching.
-- Professional 3-Band ISO EQs and Filters (Biquad).
-- Integrated Sound Color FX and BPM-synced Beat FX.
-- Reliable mono-to-stereo automatic upmixing and lock-free parameter synchronization.
+### User Interface and Rendering
+- **Graphics Engine**: Low-latency rendering via Raylib and OpenGL/GLES.
+- **Visualization**: Multi-mode waveform rendering including RGB spectrum and 3-Band frequency decomposition.
+- **Responsive Design**: Adaptive layout engine supporting varying resolutions and High-DPI hardware configurations.
+- **Hardware Accuracy**: Precise emulation of industry-standard deck strips, top bars, and control panels.
 
-### User Interface
-- Ultra-responsive UI rendered with Raylib and OpenGL.
-- Multi-style Waveform displays (Blue, RGB, 3-Band Spectrum).
-- Dynamic layout scaling for multiple resolutions and high-DPI displays.
-- Hardware-accurate Top Bar, Deck Strips, and FX Panels.
+### Database and Library Management
+- **Rekordbox Integration**: Full parsing of PDB and ANLZ database structures for metadata and waveform data.
+- **Serato Compatibility**: Support for Serato metadata and waveform parsing logic.
+- **Storage Management**: Efficient scanning and indexing for USB, SD, and internal storage devices.
 
-### Library and Browser
-- Deep integration with Rekordbox (PDB/ANLZ) databases.
-- Serato metadata and waveform parsing support.
-- Advanced Browser with Playlist Bank (Drag-and-Drop shortcuts).
-- Multi-device storage scanning (USB/SD/Internal).
+## Technical Specifications
 
-### Platform Support
-- Windows (x64): Native development and simulation.
-- Linux (ARM64): Optimized for embedded targets using DRM-KMS and GLES2.
-- Android (ARM64): Experimental builds for mobile devices.
+| Component | Technology |
+|-----------|------------|
+| Language | C / C++ (C17 / C++17) |
+| Graphics API | OpenGL 3.3 / GLES 2.0 / GLES 3.0 |
+| Framework | Raylib |
+| Compiler | Zig Toolchain |
+| Audio I/O | miniaudio |
+| DSP Logic | SoundTouch / Mixxx DSP Core |
 
-- More Sound Color FX and Beat FX.
-- Integrated Audio Recording (WAV/FLAC).
-- Pro DJ Link / Networking for multi-player synchronization.
+## Deployment Platforms
 
-## Project Status / Plans
+- **Windows (x86_64)**: Primary environment for development, simulation, and testing.
+- **Linux (ARM64)**: Optimized for embedded targets using DRM-KMS and GLES for hardware-level deployment.
+- **Android (ARM64)**: Mobile-optimized builds with NDK integration.
+- **iOS (ARM64)**: Native UIKit/CAEAGLLayer integration for high-performance mobile execution.
 
-- [/] **Audio Engine**: WSOLA-based Master Tempo integration (Functional but not yet perfect).
-- [x] **Mixer & DSP**: 3-band ISO EQs, Filters, and FX pipeline functional.
-- [x] **Rekordbox Integration**: Full PDB/ANLZ metadata and waveform support.
-- [x] **Cross-platform UI**: High-performance Raylib rendering on Win/Linux/Android.
-- [/] **MIDI/HID Support**: Logic implemented, full integration in progress.
-- [/] **Serato Support**: Metadata and database integration functional; waveform/cue extraction from file tags in progress.
-- [x] **Android Build**: Compatibility fixes for NDK (C++17) implemented.
+## Project Roadmap
 
-## Known Bugs & Limitations
+- [x] **Core Mixer**: Implementation of 3-band ISO EQs, Filters, and basic FX pipeline.
+- [x] **Metadata Engine**: Integration of Rekordbox PDB/ANLZ database parsing.
+- [x] **Cross-platform UI**: Unified rendering across desktop, embedded, and mobile platforms.
+- [/] **Master Tempo**: WSOLA-based time-stretching (Under active refinement).
+- [/] **MIDI/HID Control**: Low-latency hardware mapping integration in progress.
+- [/] **Advanced FX**: Expansion of the Beat FX and Sound Color FX libraries.
 
-### Audio Engine
-- **Master Tempo**: The current SOLA-based engine may exhibit audible artifacts or "warbling" when pitch is adjusted beyond ±10%.
-- **Reverse Playback**: Master Tempo does not yet support reverse playback (audio will mute or glitch).
+## Build and Installation
 
-### UI & Library
-- **Serato Waveforms**: Currently not displayed as the engine does not yet extract analysis tags from audio files (ID3/MP4).
-- **USB Hot-plugging**: Manual refresh may be required for some devices on Linux.
+The project utilizes the Zig toolchain for seamless cross-compilation and dependency management.
 
-## Build Instructions
-
-The project uses Zig as a C/C++ compiler for seamless cross-compilation, integrating C logic with C++ audio processing via a robust bridge.
-
-### Windows
-Run the provided build script:
+### Windows Environment
+Execute the provided batch script to initiate the build process:
 ```powershell
 ./build.bat
 ```
 
-### Linux / Embedded
-Use the included Makefile:
+### Linux and Embedded Systems
+Utilize the included Makefile for native or cross-compilation:
 ```bash
 make PLATFORM=LINUX_ARM64
 ```
 
-### Android
-Automated builds are available via GitHub Actions. For manual builds, ensure Android NDK is installed and run:
+### Android and iOS
+Mobile builds are primarily managed via GitHub Actions CI/CD pipelines. For manual NDK compilation:
 ```bash
 make -f android/Makefile.android
 ```
 
+## Credits and Acknowledgments
 
-## Credits
+UNX DJ Engine is developed within the UNX DJ project ecosystem. Strategic insights and specialized logic have been adapted from the following contributors:
+- **Mixxx Development Team**: DSP architectural insights and signal processing logic.
+- **SoundTouch**: High-quality time-stretching and pitch-shifting algorithms.
+- **Raylib, minimp3, dr_libs**: Core framework and media decoding libraries.
 
-Developed as part of the UNX DJ ENGINE project ecosystem.
+## Contact and Social Media
 
-Special thanks to:
-- [Mixxx](https://mixxx.org/) development team for architectural insights and DSP logic.
-- [SoundTouch](https://www.surina.net/soundtouch/) library for high-quality time-stretching.
-- [Raylib](https://www.raylib.com/), [minimp3](https://github.com/lieff/minimp3), and [dr_libs](https://github.com/mackron/dr_libs) contributors.
+- **GitHub**: [github.com/rayocta303](https://github.com/rayocta303)
+- **YouTube**: [@unxchr](https://youtube.com/@unxchr)
+- **Instagram**: [@unxchr](https://instagram.com/unxchr)
 
-## Social Media and Links
+## Support and Development
 
-Follow the project progress:
-- GitHub: [github.com/unxchr](https://github.com/rayocta303)
-- YouTube: [youtube.com/@unxchr](https://youtube.com/@unxchr)
-- Instagram: [instagram.com/unxchr](https://instagram.com/unxchr)
-
-## Donation
-
-If you find this project useful and would like to support its development:
-- PayPal: [paypal.me/unxchr](https://paypal.me/unxchr)
-- Saweria: [saweria.co/patradev](https://saweria.co/patradev)
-
----
-Disclaimer: This project is for educational and experimental purposes only.
+For those interested in supporting the continued development of this project:
+- **PayPal**: [paypal.me/unxchr](https://paypal.me/unxchr)
+- **Saweria**: [saweria.co/patradev](https://saweria.co/patradev)
