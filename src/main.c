@@ -545,7 +545,9 @@ int main(void) {
   app->screen = ScreenDebug;
   DebugIOS_Init(&app->debugView);
   UNX_LOG_INFO("[MAIN] Debug GUI Mode Active. Skipping heavy init.");
-  return 0; // Return early, ios_ready will handle the rest
+#if defined(PLATFORM_IOS)
+  return 0; // Return early only on iOS, ios_ready will handle the rest
+#endif
 #endif
 
   App_Init(app);
