@@ -17,6 +17,7 @@
 #include "ui/views/mixer.h"
 #include "ui/views/settings.h"
 #include "ui/views/splash.h"
+#include "ui/views/topbar.h"
 #include "ui/views/debug_ios.h"
 #include "version.h"
 #include <stdio.h>
