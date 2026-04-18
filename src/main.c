@@ -522,10 +522,8 @@ int main(void) {
   initialAudioCfg.BufferSizeFrames = 512; 
 #endif
 
-  UNX_LOG_INFO("[MAIN] Starting audio backend...");
-  AudioBackend_Start(initialAudioCfg, AudioProcessCallback);
   app->activeAudioConfig = initialAudioCfg;
-  UNX_LOG_INFO("[MAIN] Audio backend started. SR: %d, Buf: %d", initialAudioCfg.SampleRate, initialAudioCfg.BufferSizeFrames);
+  UNX_LOG_INFO("[MAIN] Audio config prepared. SR: %d, Buf: %d", initialAudioCfg.SampleRate, initialAudioCfg.BufferSizeFrames);
   
   UNX_LOG_INFO("[MAIN] Retrieving active audio info...");
   // Set initial Audio Driver name for the UI
@@ -577,6 +575,10 @@ int main(void) {
               -1.0f, 1.0f);
 
   globalAudioEngine = audioEngine;
+
+  UNX_LOG_INFO("[MAIN] Starting audio backend...");
+  AudioBackend_Start(initialAudioCfg, AudioProcessCallback);
+  UNX_LOG_INFO("[MAIN] Audio backend started.");
 
 #if defined(PLATFORM_WEB) || defined(PLATFORM_IOS)
 #if defined(PLATFORM_WEB)

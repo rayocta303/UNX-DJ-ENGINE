@@ -466,8 +466,14 @@ static void Waveform_Draw(Component *base) {
   if (endFrame > wfFrames)
     endFrame = wfFrames;
 
+  // Optimized drawing loop: Skip frames if zoomed out too much to reduce GPU load
+  int step = 1;
+#if defined(PLATFORM_IOS)
+  if (zoomDelta < 1.0f) step = 2; // Simple LOD for older iOS devices
+#endif
+
   rlBegin(RL_TRIANGLES);
-  for (int64_t i = startFrame; i < endFrame - 1; i++) {
+  for (int64_t i = startFrame; i < endFrame - step; i += step) {
     float x0 = (float)(((double)i - elapsedHalfFrames * r->dataDensity) /
                            framesPerPixel +
                        centerX);

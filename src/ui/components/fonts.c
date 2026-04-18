@@ -25,8 +25,14 @@ void UIFonts_Init(void) {
     const char* boldPathBundled = "assets/fonts/Inter-Bold.ttf";
 #endif
     
-    defaultFace = LoadFontEx(fontPathBundled, 64, 0, 0);
-    boldFace = LoadFontEx(boldPathBundled, 64, 0, 0);
+#if defined(PLATFORM_IOS)
+    int fontSize = 40;
+#else
+    int fontSize = 64;
+#endif
+    
+    defaultFace = LoadFontEx(fontPathBundled, fontSize, 0, 0);
+    boldFace = LoadFontEx(boldPathBundled, fontSize, 0, 0);
     
     if (defaultFace.texture.id == 0) {
 #ifdef _WIN32
@@ -65,19 +71,19 @@ void UIFonts_Init(void) {
     codepoints[count++] = 0x2022; // bullet
 
     // Font Awesome 5 Solid - Loaded from Memory
-    iconSolid = LoadFontFromMemory(".otf", font_awesome_solid, font_awesome_solid_size, 64, codepoints, count);
+    iconSolid = LoadFontFromMemory(".otf", font_awesome_solid, font_awesome_solid_size, fontSize, codepoints, count);
     if (iconSolid.texture.id == 0) {
         printf("[FONT] Failed to load solid icon font from memory\n");
     }
 
     // Font Awesome 5 Regular - Loaded from Memory
-    iconRegular = LoadFontFromMemory(".otf", font_awesome_regular, font_awesome_regular_size, 64, codepoints, count);
+    iconRegular = LoadFontFromMemory(".otf", font_awesome_regular, font_awesome_regular_size, fontSize, codepoints, count);
     if (iconRegular.texture.id == 0) {
         printf("[FONT] Failed to load regular icon font from memory\n");
     }
 
     // Font Awesome 5 Brands - Loaded from Memory
-    iconBrand = LoadFontFromMemory(".otf", font_awesome_brand, font_awesome_brand_size, 64, codepoints, count);
+    iconBrand = LoadFontFromMemory(".otf", font_awesome_brand, font_awesome_brand_size, fontSize, codepoints, count);
     if (iconBrand.texture.id == 0) {
         printf("[FONT] Failed to load brand icon font from memory\n");
     }
