@@ -94,8 +94,8 @@ void SplashRenderer_Init(SplashRenderer *s, int *progress) {
 #endif
 
 #if defined(PLATFORM_IOS)
-  // Cap frames on iOS to prevent OOM (192 frames @ 1MB each = 192MB VRAM!)
-  if (s->frameCount > 60) s->frameCount = 60;
+  // Cap frames on iOS to prevent OOM (30 frames is enough for a smooth 2s splash)
+  if (s->frameCount > 30) s->frameCount = 30;
 #endif
   
   s->currentFrame = 0;

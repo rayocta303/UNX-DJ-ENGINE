@@ -606,10 +606,21 @@ int main(void) {
 
 void UpdateDrawFrame(App *app) {
   static double lastHeartbeat = 0;
+  static int lastScreen = -1;
   if (GetTime() - lastHeartbeat > 2.0) { // Log RAM every 2 seconds
-      Log_Heartbeat();
+      UNX_LOG_INFO("[MAIN] Heartbeat - RAM: %.2f MB, Screen: %d", Log_GetRAMUsage(), app->screen);
       lastHeartbeat = GetTime();
   }
+  
+  if (lastScreen != app->screen) {
+      UNX_LOG_INFO("[MAIN] Screen changed to: %d", app->screen);
+      lastScreen = app->screen;
+  }
+
+#if defined(PLATFORM_IOS)
+  // Safety: If window is hidden or backgrounded, skip rendering to avoid GLDRendererMetal errors
+  if (IsWindowHidden() || IsWindowMinimized()) return;
+#endif
   
   AudioEngine *audioEngine = globalAudioEngine;
   
