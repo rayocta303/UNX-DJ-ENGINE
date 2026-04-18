@@ -54,8 +54,27 @@ typedef struct {
 } App;
 
 AudioEngine *globalAudioEngine = NULL;
+App *globalApp = NULL; // Needed for iOS callbacks
+
 void AudioProcessCallback(float *buffer, unsigned int frames);
 void UpdateDrawFrame(App *app);
+
+#if defined(PLATFORM_IOS)
+// ghera/raylib-iOS callbacks
+void ios_ready(void) {
+    // This is called by the iOS platform layer when it's ready to init raylib
+    // We already initialized most things in raylib_main, but we can ensure app is ready
+    UNX_LOG_INFO("[IOS] ios_ready called.");
+}
+
+void ios_update(void) {
+    if (globalApp) UpdateDrawFrame(globalApp);
+}
+
+void ios_destroy(void) {
+    UNX_LOG_INFO("[IOS] ios_destroy called.");
+}
+#endif
 
 void AudioProcessCallback(float *buffer, unsigned int frames) {
   if (globalAudioEngine) {
@@ -475,7 +494,11 @@ int main(void) {
   SetTargetFPS(60); // Optionally limit to 60 or let Android handle VSync
 #else
   SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
+#if defined(PLATFORM_IOS)
+  InitWindow(0, 0, APP_NAME); // 0,0 for full screen detection on mobile
+#else
   InitWindow(startWidth, startHeight, APP_NAME " - C Port Test");
+#endif
   SetWindowMinSize(REF_WIDTH, REF_HEIGHT);
   SetTargetFPS(60);
 #endif
@@ -506,6 +529,7 @@ int main(void) {
       return -1;
   }
   memset(app, 0, sizeof(App));
+  globalApp = app; // Store globally for iOS callbacks
   App_Init(app);
 
   MIDI_Init(&app->midiCtx);
