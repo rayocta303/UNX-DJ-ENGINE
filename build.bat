@@ -57,7 +57,7 @@ set CFLAGS=-Wall -Wextra -Isrc -Isrc/core -Isrc/engine -Ilib -O2 %TARGET_FLAGS%
 set CXXFLAGS=-Wall -Wextra -Isrc -Isrc/core -Isrc/engine -Ilib -Ilib/kaitai -Ilib/rekordbox-metadata -O2 -std=c++17 %TARGET_FLAGS%
 
 echo Building C files...
-for %%f in (src/main.c src/ui/components/theme.c src/ui/components/fonts.c src/ui/components/helpers.c src/ui/views/topbar.c src/ui/views/info.c src/ui/views/splash.c src/ui/views/settings.c src/ui/views/about.c src/ui/views/mixer.c src/ui/player/bottomstrip.c src/ui/player/beatfx.c src/ui/player/deckinfo.c src/ui/player/deckstrip.c src/ui/player/waveform.c src/ui/player/player.c src/audio/engine.c src/input/keyboard.c src/ui/browser/browser.c src/core/audio_backend.c src/core/logic/quantize.c src/core/logic/sync.c src/core/logic/settings_io.c src/core/logic/control_object.c src/core/midi/midi_handler.c src/core/midi/midi_mapper.c src/core/midi/midi_backend_win.c) do (
+for %%f in (src/main.c src/ui/components/theme.c src/ui/components/fonts.c src/ui/components/helpers.c src/ui/views/topbar.c src/ui/views/info.c src/ui/views/splash.c src/ui/views/settings.c src/ui/views/about.c src/ui/views/mixer.c src/ui/player/bottomstrip.c src/ui/player/beatfx.c src/ui/player/deckinfo.c src/ui/player/deckstrip.c src/ui/player/waveform.c src/ui/player/player.c src/audio/engine.c src/input/keyboard.c src/ui/browser/browser.c src/core/logger.c src/core/audio_backend.c src/core/logic/quantize.c src/core/logic/sync.c src/core/logic/settings_io.c src/core/logic/control_object.c src/core/midi/midi_handler.c src/core/midi/midi_mapper.c src/core/midi/midi_backend_win.c) do (
     %CC% %CFLAGS% -c %%f -o %%~pf%%~nf.o || exit /b 1
 )
 

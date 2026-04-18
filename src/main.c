@@ -1,4 +1,5 @@
 #include "core/audio_backend.h"
+#include "core/logger.h"
 #include "core/logic/control_object.h"
 #include "core/logic/settings_io.h"
 #include "core/logic/sync.h"
@@ -480,7 +481,11 @@ int main(void) {
 #endif
   SetExitKey(KEY_NULL); // ESC is for 'back'
 
+  Log_Init();
+  UNX_LOG_INFO("Application starting...");
+  
   UIFonts_Init();
+  UNX_LOG_INFO("Fonts initialized.");
 
 #if defined(PLATFORM_IOS)
   void ios_init_audio_session();
@@ -511,19 +516,19 @@ int main(void) {
   initialAudioCfg.BufferSizeFrames = 512; 
 #endif
 
-  printf("[MAIN] Starting audio backend...\n");
+  UNX_LOG_INFO("[MAIN] Starting audio backend...");
   AudioBackend_Start(initialAudioCfg, AudioProcessCallback);
   app.activeAudioConfig = initialAudioCfg;
-  printf("[MAIN] Audio backend started.\n");
+  UNX_LOG_INFO("[MAIN] Audio backend started. SR: %d, Buf: %d", initialAudioCfg.SampleRate, initialAudioCfg.BufferSizeFrames);
   
-  printf("[MAIN] Retrieving active audio info...\n");
+  UNX_LOG_INFO("[MAIN] Retrieving active audio info...");
   // Set initial Audio Driver name for the UI
   AudioBackend_GetActiveInfo(NULL, NULL, app.aboutState.AudioDriver, app.aboutState.AudioDevice);
 
-  printf("[MAIN] Initializing Audio Engine (Heap)...\n");
+  UNX_LOG_INFO("[MAIN] Initializing Audio Engine (Heap)...");
   AudioEngine *audioEngine = (AudioEngine *)malloc(sizeof(AudioEngine));
   if (!audioEngine) {
-      printf("[CRITICAL] Failed to allocate AudioEngine on heap!\n");
+      UNX_LOG_ERR("[CRITICAL] Failed to allocate AudioEngine on heap!");
       return -1;
   }
   AudioEngine_Init(audioEngine);
@@ -532,7 +537,7 @@ int main(void) {
   app.browserState.DeckB = (struct DeckState *)&app.deckB;
   app.player.AudioPlugin = audioEngine;
   
-  printf("[MAIN] Audio Engine initialized.\n");
+  UNX_LOG_INFO("[MAIN] Audio Engine initialized. Total RAM: %.2f MB", Log_GetRAMUsage());
 
   // Register Controls after Init
   CO_Init();
@@ -593,6 +598,12 @@ int main(void) {
 }
 
 void UpdateDrawFrame(App *app) {
+  static double lastHeartbeat = 0;
+  if (GetTime() - lastHeartbeat > 2.0) { // Log RAM every 2 seconds
+      Log_Heartbeat();
+      lastHeartbeat = GetTime();
+  }
+  
   AudioEngine *audioEngine = globalAudioEngine;
   
   // --- Sync Audio Engine State to UI State ---

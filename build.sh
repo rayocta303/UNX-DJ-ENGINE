@@ -55,7 +55,7 @@ C_FILES=(
     src/ui/views/about.c src/ui/views/mixer.c src/ui/player/bottomstrip.c src/ui/player/beatfx.c
     src/ui/player/deckinfo.c src/ui/player/deckstrip.c src/ui/player/waveform.c src/ui/player/player.c
     src/audio/engine.c src/audio/scalers.c src/input/keyboard.c src/ui/browser/browser.c src/core/audio_backend.c
-    src/core/logic/quantize.c src/core/logic/sync.c src/core/logic/settings_io.c
+    src/core/logger.c src/core/logic/quantize.c src/core/logic/sync.c src/core/logic/settings_io.c
     src/core/logic/control_object.c src/core/midi/midi_handler.c src/core/midi/midi_mapper.c
     src/core/midi/midi_backend_win.c
     src/engine/fx/dsp_utils.c src/engine/fx/colorfx/space.c src/engine/fx/colorfx/dub_echo.c
