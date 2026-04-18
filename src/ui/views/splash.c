@@ -108,6 +108,11 @@ void SplashRenderer_Init(SplashRenderer *s, int *progress) {
 #ifdef SPLASH_FRAME_COUNT
     Image img = LoadImageFromMemory(".png", splash_frames[i], splash_frames_size[i]);
     if (img.data != NULL) {
+      // Cap resolution to 1080px width for VRAM safety
+      if (img.width > 1080) {
+          float aspect = (float)img.height / (float)img.width;
+          ImageResize(&img, 1080, (int)(1080.0f * aspect));
+      }
       s->frames[i] = LoadTextureFromImage(img);
       UnloadImage(img);
       loadedAny = true;
@@ -124,6 +129,11 @@ void SplashRenderer_Init(SplashRenderer *s, int *progress) {
 
     Image imgDisk = LoadImage(path);
     if (imgDisk.data != NULL) {
+      // Cap resolution to 1080px width for VRAM safety
+      if (imgDisk.width > 1080) {
+          float aspect = (float)imgDisk.height / (float)imgDisk.width;
+          ImageResize(&imgDisk, 1080, (int)(1080.0f * aspect));
+      }
       s->frames[i] = LoadTextureFromImage(imgDisk);
       UnloadImage(imgDisk);
       loadedAny = true;

@@ -111,6 +111,10 @@ void PlayerRenderer_Init(PlayerRenderer *r, DeckState *a, DeckState *b,
   // Load shared logo from memory bundle
   Image img = LoadImageFromMemory(".png", unx_logo, unx_logo_size);
   if (img.data != NULL) {
+    if (img.width > 1080) {
+        float aspect = (float)img.height / (float)img.width;
+        ImageResize(&img, 1080, (int)(1080.0f * aspect));
+    }
     r->Logo = LoadTextureFromImage(img);
     UnloadImage(img);
   } else {
