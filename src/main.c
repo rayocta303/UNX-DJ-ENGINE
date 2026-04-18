@@ -17,7 +17,7 @@
 #include "ui/views/mixer.h"
 #include "ui/views/settings.h"
 #include "ui/views/splash.h"
-#include "ui/views/topbar.h"
+#include "ui/views/debug_ios.h"
 #include "version.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,6 +47,7 @@ typedef struct {
   AboutRenderer about;
   MixerRenderer mixer;
   SplashRenderer splash;
+  DebugIOSView debugView;
   KeyboardMapping keyMap;
   MidiContext midiCtx;
   bool showExitConfirm;
@@ -539,7 +540,15 @@ int main(void) {
       return -1;
   }
   memset(app, 0, sizeof(App));
-  globalApp = app; // Store globally for iOS callbacks
+  globalApp = app; 
+  
+#ifdef DEBUG_IOS_GUI
+  app->screen = ScreenDebug;
+  DebugIOS_Init(&app->debugView);
+  UNX_LOG_INFO("[MAIN] Debug GUI Mode Active. Skipping heavy init.");
+  return 0; // Return early, ios_ready will handle the rest
+#endif
+
   App_Init(app);
 
   MIDI_Init(&app->midiCtx);
@@ -963,8 +972,10 @@ void UpdateDrawFrame(App *app) {
       app->about.base.Update((Component *)&app->about);
     if (app->screen == ScreenMixer)
       app->mixer.base.Update((Component *)&app->mixer);
+    if (app->screen == ScreenDebug)
+      app->debugView.base.Update((Component *)&app->debugView);
 
-    if (app->screen != ScreenSplash) {
+    if (app->screen != ScreenSplash && app->screen != ScreenDebug) {
       app->stripA.base.Update((Component *)&app->stripA);
       app->stripB.base.Update((Component *)&app->stripB);
       app->topbar.base.Update((Component *)&app->topbar);
@@ -1010,6 +1021,9 @@ void UpdateDrawFrame(App *app) {
       break;
     case ScreenMixer:
       app->mixer.base.Draw((Component *)&app->mixer);
+      break;
+    case ScreenDebug:
+      app->debugView.base.Draw((Component *)&app->debugView);
       break;
     default:
       break;

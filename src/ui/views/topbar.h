@@ -2,14 +2,9 @@
 
 #include "ui/components/component.h"
 
-typedef enum {
-    ScreenPlayer,
-    ScreenBrowser,
-    ScreenInfo,
-    ScreenSettings,
-    ScreenAbout,
     ScreenMixer,
-    ScreenSplash
+    ScreenSplash,
+    ScreenDebug
 } CurrentScreen;
 
 typedef struct TopBar TopBar;
