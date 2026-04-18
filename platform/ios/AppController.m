@@ -52,6 +52,8 @@ extern int raylib_main(int argc, char *argv[]);
 
 #import <AVFoundation/AVFoundation.h>
 
+@implementation AppController (Audio)
+
 - (void)applicationDidBecomeActive:(UIApplication *)application {
     static BOOL started = NO;
     if (!started) {
