@@ -495,20 +495,26 @@ int main(void) {
   // Initialize Audio Backend FIRST so App_Init can enumerate real devices
   AudioBackend_Init();
 
-  App app;
-  App_Init(&app);
+  UNX_LOG_INFO("[MAIN] Initializing App (Heap)...");
+  App *app = (App *)malloc(sizeof(App));
+  if (!app) {
+      UNX_LOG_ERR("[CRITICAL] Failed to allocate App on heap!");
+      return -1;
+  }
+  memset(app, 0, sizeof(App));
+  App_Init(app);
 
-  MIDI_Init(&app.midiCtx);
+  MIDI_Init(&app->midiCtx);
 
   int bufMap[] = {128, 256, 512, 1024};
   AudioBackendConfig initialAudioCfg = {
-      .DeviceIndex = app.settingsState.Items[8].Current - 1,
-      .MasterOutL = app.settingsState.Items[9].Current,
-      .MasterOutR = app.settingsState.Items[10].Current,
-      .CueOutL = app.settingsState.Items[11].Current - 1,
-      .CueOutR = app.settingsState.Items[12].Current - 1,
-      .SampleRate = (app.settingsState.Items[14].Current == 0) ? 44100 : 48000,
-      .BufferSizeFrames = bufMap[app.settingsState.Items[13].Current]};
+      .DeviceIndex = app->settingsState.Items[8].Current - 1,
+      .MasterOutL = app->settingsState.Items[9].Current,
+      .MasterOutR = app->settingsState.Items[10].Current,
+      .CueOutL = app->settingsState.Items[11].Current - 1,
+      .CueOutR = app->settingsState.Items[12].Current - 1,
+      .SampleRate = (app->settingsState.Items[14].Current == 0) ? 44100 : 48000,
+      .BufferSizeFrames = bufMap[app->settingsState.Items[13].Current]};
 
 #if defined(PLATFORM_IOS)
   // Force safer defaults for iOS to prevent driver instability/crashes
@@ -518,12 +524,12 @@ int main(void) {
 
   UNX_LOG_INFO("[MAIN] Starting audio backend...");
   AudioBackend_Start(initialAudioCfg, AudioProcessCallback);
-  app.activeAudioConfig = initialAudioCfg;
+  app->activeAudioConfig = initialAudioCfg;
   UNX_LOG_INFO("[MAIN] Audio backend started. SR: %d, Buf: %d", initialAudioCfg.SampleRate, initialAudioCfg.BufferSizeFrames);
   
   UNX_LOG_INFO("[MAIN] Retrieving active audio info...");
   // Set initial Audio Driver name for the UI
-  AudioBackend_GetActiveInfo(NULL, NULL, app.aboutState.AudioDriver, app.aboutState.AudioDevice);
+  AudioBackend_GetActiveInfo(NULL, NULL, app->aboutState.AudioDriver, app->aboutState.AudioDevice);
 
   UNX_LOG_INFO("[MAIN] Initializing Audio Engine (Heap)...");
   AudioEngine *audioEngine = (AudioEngine *)malloc(sizeof(AudioEngine));
@@ -532,10 +538,10 @@ int main(void) {
       return -1;
   }
   AudioEngine_Init(audioEngine);
-  app.browserState.AudioPlugin = (struct AudioEngine *)audioEngine;
-  app.browserState.DeckA = (struct DeckState *)&app.deckA;
-  app.browserState.DeckB = (struct DeckState *)&app.deckB;
-  app.player.AudioPlugin = audioEngine;
+  app->browserState.AudioPlugin = (struct AudioEngine *)audioEngine;
+  app->browserState.DeckA = (struct DeckState *)&app->deckA;
+  app->browserState.DeckB = (struct DeckState *)&app->deckB;
+  app->player.AudioPlugin = audioEngine;
   
   UNX_LOG_INFO("[MAIN] Audio Engine initialized. Total RAM: %.2f MB", Log_GetRAMUsage());
 
@@ -579,19 +585,20 @@ int main(void) {
   // Raylib iOS provides this wrapper for compatibility
   void emscripten_set_main_loop_arg(void (*func)(void*), void *arg, int fps, int simulate_infinite_loop);
 #endif
-  emscripten_set_main_loop_arg((void (*)(void*))UpdateDrawFrame, &app, 0, 1);
+  emscripten_set_main_loop_arg((void (*)(void*))UpdateDrawFrame, app, 0, 1);
   // On iOS/Web, emscripten_set_main_loop_arg starts a timer and returns immediately,
   // allowing the OS to manage the event loop.
 #else
   while (!WindowShouldClose()) {
-    UpdateDrawFrame(&app);
+    UpdateDrawFrame(app);
   }
   
   UIFonts_Unload();
-  MIDI_Close(&app.midiCtx);
+  MIDI_Close(&app->midiCtx);
   CloseWindow();
   
   if (audioEngine) free(audioEngine);
+  if (app) free(app);
 #endif
 
   return 0;
