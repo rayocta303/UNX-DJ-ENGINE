@@ -604,6 +604,8 @@ int main(void) {
 #endif
 
   return 0;
+}
+
 void UpdateDrawFrame(App *app) {
 #if defined(PLATFORM_IOS)
   // Safety: If window is hidden, backgrounded, or not yet ready, skip rendering 
