@@ -100,8 +100,13 @@ void SplashRenderer_Init(SplashRenderer *s, int *progress) {
   
   s->currentFrame = 0;
   s->frameTimer = 0;
+#if !defined(PLATFORM_IOS)
   s->frames = (Texture2D *)malloc(sizeof(Texture2D) * s->frameCount);
+#else
+  s->frames = NULL;
+#endif
 
+#if !defined(PLATFORM_IOS)
   bool loadedAny = false;
   for (int i = 0; i < s->frameCount; i++) {
     // Try memory bundle first (newly added)
@@ -153,7 +158,8 @@ void SplashRenderer_Init(SplashRenderer *s, int *progress) {
   if (!loadedAny) {
     Image img = LoadImage("assets/splash.png");
     if (img.data == NULL) {
-      img = LoadImageFromMemory(".png", unx_logo, unx_logo_size);
+      // Skipped on iOS to avoid logo in splash
+      // img = LoadImageFromMemory(".png", unx_logo, unx_logo_size);
     }
     if (img.data != NULL) {
       s->frameCount = 1;
@@ -161,6 +167,9 @@ void SplashRenderer_Init(SplashRenderer *s, int *progress) {
       UnloadImage(img);
     }
   }
+#else
+  s->frameCount = 0;
+#endif
 
   // Restore Raylib logs
   SetTraceLogLevel(LOG_INFO);

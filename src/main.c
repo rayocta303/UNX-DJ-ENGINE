@@ -615,21 +615,26 @@ int main(void) {
 void UpdateDrawFrame(App *app) {
   static bool firstCall = true;
   if (firstCall) {
-      UNX_LOG_INFO("[MAIN] UpdateDrawFrame: First call received.");
+      UNX_LOG_INFO("[MAIN] UpdateDrawFrame: First call (Window: %dx%d, Ready: %d, Hidden: %d, Min: %d)", 
+                   GetScreenWidth(), GetScreenHeight(), IsWindowReady(), IsWindowHidden(), IsWindowMinimized());
       firstCall = false;
   }
 
 #if defined(PLATFORM_IOS)
-  // Safety: Avoid rendering if window is not ready
-  if (!IsWindowReady()) {
+  // Safety: If window dimensions are not yet available, skip this frame.
+  if (GetScreenWidth() <= 0 || GetScreenHeight() <= 0) {
       static double lastWarn = 0;
       if (GetTime() - lastWarn > 5.0) {
-          UNX_LOG_WARN("[MAIN] UpdateDrawFrame: Window not ready yet...");
+          UNX_LOG_WARN("[MAIN] UpdateDrawFrame: Waiting for valid screen dimensions (%dx%d)...", GetScreenWidth(), GetScreenHeight());
           lastWarn = GetTime();
       }
       return;
   }
-  if (IsWindowHidden() || IsWindowMinimized()) return;
+
+  // Grace period: ignore Hidden/Minimized for the first 2 seconds to allow transition
+  if (GetTime() > 2.0) {
+      if (IsWindowHidden() || IsWindowMinimized()) return;
+  }
 #endif
 
   AudioEngine *audioEngine = globalAudioEngine;
@@ -682,11 +687,13 @@ void UpdateDrawFrame(App *app) {
 
     app->topbar.ActiveScreen = app->screen;
 
-    // Navigation Logic (Mock)
+    // Navigation Logic (Time-based Splash)
     if (app->screen == ScreenSplash) {
-      app->splashCounter--;
-      if (app->splashCounter <= 0)
+      static float splashTime = 0;
+      splashTime += GetFrameTime();
+      if (splashTime >= 2.0f) { // 2 Seconds splash
         app->screen = ScreenPlayer;
+      }
     }
 
     // Exclusive Master Logic & Auto Takeover

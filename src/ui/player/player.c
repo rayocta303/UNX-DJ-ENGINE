@@ -54,7 +54,8 @@ static void Player_Draw(Component *base) {
 
   DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ColorBlack);
 
-  // Draw shared background logo behind waveforms
+#if !defined(PLATFORM_IOS)
+  // Draw shared background logo behind waveforms (disabled on iOS for VRAM safety)
   if (p->Logo.id != 0) {
     float waveAreaY = TOP_BAR_H;
     float waveAreaH = SCREEN_HEIGHT - TOP_BAR_H - FX_BAR_H - DECK_STR_H;
@@ -79,6 +80,7 @@ static void Player_Draw(Component *base) {
 
     DrawTextureEx(p->Logo, (Vector2){waveAreaX + (waveAreaW - lw) / 2.0f, waveAreaY + (waveAreaH - lh) / 2.0f}, 0.0f, logoScale, Fade(WHITE, logoOpacity));
   }
+#endif
 
   p->InfoA.base.Draw((Component *)&p->InfoA);
   p->InfoB.base.Draw((Component *)&p->InfoB);
@@ -108,6 +110,7 @@ void PlayerRenderer_Init(PlayerRenderer *r, DeckState *a, DeckState *b,
   BeatFXPanel_Init(&r->BeatFX, fx, a, b);
   BeatFXSelectBar_Init(&r->FXBar, fx, a, b, r->AudioPlugin);
 
+#if !defined(PLATFORM_IOS)
   // Load shared logo from memory bundle
   Image img = LoadImageFromMemory(".png", unx_logo, unx_logo_size);
   if (img.data != NULL) {
@@ -122,4 +125,7 @@ void PlayerRenderer_Init(PlayerRenderer *r, DeckState *a, DeckState *b,
   } else {
     r->Logo = (Texture2D){0};
   }
+#else
+  r->Logo = (Texture2D){0};
+#endif
 }
