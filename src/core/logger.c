@@ -111,7 +111,6 @@ float Log_GetRAMUsage(void) {
 }
 
 void Log_Heartbeat(void) {
-    static double lastHeartbeat = 0;
     // We can't use GetTime() here without raylib.h, so we'll just log when called.
     // In main.c we will call this periodically.
     float ram = Log_GetRAMUsage();
