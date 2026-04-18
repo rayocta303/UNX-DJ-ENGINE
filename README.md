@@ -1,5 +1,7 @@
 # UNX DJ Engine
 
+![UNX DJ Engine Player Screenshot](screenshots/player.png)
+
 UNX DJ Engine is a specialized, high-performance DJ media player firmware subset. Developed in C and C++, it leverages the Raylib framework to provide a robust environment for cross-platform simulation, embedded development, and professional-grade audio processing. The project is engineered to replicate industry-standard hardware workflows while maintaining low-latency execution and high-fidelity signal processing.
 
 ## Core Architecture
