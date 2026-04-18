@@ -19,6 +19,7 @@
 #include "ui/views/topbar.h"
 #include "version.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
@@ -504,51 +505,67 @@ int main(void) {
       .SampleRate = (app.settingsState.Items[14].Current == 0) ? 44100 : 48000,
       .BufferSizeFrames = bufMap[app.settingsState.Items[13].Current]};
 
+#if defined(PLATFORM_IOS)
+  // Force safer defaults for iOS to prevent driver instability/crashes
+  initialAudioCfg.SampleRate = 44100;
+  initialAudioCfg.BufferSizeFrames = 512; 
+#endif
+
+  printf("[MAIN] Starting audio backend...\n");
   AudioBackend_Start(initialAudioCfg, AudioProcessCallback);
   app.activeAudioConfig = initialAudioCfg;
+  printf("[MAIN] Audio backend started.\n");
   
+  printf("[MAIN] Retrieving active audio info...\n");
   // Set initial Audio Driver name for the UI
   AudioBackend_GetActiveInfo(NULL, NULL, app.aboutState.AudioDriver, app.aboutState.AudioDevice);
 
-  AudioEngine audioEngine;
-  AudioEngine_Init(&audioEngine);
-  app.browserState.AudioPlugin = (struct AudioEngine *)&audioEngine;
+  printf("[MAIN] Initializing Audio Engine (Heap)...\n");
+  AudioEngine *audioEngine = (AudioEngine *)malloc(sizeof(AudioEngine));
+  if (!audioEngine) {
+      printf("[CRITICAL] Failed to allocate AudioEngine on heap!\n");
+      return -1;
+  }
+  AudioEngine_Init(audioEngine);
+  app.browserState.AudioPlugin = (struct AudioEngine *)audioEngine;
   app.browserState.DeckA = (struct DeckState *)&app.deckA;
   app.browserState.DeckB = (struct DeckState *)&app.deckB;
-  app.player.AudioPlugin = &audioEngine;
+  app.player.AudioPlugin = audioEngine;
+  
+  printf("[MAIN] Audio Engine initialized.\n");
 
   // Register Controls after Init
   CO_Init();
   CO_Register("[Channel1]", "play", CO_TYPE_BOOL,
-              &audioEngine.Decks[0].IsMotorOn, 0, 1);
-  CO_Register("[Channel1]", "volume", CO_TYPE_FLOAT, &audioEngine.Decks[0].Trim,
+              &audioEngine->Decks[0].IsMotorOn, 0, 1);
+  CO_Register("[Channel1]", "volume", CO_TYPE_FLOAT, &audioEngine->Decks[0].Trim,
               0, 2.0f);
   CO_Register("[Channel1]", "filterHigh", CO_TYPE_FLOAT,
-              &audioEngine.Decks[0].EqHigh, 0, 1.0f);
+              &audioEngine->Decks[0].EqHigh, 0, 1.0f);
   CO_Register("[Channel1]", "filterMid", CO_TYPE_FLOAT,
-              &audioEngine.Decks[0].EqMid, 0, 1.0f);
+              &audioEngine->Decks[0].EqMid, 0, 1.0f);
   CO_Register("[Channel1]", "filterLow", CO_TYPE_FLOAT,
-              &audioEngine.Decks[0].EqLow, 0, 1.0f);
+              &audioEngine->Decks[0].EqLow, 0, 1.0f);
   CO_Register("[Channel1]", "cue_default", CO_TYPE_BOOL,
-              &audioEngine.Decks[0].IsCueActive, 0, 1);
-
+              &audioEngine->Decks[0].IsCueActive, 0, 1);
+ 
   CO_Register("[Channel2]", "play", CO_TYPE_BOOL,
-              &audioEngine.Decks[1].IsMotorOn, 0, 1);
-  CO_Register("[Channel2]", "volume", CO_TYPE_FLOAT, &audioEngine.Decks[1].Trim,
+              &audioEngine->Decks[1].IsMotorOn, 0, 1);
+  CO_Register("[Channel2]", "volume", CO_TYPE_FLOAT, &audioEngine->Decks[1].Trim,
               0, 2.0f);
   CO_Register("[Channel2]", "filterHigh", CO_TYPE_FLOAT,
-              &audioEngine.Decks[1].EqHigh, 0, 1.0f);
+              &audioEngine->Decks[1].EqHigh, 0, 1.0f);
   CO_Register("[Channel2]", "filterMid", CO_TYPE_FLOAT,
-              &audioEngine.Decks[1].EqMid, 0, 1.0f);
+              &audioEngine->Decks[1].EqMid, 0, 1.0f);
   CO_Register("[Channel2]", "filterLow", CO_TYPE_FLOAT,
-              &audioEngine.Decks[1].EqLow, 0, 1.0f);
+              &audioEngine->Decks[1].EqLow, 0, 1.0f);
   CO_Register("[Channel2]", "cue_default", CO_TYPE_BOOL,
-              &audioEngine.Decks[1].IsCueActive, 0, 1);
-
-  CO_Register("[Master]", "crossfader", CO_TYPE_FLOAT, &audioEngine.Crossfader,
+              &audioEngine->Decks[1].IsCueActive, 0, 1);
+ 
+  CO_Register("[Master]", "crossfader", CO_TYPE_FLOAT, &audioEngine->Crossfader,
               -1.0f, 1.0f);
 
-  globalAudioEngine = &audioEngine;
+  globalAudioEngine = audioEngine;
 
 #if defined(PLATFORM_WEB) || defined(PLATFORM_IOS)
 #if defined(PLATFORM_WEB)
@@ -568,6 +585,8 @@ int main(void) {
   UIFonts_Unload();
   MIDI_Close(&app.midiCtx);
   CloseWindow();
+  
+  if (audioEngine) free(audioEngine);
 #endif
 
   return 0;

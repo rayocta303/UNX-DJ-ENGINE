@@ -206,11 +206,18 @@ bool AudioBackend_Start(AudioBackendConfig config, AudioBackendCallback callback
     if (requestedChannels < 2) requestedChannels = 2;
     if (requestedChannels > 8) requestedChannels = 8; // Safety limit
     
+#if defined(PLATFORM_IOS)
+    // Force Stereo on iOS for stability with internal speakers/standard headphones
+    requestedChannels = 2;
+#endif
+
     devConfig.playback.channels = requestedChannels;
     devConfig.sampleRate = config.SampleRate;
     devConfig.periodSizeInFrames = config.BufferSizeFrames;
     devConfig.dataCallback = data_callback;
     
+    // We allow miniaudio to handle sample rate conversion if needed, 
+    // but on iOS we prefer to match hardware.
     ma_result result = ma_device_init(&g_maContext, &devConfig, &g_maDevice);
     if (result != MA_SUCCESS) {
         printf("[AUDIO] Warning: User settings for device %d (ch:%d, sr:%d) failed. Retrying with hardware native settings...\n", 
