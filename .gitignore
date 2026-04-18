@@ -18,7 +18,7 @@ local.properties
 *.dex
 
 tests
-plan
+plan/*
 
 # Generated code
 src/ui/components/assets_bundle.h
