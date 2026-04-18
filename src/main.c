@@ -579,6 +579,8 @@ int main(void) {
   UNX_LOG_INFO("[MAIN] Starting audio backend...");
   AudioBackend_Start(initialAudioCfg, AudioProcessCallback);
   UNX_LOG_INFO("[MAIN] Audio backend started.");
+  
+  UNX_LOG_INFO("[MAIN] Setting main loop (FPS: 60)...");
 
 #if defined(PLATFORM_WEB) || defined(PLATFORM_IOS)
 #if defined(PLATFORM_WEB)
@@ -607,10 +609,23 @@ int main(void) {
 }
 
 void UpdateDrawFrame(App *app) {
+  static bool firstCall = true;
+  if (firstCall) {
+      UNX_LOG_INFO("[MAIN] UpdateDrawFrame: First call received.");
+      firstCall = false;
+  }
+
 #if defined(PLATFORM_IOS)
-  // Safety: If window is hidden, backgrounded, or not yet ready, skip rendering 
-  // to avoid GLDRendererMetal "Insufficient Permission" errors.
-  if (!IsWindowReady() || IsWindowHidden() || IsWindowMinimized()) return;
+  // Safety: Avoid rendering if window is not ready
+  if (!IsWindowReady()) {
+      static double lastWarn = 0;
+      if (GetTime() - lastWarn > 5.0) {
+          UNX_LOG_WARN("[MAIN] UpdateDrawFrame: Window not ready yet...");
+          lastWarn = GetTime();
+      }
+      return;
+  }
+  if (IsWindowHidden() || IsWindowMinimized()) return;
 #endif
 
   AudioEngine *audioEngine = globalAudioEngine;
