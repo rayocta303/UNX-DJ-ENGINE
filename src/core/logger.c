@@ -56,9 +56,9 @@ void Log_Close(void) {
 void Log_Write(LogLevel level, const char* fmt, ...) {
     const char* levelStr = "INFO";
     switch (level) {
-        case LOG_WARNING: levelStr = "WARN"; break;
-        case LOG_ERROR:   levelStr = "ERR "; break;
-        case LOG_DEBUG:   levelStr = "DEBG"; break;
+        case UNX_LEVEL_WARNING: levelStr = "WARN"; break;
+        case UNX_LEVEL_ERROR:   levelStr = "ERR "; break;
+        case UNX_LEVEL_DEBUG:   levelStr = "DEBG"; break;
         default: break;
     }
 
