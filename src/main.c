@@ -625,13 +625,14 @@ int main(void) {
   UNX_LOG_INFO("[MAIN] Setting main loop (FPS: 60)...");
 #endif
 
-#if defined(PLATFORM_WEB)
-  #include <emscripten/emscripten.h>
-  emscripten_set_main_loop_arg((void (*)(void*))UpdateDrawFrame, app, 0, 1);
-#elif defined(PLATFORM_IOS)
-  // On iOS, we return here and let the platform layer call ios_ready/ios_update.
-  return 0;
-#endif
+#if defined(PLATFORM_WEB) || defined(PLATFORM_IOS)
+  #if defined(PLATFORM_WEB)
+    #include <emscripten/emscripten.h>
+    emscripten_set_main_loop_arg((void (*)(void*))UpdateDrawFrame, app, 0, 1);
+  #elif defined(PLATFORM_IOS)
+    // On iOS, we return here and let the platform layer call ios_ready/ios_update.
+    return 0;
+  #endif
 #else
   while (!WindowShouldClose()) {
     UpdateDrawFrame(app);
