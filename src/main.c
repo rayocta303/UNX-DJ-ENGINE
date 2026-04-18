@@ -604,9 +604,16 @@ int main(void) {
 #endif
 
   return 0;
-}
-
 void UpdateDrawFrame(App *app) {
+#if defined(PLATFORM_IOS)
+  // Safety: If window is hidden, backgrounded, or not yet ready, skip rendering 
+  // to avoid GLDRendererMetal "Insufficient Permission" errors.
+  if (!IsWindowReady() || IsWindowHidden() || IsWindowMinimized()) return;
+#endif
+
+  AudioEngine *audioEngine = globalAudioEngine;
+  if (!audioEngine) return;
+
   static double lastHeartbeat = 0;
   static int lastScreen = -1;
   if (GetTime() - lastHeartbeat > 2.0) { // Log RAM every 2 seconds
@@ -619,13 +626,6 @@ void UpdateDrawFrame(App *app) {
       lastScreen = app->screen;
   }
 
-#if defined(PLATFORM_IOS)
-  // Safety: If window is hidden or backgrounded, skip rendering to avoid GLDRendererMetal errors
-  if (IsWindowHidden() || IsWindowMinimized()) return;
-#endif
-  
-  AudioEngine *audioEngine = globalAudioEngine;
-  
   // --- Sync Audio Engine State to UI State ---
   if (audioEngine->Decks[0].PCMBuffer) {
       // Position is already frame-based (L+R pair = 1 frame)
@@ -919,6 +919,8 @@ void UpdateDrawFrame(App *app) {
         app->deckB.HasSeekRequest = false;
       }
     }
+
+    if (!IsWindowReady() || !IsWindowFocused()) return;
 
     BeginDrawing();
     ClearBackground(BLACK);

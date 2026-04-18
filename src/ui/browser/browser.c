@@ -884,28 +884,32 @@ static void Browser_Draw(Component *base) {
 
     float textY = ry + (artist[0] == '\0' ? S(6) : S(2));
 
-    // Marquee Logic for Title
-    float maxTitleW = listW - (textX - listX) - S(90); // Space for BPM/Key/LOAD
-    Vector2 fullSize = MeasureTextEx(faceSm, title, S(13), 1.0f);
+    // Marquee Logic for Title (Optimized: only measure for cursor item)
+    float maxTitleW = listW - (textX - listX) - S(90); 
+    
+    if (isCursor) {
+        Vector2 fullSize = MeasureTextEx(faceSm, title, S(13), 1.0f);
+        if (fullSize.x > maxTitleW) {
+            // Animation
+            double now = GetTime();
+            if (s->LastAnimTime == 0)
+                s->LastAnimTime = now;
+            float dt = (float)(now - s->LastAnimTime);
+            s->LastAnimTime = now;
 
-    if (isCursor && fullSize.x > maxTitleW) {
-      // Animation
-      double now = GetTime();
-      if (s->LastAnimTime == 0)
-        s->LastAnimTime = now;
-      float dt = (float)(now - s->LastAnimTime);
-      s->LastAnimTime = now;
+            s->MarqueeScrollX += dt * S(40.0f); // 40px per second
+            if (s->MarqueeScrollX > fullSize.x + S(40.0f))
+                s->MarqueeScrollX = -S(20.0f); // Loop with gap
 
-      s->MarqueeScrollX += dt * S(40.0f); // 40px per second
-      if (s->MarqueeScrollX > fullSize.x + S(40.0f))
-        s->MarqueeScrollX = -S(20.0f); // Loop with gap
-
-      BeginScissorMode(textX, ry, maxTitleW, rowH);
-      UIDrawText(title, faceSm, textX - s->MarqueeScrollX, textY, S(13),
-                 ColorWhite);
-      EndScissorMode();
+            BeginScissorMode(textX, ry, maxTitleW, rowH);
+            UIDrawText(title, faceSm, textX - s->MarqueeScrollX, textY, S(13),
+                       ColorWhite);
+            EndScissorMode();
+        } else {
+            UIDrawText(title, faceSm, textX, textY, S(13), ColorWhite);
+        }
     } else {
-      // Normal truncated display
+      // Normal truncated display (no measurement needed for non-cursor items)
       BeginScissorMode(textX, ry, maxTitleW, rowH);
       UIDrawText(title, faceSm, textX, textY, S(13), ColorWhite);
       EndScissorMode();

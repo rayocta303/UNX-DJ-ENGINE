@@ -114,6 +114,8 @@ void SplashRenderer_Init(SplashRenderer *s, int *progress) {
           ImageResize(&img, 1080, (int)(1080.0f * aspect));
       }
       s->frames[i] = LoadTextureFromImage(img);
+      GenTextureMipmaps(&s->frames[i]);
+      SetTextureFilter(s->frames[i], TEXTURE_FILTER_BILINEAR);
       UnloadImage(img);
       loadedAny = true;
       continue;
@@ -135,6 +137,8 @@ void SplashRenderer_Init(SplashRenderer *s, int *progress) {
           ImageResize(&imgDisk, 1080, (int)(1080.0f * aspect));
       }
       s->frames[i] = LoadTextureFromImage(imgDisk);
+      GenTextureMipmaps(&s->frames[i]);
+      SetTextureFilter(s->frames[i], TEXTURE_FILTER_BILINEAR);
       UnloadImage(imgDisk);
       loadedAny = true;
     } else {

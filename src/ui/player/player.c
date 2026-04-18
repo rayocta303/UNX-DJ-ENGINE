@@ -116,6 +116,8 @@ void PlayerRenderer_Init(PlayerRenderer *r, DeckState *a, DeckState *b,
         ImageResize(&img, 1080, (int)(1080.0f * aspect));
     }
     r->Logo = LoadTextureFromImage(img);
+    GenTextureMipmaps(&r->Logo);
+    SetTextureFilter(r->Logo, TEXTURE_FILTER_BILINEAR);
     UnloadImage(img);
   } else {
     r->Logo = (Texture2D){0};

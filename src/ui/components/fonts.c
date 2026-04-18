@@ -123,6 +123,7 @@ Font UIFonts_GetIconBrand(float size) {
 }
 
 void UIDrawText(const char* str, Font font, float x, float y, float size, Color clr) {
+    if (!str || str[0] == '\0') return; // Skip empty text
     Vector2 pos = { x, y };
     DrawTextEx(font, str, pos, size, 1.0f, clr); 
 }
