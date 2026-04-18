@@ -496,6 +496,10 @@ int main(void) {
   AudioBackend_Init();
 
   UNX_LOG_INFO("[MAIN] Initializing App (Heap)...");
+  UNX_LOG_INFO("[MAIN] Structure Sizes - App: %.2f MB, AudioEngine: %.2f MB", 
+               (float)sizeof(App)/(1024.0f*1024.0f), 
+               (float)sizeof(AudioEngine)/(1024.0f*1024.0f));
+
   App *app = (App *)malloc(sizeof(App));
   if (!app) {
       UNX_LOG_ERR("[CRITICAL] Failed to allocate App on heap!");
@@ -631,12 +635,7 @@ void UpdateDrawFrame(App *app) {
   AudioEngine *audioEngine = globalAudioEngine;
   if (!audioEngine) return;
 
-  static double lastHeartbeat = 0;
   static int lastScreen = -1;
-  if (GetTime() - lastHeartbeat > 2.0) { // Log RAM every 2 seconds
-      UNX_LOG_INFO("[MAIN] Heartbeat - RAM: %.2f MB, Screen: %d", Log_GetRAMUsage(), app->screen);
-      lastHeartbeat = GetTime();
-  }
   
   if (lastScreen != app->screen) {
       UNX_LOG_INFO("[MAIN] Screen changed to: %d", app->screen);

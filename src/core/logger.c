@@ -110,9 +110,4 @@ float Log_GetRAMUsage(void) {
     return 0.0f;
 }
 
-void Log_Heartbeat(void) {
-    // We can't use GetTime() here without raylib.h, so we'll just log when called.
-    // In main.c we will call this periodically.
-    float ram = Log_GetRAMUsage();
-    UNX_LOG_INFO("Heartbeat - RAM Usage: %.2f MB", ram);
-}
+
