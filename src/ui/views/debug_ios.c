@@ -27,31 +27,41 @@ static void DebugIOS_Draw(Component *base) {
     
     ClearBackground(v->bgColor);
     
+    // 1. Draw Screen Edge Lines (Border)
+    DrawRectangleLines(0, 0, sw, sh, RED);
+    DrawRectangleLines(2, 2, sw - 4, sh - 4, YELLOW); // Secondary safe line
+    
+    // 2. Draw Corner Color Boxes (50x50)
+    DrawRectangle(0, 0, 50, 50, RED);           // Top-Left
+    DrawRectangle(sw - 50, 0, 50, 50, GREEN);   // Top-Right
+    DrawRectangle(0, sh - 50, 50, 50, BLUE);    // Bottom-Left
+    DrawRectangle(sw - 50, sh - 50, 50, 50, YELLOW); // Bottom-Right
+    
     // Header
-    DrawText("XDJ-UNX iOS DEBUG GUI", 20, 40, 30, RAYWHITE);
-    DrawLine(20, 80, sw - 20, 80, GRAY);
+    DrawText("XDJ-UNX iOS NATIVE TEST", 70, 40, 30, RAYWHITE);
+    DrawLine(70, 80, sw - 70, 80, GRAY);
     
     // System Info
     char info[256];
     sprintf(info, "Resolution: %d x %d", sw, sh);
-    DrawText(info, 20, 100, 20, LIGHTGRAY);
+    DrawText(info, 70, 100, 20, LIGHTGRAY);
     
     sprintf(info, "FPS: %d", GetFPS());
-    DrawText(info, 20, 130, 20, GREEN);
+    DrawText(info, 70, 130, 20, GREEN);
     
     sprintf(info, "Touch Count: %d", v->touchCount);
-    DrawText(info, 20, 160, 20, ORANGE);
+    DrawText(info, 70, 160, 20, ORANGE);
     
     // Interactive Test Area
     Rectangle btn = { (float)sw/2 - 150, (float)sh/2 - 50, 300, 100 };
-    DrawRectangleRec(btn, v->isPressed ? SKYBLUE : GRAY);
+    DrawRectangleRec(btn, v->isPressed ? SKYBLUE : DARKGRAY);
     DrawRectangleLinesEx(btn, 2, WHITE);
     
-    const char* btnTxt = v->isPressed ? "TOUCHED!" : "TAP HERE";
+    const char* btnTxt = v->isPressed ? "TOUCHED!" : "TAP CENTER";
     int txtW = MeasureText(btnTxt, 25);
     DrawText(btnTxt, btn.x + (btn.width - txtW)/2, btn.y + 35, 25, WHITE);
     
-    DrawText("Press any area to change background color", 20, sh - 40, 15, GRAY);
+    DrawText("Pemicu: Sentuh area mana pun untuk ganti warna background", 70, sh - 40, 15, GRAY);
 }
 
 void DebugIOS_Init(DebugIOSView *v) {
