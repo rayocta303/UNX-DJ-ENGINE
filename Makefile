@@ -34,6 +34,7 @@ SRC_C = src/main.c \
         src/ui/views/info.c \
         src/ui/views/splash.c \
         src/ui/views/settings.c \
+        src/ui/views/debug_ios.c \
         src/ui/player/bottomstrip.c \
         src/ui/player/beatfx.c \
         src/ui/player/deckinfo.c \
