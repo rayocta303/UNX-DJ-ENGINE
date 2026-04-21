@@ -47,6 +47,9 @@ void AudioEngine_Init(AudioEngine *engine) {
         st->setChannels(CHANNELS);
         st->setSetting(SETTING_USE_QUICKSEEK, 0);
         st->setSetting(SETTING_USE_AA_FILTER, 1);
+        st->setSetting(SETTING_SEQUENCE_MS, 60);    // Balanced sequence for transients
+        st->setSetting(SETTING_SEEKWINDOW_MS, 45);   // Larger seek window for accurate matching
+        st->setSetting(SETTING_OVERLAP_MS, 25);      // More overlap for smoother crossfades
         deck->SoundTouchHandle = (void*)st;
     }
     
@@ -244,7 +247,7 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
         st->setPitch(1.0); 
 
         // Feed samples to SoundTouch until we have enough output
-        int maxIterations = 12; 
+        int maxIterations = 20; 
         while (st->numSamples() < (uint32_t)frames && maxIterations-- > 0) {
             float inBuf[512 * 2];
             int toRead = 512;
