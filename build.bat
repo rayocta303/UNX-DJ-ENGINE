@@ -37,11 +37,21 @@ del src\ui\components\splash_bundle_tmp.h
 
 echo #endif >> src\ui\components\assets_bundle.h
 
+set BACKEND=%2
+if "%BACKEND%"=="" set BACKEND=drm
+
 if "%PLATFORM%"=="linux" (
-    echo [Target: Linux ARM64]
-    set TARGET_FLAGS=-target aarch64-linux-gnu.2.36 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include
-    set LDFLAGS=-Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lpthread -ldl -lm
-    set OUT_DIR=build\linux
+    echo [Target: Linux ARM64 %BACKEND%]
+    
+    if "%BACKEND%"=="desktop" (
+        set TARGET_FLAGS=-target aarch64-linux-gnu.2.36 -DPLATFORM_DESKTOP -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include
+        set LDFLAGS=-Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -lpthread -ldl -lm -lX11 -lwayland-client -lwayland-cursor -lwayland-egl -lxkbcommon
+        set OUT_DIR=build\linux_desktop
+    ) else (
+        set TARGET_FLAGS=-target aarch64-linux-gnu.2.36 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include
+        set LDFLAGS=-Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lpthread -ldl -lm
+        set OUT_DIR=build\linux_drm
+    )
     set TARGET=xdjunx
 ) else (
     echo [Target: Windows x64]

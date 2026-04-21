@@ -18,16 +18,31 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev libx11-dev libxcursor-dev libxinerama-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+          sudo apt-get install -y libasound2-dev libx11-dev libxcursor-dev libxinerama-dev \
+                                 libxrandr-dev libxi-dev libgl1-mesa-dev \
+                                 libwayland-dev libxkbcommon-dev wayland-protocols
 
-      - name: Build with build.sh
+      - name: Build DRM Backend
         run: |
-          chmod +x build.sh
+          chmod +x build.sh tools/build_raylib.sh
           export ZIG=zig
-          ./build.sh
+          ./tools/build_raylib.sh drm
+          ./build.sh drm
 
-      - name: Upload Artifact
+      - name: Build Desktop (Wayland/X11) Backend
+        run: |
+          export ZIG=zig
+          ./tools/build_raylib.sh desktop
+          ./build.sh desktop
+
+      - name: Upload DRM Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: xdjunx-linux-arm64
-          path: xdjunx
+          name: xdjunx-linux-arm64-drm
+          path: build/linux_drm/xdjunx
+
+      - name: Upload Desktop Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xdjunx-linux-arm64-desktop
+          path: build/linux_desktop/xdjunx

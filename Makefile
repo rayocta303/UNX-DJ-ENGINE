@@ -14,12 +14,24 @@ ifeq ($(PLATFORM),WINDOWS_X64)
     LDFLAGS = -Llib -lraylib -lgdi32 -lwinmm -lopengl32
 else ifeq ($(PLATFORM),LINUX_ARM64)
     # Native compilation or cross-compilation for Aarch64
+    # LINUX_BACKEND can be DRM (default) or DESKTOP (Wayland/X11)
+    LINUX_BACKEND ?= DRM
     CC ?= gcc
     CXX ?= g++
     TARGET = xdjunx
-    CFLAGS = -O2 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
-    CXXFLAGS = -O2 -std=c++17 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
-    LDFLAGS = -Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lasound -lpthread -ldl -lm
+    
+    ifeq ($(LINUX_BACKEND),DRM)
+        CFLAGS = -O2 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
+        CXXFLAGS = -O2 -std=c++17 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
+        LDFLAGS = -Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lasound -lpthread -ldl -lm
+    else
+        # Desktop target supporting Wayland and X11
+        CFLAGS = -O2 -DPLATFORM_DESKTOP -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
+        CXXFLAGS = -O2 -std=c++17 -DPLATFORM_DESKTOP -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
+        # Link against Desktop GL/GLES and Windowing libs
+        LDFLAGS = -Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -lasound -lpthread -ldl -lm \
+                  -lX11 -lwayland-client -lwayland-cursor -lwayland-egl -lxkbcommon
+    endif
 endif
 
 CFLAGS += -Wall -Wextra -Isrc -Ilib -Ilib/kaitai

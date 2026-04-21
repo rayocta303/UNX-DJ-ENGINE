@@ -37,9 +37,18 @@ rm src/ui/components/splash_bundle_tmp.h
 echo "#endif" >> src/ui/components/assets_bundle.h
 
 # Targets and Flags
-TARGET_FLAGS="-target aarch64-linux-gnu.2.36 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include"
-LDFLAGS="-Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lpthread -ldl -lm"
-OUT_DIR="build/linux"
+BACKEND=${1:-drm}
+echo "[Selected Backend: $BACKEND]"
+
+if [ "$BACKEND" == "desktop" ]; then
+    TARGET_FLAGS="-target aarch64-linux-gnu.2.36 -DPLATFORM_DESKTOP -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include"
+    LDFLAGS="-Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -lpthread -ldl -lm -lX11 -lwayland-client -lwayland-cursor -lwayland-egl -lxkbcommon"
+else
+    TARGET_FLAGS="-target aarch64-linux-gnu.2.36 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include"
+    LDFLAGS="-Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lpthread -ldl -lm"
+fi
+
+OUT_DIR="build/linux_$BACKEND"
 TARGET="xdjunx"
 
 mkdir -p "$OUT_DIR"

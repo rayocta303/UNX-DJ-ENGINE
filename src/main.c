@@ -541,7 +541,12 @@ int main(void) {
   #if defined(__ANDROID__)
     InitWindow(GetScreenWidth(), GetScreenHeight(), APP_NAME);
     SetTargetFPS(60); 
+  #elif defined(PLATFORM_DRM)
+    // DRM/KMS usually uses native resolution, but we can hint it
+    InitWindow(startWidth, startHeight, APP_NAME);
+    SetTargetFPS(60);
   #else
+    // Desktop (X11, Wayland, Windows)
     SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
     InitWindow(startWidth, startHeight, APP_NAME);
     SetWindowMinSize(REF_WIDTH, REF_HEIGHT);
