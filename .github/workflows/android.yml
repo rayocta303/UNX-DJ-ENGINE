@@ -125,6 +125,7 @@ jobs:
             "${PROJECT_LIB_DIR}/kaitai/kaitai/kaitaistream.cpp"
             "${PROJECT_LIB_DIR}/rekordbox-metadata/*.cpp"
             "${PROJECT_LIB_DIR}/serato/*.cpp"
+            "${PROJECT_LIB_DIR}/soundtouch/*.cpp"
         )
         
         # Exclude platform specific
