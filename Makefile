@@ -29,8 +29,8 @@ else ifeq ($(PLATFORM),LINUX_ARM64)
     endif
 endif
 
-CFLAGS += -Wall -Wextra -Isrc -Isrc/core -Isrc/engine -Ilib -Ilib/kaitai
-CXXFLAGS += -Wall -Wextra -Isrc -Isrc/core -Isrc/engine -Ilib -Ilib/kaitai -Ilib/rekordbox-metadata
+CFLAGS += -Wall -Wextra -Isrc -Isrc/core -Isrc/engine -Ilib -Ilib/soundtouch -Ilib/kaitai
+CXXFLAGS += -Wall -Wextra -Isrc -Isrc/core -Isrc/engine -Ilib -Ilib/soundtouch -Ilib/kaitai -Ilib/rekordbox-metadata
 
 # Source files
 SRC_C = src/main.c \
@@ -50,7 +50,6 @@ SRC_C = src/main.c \
         src/ui/player/deckstrip.c \
         src/ui/player/waveform.c \
         src/ui/player/player.c \
-        src/audio/engine.c \
         src/input/keyboard.c \
         src/ui/browser/browser.c \
         src/core/logger.c \
@@ -72,9 +71,10 @@ SRC_CXX = lib/kaitai/kaitai/kaitaistream.cpp \
           lib/serato/serato_parser.cpp \
           lib/serato/serato_waveform.cpp \
           lib/serato/serato_tags.cpp \
-          src/library/rekordbox_reader.cpp \
           src/library/serato_reader.cpp \
-          src/engine/util/engine_math.cpp
+          src/engine/util/engine_math.cpp \
+          src/audio/engine.cpp \
+          $(wildcard lib/soundtouch/*.cpp)
 
 OBJ = $(SRC_C:.c=.o) $(SRC_CXX:.cpp=.o)
 

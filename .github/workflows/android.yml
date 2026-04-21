@@ -114,6 +114,7 @@ jobs:
             ${PROJECT_LIB_DIR}
             ${PROJECT_LIB_DIR}/kaitai
             ${PROJECT_LIB_DIR}/rekordbox-metadata
+            ${PROJECT_LIB_DIR}/soundtouch
             ${CMAKE_CURRENT_SOURCE_DIR}/../../../raylib-src/src
             src/main/cpp
         )

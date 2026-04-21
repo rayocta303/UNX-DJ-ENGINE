@@ -53,8 +53,8 @@ TARGET="xdjunx"
 
 mkdir -p "$OUT_DIR"
 
-CFLAGS="-Wall -Wextra -Isrc -Isrc/core -Isrc/engine -Ilib -O2 $TARGET_FLAGS"
-CXXFLAGS="-Wall -Wextra -Isrc -Isrc/core -Isrc/engine -Ilib -Ilib/kaitai -Ilib/rekordbox-metadata -O2 -std=c++17 $TARGET_FLAGS"
+CFLAGS="-Wall -Wextra -Isrc -Isrc/core -Isrc/engine -Ilib -Ilib/soundtouch -O2 $TARGET_FLAGS"
+CXXFLAGS="-Wall -Wextra -Isrc -Isrc/core -Isrc/engine -Ilib -Ilib/soundtouch -Ilib/kaitai -Ilib/rekordbox-metadata -O2 -std=c++17 $TARGET_FLAGS"
 
 # Compiling C files
 echo "Building C files..."
@@ -63,7 +63,7 @@ C_FILES=(
     src/ui/views/topbar.c src/ui/views/info.c src/ui/views/splash.c src/ui/views/settings.c
     src/ui/views/about.c src/ui/views/mixer.c src/ui/player/bottomstrip.c src/ui/player/beatfx.c
     src/ui/player/deckinfo.c src/ui/player/deckstrip.c src/ui/player/waveform.c src/ui/player/player.c
-    src/audio/engine.c src/audio/scalers.c src/input/keyboard.c src/ui/browser/browser.c src/core/audio_backend.c
+    src/audio/scalers.c src/input/keyboard.c src/ui/browser/browser.c src/core/audio_backend.c
     src/core/logger.c src/core/logic/quantize.c src/core/logic/sync.c src/core/logic/settings_io.c
     src/core/logic/control_object.c src/core/midi/midi_handler.c src/core/midi/midi_mapper.c
     src/core/midi/midi_backend_win.c
@@ -92,17 +92,23 @@ CPP_FILES=(
     src/library/rekordbox_reader.cpp
     src/library/serato_reader.cpp
     src/engine/util/engine_math.cpp
-    src/engine/scalers/enginebufferscale.cpp
-    src/engine/scalers/enginebufferscalest.cpp
-    src/engine/scalers/enginebufferscalerubberband.cpp
+    src/audio/engine.cpp
+    lib/soundtouch/*.cpp
 )
 
 for f in "${CPP_FILES[@]}"; do
-    $CXX $CXXFLAGS -c "$f" -o "${f%.cpp}.o" || exit 1
+    if [[ $f == *"*"* ]]; then
+        for sf in $f; do
+            $CXX $CXXFLAGS -c "$sf" -o "${sf%.cpp}.o" || exit 1
+        done
+    else
+        $CXX $CXXFLAGS -c "$f" -o "${f%.cpp}.o" || exit 1
+    fi
 done
 
 # Linking
 echo "Linking..."
-$CXX $CXXFLAGS $(find src lib -name "*.o") $LDFLAGS -o "$OUT_DIR/$TARGET" || exit 1
+OBJ_FILES=$(find src lib -name "*.o" ! -name "bin2c.o" ! -name "gen_splash_bundle.o" ! -path "*/soundtouch_temp/*")
+$CXX $CXXFLAGS $OBJ_FILES $LDFLAGS -o "$OUT_DIR/$TARGET" || exit 1
 
 echo "Done."
