@@ -45,14 +45,15 @@ if "%PLATFORM%"=="linux" (
     :: Use -Wl,-z,origin to enable $ORIGIN and -Wl,-rpath,$ORIGIN/lib to set the search path
     if "%BACKEND%"=="desktop" (
         set TARGET_FLAGS=-target aarch64-linux-gnu.2.36 -DPLATFORM_DESKTOP -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include
-        set LDFLAGS=-Llib/linux_arm64 -Wl,-z,origin -Wl,-rpath,$ORIGIN/lib -lraylib -lGLESv2 -lEGL -lpthread -ldl -lm -lX11 -lwayland-client -lwayland-cursor -lwayland-egl -lxkbcommon
+        set LDFLAGS=-Llib/linux_arm64 -Wl,-z,origin -Wl,-rpath,$ORIGIN/lib -lraylib_desktop -lGLESv2 -lEGL -lpthread -ldl -lm -lX11 -lXcursor -lXinerama -lXi -lXrandr -lxcb -lXau -lXdmcp -lxkbcommon
         set OUT_DIR=build\linux_desktop
+        set TARGET=xdjunx_desktop
     ) else (
         set TARGET_FLAGS=-target aarch64-linux-gnu.2.36 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include
         set LDFLAGS=-Llib/linux_arm64 -Wl,-z,origin -Wl,-rpath,$ORIGIN/lib -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lpthread -ldl -lm
         set OUT_DIR=build\linux_drm
+        set TARGET=xdjunx
     )
-    set TARGET=xdjunx
 ) else (
     echo [Target: Windows x64]
     set TARGET_FLAGS=-target x86_64-windows -D_WIN32 -DKS_STR_ENCODING_WIN32API

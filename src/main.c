@@ -542,14 +542,46 @@ int main(void) {
 #if !defined(PLATFORM_IOS)
   SetTraceLogLevel(LOG_ALL);
   Log_Init();
+  printf("[MAIN] Application starting...\n");
   UNX_LOG_INFO("Application starting...");
 
+
   #if defined(PLATFORM_DRM)
+    printf("[MAIN] Platform: DRM\n");
+    UNX_LOG_INFO("[DRM] --- Display Initialization ---");
+    
+    bool foundCard1 = false;
+    // Log available DRI devices
+    printf("[MAIN] Checking DRI devices...\n");
+    UNX_LOG_INFO("[DRM] Checking /dev/dri/ directory contents...");
+    #include <dirent.h>
+    DIR *d = opendir("/dev/dri");
+    if (d) {
+        struct dirent *dir;
+        while ((dir = readdir(d)) != NULL) {
+            if (dir->d_name[0] != '.') {
+                UNX_LOG_INFO("[DRM] Found DRI entry: /dev/dri/%s", dir->d_name);
+                if (strcmp(dir->d_name, "card1") == 0) foundCard1 = true;
+            }
+        }
+        closedir(d);
+    }
+
+    if (foundCard1) {
+        UNX_LOG_INFO("[DRM] Multiple cards detected. Forcing Raylib to use /dev/dri/card1...");
+        #ifdef _WIN32
+        _putenv("RAYLIB_DRM_DEVICE=/dev/dri/card1");
+        #else
+        setenv("RAYLIB_DRM_DEVICE", "/dev/dri/card1", 1);
+        #endif
+    }
+
     int monitorCount = GetMonitorCount();
+
     int displayWidth = 1920;  // Default Fallback
     int displayHeight = 1080; // Default Fallback
+    UNX_LOG_INFO("[DRM] Raylib reports %d monitor(s) through default card", monitorCount);
 
-    UNX_LOG_INFO("[DRM] --- Display Initialization ---");
     UNX_LOG_INFO("[DRM] Total Monitors detected: %d", monitorCount);
 
     if (monitorCount > 0) {
@@ -589,11 +621,29 @@ int main(void) {
     SetTargetFPS(60); 
   #else
     // Desktop (X11, Wayland, Windows)
+    printf("[MAIN] Platform: DESKTOP (X11/Wayland/Windows)\n");
     SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
-    InitWindow(startWidth, startHeight, APP_NAME);
+    
+    // Start in windowed mode (e.g., 1280x720) like Windows version
+    int winWidth = 1280;
+    int winHeight = 720;
+    
+    printf("[MAIN] Initializing Window (%dx%d)...\n", winWidth, winHeight);
+    InitWindow(winWidth, winHeight, APP_NAME);
+    
+    if (IsWindowReady()) {
+        printf("[MAIN] InitWindow SUCCESS. Window size: %dx%d\n", GetScreenWidth(), GetScreenHeight());
+        UNX_LOG_INFO("[DESKTOP] InitWindow SUCCESS.");
+    } else {
+        printf("[MAIN] InitWindow FAILED!\n");
+        UNX_LOG_ERR("[DESKTOP] InitWindow FAILED!");
+    }
+    
     SetWindowMinSize(REF_WIDTH, REF_HEIGHT);
     SetTargetFPS(60);
   #endif
+
+
   
   SetExitKey(KEY_NULL); // ESC is for 'back'
   UIFonts_Init();
