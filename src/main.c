@@ -446,14 +446,21 @@ void App_Init(App *a) {
   strcpy(a->settingsState.Items[13].Options[1], "256");
   strcpy(a->settingsState.Items[13].Options[2], "512");
   strcpy(a->settingsState.Items[13].Options[3], "1024");
-  a->settingsState.Items[13].Current = 1;
-
+  
   strcpy(a->settingsState.Items[14].Label, "SAMPLE RATE");
   a->settingsState.Items[14].Type = SETTING_TYPE_LIST;
   a->settingsState.Items[14].OptionsCount = 2;
-  strcpy(a->settingsState.Items[14].Options[0], "44.1 kHz");
-  strcpy(a->settingsState.Items[14].Options[1], "48.0 kHz");
-  a->settingsState.Items[14].Current = 1;
+  strcpy(a->settingsState.Items[14].Options[0], "44100 Hz");
+  strcpy(a->settingsState.Items[14].Options[1], "48000 Hz");
+
+  // Sync again to make sure labels/options are set before setting Current
+  a->settingsState.Items[13].Current = 1; // Default 256
+  for (int i = 0; i < 4; i++) {
+    if (a->activeAudioConfig.BufferSizeFrames == bufMap[i])
+      a->settingsState.Items[13].Current = i;
+  }
+  a->settingsState.Items[14].Current = (a->activeAudioConfig.SampleRate == 44100) ? 0 : 1;
+
 
   strcpy(a->settingsState.Items[15].Label, "ABOUT");
   a->settingsState.Items[15].Type = SETTING_TYPE_ACTION;
@@ -499,14 +506,9 @@ void App_Init(App *a) {
   a->settings.OnValueChanged = OnSettingsValueChanged;
   a->settings.callbackCtx = a;
 
-  // Default active audio config (matches main's initialAudioCfg)
-  a->activeAudioConfig = (AudioBackendConfig){.DeviceIndex = -1,
-                                              .MasterOutL = 0,
-                                              .MasterOutR = 1,
-                                              .CueOutL = 0,
-                                              .CueOutR = 1,
-                                              .SampleRate = 48000,
-                                              .BufferSizeFrames = 256};
+  // Settings_Load (at line 360) already populated this. 
+  // We only set hardcoded defaults if you want a fallback before loading.
+  
   AboutRenderer_Init(&a->about, &a->aboutState);
   MixerRenderer_Init(&a->mixer, &a->mixerState);
   SplashRenderer_Init(&a->splash, &a->splashCounter);
@@ -661,11 +663,23 @@ int main(void) {
               &audioEngine->Decks[1].EqLow, 0, 1.0f);
   CO_Register("[Channel2]", "cue_default", CO_TYPE_BOOL,
               &audioEngine->Decks[1].IsCueActive, 0, 1);
- 
   CO_Register("[Master]", "crossfader", CO_TYPE_FLOAT, &audioEngine->Crossfader,
               -1.0f, 1.0f);
 
   globalAudioEngine = audioEngine;
+  
+#if !defined(PLATFORM_IOS)
+  UNX_LOG_INFO("[MAIN] Starting audio backend...");
+  if (!AudioBackend_Start(initialAudioCfg, AudioProcessCallback)) {
+      UNX_LOG_ERR("[MAIN] Failed to start audio backend on first attempt! Retrying in 500ms...");
+      // Simple one-time retry or we could make it more robust. 
+      // For now, let's just try once more.
+      WaitTime(0.5); 
+      if (!AudioBackend_Start(initialAudioCfg, AudioProcessCallback)) {
+          UNX_LOG_ERR("[MAIN] Audio backend start failed again. Sound might not be available.");
+      }
+  }
+#endif
 
   UNX_LOG_INFO("[MAIN] Setting main loop (FPS: 60)...");
 
