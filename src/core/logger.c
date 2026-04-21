@@ -127,8 +127,7 @@ void Log_Write(LogLevel level, const char* fmt, ...) {
     // Print to file
     if (g_logFile) {
         fprintf(g_logFile, "[%s] [%s] %s\n", timestamp, levelStr, buffer);
-        // Only flush on errors to maintain performance, otherwise let OS buffer it
-        if (level == UNX_LEVEL_ERROR) fflush(g_logFile);
+        fflush(g_logFile); // Always flush so we don't lose logs on crash
     }
 
 #if defined(_WIN32)

@@ -38,6 +38,8 @@
   #undef CloseWindow
   #undef ShowCursor
   #undef DrawText
+#else
+  #include <unistd.h>
 #endif
 
 
@@ -549,32 +551,35 @@ int main(void) {
   #if defined(PLATFORM_DRM)
     printf("[MAIN] Platform: DRM\n");
     UNX_LOG_INFO("[DRM] --- Display Initialization ---");
-    
-    bool foundCard1 = false;
-    // Log available DRI devices
-    printf("[MAIN] Checking DRI devices...\n");
-    UNX_LOG_INFO("[DRM] Checking /dev/dri/ directory contents...");
-    #include <dirent.h>
-    DIR *d = opendir("/dev/dri");
-    if (d) {
-        struct dirent *dir;
-        while ((dir = readdir(d)) != NULL) {
-            if (dir->d_name[0] != '.') {
-                UNX_LOG_INFO("[DRM] Found DRI entry: /dev/dri/%s", dir->d_name);
-                if (strcmp(dir->d_name, "card1") == 0) foundCard1 = true;
-            }
-        }
-        closedir(d);
-    }
 
-    if (foundCard1) {
-        UNX_LOG_INFO("[DRM] Multiple cards detected. Forcing Raylib to use /dev/dri/card1...");
-        #ifdef _WIN32
-        _putenv("RAYLIB_DRM_DEVICE=/dev/dri/card1");
-        #else
-        setenv("RAYLIB_DRM_DEVICE", "/dev/dri/card1", 1);
-        #endif
-    }
+    // Automatically stop conflicting services if running as root
+    printf("[DRM] Preparing environment (stopping conflicting services)...\n");
+    system("systemctl stop lightdm > /dev/null 2>&1");
+    system("systemctl stop gdm3 > /dev/null 2>&1");
+    system("systemctl stop sddm > /dev/null 2>&1");
+    system("systemctl stop nodm > /dev/null 2>&1");
+    system("pkill Xorg > /dev/null 2>&1");
+    system("pkill X > /dev/null 2>&1");
+    
+    // Set environment variables to stabilize EGL/GBM on Amlogic
+    setenv("EGL_PLATFORM", "drm", 1);
+    setenv("GBM_BACKEND", "drm", 1);
+    setenv("RAYLIB_DRM_DEVICE", "/dev/dri/card0", 1); // Force card0 (Meson Display)
+    
+    // Give the kernel a moment to release the DRM master lock
+    printf("[DRM] Waiting for hardware release...\n");
+    #ifdef _WIN32
+    #else
+    sleep(2); 
+    #endif
+    printf("[DRM] Environment prepared.\n");
+
+
+    
+    // Auto-detect: Let Raylib decide which card to use (it will try card1 then card0)
+    // We only log the devices for debugging.
+    UNX_LOG_INFO("[DRM] Device detection completed. Raylib will auto-select the best card.");
+
 
     int monitorCount = GetMonitorCount();
 
@@ -605,13 +610,18 @@ int main(void) {
         UNX_LOG_WARN("[DRM] NO MONITORS DETECTED! Using default Fallback: 1920x1080");
     }
 
+    printf("[MAIN] Initializing Window (%dx%d)...\n", displayWidth, displayHeight);
     InitWindow(displayWidth, displayHeight, APP_NAME);
     
     if (IsWindowReady()) {
+        printf("[MAIN] InitWindow SUCCESS. Window size: %dx%d\n", GetScreenWidth(), GetScreenHeight());
         UNX_LOG_INFO("[DRM] InitWindow SUCCESS. Window is ready at %dx%d", GetScreenWidth(), GetScreenHeight());
     } else {
+        printf("[MAIN] InitWindow FAILED!\n");
         UNX_LOG_ERR("[DRM] InitWindow FAILED! Possible causes: No permissions to /dev/dri/card0, or no HDMI connected.");
+        return 1;
     }
+
 
     
     SetTargetFPS(60);
