@@ -101,9 +101,20 @@ bool WaveformParser::parseBinary(const std::vector<uint8_t>& data, SeratoAnalysi
             // For now we just store raw.
         } else if (strcmp(blockName, "anlz") == 0) {
             out.detailedWaveform.assign(body, body + blockLength);
-        } else {
-            // Unknown block
-            // std::cerr << "Serato Waveform: Unknown block " << blockName << std::endl;
+        } else if (strcmp(blockName, "MARK") == 0) {
+            // Serato Markers2 entry
+            if (blockLength >= 12) {
+                Marker m;
+                // Markers2 structure: [1:idx][4:timeBE][1:type][4:colorBE][1:nameLen][...:name]
+                m.time = readUint32BE(body + 1);
+                m.type = body[5]; // 0=Cue, 1=Loop
+                m.color = readUint32BE(body + 6) >> 8;
+                uint8_t nameLen = body[10];
+                if (nameLen > 0 && 11 + nameLen <= blockLength) {
+                    m.name = std::string((const char*)(body + 11), nameLen);
+                }
+                out.markers.push_back(m);
+            }
         }
         
         offset += blockLength;
@@ -111,5 +122,6 @@ bool WaveformParser::parseBinary(const std::vector<uint8_t>& data, SeratoAnalysi
     
     return true;
 }
+
 
 } // namespace serato

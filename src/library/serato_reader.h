@@ -17,6 +17,8 @@ typedef struct {
     uint32_t SampleCount;
 } SeratoWaveform;
 
+#include "rekordbox_reader.h" // Reuse RBCue for simplicity
+
 typedef struct {
     uint32_t ID;
     char Title[256];
@@ -28,6 +30,10 @@ typedef struct {
     uint32_t Duration;
     char FilePath[512];
     char Comment[256];
+    
+    // Analysis data
+    RBCue* Cues;
+    uint32_t CueCount;
 } SeratoTrack;
 
 typedef struct {
@@ -48,9 +54,13 @@ typedef struct {
 SeratoDatabase* Serato_LoadDatabase(const char* rootPath);
 void Serato_FreeDatabase(SeratoDatabase* db);
 
-// Waveform Loading
+// Waveform and Marker Loading
 SeratoWaveform* Serato_LoadWaveformFromBase64(const char* base64Data);
 void Serato_FreeWaveform(SeratoWaveform* wf);
+
+// Loads analysis and marker data from the audio file itself
+void Serato_LoadTrackData(SeratoTrack* track, const char* rootPath);
+
 
 #ifdef __cplusplus
 }

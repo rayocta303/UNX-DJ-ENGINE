@@ -4,7 +4,6 @@
 PLATFORM ?= WINDOWS_X64
 
 # Compiler settings
-# Using Zig for cross-compilation on Windows, or native GCC on Linux
 ifeq ($(PLATFORM),WINDOWS_X64)
     CC = t:\zig\zig.exe cc
     CXX = t:\zig\zig.exe c++
@@ -13,29 +12,25 @@ ifeq ($(PLATFORM),WINDOWS_X64)
     CXXFLAGS = -O2 -target x86_64-windows -std=c++17 -D_WIN32 -DKS_STR_ENCODING_WIN32API
     LDFLAGS = -Llib -lraylib -lgdi32 -lwinmm -lopengl32
 else ifeq ($(PLATFORM),LINUX_ARM64)
-    # Native compilation or cross-compilation for Aarch64
-    # LINUX_BACKEND can be DRM (default) or DESKTOP (Wayland/X11)
     LINUX_BACKEND ?= DRM
-    CC ?= gcc
-    CXX ?= g++
+    CC ?= t:\zig\zig.exe cc
+    CXX ?= t:\zig\zig.exe c++
     TARGET = xdjunx
     
     ifeq ($(LINUX_BACKEND),DRM)
-        CFLAGS = -O2 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
-        CXXFLAGS = -O2 -std=c++17 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
-        LDFLAGS = -Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lasound -lpthread -ldl -lm
+        CFLAGS = -O2 -target aarch64-linux-gnu.2.36 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
+        CXXFLAGS = -O2 -target aarch64-linux-gnu.2.36 -std=c++17 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
+        LDFLAGS = -Llib/linux_arm64 -Wl,-z,origin -Wl,-rpath,'$$ORIGIN/lib' -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lasound -lpthread -ldl -lm
     else
-        # Desktop target supporting Wayland and X11
-        CFLAGS = -O2 -DPLATFORM_DESKTOP -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
-        CXXFLAGS = -O2 -std=c++17 -DPLATFORM_DESKTOP -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
-        # Link against Desktop GL/GLES and Windowing libs
-        LDFLAGS = -Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -lasound -lpthread -ldl -lm \
+        CFLAGS = -O2 -target aarch64-linux-gnu.2.36 -DPLATFORM_DESKTOP -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
+        CXXFLAGS = -O2 -target aarch64-linux-gnu.2.36 -std=c++17 -DPLATFORM_DESKTOP -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE
+        LDFLAGS = -Llib/linux_arm64 -Wl,-z,origin -Wl,-rpath,'$$ORIGIN/lib' -lraylib -lGLESv2 -lEGL -lasound -lpthread -ldl -lm \
                   -lX11 -lwayland-client -lwayland-cursor -lwayland-egl -lxkbcommon
     endif
 endif
 
-CFLAGS += -Wall -Wextra -Isrc -Ilib -Ilib/kaitai
-CXXFLAGS += -Wall -Wextra -Isrc -Ilib -Ilib/kaitai -Ilib/rekordbox-metadata
+CFLAGS += -Wall -Wextra -Isrc -Isrc/core -Isrc/engine -Ilib -Ilib/kaitai
+CXXFLAGS += -Wall -Wextra -Isrc -Isrc/core -Isrc/engine -Ilib -Ilib/kaitai -Ilib/rekordbox-metadata
 
 # Source files
 SRC_C = src/main.c \
@@ -46,6 +41,8 @@ SRC_C = src/main.c \
         src/ui/views/info.c \
         src/ui/views/splash.c \
         src/ui/views/settings.c \
+        src/ui/views/about.c \
+        src/ui/views/mixer.c \
         src/ui/views/debug_ios.c \
         src/ui/player/bottomstrip.c \
         src/ui/player/beatfx.c \
@@ -56,6 +53,7 @@ SRC_C = src/main.c \
         src/audio/engine.c \
         src/input/keyboard.c \
         src/ui/browser/browser.c \
+        src/core/logger.c \
         src/core/audio_backend.c \
         src/core/logic/quantize.c \
         src/core/logic/sync.c \
@@ -73,8 +71,10 @@ SRC_CXX = lib/kaitai/kaitai/kaitaistream.cpp \
           lib/rekordbox-metadata/rekordbox_pdb.cpp \
           lib/serato/serato_parser.cpp \
           lib/serato/serato_waveform.cpp \
+          lib/serato/serato_tags.cpp \
           src/library/rekordbox_reader.cpp \
-          src/library/serato_reader.cpp
+          src/library/serato_reader.cpp \
+          src/engine/util/engine_math.cpp
 
 OBJ = $(SRC_C:.c=.o) $(SRC_CXX:.cpp=.o)
 

@@ -128,3 +128,43 @@ extern "C" void Serato_FreeWaveform(SeratoWaveform* wf) {
     if (wf->Samples) delete[] wf->Samples;
     delete wf;
 }
+
+#include "../../lib/serato/serato_tags.h"
+
+extern "C" void Serato_LoadTrackData(SeratoTrack* track, const char* rootPath) {
+    if (!track) return;
+
+    std::string fullPath;
+    if (track->FilePath[0] == '/' || track->FilePath[0] == '\\') {
+        fullPath = std::string(rootPath) + track->FilePath;
+    } else {
+        fullPath = std::string(rootPath) + "/" + track->FilePath;
+    }
+
+    auto tags = serato::TagParser::readTags(fullPath);
+    
+    serato::WaveformParser parser;
+    serato::SeratoAnalysis analysis;
+
+    // Load Markers (Cues)
+    if (tags.count("Markers")) {
+        if (parser.parseBase64(tags["Markers"], analysis)) {
+            if (!analysis.markers.empty()) {
+                track->CueCount = (uint32_t)analysis.markers.size();
+                track->Cues = new RBCue[track->CueCount];
+                for (size_t i = 0; i < analysis.markers.size(); i++) {
+                    track->Cues[i].Time = analysis.markers[i].time;
+                    track->Cues[i].ID = (uint16_t)(i + 1); // 1-8
+                    track->Cues[i].Type = (uint16_t)(analysis.markers[i].type == 0 ? 1 : 2); // 1=Mem, 2=Loop
+                    // Extract color
+                    uint32_t c = analysis.markers[i].color;
+                    track->Cues[i].Color[0] = (c >> 16) & 0xFF;
+                    track->Cues[i].Color[1] = (c >> 8) & 0xFF;
+                    track->Cues[i].Color[2] = c & 0xFF;
+                    strncpy(track->Cues[i].Comment, analysis.markers[i].name.c_str(), 63);
+                }
+            }
+        }
+    }
+}
+

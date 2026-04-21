@@ -29,6 +29,7 @@ typedef struct {
     RBDatabase *DB;
     SeratoDatabase *SeratoDB;
     int DatabaseType; // 0=Rekordbox, 1=Serato
+    bool HasBothDatabases;
 
     // Filtered view
     RBTrack **TrackPointers;

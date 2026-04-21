@@ -13,6 +13,6 @@
 #define BUILD_TIME __TIME__
 
 // Debug Toggles
-#define DEBUG_IOS_GUI // Uncomment this to run minimal GUI test for iOS stability
+// #define DEBUG_IOS_GUI // Uncomment this to run minimal GUI test for iOS stability
 
 #endif // VERSION_H

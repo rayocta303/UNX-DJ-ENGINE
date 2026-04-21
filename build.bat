@@ -42,14 +42,14 @@ if "%BACKEND%"=="" set BACKEND=drm
 
 if "%PLATFORM%"=="linux" (
     echo [Target: Linux ARM64 %BACKEND%]
-    
+    :: Use -Wl,-z,origin to enable $ORIGIN and -Wl,-rpath,$ORIGIN/lib to set the search path
     if "%BACKEND%"=="desktop" (
         set TARGET_FLAGS=-target aarch64-linux-gnu.2.36 -DPLATFORM_DESKTOP -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include
-        set LDFLAGS=-Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -lpthread -ldl -lm -lX11 -lwayland-client -lwayland-cursor -lwayland-egl -lxkbcommon
+        set LDFLAGS=-Llib/linux_arm64 -Wl,-z,origin -Wl,-rpath,$ORIGIN/lib -lraylib -lGLESv2 -lEGL -lpthread -ldl -lm -lX11 -lwayland-client -lwayland-cursor -lwayland-egl -lxkbcommon
         set OUT_DIR=build\linux_desktop
     ) else (
         set TARGET_FLAGS=-target aarch64-linux-gnu.2.36 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include
-        set LDFLAGS=-Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lpthread -ldl -lm
+        set LDFLAGS=-Llib/linux_arm64 -Wl,-z,origin -Wl,-rpath,$ORIGIN/lib -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lpthread -ldl -lm
         set OUT_DIR=build\linux_drm
     )
     set TARGET=xdjunx
@@ -85,6 +85,7 @@ echo Building C++ files...
 %CXX% %CXXFLAGS% -c lib/rekordbox-metadata/rekordbox_pdb.cpp -o lib/rekordbox-metadata/rekordbox_pdb.o || exit /b 1
 %CXX% %CXXFLAGS% -c lib/serato/serato_parser.cpp -o lib/serato/serato_parser.o || exit /b 1
 %CXX% %CXXFLAGS% -c lib/serato/serato_waveform.cpp -o lib/serato/serato_waveform.o || exit /b 1
+%CXX% %CXXFLAGS% -c lib/serato/serato_tags.cpp -o lib/serato/serato_tags.o || exit /b 1
 %CXX% %CXXFLAGS% -c src/library/rekordbox_reader.cpp -o src/library/rekordbox_reader.o || exit /b 1
 %CXX% %CXXFLAGS% -c src/library/serato_reader.cpp -o src/library/serato_reader.o || exit /b 1
 %CXX% %CXXFLAGS% -c src/engine/util/engine_math.cpp -o src/engine/util/engine_math.o || exit /b 1
@@ -95,11 +96,22 @@ if "%2"=="check" (
 )
 
 echo Linking...
-%CXX% %CXXFLAGS% src/main.o src/ui/components/theme.o src/ui/components/fonts.o src/ui/components/helpers.o src/ui/views/topbar.o src/ui/views/info.o src/ui/views/splash.o src/ui/views/settings.o src/ui/views/about.o src/ui/views/mixer.o src/ui/views/debug_ios.o src/ui/player/bottomstrip.o src/ui/player/beatfx.o src/ui/player/deckinfo.o src/ui/player/deckstrip.o src/ui/player/waveform.o src/ui/player/player.o src/audio/engine.o src/engine/util/engine_math.o src/engine/fx/dsp_utils.o src/engine/fx/colorfx/space.o src/engine/fx/colorfx/dub_echo.o src/engine/fx/colorfx/sweep.o src/engine/fx/colorfx/noise.o src/engine/fx/colorfx/crush.o src/engine/fx/colorfx/filter.o src/engine/fx/colorfx/colorfx_manager.o src/engine/fx/beatfx/delay.o src/engine/fx/beatfx/echo.o src/engine/fx/beatfx/pingpong.o src/engine/fx/beatfx/spiral.o src/engine/fx/beatfx/roll.o src/engine/fx/beatfx/sliproll.o src/engine/fx/beatfx/reverb.o src/engine/fx/beatfx/helix.o src/engine/fx/beatfx/flanger.o src/engine/fx/beatfx/phaser.o src/engine/fx/beatfx/bfilter.o src/engine/fx/beatfx/trans.o src/engine/fx/beatfx/pitch.o src/engine/fx/beatfx/vinylbrake.o src/engine/fx/beatfx/beatfx_manager.o src/input/keyboard.o src/ui/browser/browser.o src/core/logger.o src/core/audio_backend.o src/core/logic/quantize.o src/core/logic/sync.o src/core/logic/settings_io.o src/core/logic/control_object.o src/core/midi/midi_handler.o src/core/midi/midi_mapper.o src/core/midi/midi_backend_win.o lib/kaitai/kaitai/kaitaistream.o lib/rekordbox-metadata/rekordbox_anlz.o lib/rekordbox-metadata/rekordbox_pdb.o lib/serato/serato_parser.o lib/serato/serato_waveform.o src/library/rekordbox_reader.o src/library/serato_reader.o %LDFLAGS% -o %OUT_DIR%\%TARGET% || exit /b 1
+%CXX% %CXXFLAGS% src/main.o src/ui/components/theme.o src/ui/components/fonts.o src/ui/components/helpers.o src/ui/views/topbar.o src/ui/views/info.o src/ui/views/splash.o src/ui/views/settings.o src/ui/views/about.o src/ui/views/mixer.o src/ui/views/debug_ios.o src/ui/player/bottomstrip.o src/ui/player/beatfx.o src/ui/player/deckinfo.o src/ui/player/deckstrip.o src/ui/player/waveform.o src/ui/player/player.o src/audio/engine.o src/engine/util/engine_math.o src/engine/fx/dsp_utils.o src/engine/fx/colorfx/space.o src/engine/fx/colorfx/dub_echo.o src/engine/fx/colorfx/sweep.o src/engine/fx/colorfx/noise.o src/engine/fx/colorfx/crush.o src/engine/fx/colorfx/filter.o src/engine/fx/colorfx/colorfx_manager.o src/engine/fx/beatfx/delay.o src/engine/fx/beatfx/echo.o src/engine/fx/beatfx/pingpong.o src/engine/fx/beatfx/spiral.o src/engine/fx/beatfx/roll.o src/engine/fx/beatfx/sliproll.o src/engine/fx/beatfx/reverb.o src/engine/fx/beatfx/helix.o src/engine/fx/beatfx/flanger.o src/engine/fx/beatfx/phaser.o src/engine/fx/beatfx/bfilter.o src/engine/fx/beatfx/trans.o src/engine/fx/beatfx/pitch.o src/engine/fx/beatfx/vinylbrake.o src/engine/fx/beatfx/beatfx_manager.o src/input/keyboard.o src/ui/browser/browser.o src/core/logger.o src/core/audio_backend.o src/core/logic/quantize.o src/core/logic/sync.o src/core/logic/settings_io.o src/core/logic/control_object.o src/core/midi/midi_handler.o src/core/midi/midi_mapper.o src/core/midi/midi_backend_win.o lib/kaitai/kaitai/kaitaistream.o lib/rekordbox-metadata/rekordbox_anlz.o lib/rekordbox-metadata/rekordbox_pdb.o lib/serato/serato_parser.o lib/serato/serato_waveform.o lib/serato/serato_tags.o src/library/rekordbox_reader.o src/library/serato_reader.o %LDFLAGS% -o %OUT_DIR%\%TARGET% || exit /b 1
 
 if "%PLATFORM%"=="windows" (
     echo [Copying Dependencies...]
     if exist lib\raylib.dll copy /y lib\raylib.dll %OUT_DIR% > nul
+) else (
+    echo [Copying Linux Dependencies...]
+    if not exist %OUT_DIR%\lib mkdir %OUT_DIR%\lib
+    copy /y lib\linux_arm64\*.so* %OUT_DIR%\lib > nul
+    
+    :: Explicitly copy sonames for stability
+    if exist lib\linux_arm64\libGLESv2.so copy /y lib\linux_arm64\libGLESv2.so %OUT_DIR%\lib\libGLESv2.so.2 > nul
+    if exist lib\linux_arm64\libEGL.so copy /y lib\linux_arm64\libEGL.so %OUT_DIR%\lib\libEGL.so.1 > nul
+    if exist lib\linux_arm64\libasound.so copy /y lib\linux_arm64\libasound.so %OUT_DIR%\lib\libasound.so.2 > nul
+    if exist lib\linux_arm64\libdrm.so copy /y lib\linux_arm64\libdrm.so %OUT_DIR%\lib\libdrm.so.2 > nul
+    if exist lib\linux_arm64\libgbm.so copy /y lib\linux_arm64\libgbm.so %OUT_DIR%\lib\libgbm.so.1 > nul
 )
 
 :end

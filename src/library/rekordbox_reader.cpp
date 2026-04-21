@@ -123,6 +123,8 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
                                     RBPlaylist pl;
                                     memset(&pl, 0, sizeof(RBPlaylist));
                                     pl.ID = r->id();
+                                    pl.ParentID = r->parent_id();
+                                    pl.IsFolder = (r->raw_is_folder() != 0);
                                     strncpy(pl.Name, RB_GetString(r->name()).c_str(), 255);
                                     rbPlaylists.push_back(pl);
                                     break;

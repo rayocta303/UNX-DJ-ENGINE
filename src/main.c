@@ -540,13 +540,53 @@ int main(void) {
 #endif
 
 #if !defined(PLATFORM_IOS)
-  #if defined(__ANDROID__)
+  SetTraceLogLevel(LOG_ALL);
+  Log_Init();
+  UNX_LOG_INFO("Application starting...");
+
+  #if defined(PLATFORM_DRM)
+    int monitorCount = GetMonitorCount();
+    int displayWidth = 1920;  // Default Fallback
+    int displayHeight = 1080; // Default Fallback
+
+    UNX_LOG_INFO("[DRM] --- Display Initialization ---");
+    UNX_LOG_INFO("[DRM] Total Monitors detected: %d", monitorCount);
+
+    if (monitorCount > 0) {
+        for (int i = 0; i < monitorCount; i++) {
+            int w = GetMonitorWidth(i);
+            int h = GetMonitorHeight(i);
+            UNX_LOG_INFO("[DRM] Monitor [%d]: %s (%dx%d) @ %dHz", 
+                         i, GetMonitorName(i), w, h, GetMonitorRefreshRate(i));
+            
+            if (i == 0 && w > 0 && h > 0) {
+                displayWidth = w;
+                displayHeight = h;
+                UNX_LOG_INFO("[DRM] Using Monitor 0 native resolution: %dx%d", displayWidth, displayHeight);
+            }
+        }
+        
+        if (displayWidth == 1920 && displayHeight == 1080) {
+            UNX_LOG_WARN("[DRM] Monitor 0 reported 0x0 or invalid. FORCING FALLBACK: 1920x1080");
+        }
+    } else {
+        UNX_LOG_WARN("[DRM] NO MONITORS DETECTED! Using default Fallback: 1920x1080");
+    }
+
+    InitWindow(displayWidth, displayHeight, APP_NAME);
+    
+    if (IsWindowReady()) {
+        UNX_LOG_INFO("[DRM] InitWindow SUCCESS. Window is ready at %dx%d", GetScreenWidth(), GetScreenHeight());
+    } else {
+        UNX_LOG_ERR("[DRM] InitWindow FAILED! Possible causes: No permissions to /dev/dri/card0, or no HDMI connected.");
+    }
+
+    
+    SetTargetFPS(60);
+
+  #elif defined(__ANDROID__)
     InitWindow(GetScreenWidth(), GetScreenHeight(), APP_NAME);
     SetTargetFPS(60); 
-  #elif defined(PLATFORM_DRM)
-    // DRM/KMS usually uses native resolution, but we can hint it
-    InitWindow(startWidth, startHeight, APP_NAME);
-    SetTargetFPS(60);
   #else
     // Desktop (X11, Wayland, Windows)
     SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
@@ -554,16 +594,13 @@ int main(void) {
     SetWindowMinSize(REF_WIDTH, REF_HEIGHT);
     SetTargetFPS(60);
   #endif
-#endif
-  SetExitKey(KEY_NULL); // ESC is for 'back'
-
-  Log_Init();
-  UNX_LOG_INFO("Application starting...");
   
-#if !defined(PLATFORM_IOS)
+  SetExitKey(KEY_NULL); // ESC is for 'back'
   UIFonts_Init();
   UNX_LOG_INFO("Fonts initialized.");
 #endif
+
+
 
 #if defined(PLATFORM_IOS)
   void ios_init_audio_session();
@@ -604,10 +641,11 @@ int main(void) {
       .DeviceIndex = app->settingsState.Items[8].Current - 1,
       .MasterOutL = app->settingsState.Items[9].Current,
       .MasterOutR = app->settingsState.Items[10].Current,
-      .CueOutL = app->settingsState.Items[11].Current - 1,
-      .CueOutR = app->settingsState.Items[12].Current - 1,
+      .CueOutL = -1, // Disable for stereo compatibility
+      .CueOutR = -1, // Disable for stereo compatibility
       .SampleRate = (app->settingsState.Items[14].Current == 0) ? 44100 : 48000,
       .BufferSizeFrames = bufMap[app->settingsState.Items[13].Current]};
+
 
 #if defined(PLATFORM_IOS)
   // Force safer defaults for iOS to prevent driver instability/crashes
@@ -617,12 +655,12 @@ int main(void) {
 
   app->activeAudioConfig = initialAudioCfg;
   UNX_LOG_INFO("[MAIN] Audio config prepared. SR: %d, Buf: %d", initialAudioCfg.SampleRate, initialAudioCfg.BufferSizeFrames);
-  
   UNX_LOG_INFO("[MAIN] Retrieving active audio info...");
   // Set initial Audio Driver name for the UI
   AudioBackend_GetActiveInfo(NULL, NULL, app->aboutState.AudioDriver, app->aboutState.AudioDevice);
 
   UNX_LOG_INFO("[MAIN] Initializing Audio Engine (Heap)...");
+
   AudioEngine *audioEngine = (AudioEngine *)malloc(sizeof(AudioEngine));
   if (!audioEngine) {
       UNX_LOG_ERR("[CRITICAL] Failed to allocate AudioEngine on heap!");

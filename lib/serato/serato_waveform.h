@@ -14,13 +14,22 @@ struct WaveformSample {
     uint8_t alpha; // Often used for intensity/height
 };
 
+struct Marker {
+    uint32_t type; // 0=Cue, 1=Loop
+    uint32_t time; // ms
+    uint32_t color; // RGB
+    uint32_t endTime; // for loops
+    std::string name;
+};
+
 struct SeratoAnalysis {
     std::string version;
     std::vector<uint8_t> overview; // onvg raw data
     std::vector<uint8_t> detailedWaveform; // anlz raw data
     
-    // Parsed overview (color-coded)
+    // Parsed data
     std::vector<WaveformSample> overviewSamples;
+    std::vector<Marker> markers;
 };
 
 class WaveformParser {

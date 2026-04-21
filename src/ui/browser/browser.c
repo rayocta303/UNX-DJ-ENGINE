@@ -407,7 +407,7 @@ static int Browser_Update(Component *base) {
       totalItems = s->DB ? s->DB->PlaylistCount : 0;
       break;
     case 2:
-      totalItems = 5;
+      totalItems = 5 + (s->HasBothDatabases ? 1 : 0);
       break;
     case 3:
       totalItems = s->StorageCount;
@@ -514,30 +514,44 @@ static int Browser_Update(Component *base) {
         s->DB = NULL;
         s->SeratoDB = NULL;
 
-        // Try Rekordbox first
+        // Attempt to load both databases if they exist
         s->DB = RB_LoadDatabase(s->SelectedStorage->Path);
-        if (s->DB) {
-          s->DatabaseType = 0;
-          if (s->TrackPointers) free(s->TrackPointers);
-          s->TrackPointers = (RBTrack **)malloc(s->DB->TrackCount * sizeof(RBTrack *));
-          s->BrowseLevel = 2;
-          s->CursorPos = s->ScrollOffset = 0;
-        } else {
-          // Try Serato
-          s->SeratoDB = Serato_LoadDatabase(s->SelectedStorage->Path);
+        s->SeratoDB = Serato_LoadDatabase(s->SelectedStorage->Path);
+        s->HasBothDatabases = (s->DB != NULL && s->SeratoDB != NULL);
+
+        if (s->DB || s->SeratoDB) {
+          if (s->DB) {
+            s->DatabaseType = 0; // Default to Rekordbox if present
+            if (s->TrackPointers) free(s->TrackPointers);
+            s->TrackPointers = (RBTrack **)malloc(s->DB->TrackCount * sizeof(RBTrack *));
+          } else {
+            s->DatabaseType = 1; // Fallback to Serato
+          }
+          
           if (s->SeratoDB) {
-            s->DatabaseType = 1;
             if (s->SeratoTrackPointers) free(s->SeratoTrackPointers);
             s->SeratoTrackPointers = (SeratoTrack **)malloc(s->SeratoDB->TrackCount * sizeof(SeratoTrack *));
-            s->BrowseLevel = 2;
-            s->CursorPos = s->ScrollOffset = 0;
-          } else {
-            printf("[BROWSER] Failed to load database from %s\n", s->SelectedStorage->Path);
+            // If ONLY Serato was found, ensure DatabaseType is Serato
+            if (!s->DB) s->DatabaseType = 1;
           }
+
+          s->BrowseLevel = 2; // Categories level
+          s->CursorPos = s->ScrollOffset = 0;
+        } else {
+          printf("[BROWSER] Failed to load any database from %s\n", s->SelectedStorage->Path);
         }
+
       }
     } else if (s->BrowseLevel == 2) {
-      if (s->CursorPos == 2) {
+      if (s->CursorPos == 5 && s->HasBothDatabases) {
+        // TOGGLE DATABASE
+        s->DatabaseType = (s->DatabaseType == 0) ? 1 : 0;
+        printf("[BROWSER] Switched database to %s\n", s->DatabaseType == 0 ? "Rekordbox" : "Serato");
+        s->CurrentPlaylistIdx = -1; // Reset playlist selection on switch
+        s->CursorPos = s->ScrollOffset = 0;
+        Browser_UpdateActiveTracks(s);
+      }
+ else if (s->CursorPos == 2) {
         s->BrowseLevel = 1; // Categories to Playlists
       } else if (s->CursorPos == 3 || s->CursorPos == 0) {
         s->BrowseLevel = 0; // Categories to Tracks
@@ -546,6 +560,7 @@ static int Browser_Update(Component *base) {
       }
       s->CursorPos = s->ScrollOffset = 0;
     } else if (s->BrowseLevel == 1) {
+
       int idx = s->ScrollOffset + s->CursorPos;
       if (s->DatabaseType == 0) {
         if (s->DB && idx < (int)s->DB->PlaylistCount) {
@@ -659,7 +674,10 @@ static int Browser_Update(Component *base) {
         printf("[BROWSER] Loading Serato track: %s to Deck %c\n", t->Title, loadToDeck == 0 ? 'A' : 'B');
         
         if (s->SelectedStorage) {
+          Serato_LoadTrackData(t, s->SelectedStorage->Path);
+          
           if (s->AudioPlugin) {
+
             char fullPath[1024];
             const char *relPath = t->FilePath;
             // Serato locations can be absolute or relative. Let's assume relative to root if it starts with /
@@ -680,13 +698,28 @@ static int Browser_Update(Component *base) {
             TrackState *newTrack = (TrackState *)malloc(sizeof(TrackState));
             if (newTrack) {
                 memset(newTrack, 0, sizeof(TrackState));
-                // Basic Serato TrackState setup (no waveforms/cues yet)
+                
+                // Copy cues from Serato metadata
+                for (uint32_t i = 0; i < t->CueCount && i < 32; i++) {
+                    if (t->Cues[i].ID >= 1 && t->Cues[i].ID <= 8) {
+                        newTrack->HotCues[newTrack->HotCuesCount].ID = t->Cues[i].ID;
+                        newTrack->HotCues[newTrack->HotCuesCount].Start = t->Cues[i].Time;
+                        memcpy(newTrack->HotCues[newTrack->HotCuesCount].Color, t->Cues[i].Color, 3);
+                        newTrack->HotCuesCount++;
+                    } else {
+                        newTrack->Cues[newTrack->CuesCount].Start = t->Cues[i].Time;
+                        memcpy(newTrack->Cues[newTrack->CuesCount].Color, t->Cues[i].Color, 3);
+                        newTrack->CuesCount++;
+                    }
+                }
+
                 TrackState *oldTrack = targetDeck->LoadedTrack;
                 targetDeck->LoadedTrack = newTrack;
                 if (oldTrack) free(oldTrack);
-                targetDeck->PositionMs = 0;
-                DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck], 0);
+                targetDeck->PositionMs = (newTrack->CuesCount > 0) ? newTrack->Cues[0].Start : 0;
+                DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck], (uint32_t)targetDeck->PositionMs);
             }
+
           }
         }
       }
@@ -854,6 +887,11 @@ static void Browser_Draw(Component *base) {
     case 2:
       if (idx < 5)
         title = categories[idx];
+      else if (idx == 5 && s->HasBothDatabases) {
+        static char switchBuf[32];
+        sprintf(switchBuf, "SWITCH TO %s", s->DatabaseType == 0 ? "SERATO" : "REKORDBOX");
+        title = switchBuf;
+      }
       break;
     case 3:
       if (idx < s->StorageCount)
