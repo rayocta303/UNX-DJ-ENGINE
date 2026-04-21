@@ -38,9 +38,13 @@ UNX DJ Engine is a specialized, high-performance DJ media player firmware subset
 ## Deployment Platforms
 
 - **Windows (x86_64)**: Primary environment for development, simulation, and testing.
-- **Linux (ARM64)**: Optimized for embedded targets using DRM-KMS and GLES for hardware-level deployment.
+- **Linux (ARM64/x64)**: Support for multiple graphics backends:
+    - **DRM-KMS**: Optimized for embedded/firmware targets without a window manager.
+    - **Wayland**: Modern desktop Linux support (e.g., Phosh on postmarketOS).
+    - **X11**: Legacy desktop Linux compatibility.
 - **Android (ARM64)**: Mobile-optimized builds with NDK integration.
 - **iOS (ARM64)**: Native UIKit/CAEAGLLayer integration for high-performance mobile execution.
+
 
 ## Project Roadmap
 
@@ -53,25 +57,37 @@ UNX DJ Engine is a specialized, high-performance DJ media player firmware subset
 
 ## Build and Installation
 
-The project utilizes the Zig toolchain for seamless cross-compilation and dependency management.
+The project utilizes the Zig toolchain for seamless cross-compilation and dependency management. Ensure the `ZIG` environment variable points to your `zig.exe`.
 
 ### Windows Environment
-Execute the provided batch script to initiate the build process:
+Execute the provided batch script to build for Windows:
 ```powershell
-./build.bat
+./build.bat windows
 ```
 
-### Linux and Embedded Systems
-Utilize the included Makefile for native or cross-compilation:
+### Linux (Cross-Compilation from Windows)
+Build for specific graphics backends using the batch script:
+```powershell
+# For Embedded Firmware (DRM-KMS)
+./build.bat linux drm
+
+# For Desktop/Wayland/X11
+./build.bat linux desktop
+```
+
+### Linux (Native Build)
+Utilize the included `build.sh` script:
 ```bash
-make PLATFORM=LINUX_ARM64
+# Default (DRM)
+./build.sh drm
+
+# Desktop (Wayland/X11)
+./build.sh desktop
 ```
 
 ### Android and iOS
-Mobile builds are primarily managed via GitHub Actions CI/CD pipelines. For manual NDK compilation:
-```bash
-make -f android/Makefile.android
-```
+Mobile builds are managed via GitHub Actions CI/CD pipelines.
+
 
 ## Credits and Acknowledgments
 
