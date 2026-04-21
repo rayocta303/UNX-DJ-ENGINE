@@ -15,6 +15,9 @@
 #else
     #include <unistd.h>
     #include <pthread.h>
+    #if defined(__APPLE__)
+        #include <mach/mach.h>
+    #endif
     static pthread_mutex_t g_logLock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
