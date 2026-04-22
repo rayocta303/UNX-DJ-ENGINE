@@ -428,7 +428,7 @@ static int Browser_Update(Component *base) {
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
           s->TouchDragAccumulator = 0;
           if (s->BrowseLevel == 1) {
-            s->IsDragging = true;
+            s->IsDragging = false; // Start as potential drag
             s->DraggingIdx = idx;
             s->DraggingType = 1;
           }
@@ -461,27 +461,32 @@ static int Browser_Update(Component *base) {
       }
     }
 
-    // Drag Scrolling logic
-    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) && !s->IsDragging) {
+    // Drag logic for Playlist Banking (Horizontal/Significant move) or Scrolling
+    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
       Vector2 delta = GetMouseDelta();
-      s->TouchDragAccumulator += delta.y;
+      s->TouchDragAccumulator += fabsf(delta.y) + fabsf(delta.x);
 
-      float threshold = S(20.0f);
-      if (s->TouchDragAccumulator < -threshold) { // Dragged up -> Scroll down
-        if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
-          if (s->CursorPos < totalVisible - 1)
-            s->CursorPos++;
-          else
-            s->ScrollOffset++;
-        }
-        s->TouchDragAccumulator = 0;
-      } else if (s->TouchDragAccumulator >
-                 threshold) { // Dragged down -> Scroll up
-        if (s->CursorPos > 0)
-          s->CursorPos--;
-        else if (s->ScrollOffset > 0)
-          s->ScrollOffset--;
-        s->TouchDragAccumulator = 0;
+      // If we are on Level 1 (Playlists) and move enough, trigger actual Drag state
+      if (s->BrowseLevel == 1 && !s->IsDragging && s->TouchDragAccumulator > S(15.0f)) {
+          s->IsDragging = true;
+      }
+
+      if (!s->IsDragging) {
+          // List Scrolling logic (only if not dragging to bank)
+          static float scrollAccum = 0;
+          scrollAccum += delta.y;
+          float threshold = S(20.0f);
+          if (scrollAccum < -threshold) {
+              if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
+                  if (s->CursorPos < totalVisible - 1) s->CursorPos++;
+                  else s->ScrollOffset++;
+              }
+              scrollAccum = 0;
+          } else if (scrollAccum > threshold) {
+              if (s->CursorPos > 0) s->CursorPos--;
+              else if (s->ScrollOffset > 0) s->ScrollOffset--;
+              scrollAccum = 0;
+          }
       }
     }
 
@@ -776,29 +781,39 @@ static void Browser_Draw(Component *base) {
     bool isBank = (i >= 4);
     bool isAssigned = isBank && (s->PlaylistBankIdx[i - 4] >= 0);
 
+    bool isActiveNav = false;
+    if (!isBank) {
+        if (i == 0 && s->BrowseLevel == 0) isActiveNav = true; // Tracks
+        if (i == 1 && s->BrowseLevel == 2) isActiveNav = true; // Folders/Categories
+        if (i == 2 && s->BrowseLevel == 1) isActiveNav = true; // Playlists
+        if (i == 3 && s->BrowseLevel == 3) isActiveNav = true; // Source
+    }
+
     // Background
-    Color bg = isHovered ? ColorBlue
-                         : (isBank ? (isAssigned ? ColorDGreen : ColorDark3)
-                                   : ColorDark2);
+    Color bg = ColorDark2;
+    if (isHovered) bg = ColorDark1;
+    if (isActiveNav) bg = (Color){30, 30, 60, 255};
+    if (isBank) bg = isAssigned ? ColorDGreen : ColorDark3;
+
     DrawRectangle(0, boxY, sidebarW, sidebarW, bg);
+    if (isActiveNav) DrawRectangle(0, boxY, S(3), sidebarW, ColorBlue);
 
     // Inner separation lines
     DrawRectangleLinesEx(boxRect, 1.0f, ColorDark1);
 
     if (!isBank) {
-      // Icon / Symbol for main navigation
-      const char *sidIcons[] = {
-          "\uf03c", "\uf07b", "\uf002",
-          "\uf287"}; // Playlist, Folder, Search, Drive (USB)
-      UIDrawText(sidIcons[i], faceIcon, S(12), boxY + S(12), S(16), ColorWhite);
+      const char *sidIcons[] = {"\uf03a", "\uf07b", "\uf5c0", "\uf287"}; // Tracks, Folders, Playlist, USB
+      DrawCentredText(sidIcons[i], (i == 3) ? faceBrand : faceIcon, 0, sidebarW, boxY + S(12), S(16), 
+                      isActiveNav ? ColorBlue : (isHovered ? ColorWhite : ColorShadow));
     } else {
       // Playlist Bank Placeholders (1-3)
       char bankNum[4];
       sprintf(bankNum, "P%d", i - 3);
       // Draw a bookmark icon as a background for the bank spot
-      UIDrawText("\uf02e", faceIcon, S(13), boxY + S(8), S(14),
+      DrawCentredText("\uf02e", faceIcon, 0, sidebarW, boxY + S(8), S(14),
                  isAssigned ? ColorWhite : ColorShadow);
-      UIDrawText(bankNum, faceXS, S(14), boxY + S(24), S(10), ColorWhite);
+      DrawCentredText(bankNum, faceXS, 0, sidebarW, boxY + S(24), S(10), 
+                      isAssigned ? ColorWhite : ColorShadow);
     }
   }
 
@@ -1062,6 +1077,21 @@ static void Browser_Draw(Component *base) {
     DrawCentredText("DECK 2", faceMd, px + pw / 2.0f, pw / 2.0f,
                     py + ph / 2.0f + S(20), S(15),
                     hoverB ? ColorBlack : ColorBlue);
+  }
+
+  // Drag and Drop Visual
+  if (s->IsDragging) {
+      char dragName[128] = "Playlist";
+      if (s->DraggingType == 1 && s->DB && s->DraggingIdx >= 0 && s->DraggingIdx < (int)s->DB->PlaylistCount) {
+          strncpy(dragName, s->DB->Playlists[s->DraggingIdx].Name, 127);
+      } else if (s->DraggingType == 1 && s->SeratoDB && s->DraggingIdx >= 0 && s->DraggingIdx < (int)s->SeratoDB->PlaylistCount) {
+          strncpy(dragName, s->SeratoDB->Playlists[s->DraggingIdx].Name, 127);
+      }
+      
+      float dw = S(120), dh = S(22);
+      DrawRectangle(mPos.x + 10, mPos.y + 10, dw, dh, (Color){40, 40, 40, 200});
+      DrawRectangleLines(mPos.x + 10, mPos.y + 10, dw, dh, ColorBlue);
+      UIDrawText(dragName, faceXS, mPos.x + 15, mPos.y + 15, S(10), ColorWhite);
   }
 }
 
