@@ -193,21 +193,31 @@ void Browser_RefreshStorages(BrowserState *s) {
         if (dir->d_name[0] == '.')
           continue;
         
-        // Skip system folders
+        // Skip system folders and internal mount points
         if (strcmp(dir->d_name, "self") == 0 ||
             strcmp(dir->d_name, "emulated") == 0 ||
             strcmp(dir->d_name, "knox-emulated") == 0 ||
             strcmp(dir->d_name, "container") == 0 ||
             strcmp(dir->d_name, "secure") == 0 ||
             strcmp(dir->d_name, "asec") == 0 ||
-            strcmp(dir->d_name, "obb") == 0)
+            strcmp(dir->d_name, "obb") == 0 ||
+            strcmp(dir->d_name, "runtime") == 0 ||
+            strcmp(dir->d_name, "appfuse") == 0 ||
+            strcmp(dir->d_name, "shared") == 0 ||
+            strcmp(dir->d_name, "user") == 0 ||
+            strcmp(dir->d_name, "media_rw") == 0 ||
+            strcmp(dir->d_name, "temp") == 0 ||
+            strcmp(dir->d_name, "expand") == 0 ||
+            strcmp(dir->d_name, "legacy") == 0 ||
+            strcmp(dir->d_name, "usb") == 0 ||
+            strcmp(dir->d_name, "sdcard") == 0) // Already covered by "Internal Storage"
           continue;
 
         char fullPath[512];
         snprintf(fullPath, sizeof(fullPath), "%s/%s", scanDirs[i], dir->d_name);
 
         struct stat st_dir;
-        if (stat(fullPath, &st_dir) == 0 && S_ISDIR(st_dir.st_mode)) {
+        if (stat(fullPath, &st_dir) == 0 && S_ISDIR(st_dir.st_mode) && access(fullPath, R_OK) == 0) {
           bool exists = false;
           for (int j = 0; j < s->StorageCount; j++) {
             if (strcmp(s->AvailableStorages[j].Path, fullPath) == 0) {
@@ -994,10 +1004,18 @@ static void Browser_Draw(Component *base) {
 
     // Storage icons
     if (s->BrowseLevel == 3 && idx < s->StorageCount) {
-      const char *icon = "\uf287"; // uf287 usb (UTF-8)
-      if (strcmp(s->AvailableStorages[idx].Type, "SD") == 0)
-        icon = "\uf7c2"; // uf7c2 sd-card
-      UIDrawText(icon, faceBrand, listX + S(11), ry + S(7), S(12), ColorWhite);
+      const char *icon = "\uf287"; // USB
+      Font iconFont = faceBrand;
+      
+      if (strcmp(s->AvailableStorages[idx].Type, "Internal") == 0) {
+        icon = "\uf3cd"; // Mobile icon for Internal
+        iconFont = faceIcon;
+      } else if (strcmp(s->AvailableStorages[idx].Type, "SD") == 0) {
+        icon = "\uf7c2"; // SD Card
+        iconFont = faceIcon;
+      }
+      
+      UIDrawText(icon, iconFont, listX + S(11), ry + S(7), S(12), ColorWhite);
     }
   }
 
