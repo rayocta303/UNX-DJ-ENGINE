@@ -42,15 +42,15 @@ void AudioEngine_Init(AudioEngine *engine, uint32_t outputSampleRate) {
         deck->IsMotorOn = false;
         deck->IsPlaying = false;
 
-        // Initialize SoundTouch
+        // Initialize SoundTouch with High Fidelity parameters
         SoundTouch *st = new SoundTouch();
         st->setSampleRate(engine->OutputSampleRate);
         st->setChannels(CHANNELS);
-        st->setSetting(SETTING_USE_QUICKSEEK, 0);
+        st->setSetting(SETTING_USE_QUICKSEEK, 0);     // High quality correlation (Full search)
         st->setSetting(SETTING_USE_AA_FILTER, 1);
-        st->setSetting(SETTING_SEQUENCE_MS, 80);    // Ultra-high resolution for slow speeds
-        st->setSetting(SETTING_SEEKWINDOW_MS, 60);   // Very large seek window for extreme stretching
-        st->setSetting(SETTING_OVERLAP_MS, 30);      // Extra smooth crossfades
+        st->setSetting(SETTING_SEQUENCE_MS, 60);      // Optimized for DJ tempo ranges
+        st->setSetting(SETTING_SEEKWINDOW_MS, 20);    // Balanced seek window
+        st->setSetting(SETTING_OVERLAP_MS, 15);       // Smoother crossfades for Master Tempo
         deck->SoundTouchHandle = (void*)st;
     }
     
@@ -260,23 +260,16 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
         st->setPitch(1.0); 
 
         // Feed samples to SoundTouch until we have enough output
-        int maxIterations = 30; 
+        // We use a safety margin to ensure st->receiveSamples gets what it needs
+        int maxIterations = 15; 
         while (st->numSamples() < (uint32_t)frames && maxIterations-- > 0) {
             float inBuf[512 * 2];
             int toRead = 512;
-            int startPos = (int)deck->MT_ReadPos;
-            float frac = (float)(deck->MT_ReadPos - startPos);
             
-            if (frac < 0.001f) {
-                for (int j = 0; j < toRead; j++) {
-                    AudioEngine_GetSampleDirect(deck, startPos + j, &inBuf[j*2], &inBuf[j*2+1]);
-                }
-                deck->MT_ReadPos += (targetRate > 0) ? (double)toRead : -(double)toRead;
-            } else {
-                for (int j = 0; j < toRead; j++) {
-                    AudioEngine_GetSample(deck, deck->MT_ReadPos, &inBuf[j*2], &inBuf[j*2+1]);
-                    deck->MT_ReadPos += (targetRate > 0) ? 1.0 : -1.0;
-                }
+            for (int j = 0; j < toRead; j++) {
+                // Use interpolation if position is fractional for high quality feeding
+                AudioEngine_GetSample(deck, deck->MT_ReadPos, &inBuf[j*2], &inBuf[j*2+1]);
+                deck->MT_ReadPos += (targetRate > 0) ? 1.0 : -1.0;
             }
             st->putSamples(inBuf, toRead);
         }
