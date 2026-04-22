@@ -116,16 +116,29 @@ void Browser_RefreshStorages(BrowserState *s) {
 
   // 1. Check for testing storage
   struct stat st;
-  if (stat("usb_test/PIONEER/rekordbox/export.pdb", &st) == 0) {
-    strcpy(s->AvailableStorages[s->StorageCount].Name, "Testing USB (RB)");
-    strcpy(s->AvailableStorages[s->StorageCount].Path, "usb_test");
+  const char *testPath = "usb_test";
+#ifdef __ANDROID__
+  // On Android, check the root of internal storage for usb_test folder
+  if (stat("/storage/emulated/0/usb_test", &st) == 0) {
+    testPath = "/storage/emulated/0/usb_test";
+  }
+#endif
+
+  char dbCheck[512];
+  snprintf(dbCheck, sizeof(dbCheck), "%s/PIONEER/rekordbox/export.pdb", testPath);
+  if (stat(dbCheck, &st) == 0) {
+    strcpy(s->AvailableStorages[s->StorageCount].Name, "USB Test (RB)");
+    strcpy(s->AvailableStorages[s->StorageCount].Path, testPath);
     strcpy(s->AvailableStorages[s->StorageCount].Type, "Rekordbox");
     s->StorageCount++;
-  } else if (stat("usb_test/_Serato_/database V2", &st) == 0) {
-    strcpy(s->AvailableStorages[s->StorageCount].Name, "Testing USB (Serato)");
-    strcpy(s->AvailableStorages[s->StorageCount].Path, "usb_test");
-    strcpy(s->AvailableStorages[s->StorageCount].Type, "Serato");
-    s->StorageCount++;
+  } else {
+    snprintf(dbCheck, sizeof(dbCheck), "%s/_Serato_/database V2", testPath);
+    if (stat(dbCheck, &st) == 0) {
+      strcpy(s->AvailableStorages[s->StorageCount].Name, "USB Test (Serato)");
+      strcpy(s->AvailableStorages[s->StorageCount].Path, testPath);
+      strcpy(s->AvailableStorages[s->StorageCount].Type, "Serato");
+      s->StorageCount++;
+    }
   }
 
 #ifdef _WIN32
