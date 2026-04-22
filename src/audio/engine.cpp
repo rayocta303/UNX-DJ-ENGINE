@@ -42,15 +42,15 @@ void AudioEngine_Init(AudioEngine *engine, uint32_t outputSampleRate) {
         deck->IsMotorOn = false;
         deck->IsPlaying = false;
 
-        // Initialize SoundTouch with Extreme Quality parameters (Prioritize smoothness over CPU)
+        // Initialize SoundTouch with Balanced parameters (Optimized for Mobile/DJ)
         SoundTouch *st = new SoundTouch();
         st->setSampleRate(engine->OutputSampleRate);
         st->setChannels(CHANNELS);
-        st->setSetting(SETTING_USE_QUICKSEEK, 0);     // Highest quality correlation
+        st->setSetting(SETTING_USE_QUICKSEEK, 1);     // Performance boost for mobile
         st->setSetting(SETTING_USE_AA_FILTER, 1);
-        st->setSetting(SETTING_SEQUENCE_MS, 100);     // Very long sequences for stable low-end
-        st->setSetting(SETTING_SEEKWINDOW_MS, 35);    // Large search window for perfect matching
-        st->setSetting(SETTING_OVERLAP_MS, 25);       // Maximum overlap for seamless blending
+        st->setSetting(SETTING_SEQUENCE_MS, 40);      // Balanced resolution/latency
+        st->setSetting(SETTING_SEEKWINDOW_MS, 15);    // Reduced CPU load for mobile
+        st->setSetting(SETTING_OVERLAP_MS, 8);        // Standard overlap for smoothness
         deck->SoundTouchHandle = (void*)st;
     }
     
