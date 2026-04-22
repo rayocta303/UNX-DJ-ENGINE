@@ -38,7 +38,7 @@ static void DebugIOS_Draw(Component *base) {
     DrawRectangle(sw - 50, sh - 50, 50, 50, YELLOW); // Bottom-Right
     
     // Header
-    DrawText("XDJ-UNX iOS NATIVE TEST", 70, 40, 30, RAYWHITE);
+    DrawText("UNX ENGINE iOS NATIVE TEST", 70, 40, 30, RAYWHITE);
     DrawLine(70, 80, sw - 70, 80, GRAY);
     
     // System Info
