@@ -180,11 +180,17 @@ void OnSettingsApply(void *ctx) {
 
   if (audioChanged) {
     UNX_LOG_INFO("[SETTINGS] Audio Hardware config changed, restarting backend...");
-    AudioBackend_Start(aconf, AudioProcessCallback);
-    a->activeAudioConfig = aconf;
-    
-    // Update active driver info in About screen
-    AudioBackend_GetActiveInfo(NULL, NULL, a->aboutState.AudioDriver, a->aboutState.AudioDevice);
+    if (AudioBackend_Start(aconf, AudioProcessCallback)) {
+        a->activeAudioConfig = aconf;
+        
+        // Sync actual hardware sample rate back to engine
+        int actualSR = 0;
+        AudioBackend_GetActiveInfo(NULL, &actualSR, NULL, NULL);
+        if (globalAudioEngine) AudioEngine_SetOutputSampleRate(globalAudioEngine, actualSR);
+
+        // Update active driver info in About screen
+        AudioBackend_GetActiveInfo(NULL, NULL, a->aboutState.AudioDriver, a->aboutState.AudioDevice);
+    }
   }
 
   Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig);
@@ -726,7 +732,7 @@ int main(void) {
       UNX_LOG_ERR("[CRITICAL] Failed to allocate AudioEngine on heap!");
       return -1;
   }
-  AudioEngine_Init(audioEngine);
+  AudioEngine_Init(audioEngine, initialAudioCfg.SampleRate);
   app->browserState.AudioPlugin = (struct AudioEngine *)audioEngine;
   app->browserState.DeckA = (struct DeckState *)&app->deckA;
   app->browserState.DeckB = (struct DeckState *)&app->deckB;
@@ -770,13 +776,16 @@ int main(void) {
   UNX_LOG_INFO("[MAIN] Starting audio backend...");
   if (!AudioBackend_Start(initialAudioCfg, AudioProcessCallback)) {
       UNX_LOG_ERR("[MAIN] Failed to start audio backend on first attempt! Retrying in 500ms...");
-      // Simple one-time retry or we could make it more robust. 
-      // For now, let's just try once more.
       WaitTime(0.5); 
       if (!AudioBackend_Start(initialAudioCfg, AudioProcessCallback)) {
           UNX_LOG_ERR("[MAIN] Audio backend start failed again. Sound might not be available.");
       }
   }
+
+  // Final sync of actual hardware sample rate
+  int actualSR = 0;
+  AudioBackend_GetActiveInfo(NULL, &actualSR, NULL, NULL);
+  AudioEngine_SetOutputSampleRate(audioEngine, actualSR);
 #endif
 
   UNX_LOG_INFO("[MAIN] Setting main loop (FPS: 60)...");

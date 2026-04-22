@@ -20,8 +20,9 @@
 
 using namespace soundtouch;
 
-void AudioEngine_Init(AudioEngine *engine) {
+void AudioEngine_Init(AudioEngine *engine, uint32_t outputSampleRate) {
     memset(engine, 0, sizeof(AudioEngine));
+    engine->OutputSampleRate = outputSampleRate;
 
     for (int i = 0; i < MAX_DECKS; i++) {
         DeckAudioState *deck = &engine->Decks[i];
@@ -43,7 +44,7 @@ void AudioEngine_Init(AudioEngine *engine) {
 
         // Initialize SoundTouch
         SoundTouch *st = new SoundTouch();
-        st->setSampleRate(SAMPLE_RATE);
+        st->setSampleRate(engine->OutputSampleRate);
         st->setChannels(CHANNELS);
         st->setSetting(SETTING_USE_QUICKSEEK, 0);
         st->setSetting(SETTING_USE_AA_FILTER, 1);
@@ -55,6 +56,16 @@ void AudioEngine_Init(AudioEngine *engine) {
     
     BeatFXManager_Init(&engine->BeatFX);
     engine->Crossfader = 0.0f;
+}
+
+void AudioEngine_SetOutputSampleRate(AudioEngine *engine, uint32_t sampleRate) {
+    if (sampleRate == 0) return;
+    engine->OutputSampleRate = sampleRate;
+    for (int i = 0; i < MAX_DECKS; i++) {
+        if (engine->Decks[i].SoundTouchHandle) {
+            ((SoundTouch*)engine->Decks[i].SoundTouchHandle)->setSampleRate(sampleRate);
+        }
+    }
 }
 
 void AudioEngine_Destroy(AudioEngine *engine) {
@@ -210,15 +221,15 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
         return;
     }
 
-    float fs = (deck->SampleRate > 0) ? (float)deck->SampleRate : (float)SAMPLE_RATE;
+    float fs = (float)engine->OutputSampleRate;
     if (deck->LastRate == 0) deck->LastRate = deck->OutlinedRate;
     double targetRate = deck->OutlinedRate;
     
     // EQ Setup
-    EngineLR4_SetLowpass(&deck->EqLowStateL, 350.0f, SAMPLE_RATE);
-    EngineLR4_SetLowpass(&deck->EqLowStateR, 350.0f, SAMPLE_RATE);
-    EngineLR4_SetHighpass(&deck->EqHighStateL, 2500.0f, SAMPLE_RATE);
-    EngineLR4_SetHighpass(&deck->EqHighStateR, 2500.0f, SAMPLE_RATE);
+    EngineLR4_SetLowpass(&deck->EqLowStateL, 350.0f, engine->OutputSampleRate);
+    EngineLR4_SetLowpass(&deck->EqLowStateR, 350.0f, engine->OutputSampleRate);
+    EngineLR4_SetHighpass(&deck->EqHighStateL, 2500.0f, engine->OutputSampleRate);
+    EngineLR4_SetHighpass(&deck->EqHighStateR, 2500.0f, engine->OutputSampleRate);
 
     float gainL = (deck->EqLow < 0.5f) ? (deck->EqLow * 2.0f) : (1.0f + (deck->EqLow - 0.5f) * 4.0f);
     float gainM = (deck->EqMid < 0.5f) ? (deck->EqMid * 2.0f) : (1.0f + (deck->EqMid - 0.5f) * 4.0f);
@@ -227,6 +238,7 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
 
     SoundTouch *st = (SoundTouch*)deck->SoundTouchHandle;
     float maxL = 0, maxR = 0;
+    float sampleRateRatio = (float)deck->SampleRate / (float)engine->OutputSampleRate;
 
     if (deck->MasterTempoActive && !deck->IsTouching && st && fabs(targetRate) > 0.01) {
         // --- MASTER TEMPO MODE (SOUNDTOUCH) ---
@@ -240,9 +252,10 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
 
         static double lastTempo[MAX_DECKS] = {0};
         double absRate = fabs(targetRate);
-        if (fabs(lastTempo[deckIndex] - absRate) > 0.0001) {
-            st->setTempo(absRate);
-            lastTempo[deckIndex] = absRate;
+        double effectiveTempo = absRate * (double)sampleRateRatio;
+        if (fabs(lastTempo[deckIndex] - effectiveTempo) > 0.0001) {
+            st->setTempo(effectiveTempo);
+            lastTempo[deckIndex] = effectiveTempo;
         }
         st->setPitch(1.0); 
 
@@ -294,7 +307,7 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
             l *= mixGain; r *= mixGain;
             ColorFXManager_Process(&deck->ColorFX, &l, &r, l, r, fs);
             if (engine->BeatFX.targetChannel == deckIndex + 1) {
-                BeatFXManager_Process(&engine->BeatFX, &l, &r, l, r, SAMPLE_RATE);
+                BeatFXManager_Process(&engine->BeatFX, &l, &r, l, r, engine->OutputSampleRate);
             }
 
             maxL = fmaxf(maxL, fabsf(l)); maxR = fmaxf(maxR, fabsf(r));
@@ -317,12 +330,12 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
             currentRate += rateDelta;
             float l, r;
             
-            if (isNormalSpeed) {
+            if (isNormalSpeed && fabs(sampleRateRatio - 1.0f) < 0.0001f) {
                 AudioEngine_GetSampleDirect(deck, (int)deck->Position, &l, &r);
                 deck->Position += 1.0;
             } else {
                 AudioEngine_GetSample(deck, deck->Position, &l, &r);
-                deck->Position += currentRate;
+                deck->Position += currentRate * (double)sampleRateRatio;
             }
             float lowL = EngineLR4_Process(&deck->EqLowStateL, l);
             float highL = EngineLR4_Process(&deck->EqHighStateL, l);
@@ -335,7 +348,7 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
             l *= mixGain; r *= mixGain;
             ColorFXManager_Process(&deck->ColorFX, &l, &r, l, r, fs);
             if (engine->BeatFX.targetChannel == deckIndex + 1) {
-                BeatFXManager_Process(&engine->BeatFX, &l, &r, l, r, SAMPLE_RATE);
+                BeatFXManager_Process(&engine->BeatFX, &l, &r, l, r, engine->OutputSampleRate);
             }
 
             maxL = fmaxf(maxL, fabsf(l)); maxR = fmaxf(maxR, fabsf(r));
@@ -361,7 +374,7 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
 
     for (int s = 0; s < frames; s++) {
         if (engine->BeatFX.targetChannel == 0) {
-            BeatFXManager_Process(&engine->BeatFX, &masterMix[s*2], &masterMix[s*2+1], masterMix[s*2], masterMix[s*2+1], SAMPLE_RATE);
+            BeatFXManager_Process(&engine->BeatFX, &masterMix[s*2], &masterMix[s*2+1], masterMix[s*2], masterMix[s*2+1], engine->OutputSampleRate);
         }
         outBuffer[s*4] = fmaxf(-1.0f, fminf(1.0f, masterMix[s*2]));
         outBuffer[s*4 + 1] = fmaxf(-1.0f, fminf(1.0f, masterMix[s*2+1]));
