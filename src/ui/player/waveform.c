@@ -151,78 +151,7 @@ int PWV4_Decode(unsigned char *data, int64_t frame, Color *outColor) {
   return height;
 }
 
-// Peak-sample PWV2 over a range of frames
-static unsigned char GetPWV2Peak(unsigned char *data, int64_t maxFrames,
-                                 double start, double end) {
-  if (end <= 0 || start >= maxFrames)
-    return 0;
 
-  // For very tight windows (high zoom), use interpolation logic
-  if (end - start <= 1.0) {
-    int64_t i1 = (int64_t)floor(start);
-    if (i1 < 0)
-      i1 = 0;
-    int64_t i2 = i1 + 1;
-    if (i2 >= maxFrames)
-      i2 = maxFrames - 1;
-    double fr = start - floor(start);
-
-    // Simple blend of the two surrounding samples - not perfect for Pioneer
-    // bytes but better for smoothness
-    int v1 = data[i1];
-    int v2 = data[i2];
-    return (unsigned char)((double)v1 * (1.0 - fr) + (double)v2 * fr);
-  }
-
-  int64_t s = (int64_t)floor(start);
-  if (s < 0)
-    s = 0;
-  int64_t e = (int64_t)ceil(end);
-  if (e > maxFrames)
-    e = maxFrames;
-
-  int maxAmp = -1;
-  unsigned char best = 0;
-  for (int64_t i = s; i < e; i++) {
-    int amp = data[i] & 0x1F;
-    if (amp > maxAmp) {
-      maxAmp = amp;
-      best = data[i];
-    }
-  }
-  return best;
-}
-
-// Peak-sample PWV4 over a range: returns frame index with max height
-static int64_t GetPWV4PeakFrame(unsigned char *data, int64_t maxFrames,
-                                double start, double end) {
-  if (end <= 0 || start >= maxFrames)
-    return -1;
-
-  if (end - start <= 1.0) {
-    return (int64_t)floor(
-        start + 0.5); // Round to nearest frame for discrete color formats
-  }
-
-  int64_t s = (int64_t)floor(start);
-  if (s < 0)
-    s = 0;
-  int64_t e = (int64_t)ceil(end);
-  if (e > maxFrames)
-    e = maxFrames;
-
-  int maxH = -1;
-  int64_t best = s;
-  for (int64_t i = s; i < e; i++) {
-    uint16_t v = ((uint16_t)data[i * 2] << 8) | data[i * 2 + 1];
-    int h = (v >> 2) & 0x1F;
-    if (h > maxH) {
-      maxH = h;
-      best = i;
-    }
-  }
-  return best;
-}
 
 // PWV7 (3-Band Scrolling Waveform) byte layout per Pioneer reverse engineering
 // (dysentery):

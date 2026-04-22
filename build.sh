@@ -7,9 +7,7 @@ CXX="$ZIG c++"
 
 # Build Asset Bundle Tool
 echo "[Building Asset Bundle Tool...]"
-if [ ! -f tools/bin2c ]; then
-    $CC tools/bin2c.c -o tools/bin2c
-fi
+$CC tools/bin2c.c -o tools/bin2c
 
 # Generate Asset Bundle Header
 echo "[Generating Assets Bundle...]"
@@ -26,9 +24,7 @@ EOF
 ./tools/bin2c "assets/icons/crown.png" src/ui/components/assets_bundle.h icon_crown append
 ./tools/bin2c "assets/icons/star.png" src/ui/components/assets_bundle.h icon_star append
 
-if [ ! -f tools/gen_splash_bundle ]; then
-    $CC tools/gen_splash_bundle.c -o tools/gen_splash_bundle
-fi
+$CC tools/gen_splash_bundle.c -o tools/gen_splash_bundle
 
 echo "[Generating Splash Bundle...]"
 ./tools/gen_splash_bundle assets/splash src/ui/components/splash_bundle_tmp.h
