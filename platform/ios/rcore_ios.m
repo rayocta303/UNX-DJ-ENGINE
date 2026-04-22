@@ -1,4 +1,6 @@
+#ifndef GLES_SILENCE_DEPRECATION
 #define GLES_SILENCE_DEPRECATION
+#endif
 #import <UIKit/UIKit.h>
 #import <OpenGLES/ES3/gl.h>
 #import <OpenGLES/ES2/gl.h>
@@ -16,18 +18,8 @@ void ios_crash_handler(NSException *exception) {
     NSLog(@"[CRASH] Stack trace: %@", [exception callStackSymbols]);
 }
 
-const char* ios_get_documents_path(void) {
-    static char path[1024] = {0};
-    if (path[0] == '\0') {
-        NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-        if (docs) strcpy(path, [docs UTF8String]);
-    }
-    return path;
-}
-
-const char* ios_get_media_path(void) {
-    return "/var/mobile/Media";
-}
+extern const char* ios_get_documents_path(const char* filename);
+extern const char* ios_get_media_path(void);
 
 /* ---- Raylib types we need (avoid including full raylib.h) ---- */
 #ifndef RAYLIB_H
@@ -72,7 +64,7 @@ static CADisplayLink    *_displayLink   = nil;
 
 int InitPlatform(void) {
     /* Set up Logging to Documents/log.txt */
-    const char *docsPath = ios_get_documents_path();
+    const char *docsPath = ios_get_documents_path("");
     if (docsPath && docsPath[0] != '\0') {
         char logPath[1024];
         snprintf(logPath, sizeof(logPath), "%s/log.txt", docsPath);
@@ -117,7 +109,20 @@ int InitPlatform(void) {
 
     /* Get the layer from the app's root view controller */
     // AppController sets RaylibViewController as root
-    UIView *rootView = [UIApplication sharedApplication].keyWindow.rootViewController.view;
+    UIWindow *window = nil;
+    if (@available(iOS 13.0, *)) {
+        for (UIWindowScene* windowScene in [UIApplication sharedApplication].connectedScenes) {
+            if (windowScene.activationState == UISceneActivationStateForegroundActive) {
+                for (UIWindow *w in windowScene.windows) {
+                    if (w.isKeyWindow) { window = w; break; }
+                }
+            }
+            if (window) break;
+        }
+    }
+    if (!window) window = [UIApplication sharedApplication].keyWindow;
+    
+    UIView *rootView = window.rootViewController.view;
     if (!rootView) {
         NSLog(@"[rcore_ios] Failed to find root view");
         return -1;

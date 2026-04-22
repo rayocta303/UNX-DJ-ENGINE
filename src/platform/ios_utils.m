@@ -42,3 +42,7 @@ void ios_init_audio_session() {
     [session setCategory:AVAudioSessionCategoryPlayback error:nil];
     [session setActive:YES error:nil];
 }
+
+const char* ios_get_media_path() {
+    return "/var/mobile/Media";
+}
