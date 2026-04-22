@@ -24,6 +24,7 @@ EOF
 ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Brands-Regular-400.otf" src/ui/components/assets_bundle.h font_awesome_brand append
 ./tools/bin2c "assets/splash.png" src/ui/components/assets_bundle.h unx_logo append
 ./tools/bin2c "assets/icons/crown.png" src/ui/components/assets_bundle.h icon_crown append
+./tools/bin2c "assets/icons/star.png" src/ui/components/assets_bundle.h icon_star append
 
 if [ ! -f tools/gen_splash_bundle ]; then
     $CC tools/gen_splash_bundle.c -o tools/gen_splash_bundle

@@ -8,6 +8,7 @@
 #include "ui/components/assets_bundle.h"
 
 static Texture2D crownTex = {0};
+static Texture2D starTex = {0};
 
 static int DeckInfo_Update(Component *base) {
     (void)base;
@@ -18,16 +19,25 @@ static void DeckInfo_Draw(Component *base) {
     DeckInfoPanel *d = (DeckInfoPanel *)base;
     
     if (crownTex.id == 0) {
-        Image img = LoadImage("assets/icons/crown.png");
-        if (img.data == NULL) {
-            img = LoadImageFromMemory(".png", icon_crown, icon_crown_size);
-        }
+        Image img = LoadImageFromMemory(".png", icon_crown, icon_crown_size);
+        if (img.data == NULL) img = LoadImage("assets/icons/crown.png");
         
         if (img.data != NULL) {
             ImageResize(&img, (int)S(9), (int)S(9));
             crownTex = LoadTextureFromImage(img);
             UnloadImage(img);
             SetTextureFilter(crownTex, TEXTURE_FILTER_BILINEAR);
+        }
+    }
+    if (starTex.id == 0) {
+        Image img = LoadImageFromMemory(".png", icon_star, icon_star_size);
+        if (img.data == NULL) img = LoadImage("assets/icons/star.png");
+        
+        if (img.data != NULL) {
+            ImageResize(&img, (int)S(7), (int)S(7));
+            starTex = LoadTextureFromImage(img);
+            UnloadImage(img);
+            SetTextureFilter(starTex, TEXTURE_FILTER_BILINEAR);
         }
     }
     
@@ -78,6 +88,14 @@ static void DeckInfo_Draw(Component *base) {
         keyStr = d->State->TrackKey;
     }
     UIDrawText(keyStr, faceXS, S(margin + 20), keyY, S(8.5f), ColorWhite);
+
+    // Track Rating (Placeholder stars if loaded)
+    if (d->State->LoadedTrack != NULL) {
+        float starX = S(margin + 60);
+        for (int i = 0; i < 5; i++) {
+            DrawTextureEx(starTex, (Vector2){starX + i * S(8), keyY + S(1)}, 0.0f, 1.0f, (i < 3) ? ColorOrange : ColorShadow);
+        }
+    }
 
     // 3. Bars Row
     float barsY = contentY + rowH * 2.0f + (rowH - S(11)) / 2.0f;

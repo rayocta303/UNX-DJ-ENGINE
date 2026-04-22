@@ -156,10 +156,9 @@ void SplashRenderer_Init(SplashRenderer *s, int *progress) {
 
   // Fallback to static if sequence failed
   if (!loadedAny) {
-    Image img = LoadImage("assets/splash.png");
+    Image img = LoadImageFromMemory(".png", unx_logo, unx_logo_size);
     if (img.data == NULL) {
-      // Skipped on iOS to avoid logo in splash
-      // img = LoadImageFromMemory(".png", unx_logo, unx_logo_size);
+      img = LoadImage("assets/splash.png");
     }
     if (img.data != NULL) {
       s->frameCount = 1;
