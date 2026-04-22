@@ -4,12 +4,12 @@ plugins {
 
 android {
     namespace 'com.unxchr.xdjunx'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.unxchr.xdjunx"
-        minSdk 26 // Android 8.0
-        targetSdk 34
+        minSdk 19
+        targetSdk 35
         versionCode 1
         versionName "1.0"
 
