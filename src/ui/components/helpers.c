@@ -78,27 +78,46 @@ void DrawCentredText(const char* str, Font font, float padX, float width, float 
 }
 
 void UIDrawKnob(float x, float y, float radius, float value, float min, float max, const char* unit, Color color) {
-    // Background arc
-    DrawCircleSectorLines((Vector2){x, y}, radius, 135, 405, 32, ColorShadow);
-    
-    // Active arc
     float normalized = (value - min) / (max - min);
     if (normalized < 0) normalized = 0;
     if (normalized > 1) normalized = 1;
-    
+
+    // 1. Background Track (Groove)
+    // Draw a dark track where the knob "sits"
+    DrawCircleV((Vector2){x, y}, radius + S(3), ColorDark1);
+    DrawRing((Vector2){x, y}, radius + S(1), radius + S(4), 135, 405, 32, Fade(BLACK, 0.4f));
+
+    // 2. Progress Arc (The colored part)
+    float startAngle = 135;
     float endAngle = 135 + (normalized * 270);
-    DrawCircleSectorLines((Vector2){x, y}, radius, 135, endAngle, 32, color);
     
-    // Needle
-    float angleRad = (endAngle - 90) * (M_PI / 180.0f);
-    Vector2 needleEnd = {
-        x + cosf(angleRad) * radius,
-        y + sinf(angleRad) * radius
+    // Draw the active part of the ring
+    DrawRing((Vector2){x, y}, radius + S(1.5f), radius + S(3.5f), startAngle, endAngle, 36, color);
+    // Subtle glow for the active part
+    DrawRing((Vector2){x, y}, radius + S(1.0f), radius + S(4.0f), startAngle, endAngle, 36, Fade(color, 0.2f));
+
+    // 3. Knob Body (3D cylindrical look)
+    // Dark to light gradient to simulate lighting from top-left
+    DrawCircleGradient((int)x, (int)y, radius, ColorDark2, ColorDark3);
+    DrawCircleLines((int)x, (int)y, radius, Fade(WHITE, 0.1f));
+    
+    // Outer rim highlight
+    DrawRing((Vector2){x, y}, radius - S(1), radius, 0, 360, 32, Fade(WHITE, 0.05f));
+
+    // 4. Indicator (Modern Dot)
+    float angleRad = (endAngle - 90) * (PI / 180.0f);
+    Vector2 dotPos = {
+        x + cosf(angleRad) * (radius - S(5)),
+        y + sinf(angleRad) * (radius - S(5))
     };
-    DrawLineEx((Vector2){x, y}, needleEnd, 2.0f, color);
-    
-    // Value / Label text
-    const char *finalLabel = unit ? unit : "";
-    Font face = UIFonts_GetFace(S(8));
-    DrawCentredText(finalLabel, face, x - radius, radius * 2, y + radius + 1, S(8), ColorWhite);
+    // Draw the dot indicator
+    DrawCircleV(dotPos, S(2), ColorWhite);
+    // Dot glow
+    DrawCircleV(dotPos, S(3.5f), Fade(WHITE, 0.2f));
+
+    // 5. Label text (below knob)
+    if (unit && unit[0] != '\0') {
+        Font face = UIFonts_GetFace(S(8));
+        DrawCentredText(unit, face, x - radius, radius * 2, y + radius + S(6), S(8), ColorShadow);
+    }
 }
