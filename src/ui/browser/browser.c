@@ -427,11 +427,11 @@ static int Browser_Update(Component *base) {
       if (CheckCollisionPointRec(mousePos, itemRect)) {
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
           s->TouchDragAccumulator = 0;
-          if (s->BrowseLevel == 1) {
-            s->IsDragging = false; // Start as potential drag
-            s->DraggingIdx = idx;
-            s->DraggingType = 1;
-          }
+          s->IsDragging = false; // Start as potential drag
+          s->DraggingIdx = idx;
+          if (s->BrowseLevel == 1) s->DraggingType = 1;      // Playlist
+          else if (s->BrowseLevel == 0) s->DraggingType = 0; // Track
+          else s->DraggingType = -1;                         // Other
           if (s->CursorPos != i) {
             s->CursorPos = i;
             s->MarqueeScrollX = 0; // Reset marquee on selection change
@@ -467,7 +467,7 @@ static int Browser_Update(Component *base) {
       s->TouchDragAccumulator += fabsf(delta.y) + fabsf(delta.x);
 
       // If we are on Level 1 (Playlists) and move enough, trigger actual Drag state
-      if (s->BrowseLevel == 1 && !s->IsDragging && s->TouchDragAccumulator > S(15.0f)) {
+      if (s->DraggingType == 1 && !s->IsDragging && s->TouchDragAccumulator > S(15.0f)) {
           s->IsDragging = true;
       }
 
@@ -1016,22 +1016,6 @@ static void Browser_Draw(Component *base) {
   DrawScrollbar(SCREEN_WIDTH - S(4), TOP_BAR_H, S(2), viewH - TOP_BAR_H,
                 maxItems, s->ScrollOffset, totalVisible);
 
-  // Drag and Drop Preview
-  if (s->IsDragging) {
-    const char *dragTitle = "Playlist Item";
-    if (s->DatabaseType == 0) {
-        if (s->DraggingType == 1 && s->DB && s->DraggingIdx >= 0 && (uint32_t)s->DraggingIdx < s->DB->PlaylistCount) {
-            dragTitle = s->DB->Playlists[s->DraggingIdx].Name;
-        }
-    } else {
-        if (s->DraggingType == 1 && s->SeratoDB && s->DraggingIdx >= 0 && (uint32_t)s->DraggingIdx < s->SeratoDB->PlaylistCount) {
-            dragTitle = s->SeratoDB->Playlists[s->DraggingIdx].Name;
-        }
-    }
-    DrawRectangle(mPos.x, mPos.y, S(120), rowH, Fade(ColorBlue, 0.6f));
-    UIDrawText(dragTitle, faceSm, mPos.x + S(8), mPos.y + S(6), S(13),
-               ColorWhite);
-  }
 
   // Load Deck Popup Modal
   if (s->ShowLoadPopup) {
@@ -1079,17 +1063,17 @@ static void Browser_Draw(Component *base) {
                     hoverB ? ColorBlack : ColorBlue);
   }
 
-  // Drag and Drop Visual
-  if (s->IsDragging) {
+  // Drag and Drop Visual (Only for Playlists)
+  if (s->IsDragging && s->DraggingType == 1) {
       char dragName[128] = "Playlist";
-      if (s->DraggingType == 1 && s->DB && s->DraggingIdx >= 0 && s->DraggingIdx < (int)s->DB->PlaylistCount) {
+      if (s->DatabaseType == 0 && s->DB && s->DraggingIdx >= 0 && (uint32_t)s->DraggingIdx < s->DB->PlaylistCount) {
           strncpy(dragName, s->DB->Playlists[s->DraggingIdx].Name, 127);
-      } else if (s->DraggingType == 1 && s->SeratoDB && s->DraggingIdx >= 0 && s->DraggingIdx < (int)s->SeratoDB->PlaylistCount) {
+      } else if (s->DatabaseType == 1 && s->SeratoDB && s->DraggingIdx >= 0 && (uint32_t)s->DraggingIdx < s->SeratoDB->PlaylistCount) {
           strncpy(dragName, s->SeratoDB->Playlists[s->DraggingIdx].Name, 127);
       }
       
       float dw = S(120), dh = S(22);
-      DrawRectangle(mPos.x + 10, mPos.y + 10, dw, dh, (Color){40, 40, 40, 200});
+      DrawRectangle(mPos.x + 10, mPos.y + 10, dw, dh, Fade(ColorDark3, 0.8f));
       DrawRectangleLines(mPos.x + 10, mPos.y + 10, dw, dh, ColorBlue);
       UIDrawText(dragName, faceXS, mPos.x + 15, mPos.y + 15, S(10), ColorWhite);
   }
