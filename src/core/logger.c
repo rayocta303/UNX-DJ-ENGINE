@@ -12,6 +12,11 @@
     #include <psapi.h>
     static CRITICAL_SECTION g_logLock;
     static bool g_lockInitialized = false;
+#elif defined(__ANDROID__)
+    #include <android/log.h>
+    #include <unistd.h>
+    #include <pthread.h>
+    static pthread_mutex_t g_logLock = PTHREAD_MUTEX_INITIALIZER;
 #else
     #include <unistd.h>
     #include <pthread.h>
@@ -123,6 +128,14 @@ void Log_Write(LogLevel level, const char* fmt, ...) {
 
     // Print to console
     printf("[%s] [%s] %s\n", timestamp, levelStr, buffer);
+
+#if defined(__ANDROID__)
+    int priority = ANDROID_LOG_INFO;
+    if (level == UNX_LEVEL_WARNING) priority = ANDROID_LOG_WARN;
+    else if (level == UNX_LEVEL_ERROR) priority = ANDROID_LOG_ERROR;
+    else if (level == UNX_LEVEL_DEBUG) priority = ANDROID_LOG_DEBUG;
+    __android_log_print(priority, "XDJ-UNX", "[%s] %s", levelStr, buffer);
+#endif
 
     // Print to file
     if (g_logFile) {

@@ -16,6 +16,7 @@ void UIFonts_Init(void) {
     static bool isInitialized = false;
     if (isInitialized) return;
     isInitialized = true;
+    UNX_LOG_INFO("[FONTS] UIFonts_Init starting...");
 
     // Attempt to load standard font. Use Arial on Windows as requested.
     // TODO: Embed a primary UI font to avoid OS dependencies.
@@ -35,6 +36,7 @@ void UIFonts_Init(void) {
     int fontSize = 64;
 #endif
     
+    UNX_LOG_INFO("[FONTS] Loading default and bold faces...");
     defaultFace = LoadFontEx(fontPathBundled, fontSize, 0, 0);
     boldFace = LoadFontEx(boldPathBundled, fontSize, 0, 0);
     
@@ -61,6 +63,7 @@ void UIFonts_Init(void) {
 
     // Common Unicode ranges for Font Awesome 5/6 (PUA range)
     // Most icons are in 0xF000 - 0xF8FF
+    UNX_LOG_INFO("[FONTS] Preparing icon codepoints...");
     int codepoints[3000];
     int count = 0;
     for (int i = 32; i < 127; i++) codepoints[count++] = i;
@@ -74,6 +77,7 @@ void UIFonts_Init(void) {
     codepoints[count++] = 0x266A; // eighth note
     codepoints[count++] = 0x2022; // bullet
 
+    UNX_LOG_INFO("[FONTS] Loading icon fonts from memory (this may take a moment)...");
     // Font Awesome 5 Solid - Loaded from Memory
     iconSolid = LoadFontFromMemory(".otf", font_awesome_solid, font_awesome_solid_size, fontSize, codepoints, count);
     if (iconSolid.texture.id == 0) {
@@ -91,6 +95,7 @@ void UIFonts_Init(void) {
     if (iconBrand.texture.id == 0) {
         printf("[FONT] Failed to load brand icon font from memory\n");
     }
+    UNX_LOG_INFO("[FONTS] UIFonts_Init completed.");
 }
 
 void UIFonts_Unload(void) {
