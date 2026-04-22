@@ -82,7 +82,7 @@ int InitPlatform(void) {
         freopen(logPath, "a", stdout);
         freopen(logPath, "a", stderr);
         
-        printf("\n=== XDJ-UNX iOS SESSION START ===\n");
+        printf("\n=== UNX ENGINE iOS SESSION START ===\n");
         setbuf(stdout, NULL); // Disable buffering so logs appear immediately
     }
     

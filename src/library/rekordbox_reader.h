@@ -83,7 +83,7 @@ typedef struct {
     uint32_t PlaylistCount;
 } RBDatabase;
 
-// Path should be the root of the USB (e.g. "p:/XDJ-UNX-C/usb_test")
+// Path should be the root of the USB (e.g. "p:/UNX-ENGINE/usb_test")
 RBDatabase* RB_LoadDatabase(const char* rootPath);
 void RB_FreeDatabase(RBDatabase* db);
 

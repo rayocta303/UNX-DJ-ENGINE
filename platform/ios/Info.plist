@@ -67,10 +67,10 @@
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>NSAppleMusicUsageDescription</key>
-	<string>XDJ-UNX needs access to your Media Library to play music files.</string>
+	<string>UNX ENGINE needs access to your Media Library to play music files.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>XDJ-UNX uses Bluetooth for audio output and MIDI controllers.</string>
+	<string>UNX ENGINE uses Bluetooth for audio output and MIDI controllers.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>XDJ-UNX uses the local network for ProDJ Link and synchronization.</string>
+	<string>UNX ENGINE uses the local network for ProDJ Link and synchronization.</string>
 </dict>
 </plist>
