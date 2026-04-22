@@ -601,6 +601,12 @@ int main(void) {
   #endif
 
   SetExitKey(KEY_NULL); // ESC is for 'back'
+  
+#if defined(__ANDROID__)
+  UNX_LOG_INFO("[MAIN] Stability delay for hardware driver...");
+  usleep(200000); // 200ms delay
+#endif
+
   UNX_LOG_INFO("[MAIN] Initializing Fonts...");
   UIFonts_Init();
   UNX_LOG_INFO("[MAIN] Fonts initialized.");
@@ -611,6 +617,12 @@ int main(void) {
 #if defined(PLATFORM_IOS)
   void ios_init_audio_session();
   ios_init_audio_session();
+#endif
+
+#if defined(__ANDROID__)
+  UNX_LOG_INFO("[MAIN] Disabling MSAA for legacy driver compatibility...");
+  ClearConfigFlags(FLAG_MSAA_4X_HINT);
+  usleep(100000); // 100ms
 #endif
 
   // Initialize Audio Backend FIRST so App_Init can enumerate real devices
