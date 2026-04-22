@@ -307,7 +307,7 @@ static void Settings_Draw(Component *base) {
       }
     } else if (item->Type == SETTING_TYPE_KNOB) {
       UIDrawKnob(SCREEN_WIDTH - S(80), ry + (rowH / 2.0f), S(9), item->Value,
-                 item->Min, item->Max, item->Unit, ColorOrange);
+                 item->Min, item->Max, item->Unit, ColorOrange, false);
                  
       char valBuf[16];
       if (item->Value == (int)item->Value) sprintf(valBuf, "%d", (int)item->Value);

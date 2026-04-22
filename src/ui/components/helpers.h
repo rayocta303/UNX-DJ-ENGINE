@@ -9,4 +9,4 @@ void DrawSelectionTriangleEx(float x, float y, float size, int direction, Color 
 void DrawScrollbar(float x, float y, float w, float h, int totalItems, int currentPos, int visibleItems);
 void DrawBadge(float x, float y, float w, float h, Color bg, Color textClr, const char* label);
 void DrawCentredText(const char* str, Font font, float padX, float width, float y, float fontSize, Color clr);
-void UIDrawKnob(float x, float y, float radius, float value, float min, float max, const char* unit, Color color);
+void UIDrawKnob(float x, float y, float radius, float value, float min, float max, const char* unit, Color color, bool centerZero);

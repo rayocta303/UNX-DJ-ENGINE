@@ -21,12 +21,15 @@ static void HandleVerticalFader(float *val, float fx, float fy, float fw,
   if (mDown && hovered) {
     float relY = (mousePos.y - (fy + handleH / 2.0f));
     *val = 1.0f - (relY / travelRange);
-    if (*val < 0.0f) *val = 0.0f;
-    if (*val > 1.0f) *val = 1.0f;
+    if (*val < 0.0f)
+      *val = 0.0f;
+    if (*val > 1.0f)
+      *val = 1.0f;
   }
 }
 
-static void DrawVerticalFader(float x, float y, float w, float h, float val, bool cueActive) {
+static void DrawVerticalFader(float x, float y, float w, float h, float val,
+                              bool cueActive) {
   float handleH = S(22);
   float handleW = w * 0.75f;
   float travelRange = h - handleH;
@@ -46,18 +49,24 @@ static void DrawVerticalFader(float x, float y, float w, float h, float val, boo
   float hy = (y + handleH / 2.0f) + (1.0f - val) * travelRange - handleH / 2.0f;
   Rectangle handle = {x + (w - handleW) / 2.0f, hy, handleW, handleH};
 
-  DrawRectangle(handle.x + S(2), handle.y + S(2), handle.width, handle.height, (Color){0, 0, 0, 150});
+  DrawRectangle(handle.x + S(2), handle.y + S(2), handle.width, handle.height,
+                (Color){0, 0, 0, 150});
   DrawRectangleRec(handle, (Color){45, 45, 45, 255});
   DrawRectangleLinesEx(handle, 1.5f, ColorWhite);
-  DrawLine(handle.x + S(4), handle.y + handleH / 2.0f, handle.x + handleW - S(4), handle.y + handleH / 2.0f, ColorWhite);
+  DrawLine(handle.x + S(4), handle.y + handleH / 2.0f,
+           handle.x + handleW - S(4), handle.y + handleH / 2.0f, ColorWhite);
 
   if (cueActive) {
-    DrawRectangleRec((Rectangle){handle.x + S(2), handle.y + S(2), handleW - S(4), handleH - S(4)}, Fade(ColorOrange, 0.4f));
+    DrawRectangleRec((Rectangle){handle.x + S(2), handle.y + S(2),
+                                 handleW - S(4), handleH - S(4)},
+                     Fade(ColorOrange, 0.4f));
   }
 }
 
-static bool DrawFXButton(const char *label, float x, float y, float w, float h, bool active) {
-  bool hovered = CheckCollisionPointRec(UIGetMousePosition(), (Rectangle){x, y, w, h});
+static bool DrawFXButton(const char *label, float x, float y, float w, float h,
+                         bool active) {
+  bool hovered =
+      CheckCollisionPointRec(UIGetMousePosition(), (Rectangle){x, y, w, h});
   bool pressed = hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
   Color bg = active ? ColorOrange : (hovered ? ColorDark1 : ColorBlack);
   Color fg = active ? ColorBlack : ColorOrange;
@@ -70,42 +79,37 @@ static bool DrawFXButton(const char *label, float x, float y, float w, float h, 
 }
 
 // Improved local knob drawer with percentage
-static void Mixer_DrawKnob(float x, float y, float radius, float value, float min, float max, const char* label, Color color) {
-    UIDrawKnob(x, y, radius, value, min, max, label, color);
-    
-    // Calculate percentage string
-    float range = max - min;
-    float pct = ((value - min) / range) * 100.0f;
-    
-    // Optional: for bipolar controls (like Color FX -1 to 1), map to -100% to 100%
-    if (min < 0.0f && max > 0.0f) {
-        pct = (value / max) * 100.0f;
-    }
-    
-    char pctStr[16];
-    sprintf(pctStr, "%.0f%%", pct);
-    Font f = UIFonts_GetFace(S(7));
-    // Draw directly below the main label that is drawn at `y + radius + 1`
-    DrawCentredText(pctStr, f, x - S(20), S(40), y + radius + S(11), S(7), ColorShadow);
+static void Mixer_DrawKnob(float x, float y, float radius, float value,
+                           float min, float max, const char *label, Color color,
+                           bool centerZero) {
+  UIDrawKnob(x, y, radius, value, min, max, label, color, centerZero);
 }
 
-static void HandleKnob(float *val, float cx, float cy, float r, float min, float max, bool centerZero, Vector2 mousePos, bool mDown) {
-  bool hovered = CheckCollisionPointCircle(mousePos, (Vector2){cx, cy}, r + S(12));
+static void HandleKnob(float *val, float cx, float cy, float r, float min,
+                       float max, bool centerZero, Vector2 mousePos,
+                       bool mDown) {
+  bool hovered =
+      CheckCollisionPointCircle(mousePos, (Vector2){cx, cy}, r + S(12));
   if (mDown && hovered) {
     Vector2 delta = GetMouseDelta();
     float range = max - min;
     *val -= (delta.y / S(110.0f)) * range;
-    if (*val < min) *val = min;
-    if (*val > max) *val = max;
+    if (*val < min)
+      *val = min;
+    if (*val > max)
+      *val = max;
   }
   float wheel = GetMouseWheelMove();
   if (wheel != 0.0f && hovered) {
     float range = max - min;
     *val += (wheel * 0.05f) * range;
-    if (*val < min) *val = min;
-    if (*val > max) *val = max;
+    if (*val < min)
+      *val = min;
+    if (*val > max)
+      *val = max;
   }
-  if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointCircle(mousePos, (Vector2){cx, cy}, r)) {
+  if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
+      CheckCollisionPointCircle(mousePos, (Vector2){cx, cy}, r)) {
     static float lastClickTime = 0;
     if (GetTime() - lastClickTime < 0.3) {
       *val = centerZero ? (min + (max - min) / 2.0f) : min;
@@ -122,155 +126,181 @@ static void DrawVertVU(float vx, float vy, float vw, float vh, float level) {
   for (int i = 0; i < segs; i++) {
     float th = (float)(i + 1) / segs;
     Color c = (i < 12) ? ColorDGreen : (i < 16 ? ColorOrange : ColorRed);
-    if (level < th) c = Fade(c, 0.12f);
+    if (level < th)
+      c = Fade(c, 0.12f);
     DrawRectangle(vx + 2, vy + vh - (i + 1) * segH - 1, vw - 4, segH - 1, c);
   }
 }
 
 static void Mixer_Draw(Component *base) {
-    MixerRenderer *r = (MixerRenderer *)base;
-    if (!r->State->IsActive || r->State->AudioPlugin == NULL) return;
+  MixerRenderer *r = (MixerRenderer *)base;
+  if (!r->State->IsActive || r->State->AudioPlugin == NULL)
+    return;
 
-    AudioEngine *eng = r->State->AudioPlugin;
-    Vector2 mousePos = UIGetMousePosition();
-    bool mDown = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+  AudioEngine *eng = r->State->AudioPlugin;
+  Vector2 mousePos = UIGetMousePosition();
+  bool mDown = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
 
-    float viewH = SCREEN_HEIGHT - DECK_STR_H;
-    DrawRectangle(0, 0, SCREEN_WIDTH, viewH, ColorBGUtil);
+  float viewH = SCREEN_HEIGHT - DECK_STR_H;
+  DrawRectangle(0, 0, SCREEN_WIDTH, viewH, ColorBGUtil);
 
-    DrawRectangle(0, 0, SCREEN_WIDTH, TOP_BAR_H, ColorDark1);
-    DrawLine(0, TOP_BAR_H, SCREEN_WIDTH, TOP_BAR_H, ColorShadow);
-    UIDrawText("MIXER", UIFonts_GetFace(S(12)), S(15), S(5), S(12), ColorWhite);
+  DrawRectangle(0, 0, SCREEN_WIDTH, TOP_BAR_H, ColorDark1);
+  DrawLine(0, TOP_BAR_H, SCREEN_WIDTH, TOP_BAR_H, ColorShadow);
+  UIDrawText("MIXER", UIFonts_GetFace(S(12)), S(15), S(5), S(12), ColorWhite);
 
-    // --- MAIN PANEL ---
-    float panelW = S(640); 
-    float panelH = viewH - TOP_BAR_H - S(10); 
-    float panelX = (SCREEN_WIDTH - panelW) / 2.0f;
-    float panelY = TOP_BAR_H + S(5);
+  // --- MAIN PANEL ---
+  float panelW = S(640);
+  float panelH = viewH - TOP_BAR_H - S(10);
+  float panelX = (SCREEN_WIDTH - panelW) / 2.0f;
+  float panelY = TOP_BAR_H + S(5);
 
-    DrawRectangle(panelX, panelY, panelW, panelH, ColorDark3);
-    DrawRectangleLinesEx((Rectangle){panelX, panelY, panelW, panelH}, 1.0f, ColorGray);
+  DrawRectangle(panelX, panelY, panelW, panelH, ColorDark3);
+  DrawRectangleLinesEx((Rectangle){panelX, panelY, panelW, panelH}, 1.0f,
+                       ColorGray);
 
-    float chW = S(210); 
-    float centerW = panelW - (chW * 2);
-    float ch1X = panelX;
-    float centerX = panelX + chW;
-    float ch2X = centerX + centerW;
+  float chW = S(210);
+  float centerW = panelW - (chW * 2);
+  float ch1X = panelX;
+  float centerX = panelX + chW;
+  float ch2X = centerX + centerW;
 
-    Font fSub = UIFonts_GetFace(S(9));
-    Font fTiny = UIFonts_GetFace(S(7));
+  Font fSub = UIFonts_GetFace(S(9));
+  Font fTiny = UIFonts_GetFace(S(7));
 
-    // --- CHANNELS ---
-    for (int i = 0; i < 2; i++) {
-        DeckAudioState *d = &eng->Decks[i];
-        float x = (i == 0) ? ch1X : ch2X;
-        
-        DrawRectangle(x + S(2), panelY + S(2), chW - S(4), panelH - S(4), (Color){20, 20, 20, 255});
-        DrawRectangleLinesEx((Rectangle){x + S(2), panelY + S(2), chW - S(4), panelH - S(4)}, 1, ColorDark1);
+  // --- CHANNELS ---
+  for (int i = 0; i < 2; i++) {
+    DeckAudioState *d = &eng->Decks[i];
+    float x = (i == 0) ? ch1X : ch2X;
 
-        float eqW = chW * 0.45f;
-        float rColW = chW - eqW - S(8);
-        float eqCx = x + eqW/2.0f + S(4);
-        
-        float ky = panelY + S(22);
-        float kStep = S(40);
-        float kR = S(12);
+    DrawRectangle(x + S(2), panelY + S(2), chW - S(4), panelH - S(4),
+                  (Color){20, 20, 20, 255});
+    DrawRectangleLinesEx(
+        (Rectangle){x + S(2), panelY + S(2), chW - S(4), panelH - S(4)}, 1,
+        ColorDark1);
 
-        UIDrawText(i == 0 ? "CH 1" : "CH 2", fSub, eqCx - S(10), ky - S(14), S(9), ColorOrange);
+    float eqW = chW * 0.45f;
+    float rColW = chW - eqW - S(8);
+    float eqCx = x + eqW / 2.0f + S(4);
 
-        Mixer_DrawKnob(eqCx, ky, kR, d->Trim, 0.0f, 2.0f, "TRIM", (Color){200, 180, 80, 255});
-        HandleKnob(&d->Trim, eqCx, ky, kR, 0.0f, 2.0f, false, mousePos, mDown);
-        
-        ky += kStep + S(12);
-        Mixer_DrawKnob(eqCx, ky, kR, d->EqHigh, 0.0f, 1.0f, "HI", ColorWhite);
-        HandleKnob(&d->EqHigh, eqCx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
-        ky += kStep + S(2);
-        Mixer_DrawKnob(eqCx, ky, kR, d->EqMid, 0.0f, 1.0f, "MID", ColorWhite);
-        HandleKnob(&d->EqMid, eqCx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
-        ky += kStep + S(2);
-        Mixer_DrawKnob(eqCx, ky, kR, d->EqLow, 0.0f, 1.0f, "LOW", ColorWhite);
-        HandleKnob(&d->EqLow, eqCx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
+    float ky = panelY + S(28);
+    float kStep = S(48);
+    float kR = S(12);
 
-        // FADER CLUSTER
-        float rColX = x + eqW + S(4);
-        float colorY = panelY + S(35);
-        float colorCx = rColX + rColW/2.0f;
+    // UIDrawText(i == 0 ? "CH 1" : "CH 2", fSub, eqCx - S(10), ky - S(18),
+    // S(9), ColorOrange);
 
-        Mixer_DrawKnob(colorCx, colorY, S(16), d->ColorFX.colorValue, -1.0f, 1.0f, "COLOR", ColorOrange);
-        HandleKnob(&d->ColorFX.colorValue, colorCx, colorY, S(16), -1.0f, 1.0f, true, mousePos, mDown);
+    Mixer_DrawKnob(eqCx, ky, kR, d->Trim, 0.0f, 2.0f, "TRIM",
+                   (Color){0, 150, 255, 255}, true);
+    HandleKnob(&d->Trim, eqCx, ky, kR, 0.0f, 2.0f, true, mousePos, mDown);
 
-        float controlsY = colorY + S(32);
-        float controlsH = panelH - (controlsY - panelY) - S(45);
-        float vuW = S(11);
-        float faderW = rColW - vuW - S(10);
-        float faderX = rColX + S(4);
-        float vuX = faderX + faderW + S(2);
+    ky += kStep;
+    Mixer_DrawKnob(eqCx, ky, kR, d->EqHigh, 0.0f, 1.0f, "HIGH",
+                   (Color){0, 150, 255, 255}, true);
+    HandleKnob(&d->EqHigh, eqCx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
+    ky += kStep;
+    Mixer_DrawKnob(eqCx, ky, kR, d->EqMid, 0.0f, 1.0f, "MID",
+                   (Color){0, 150, 255, 255}, true);
+    HandleKnob(&d->EqMid, eqCx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
+    ky += kStep;
+    Mixer_DrawKnob(eqCx, ky, kR, d->EqLow, 0.0f, 1.0f, "LOW",
+                   (Color){0, 150, 255, 255}, true);
+    HandleKnob(&d->EqLow, eqCx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
 
-        DrawVertVU(vuX, controlsY, vuW, controlsH, fmaxf(d->VuMeterL, d->VuMeterR));
-        HandleVerticalFader(&d->Fader, faderX, controlsY, faderW, controlsH, mousePos, mDown);
-        DrawVerticalFader(faderX, controlsY, faderW, controlsH, d->Fader, d->IsCueActive);
+    // FADER CLUSTER
+    float rColX = x + eqW + S(4);
+    float colorY = panelY + S(28);
+    float colorCx = rColX + rColW / 2.0f;
 
-        float cueY = controlsY + controlsH + S(8);
-        if (DrawFXButton("CUE", rColX + S(5), cueY, rColW - S(10), S(22), d->IsCueActive)) d->IsCueActive = !d->IsCueActive;
+    Mixer_DrawKnob(colorCx, colorY, S(16), d->ColorFX.colorValue, -1.0f, 1.0f,
+                   "COLOR", ColorOrange, true);
+    HandleKnob(&d->ColorFX.colorValue, colorCx, colorY, S(16), -1.0f, 1.0f,
+               true, mousePos, mDown);
+
+    float controlsY = colorY + S(48);
+    float controlsH = panelH - (controlsY - panelY) - S(45);
+    float vuW = S(11);
+    float faderW = rColW - vuW - S(10);
+    float faderX = rColX + S(4);
+    float vuX = faderX + faderW + S(2);
+
+    DrawVertVU(vuX, controlsY, vuW, controlsH, fmaxf(d->VuMeterL, d->VuMeterR));
+    HandleVerticalFader(&d->Fader, faderX, controlsY, faderW, controlsH,
+                        mousePos, mDown);
+    DrawVerticalFader(faderX, controlsY, faderW, controlsH, d->Fader,
+                      d->IsCueActive);
+
+    float cueY = controlsY + controlsH + S(8);
+    if (DrawFXButton("CUE", rColX + S(5), cueY, rColW - S(10), S(22),
+                     d->IsCueActive))
+      d->IsCueActive = !d->IsCueActive;
+  }
+
+  // --- CENTER: FX GLOBAL (2 Column Layout) ---
+  float colW = centerW / 2.0f;
+  float leftX = centerX;
+  float rightX = centerX + colW;
+  float fxY = panelY + S(12);
+
+  // LEFT COLUMN: SOUND COLOR FX
+  DrawCentredText("SOUND COLOR FX", fTiny, leftX, colW, fxY, S(8), ColorShadow);
+  float cfy = fxY + S(14);
+  char *cfxNames[] = {"SPACE", "DUB ECHO", "SWEEP", "NOISE", "CRUSH", "FILTER"};
+  ColorFXType cfxTypes[] = {COLORFX_SPACE, COLORFX_DUBECHO, COLORFX_SWEEP, COLORFX_NOISE, COLORFX_CRUSH, COLORFX_FILTER};
+  float btnW = colW - S(16);
+  float btnH = S(16);
+  for (int i = 0; i < 6; i++) {
+    float bx = leftX + S(8);
+    float by = cfy + i * (btnH + S(4));
+    if (DrawFXButton(cfxNames[i], bx, by, btnW, btnH, eng->Decks[0].ColorFX.activeFX == cfxTypes[i])) {
+      ColorFXManager_SetFX(&eng->Decks[0].ColorFX, cfxTypes[i]);
+      ColorFXManager_SetFX(&eng->Decks[1].ColorFX, cfxTypes[i]);
     }
+  }
+  cfy += 6 * (btnH + S(4)) + S(8);
+  Mixer_DrawKnob(leftX + colW / 2.0f, cfy + S(12), S(11), eng->Decks[0].ColorFX.parameter, 0.0f, 1.0f, "PARAM", ColorShadow, true);
+  if (CheckCollisionPointCircle(mousePos, (Vector2){leftX + colW / 2.0f, cfy + S(12)}, S(20))) {
+    HandleKnob(&eng->Decks[0].ColorFX.parameter, leftX + colW / 2.0f, cfy + S(12), S(11), 0.0f, 1.0f, true, mousePos, mDown);
+    eng->Decks[1].ColorFX.parameter = eng->Decks[0].ColorFX.parameter; // Sync
+  }
 
-    // --- CENTER: FX GLOBAL ---
-    float midX = centerX + centerW/2.0f;
-    float fy = panelY + S(8);
-    
-    // COLOR FX (2x3 Grid)
-    DrawCentredText("SOUND COLOR FX", fTiny, centerX, centerW, fy, S(8), ColorShadow);
-    fy += S(10);
-    char* cfxNames[] = {"SPACE", "DUB ECHO", "SWEEP", "NOISE", "CRUSH", "FILTER"};
-    ColorFXType cfxTypes[] = {COLORFX_SPACE, COLORFX_DUBECHO, COLORFX_SWEEP, COLORFX_NOISE, COLORFX_CRUSH, COLORFX_FILTER};
-    float bw = (centerW - S(25)) / 2;
-    float bh = S(18);
-    for(int i=0; i<6; i++) {
-        float bx = centerX + S(8) + (i % 2) * (bw + S(8));
-        float by = fy + (i / 2) * (bh + S(5));
-        if (DrawFXButton(cfxNames[i], bx, by, bw, bh, eng->Decks[0].ColorFX.activeFX == cfxTypes[i])) {
-            ColorFXManager_SetFX(&eng->Decks[0].ColorFX, cfxTypes[i]);
-            ColorFXManager_SetFX(&eng->Decks[1].ColorFX, cfxTypes[i]);
-        }
-    }
-    fy += S(68);
+  // RIGHT COLUMN: BEAT FX
+  DrawCentredText("BEAT FX", fTiny, rightX, colW, fxY, S(8), ColorShadow);
+  float bfy = fxY + S(14);
+  const char *bfxNames[] = {"DELAY",    "ECHO",   "P-PONG",  "SPIRAL", "REVERB",
+                            "TRANS",    "FILTER", "FLANGER", "PHASER", "PITCH",
+                            "SLIPROLL", "ROLL",   "BRAKE",   "HELIX"};
+  float bItemW = colW - S(16);
+  
+  // FX Selector
+  DrawRectangle(rightX + S(8), bfy, bItemW, S(18), ColorBlack);
+  DrawRectangleLinesEx((Rectangle){rightX + S(8), bfy, bItemW, S(18)}, 1.0f, ColorDark1);
+  DrawCentredText(bfxNames[eng->BeatFX.activeFX % 14], fSub, rightX, colW, bfy + S(4), S(9), ColorWhite);
+  if (CheckCollisionPointRec(mousePos, (Rectangle){rightX + S(8), bfy, bItemW, S(18)}) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    BeatFXManager_SetFX(&eng->BeatFX, (eng->BeatFX.activeFX + 1) % 14);
+  }
+  bfy += S(22);
 
-    // One Parameter for both Color FX
-    Mixer_DrawKnob(midX, fy + S(12), S(12), eng->Decks[0].ColorFX.parameter, 0.0f, 1.0f, "PARAM", ColorShadow);
-    if (CheckCollisionPointCircle(mousePos, (Vector2){midX, fy + S(12)}, S(20))) {
-        HandleKnob(&eng->Decks[0].ColorFX.parameter, midX, fy + S(12), S(12), 0.0f, 1.0f, false, mousePos, mDown);
-        eng->Decks[1].ColorFX.parameter = eng->Decks[0].ColorFX.parameter; // Sync
-    }
-    fy += S(38);
+  // Target Select
+  const char *targetNames[] = {"MASTER", "CH 1", "CH 2"};
+  if (DrawFXButton(targetNames[eng->BeatFX.targetChannel], rightX + S(8), bfy, bItemW, S(18), false)) {
+    eng->BeatFX.targetChannel = (eng->BeatFX.targetChannel + 1) % 3;
+  }
+  bfy += S(35);
 
-    // BEAT FX
-    DrawCentredText("BEAT FX", fTiny, centerX, centerW, fy, S(8), ColorShadow);
-    fy += S(10);
-    const char* bfxNames[] = {"DELAY", "ECHO", "P-PONG", "SPIRAL", "REVERB", "TRANS", "FILTER", "FLANGER", "PHASER", "PITCH", "SLIPROLL", "ROLL", "BRAKE", "HELIX"};
-    DrawRectangle(centerX + S(10), fy, centerW - S(20), S(18), ColorBlack);
-    DrawCentredText(bfxNames[eng->BeatFX.activeFX % 14], fSub, centerX, centerW, fy + S(4), S(9), ColorWhite);
-    if (CheckCollisionPointRec(mousePos, (Rectangle){centerX + S(10), fy, centerW - S(20), S(18)}) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        BeatFXManager_SetFX(&eng->BeatFX, (eng->BeatFX.activeFX + 1) % 14);
-    }
-    fy += S(22);
+  // Depth Knob
+  Mixer_DrawKnob(rightX + colW / 2.0f, bfy, S(13), eng->BeatFX.levelDepth, 0.0f, 1.0f, "DEPTH", ColorOrange, false);
+  HandleKnob(&eng->BeatFX.levelDepth, rightX + colW / 2.0f, bfy, S(13), 0.0f, 1.0f, false, mousePos, mDown);
+  bfy += S(50);
 
-    const char* targetNames[] = {"MASTER", "CH 1", "CH 2"};
-    if (DrawFXButton(targetNames[eng->BeatFX.targetChannel], centerX + S(10), fy, centerW - S(20), S(18), false)) {
-        eng->BeatFX.targetChannel = (eng->BeatFX.targetChannel + 1) % 3;
-    }
-    fy += S(22);
-
-    Mixer_DrawKnob(midX, fy + S(15), S(14), eng->BeatFX.levelDepth, 0.0f, 1.0f, "DEPTH", ColorOrange);
-    HandleKnob(&eng->BeatFX.levelDepth, midX, fy + S(15), S(14), 0.0f, 1.0f, false, mousePos, mDown);
-    fy += S(42);
-
-    if (DrawFXButton(eng->BeatFX.isFxOn ? "ON" : "OFF", centerX + S(25), fy, centerW - S(50), S(35), eng->BeatFX.isFxOn)) {
-        eng->BeatFX.isFxOn = !eng->BeatFX.isFxOn;
-    }
+  // On/Off Button
+  if (DrawFXButton(eng->BeatFX.isFxOn ? "ON" : "OFF", rightX + S(15), bfy, colW - S(30), S(35), eng->BeatFX.isFxOn)) {
+    eng->BeatFX.isFxOn = !eng->BeatFX.isFxOn;
+  }
 }
 
 void MixerRenderer_Init(MixerRenderer *r, MixerState *state) {
-  if (!r) return;
+  if (!r)
+    return;
   memset(r, 0, sizeof(MixerRenderer));
   r->State = state;
   r->base.Draw = Mixer_Draw;

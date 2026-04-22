@@ -77,47 +77,66 @@ void DrawCentredText(const char* str, Font font, float padX, float width, float 
     UIDrawText(str, font, x, y, fontSize, clr);
 }
 
-void UIDrawKnob(float x, float y, float radius, float value, float min, float max, const char* unit, Color color) {
+void UIDrawKnob(float x, float y, float radius, float value, float min, float max, const char* unit, Color color, bool centerZero) {
     float normalized = (value - min) / (max - min);
     if (normalized < 0) normalized = 0;
     if (normalized > 1) normalized = 1;
 
-    // 1. Background Track (Groove)
-    // Draw a dark track where the knob "sits"
-    DrawCircleV((Vector2){x, y}, radius + S(3), ColorDark1);
-    DrawRing((Vector2){x, y}, radius + S(1), radius + S(4), 135, 405, 32, Fade(BLACK, 0.4f));
+    // 1. Background Track (Groove) - Thicker and more distinct
+    DrawRing((Vector2){x, y}, radius + S(1), radius + S(4.5f), 135, 405, 32, ColorDark1);
+    DrawRing((Vector2){x, y}, radius + S(1.5f), radius + S(4.0f), 135, 405, 32, ColorBlack);
 
-    // 2. Progress Arc (The colored part)
-    float startAngle = 135;
-    float endAngle = 135 + (normalized * 270);
-    
-    // Draw the active part of the ring
-    DrawRing((Vector2){x, y}, radius + S(1.5f), radius + S(3.5f), startAngle, endAngle, 36, color);
-    // Subtle glow for the active part
-    DrawRing((Vector2){x, y}, radius + S(1.0f), radius + S(4.0f), startAngle, endAngle, 36, Fade(color, 0.2f));
+    // 2. Progress Arc
+    float startAngle, endAngle;
+    if (centerZero) {
+        float mid = (min + max) / 2.0f;
+        startAngle = 270.0f; // Top
+        if (value >= mid) {
+            float range = max - mid;
+            float t = (value - mid) / range;
+            endAngle = 270.0f + (t * 135.0f);
+        } else {
+            float range = mid - min;
+            float t = (mid - value) / range;
+            endAngle = 270.0f - (t * 135.0f);
+            // Swap for DrawRing correctly
+            float tmp = startAngle;
+            startAngle = endAngle;
+            endAngle = tmp;
+        }
+    } else {
+        startAngle = 135.0f;
+        endAngle = 135.0f + (normalized * 270.0f);
+    }
 
-    // 3. Knob Body (3D cylindrical look)
-    // Dark to light gradient to simulate lighting from top-left
+    // Main Progress Ring
+    DrawRing((Vector2){x, y}, radius + S(1.5f), radius + S(4.0f), startAngle, endAngle, 36, color);
+    // Subtle glow/inner shine
+    DrawRing((Vector2){x, y}, radius + S(2.5f), radius + S(3.0f), startAngle, endAngle, 36, Fade(WHITE, 0.3f));
+
+    // 3. Knob Body (3D look)
     DrawCircleGradient((int)x, (int)y, radius, ColorDark2, ColorDark3);
     DrawCircleLines((int)x, (int)y, radius, Fade(WHITE, 0.1f));
-    
-    // Outer rim highlight
-    DrawRing((Vector2){x, y}, radius - S(1), radius, 0, 360, 32, Fade(WHITE, 0.05f));
+    DrawRing((Vector2){x, y}, radius - S(1.5f), radius, 0, 360, 32, Fade(WHITE, 0.05f));
 
-    // 4. Indicator (Modern Dot)
-    float angleRad = (endAngle - 90) * (PI / 180.0f);
-    Vector2 dotPos = {
-        x + cosf(angleRad) * (radius - S(5)),
-        y + sinf(angleRad) * (radius - S(5))
+    // 4. Indicator (Professional thick bar)
+    float indicatorAngle = 135.0f + (normalized * 270.0f);
+    float angleRad = indicatorAngle * (PI / 180.0f);
+    Vector2 needleStart = {
+        x + cosf(angleRad) * (radius * 0.4f),
+        y + sinf(angleRad) * (radius * 0.4f)
     };
-    // Draw the dot indicator
-    DrawCircleV(dotPos, S(2), ColorWhite);
-    // Dot glow
-    DrawCircleV(dotPos, S(3.5f), Fade(WHITE, 0.2f));
+    Vector2 needleEnd = {
+        x + cosf(angleRad) * (radius - S(0.5f)),
+        y + sinf(angleRad) * (radius - S(0.5f))
+    };
+    DrawLineEx(needleStart, needleEnd, S(4.5f), ColorWhite);
+    // Indicator cap
+    DrawCircleV(needleEnd, S(1.8f), ColorWhite);
 
-    // 5. Label text (below knob)
+    // 5. Label text (Adjusted position and color to match premium UI)
     if (unit && unit[0] != '\0') {
-        Font face = UIFonts_GetFace(S(8));
-        DrawCentredText(unit, face, x - radius, radius * 2, y + radius + S(6), S(8), ColorShadow);
+        Font face = UIFonts_GetFace(S(9));
+        DrawCentredText(unit, face, x - radius * 2.0f, radius * 4.0f, y + radius + S(12), S(9), Fade(ColorWhite, 0.7f));
     }
 }
