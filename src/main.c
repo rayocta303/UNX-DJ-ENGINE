@@ -82,30 +82,38 @@ void UpdateDrawFrame(App *app);
 #if defined(PLATFORM_IOS)
 // ghera/raylib-iOS callbacks
 void ios_ready(void) {
-  UNX_LOG_INFO("[IOS] ios_ready: Starting Force Init...");
+  UNX_LOG_INFO("[IOS] ios_ready: Initializing Window...");
 
   // 1. Initialize Window
   InitWindow(0, 0, APP_NAME);
+  
+  // Stability delay for iOS surface binding
+  UNX_LOG_INFO("[IOS] ios_ready: Window Init called. Waiting for driver stabilization...");
+  usleep(100000); // 100ms
+  
   SetTargetFPS(60);
 
-// 2. Initialize Fonts (Optional in Debug)
+  // 2. Initialize Fonts
+  UNX_LOG_INFO("[IOS] ios_ready: Initializing Fonts...");
 #ifndef DEBUG_IOS_GUI
   UIFonts_Init();
 #endif
 
   // 3. Start Audio Backend
+  UNX_LOG_INFO("[IOS] ios_ready: Initializing Audio...");
   if (globalApp && globalApp->activeAudioConfig.SampleRate > 0) {
     AudioBackend_Start(globalApp->activeAudioConfig, AudioProcessCallback);
   }
 
   // 4. Force a clear frame to bind GPU surface
+  UNX_LOG_INFO("[IOS] ios_ready: Performing initial clear...");
   BeginDrawing();
-  ClearBackground(ORANGE); // Bright orange to signal success
-  DrawText("INITIALIZING...", 20, 20, 20, BLACK);
+  ClearBackground(ORANGE); 
+  DrawText("XDJ-UNX INITIALIZING...", 40, 40, 20, BLACK);
   EndDrawing();
 
-  UNX_LOG_INFO("[IOS] ios_ready: Final Window Size: %dx%d", GetScreenWidth(),
-               GetScreenHeight());
+  UNX_LOG_INFO("[IOS] ios_ready: Final Window Size: %dx%d (Ready: %d)",
+               GetScreenWidth(), GetScreenHeight(), IsWindowReady());
 }
 
 void ios_update(void) {
@@ -635,7 +643,8 @@ int main(void) {
 
 #if defined(__ANDROID__)
   UNX_LOG_INFO("[MAIN] Disabling MSAA for legacy driver compatibility...");
-  ClearConfigFlags(FLAG_MSAA_4X_HINT);
+  // ClearWindowState is more standard for runtime changes if supported
+  ClearWindowState(FLAG_MSAA_4X_HINT);
   usleep(100000); // 100ms
 #endif
 

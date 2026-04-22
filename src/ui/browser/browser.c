@@ -124,6 +124,31 @@ void Browser_RefreshStorages(BrowserState *s) {
   }
 #endif
 
+#if defined(PLATFORM_IOS)
+  // On iOS, we use the Documents container as a primary storage
+  extern const char *ios_get_documents_path(const char *filename);
+  const char *docPath = ios_get_documents_path("");
+  if (docPath && docPath[0] != '\0') {
+    strcpy(s->AvailableStorages[s->StorageCount].Name, "App Container");
+    strcpy(s->AvailableStorages[s->StorageCount].Path, docPath);
+    strcpy(s->AvailableStorages[s->StorageCount].Type, "Internal");
+
+    // Check if there's a Rekordbox DB in the container root
+    char dbCheck[512];
+    snprintf(dbCheck, sizeof(dbCheck), "%s/PIONEER/rekordbox/export.pdb",
+             docPath);
+    if (stat(dbCheck, &st) == 0) {
+      strcpy(s->AvailableStorages[s->StorageCount].Type, "Rekordbox");
+    } else {
+      snprintf(dbCheck, sizeof(dbCheck), "%s/_Serato_/database V2", docPath);
+      if (stat(dbCheck, &st) == 0) {
+        strcpy(s->AvailableStorages[s->StorageCount].Type, "Serato");
+      }
+    }
+    s->StorageCount++;
+  }
+#endif
+
   char dbCheck[512];
   snprintf(dbCheck, sizeof(dbCheck), "%s/PIONEER/rekordbox/export.pdb",
            testPath);

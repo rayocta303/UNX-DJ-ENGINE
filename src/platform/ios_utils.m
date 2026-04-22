@@ -27,6 +27,16 @@ const char* ios_get_bundle_path(const char* filename) {
     return filename; // Fallback
 }
 
+const char* ios_get_documents_path(const char* filename) {
+    static char path[1024];
+    NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString* documentsDirectory = [paths objectAtIndex:0];
+    NSString* fullPath = [documentsDirectory stringByAppendingPathComponent:[NSString stringWithUTF8String:filename]];
+    
+    strncpy(path, [fullPath UTF8String], sizeof(path) - 1);
+    return path;
+}
+
 void ios_init_audio_session() {
     AVAudioSession *session = [AVAudioSession sharedInstance];
     [session setCategory:AVAudioSessionCategoryPlayback error:nil];

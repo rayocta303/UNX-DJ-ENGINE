@@ -41,9 +41,12 @@ void UIFonts_Init(void) {
   int fontSize = 64;
 #endif
 
-  UNX_LOG_INFO("[FONTS] Loading default and bold faces...");
+  UNX_LOG_INFO("[FONTS] Loading default from: %s", fontPathBundled);
   defaultFace = LoadFontEx(fontPathBundled, fontSize, 0, 0);
+  UNX_LOG_INFO("[FONTS] Loading bold from: %s", boldPathBundled);
   boldFace = LoadFontEx(boldPathBundled, fontSize, 0, 0);
+  
+  UNX_LOG_INFO("[FONTS] Result: Default ID=%u, Bold ID=%u", defaultFace.texture.id, boldFace.texture.id);
 
   if (defaultFace.texture.id == 0) {
 #ifdef _WIN32

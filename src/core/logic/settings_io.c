@@ -57,15 +57,23 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     audio->CueOutL = 2; audio->CueOutR = 3;
     audio->SampleRate = 48000; audio->BufferSizeFrames = 256;
 
+    char path[512];
     const char *basePath = "";
+
 #if defined(__ANDROID__)
     basePath = GetApplicationDirectory();
-#endif
-    char path[512];
     snprintf(path, sizeof(path), "%s/settings.json", basePath);
+#elif defined(PLATFORM_IOS)
+    extern const char* ios_get_documents_path(const char* filename);
+    strncpy(path, ios_get_documents_path("settings.json"), sizeof(path)-1);
+#else
+    strncpy(path, "settings.json", sizeof(path)-1);
+#endif
 
     FILE *f = fopen(path, "r");
-    if (!f) f = fopen("settings.json", "r");
+    if (!f && strcmp(path, "settings.json") != 0) {
+        f = fopen("settings.json", "r");
+    }
 
     if (!f) {
         Settings_Save(*wfmA, *wfmB, *audio);
@@ -87,18 +95,25 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
 }
 
 void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendConfig audio) {
+    char path[512];
     const char *basePath = "";
+
 #if defined(__ANDROID__)
     basePath = GetApplicationDirectory();
-#endif
-    char path[512];
     snprintf(path, sizeof(path), "%s/settings.json", basePath);
+#elif defined(PLATFORM_IOS)
+    extern const char* ios_get_documents_path(const char* filename);
+    strncpy(path, ios_get_documents_path("settings.json"), sizeof(path)-1);
+#else
+    strncpy(path, "settings.json", sizeof(path)-1);
+#endif
 
     FILE *f = fopen(path, "w");
-    if (!f) {
+    if (!f && strcmp(path, "settings.json") != 0) {
         f = fopen("settings.json", "w");
-        if (!f) return;
     }
+    
+    if (!f) return;
 
     fprintf(f, "{\n");
     fprintf(f, "  \"wfmA\": { \"style\": %d, \"low\": %.2f, \"mid\": %.2f, \"high\": %.2f, \"start\": %.1f, \"stop\": %.1f, \"lock\": %d },\n", 
