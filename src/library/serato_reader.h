@@ -25,11 +25,19 @@ typedef struct {
     char Artist[256];
     char Album[256];
     char Genre[256];
+    char Label[256];
     char Key[32];
     float BPM;
     uint32_t Duration;
     char FilePath[512];
     char Comment[256];
+    char Grouping[256];
+    char FileType[32];
+    int Year;
+    int Bitrate;
+    int SampleRate;
+    uint32_t FileTime;
+    uint32_t DateAdded;
     
     // Analysis data
     RBCue* Cues;

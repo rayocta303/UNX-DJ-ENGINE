@@ -49,8 +49,20 @@ typedef struct {
     char AnalyzePath[512];
     char Label[128];
     char Comment[256];
+    char Remixer[128];
+    char Composer[128];
+    char MixName[128];
+    char DateAdded[32];
+    char ReleaseDate[32];
+    char ISRC[32];
     int Rating;
     int Year;
+    int Bitrate;
+    int SampleRate;
+    int PlayCount;
+    int ColorID;
+    int TrackNumber;
+    int DiscNumber;
     
     // Analysis data
     RBCue* Cues;

@@ -34,11 +34,19 @@ extern "C" SeratoDatabase* Serato_LoadDatabase(const char* rootPath) {
         strncpy(t.Artist, tracks[i].artist.c_str(), 255);
         strncpy(t.Album, tracks[i].album.c_str(), 255);
         strncpy(t.Genre, tracks[i].genre.c_str(), 255);
+        strncpy(t.Label, tracks[i].label.c_str(), 255);
         strncpy(t.Key, tracks[i].key.c_str(), 31);
         t.BPM = (float)tracks[i].bpm;
         t.Duration = (uint32_t)tracks[i].duration;
         strncpy(t.FilePath, tracks[i].location.c_str(), 511);
         strncpy(t.Comment, tracks[i].comment.c_str(), 255);
+        strncpy(t.Grouping, tracks[i].grouping.c_str(), 255);
+        strncpy(t.FileType, tracks[i].filetype.c_str(), 31);
+        t.Year = tracks[i].year;
+        t.Bitrate = atoi(tracks[i].bitrate.c_str());
+        t.SampleRate = atoi(tracks[i].samplerate.c_str());
+        t.FileTime = tracks[i].filetime;
+        t.DateAdded = tracks[i].datetimeadded;
 
         trackPathToId[tracks[i].location] = t.ID;
     }

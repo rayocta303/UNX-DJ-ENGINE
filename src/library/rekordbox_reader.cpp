@@ -121,9 +121,24 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
                                     if (artworks.count(r->artwork_id())) strncpy(t.ArtworkPath, artworks[r->artwork_id()].c_str(), 511);
                                     if (labels.count(r->label_id())) strncpy(t.Label, labels[r->label_id()].c_str(), 127);
                                     
+                                    if (artists.count(r->remixer_id())) strncpy(t.Remixer, artists[r->remixer_id()].c_str(), 127);
+                                    if (artists.count(r->composer_id())) strncpy(t.Composer, artists[r->composer_id()].c_str(), 127);
+                                    
+                                    strncpy(t.MixName, RB_GetString(r->mix_name()).c_str(), 127);
                                     strncpy(t.Comment, RB_GetString(r->comment()).c_str(), 255);
+                                    strncpy(t.DateAdded, RB_GetString(r->date_added()).c_str(), 31);
+                                    strncpy(t.ReleaseDate, RB_GetString(r->release_date()).c_str(), 31);
+                                    strncpy(t.ISRC, RB_GetString(r->isrc()).c_str(), 31);
+                                    
                                     t.Rating = r->rating();
                                     t.Year = r->year();
+                                    t.Bitrate = r->bitrate();
+                                    t.SampleRate = r->sample_rate();
+                                    t.PlayCount = r->play_count();
+                                    t.ColorID = r->color_id();
+                                    t.TrackNumber = r->track_number();
+                                    t.DiscNumber = r->disc_number();
+                                    
                                     strncpy(t.AnalyzePath, RB_GetString(r->analyze_path()).c_str(), 511);
 
                                     rbTracks.push_back(t);
