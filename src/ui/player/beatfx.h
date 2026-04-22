@@ -9,7 +9,8 @@ struct BeatFXPanel {
     BeatFXState *State;
     DeckState *DeckA;
     DeckState *DeckB;
+    struct AudioEngine *AudioPlugin;
     Rectangle FXButton;
 };
 
-void BeatFXPanel_Init(BeatFXPanel *b, BeatFXState *state, DeckState *a, DeckState *b_state);
+void BeatFXPanel_Init(BeatFXPanel *b, BeatFXState *state, DeckState *a, DeckState *b_state, struct AudioEngine *audioPlugin);

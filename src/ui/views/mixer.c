@@ -26,6 +26,13 @@ static void HandleVerticalFader(float *val, float fx, float fy, float fw,
     if (*val > 1.0f)
       *val = 1.0f;
   }
+
+  float wheel = GetMouseWheelMove();
+  if (hovered && wheel != 0) {
+    *val += wheel * 0.05f;
+    if (*val < 0.0f) *val = 0.0f;
+    if (*val > 1.0f) *val = 1.0f;
+  }
 }
 
 static void DrawVerticalFader(float x, float y, float w, float h, float val,
@@ -252,14 +259,24 @@ static void Mixer_Draw(Component *base) {
     float bx = leftX + S(8);
     float by = cfy + i * (btnH + S(4));
     if (DrawFXButton(cfxNames[i], bx, by, btnW, btnH, eng->Decks[0].ColorFX.activeFX == cfxTypes[i])) {
-      ColorFXManager_SetFX(&eng->Decks[0].ColorFX, cfxTypes[i]);
-      ColorFXManager_SetFX(&eng->Decks[1].ColorFX, cfxTypes[i]);
+      if (eng->Decks[0].ColorFX.activeFX == cfxTypes[i]) {
+        ColorFXManager_SetFX(&eng->Decks[0].ColorFX, COLORFX_NONE);
+        ColorFXManager_SetFX(&eng->Decks[1].ColorFX, COLORFX_NONE);
+      } else {
+        ColorFXManager_SetFX(&eng->Decks[0].ColorFX, cfxTypes[i]);
+        ColorFXManager_SetFX(&eng->Decks[1].ColorFX, cfxTypes[i]);
+      }
     }
   }
-  cfy += 6 * (btnH + S(4)) + S(8);
-  Mixer_DrawKnob(leftX + colW / 2.0f, cfy + S(12), S(11), eng->Decks[0].ColorFX.parameter, 0.0f, 1.0f, "PARAM", ColorShadow, true);
-  if (CheckCollisionPointCircle(mousePos, (Vector2){leftX + colW / 2.0f, cfy + S(12)}, S(20))) {
-    HandleKnob(&eng->Decks[0].ColorFX.parameter, leftX + colW / 2.0f, cfy + S(12), S(11), 0.0f, 1.0f, true, mousePos, mDown);
+  // Param knob aligned to bottom, same level as Depth knob
+  float fxBtnH = S(32);
+  float fxBtnY = panelY + panelH - fxBtnH - S(15);
+  float depthKnobY = fxBtnY - S(45);
+  float paramY = depthKnobY;
+
+  Mixer_DrawKnob(leftX + colW / 2.0f, paramY, S(13), eng->Decks[0].ColorFX.parameter, 0.0f, 1.0f, "PARAM", ColorShadow, true);
+  if (CheckCollisionPointCircle(mousePos, (Vector2){leftX + colW / 2.0f, paramY}, S(20))) {
+    HandleKnob(&eng->Decks[0].ColorFX.parameter, leftX + colW / 2.0f, paramY, S(13), 0.0f, 1.0f, true, mousePos, mDown);
     eng->Decks[1].ColorFX.parameter = eng->Decks[0].ColorFX.parameter; // Sync
   }
 
@@ -287,13 +304,17 @@ static void Mixer_Draw(Component *base) {
   }
   bfy += S(35);
 
+  // Beat FX Controls pushed to bottom
+  fxBtnH = S(32);
+  fxBtnY = panelY + panelH - fxBtnH - S(15);
+  depthKnobY = fxBtnY - S(45);
+
   // Depth Knob
-  Mixer_DrawKnob(rightX + colW / 2.0f, bfy, S(13), eng->BeatFX.levelDepth, 0.0f, 1.0f, "DEPTH", ColorOrange, false);
-  HandleKnob(&eng->BeatFX.levelDepth, rightX + colW / 2.0f, bfy, S(13), 0.0f, 1.0f, false, mousePos, mDown);
-  bfy += S(50);
+  Mixer_DrawKnob(rightX + colW / 2.0f, depthKnobY, S(13), eng->BeatFX.levelDepth, 0.0f, 1.0f, "DEPTH", ColorOrange, false);
+  HandleKnob(&eng->BeatFX.levelDepth, rightX + colW / 2.0f, depthKnobY, S(13), 0.0f, 1.0f, false, mousePos, mDown);
 
   // On/Off Button
-  if (DrawFXButton(eng->BeatFX.isFxOn ? "ON" : "OFF", rightX + S(15), bfy, colW - S(30), S(35), eng->BeatFX.isFxOn)) {
+  if (DrawFXButton(eng->BeatFX.isFxOn ? "ON" : "OFF", rightX + S(12), fxBtnY, colW - S(24), fxBtnH, eng->BeatFX.isFxOn)) {
     eng->BeatFX.isFxOn = !eng->BeatFX.isFxOn;
   }
 }

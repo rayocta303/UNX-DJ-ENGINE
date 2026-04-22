@@ -107,7 +107,7 @@ void PlayerRenderer_Init(PlayerRenderer *r, DeckState *a, DeckState *b,
   WaveformRenderer_Init(&r->WaveA, 0, a, b);
   WaveformRenderer_Init(&r->WaveB, 1, b, a);
 
-  BeatFXPanel_Init(&r->BeatFX, fx, a, b);
+  BeatFXPanel_Init(&r->BeatFX, fx, a, b, audioPlugin);
   BeatFXSelectBar_Init(&r->FXBar, fx, a, b, r->AudioPlugin);
 
 #if !defined(PLATFORM_IOS)

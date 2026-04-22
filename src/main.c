@@ -684,8 +684,8 @@ int main(void) {
       .DeviceIndex = app->settingsState.Items[8].Current - 1,
       .MasterOutL = app->settingsState.Items[9].Current,
       .MasterOutR = app->settingsState.Items[10].Current,
-      .CueOutL = -1, // Disable for stereo compatibility
-      .CueOutR = -1, // Disable for stereo compatibility
+      .CueOutL = app->settingsState.Items[11].Current - 1,
+      .CueOutR = app->settingsState.Items[12].Current - 1,
       .SampleRate = (app->settingsState.Items[14].Current == 0) ? 44100 : 48000,
       .BufferSizeFrames = bufMap[app->settingsState.Items[13].Current]};
 

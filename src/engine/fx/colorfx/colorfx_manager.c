@@ -2,7 +2,7 @@
 #include <string.h>
 
 void ColorFXManager_Init(ColorFXManager* mgr) {
-    mgr->activeFX = COLORFX_FILTER; // Default
+    mgr->activeFX = COLORFX_NONE; // Default to OFF
     mgr->colorValue = 0.0f;
     mgr->parameter = 0.5f; // Neutral mid point
 

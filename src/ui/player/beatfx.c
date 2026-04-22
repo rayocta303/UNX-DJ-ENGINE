@@ -3,6 +3,7 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "core/logic/quantize.h"
+#include "audio/engine.h"
 #include <stdio.h>
 
 static const char* AllFXNames[] = {
@@ -33,6 +34,13 @@ static int BeatFX_Update(Component *base) {
     Rectangle chRect = { x + S(4), cy, w - S(8), S(14) };
     bool chHovered = CheckCollisionPointRec(mouse, chRect);
     
+    // Sync UI State with Engine State (if engine exists)
+    if (b->AudioPlugin) {
+        b->State->IsFXOn = b->AudioPlugin->BeatFX.isFxOn;
+        b->State->SelectedFX = b->AudioPlugin->BeatFX.activeFX;
+        b->State->SelectedChannel = b->AudioPlugin->BeatFX.targetChannel;
+    }
+
     if (b->State->FXDropdownOpen) {
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             float dy = fxSelectY + S(18);
@@ -40,6 +48,7 @@ static int BeatFX_Update(Component *base) {
                 Rectangle optRect = { x + S(4), dy, w - S(8), S(14) };
                 if (CheckCollisionPointRec(mouse, optRect)) {
                     b->State->SelectedFX = i;
+                    if (b->AudioPlugin) BeatFXManager_SetFX(&b->AudioPlugin->BeatFX, i);
                     break;
                 }
                 dy += S(14);
@@ -53,6 +62,7 @@ static int BeatFX_Update(Component *base) {
                 Rectangle optRect = { x + S(4), dy, w - S(8), S(14) };
                 if (CheckCollisionPointRec(mouse, optRect)) {
                     b->State->SelectedChannel = i;
+                    if (b->AudioPlugin) b->AudioPlugin->BeatFX.targetChannel = i;
                     break;
                 }
                 dy += S(14);
@@ -61,18 +71,17 @@ static int BeatFX_Update(Component *base) {
         }
     } else {
         if (fxHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            // Cycle on scroll can be added later if needed
             b->State->FXDropdownOpen = true;
         }
     
         if (chHovered) {
             float wheel = GetMouseWheelMove();
             if (wheel != 0) {
-                // Cycle through 0 (Master), 1 (Deck 1), 2 (Deck 2)
                 int next = b->State->SelectedChannel - (int)wheel;
                 if (next < 0) next = 2;
                 if (next > 2) next = 0;
                 b->State->SelectedChannel = next;
+                if (b->AudioPlugin) b->AudioPlugin->BeatFX.targetChannel = next;
             }
             
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -81,7 +90,7 @@ static int BeatFX_Update(Component *base) {
         }
     }
     
-    // 3. Black parameter container hitboxes
+    // ... (rest of the logic)
     float containerY = cy + S(20);
     float rowH = S(56) / 4.0f;
     Rectangle qRect = { x + S(4), containerY + 3 * rowH, w - S(8), rowH };
@@ -92,6 +101,7 @@ static int BeatFX_Update(Component *base) {
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         if (CheckCollisionPointRec(mouse, b->FXButton)) {
             b->State->IsFXOn = !b->State->IsFXOn;
+            if (b->AudioPlugin) b->AudioPlugin->BeatFX.isFxOn = b->State->IsFXOn;
         }
     }
 
@@ -324,11 +334,12 @@ static void BeatFX_Draw(Component *base) {
     }
 }
 
-void BeatFXPanel_Init(BeatFXPanel *b, BeatFXState *state, DeckState *deckA, DeckState *deckB) {
+void BeatFXPanel_Init(BeatFXPanel *b, BeatFXState *state, DeckState *deckA, DeckState *deckB, struct AudioEngine *audioPlugin) {
     b->base.Update = BeatFX_Update;
     b->base.Draw = BeatFX_Draw;
     b->State = state;
     b->DeckA = deckA;
     b->DeckB = deckB;
+    b->AudioPlugin = audioPlugin;
     b->FXButton = (Rectangle){0};
 }

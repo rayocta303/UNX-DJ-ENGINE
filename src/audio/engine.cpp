@@ -246,7 +246,6 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
     float gainL = (deck->EqLow < 0.5f) ? (deck->EqLow * 2.0f) : (1.0f + (deck->EqLow - 0.5f) * 4.0f);
     float gainM = (deck->EqMid < 0.5f) ? (deck->EqMid * 2.0f) : (1.0f + (deck->EqMid - 0.5f) * 4.0f);
     float gainH = (deck->EqHigh < 0.5f) ? (deck->EqHigh * 2.0f) : (1.0f + (deck->EqHigh - 0.5f) * 4.0f);
-    float mixGain = deck->Trim * deck->Fader;
 
     SoundTouch *st = (SoundTouch*)deck->SoundTouchHandle;
     float maxL = 0, maxR = 0;
@@ -309,15 +308,23 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
             float highR = EngineLR4_Process(&deck->EqHighStateR, r);
             r = (lowR * gainL) + (r - lowR - highR) * gainM + (highR * gainH);
 
-            l *= mixGain; r *= mixGain;
+            l *= deck->Trim; r *= deck->Trim;
             ColorFXManager_Process(&deck->ColorFX, &l, &r, l, r, fs);
+
+            // Cue & VU (Pre-Fader)
+            if (deck->IsCueActive) { 
+                outCue[i*2] += l; outCue[i*2+1] += r; 
+            }
+            maxL = fmaxf(maxL, fabsf(l)); maxR = fmaxf(maxR, fabsf(r));
+
+            // Fader (Post-Cue)
+            l *= deck->Fader; r *= deck->Fader;
+
             if (engine->BeatFX.targetChannel == deckIndex + 1) {
                 BeatFXManager_Process(&engine->BeatFX, &l, &r, l, r, engine->OutputSampleRate);
             }
 
-            maxL = fmaxf(maxL, fabsf(l)); maxR = fmaxf(maxR, fabsf(r));
             outMaster[i*2] += l; outMaster[i*2+1] += r;
-            if (deck->IsCueActive) { outCue[i*2] += l; outCue[i*2+1] += r; }
         }
     } else {
         // --- NORMAL MODE (PITCH CHANGE) ---
@@ -350,15 +357,23 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
             float highR = EngineLR4_Process(&deck->EqHighStateR, r);
             r = (lowR * gainL) + (r - lowR - highR) * gainM + (highR * gainH);
 
-            l *= mixGain; r *= mixGain;
+            l *= deck->Trim; r *= deck->Trim;
             ColorFXManager_Process(&deck->ColorFX, &l, &r, l, r, fs);
+
+            // Cue & VU (Pre-Fader)
+            if (deck->IsCueActive) { 
+                outCue[i*2] += l; outCue[i*2+1] += r; 
+            }
+            maxL = fmaxf(maxL, fabsf(l)); maxR = fmaxf(maxR, fabsf(r));
+
+            // Fader (Post-Cue)
+            l *= deck->Fader; r *= deck->Fader;
+
             if (engine->BeatFX.targetChannel == deckIndex + 1) {
                 BeatFXManager_Process(&engine->BeatFX, &l, &r, l, r, engine->OutputSampleRate);
             }
 
-            maxL = fmaxf(maxL, fabsf(l)); maxR = fmaxf(maxR, fabsf(r));
             outMaster[i*2] += l; outMaster[i*2+1] += r;
-            if (deck->IsCueActive) { outCue[i*2] += l; outCue[i*2+1] += r; }
         }
     }
 
