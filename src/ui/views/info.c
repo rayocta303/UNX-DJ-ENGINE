@@ -40,7 +40,7 @@ static void Info_Draw(Component *base) {
   Font iconMd = UIFonts_GetIcon(S(20));
 
   float availableH = SCREEN_HEIGHT - TOP_BAR_H - DECK_STR_H - FX_BAR_H;
-  float halfH = availableH / 1.75f;
+  float halfH = availableH / 2.0f;
   float centerX = SCREEN_WIDTH / 2.0f;
 
   for (int deckIdx = 0; deckIdx < 2; deckIdx++) {
@@ -67,12 +67,12 @@ static void Info_Draw(Component *base) {
     InfoTrack *trk = &r->State->Tracks[deckIdx];
 
     // Main Header Area (Title & Artist)
-    float headX = panelX + S(80);
-    float headY = panelY + S(14);
+    float headX = panelX + S(75);
+    float headY = panelY + S(12);
 
     // Large Music Icon - Slightly translucent
-    UIDrawText("\xef\x80\x81", iconMd, panelX + S(30), headY + S(2), S(20),
-               Fade(ColorWhite, 0.8f));
+    UIDrawText("\xef\x80\x81", iconMd, panelX + S(25), headY + S(2), S(22),
+               Fade(ColorWhite, 0.5f));
 
     // Title
     char tTitle[128];
@@ -91,14 +91,14 @@ static void Info_Draw(Component *base) {
     UIDrawText(tArtist, faceMd, headX, headY + S(20), S(11), ColorShadow);
 
     // Metadata Grid - Centered in remaining space
-    float col1IconX = panelX + S(20);
-    float col1TextX = panelX + S(40);
-    float col2IconX = centerX + S(20);
-    float col2TextX = centerX + S(40);
+    float col1IconX = panelX + S(15);
+    float col1TextX = panelX + S(35);
+    float col2IconX = centerX + S(5);
+    float col2TextX = centerX + S(25);
 
     // Adjust Y start based on panel height to center it better
-    float startGridY = panelY + S(60);
-    float rowH = S(22);
+    float startGridY = panelY + S(54);
+    float rowH = S(21);
 
     // Row 1: BPM & KEY
     char bpmStr[32];
@@ -196,21 +196,21 @@ static void Info_Draw(Component *base) {
     // Comment Area
     if (trk->Comment[0]) {
       char tComment[256];
-      truncateStr(trk->Comment, tComment, 100);
-      UIDrawText("COMMENT:", faceXXS, panelX + S(10), panelY + panelH - S(25),
+      truncateStr(trk->Comment, tComment, 80);
+      UIDrawText("COMMENT:", faceXXS, panelX + S(10), panelY + panelH - S(22),
                  S(7), ColorShadow);
-      UIDrawText(tComment, faceXXS, panelX + S(55), panelY + panelH - S(25),
-                 S(7), Fade(ColorWhite, 0.7f));
+      UIDrawText(tComment, faceXXS, panelX + S(55), panelY + panelH - S(22),
+                 S(7), Fade(ColorWhite, 0.6f));
     }
 
     // Small source info at absolute bottom of card
     if (trk->FilePath[0]) {
-      char sourceInfo[128];
+      char sourceInfo[256];
       sprintf(sourceInfo, "[%s] %s", trk->Source, trk->FilePath);
-      char tSource[128];
+      char tSource[256];
       truncateStr(sourceInfo, tSource, 110);
       UIDrawText(tSource, faceXXS, panelX + S(10), panelY + panelH - S(10),
-                 S(7), Fade(ColorShadow, 0.5f));
+                 S(7), Fade(ColorShadow, 0.4f));
     }
   }
 }

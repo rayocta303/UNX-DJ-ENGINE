@@ -634,7 +634,11 @@ int main(void) {
     SetTargetFPS(60);
 
   #elif defined(__ANDROID__)
-    InitWindow(GetScreenWidth(), GetScreenHeight(), APP_NAME);
+    int w = GetScreenWidth();
+    int h = GetScreenHeight();
+    if (w <= 0) w = 1920; // Fallback to common resolution
+    if (h <= 0) h = 1080;
+    InitWindow(w, h, APP_NAME);
     SetTargetFPS(60); 
   #else
     // Desktop (X11, Wayland, Windows)
