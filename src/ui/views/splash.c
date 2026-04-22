@@ -93,8 +93,8 @@ void SplashRenderer_Init(SplashRenderer *s, int *progress) {
   s->frameCount = 192;
 #endif
 
-#if defined(PLATFORM_IOS)
-  // Cap frames on iOS to prevent OOM (30 frames is enough for a smooth 2s splash)
+#if defined(PLATFORM_IOS) || defined(__ANDROID__)
+  // Cap frames on mobile to prevent OOM (30 frames is enough for a smooth 2s splash)
   if (s->frameCount > 30) s->frameCount = 30;
 #endif
   

@@ -112,13 +112,19 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
         if (pSampleData) {
             if (channels == 1) {
                 float *stereoBuf = (float *)malloc(totalPCMFrameCount * 2 * sizeof(float));
-                for (drwav_uint64 i = 0; i < totalPCMFrameCount; i++) {
-                    stereoBuf[i*2] = pSampleData[i];
-                    stereoBuf[i*2 + 1] = pSampleData[i];
+                if (stereoBuf) {
+                    for (drwav_uint64 i = 0; i < totalPCMFrameCount; i++) {
+                        stereoBuf[i*2] = pSampleData[i];
+                        stereoBuf[i*2 + 1] = pSampleData[i];
+                    }
+                    drwav_free(pSampleData, NULL);
+                    deck->PCMBuffer = stereoBuf;
+                    deck->TotalSamples = totalPCMFrameCount * 2;
+                } else {
+                    drwav_free(pSampleData, NULL);
+                    deck->PCMBuffer = NULL;
+                    deck->TotalSamples = 0;
                 }
-                drwav_free(pSampleData, NULL);
-                deck->PCMBuffer = stereoBuf;
-                deck->TotalSamples = totalPCMFrameCount * 2;
             } else {
                 deck->PCMBuffer = pSampleData;
                 deck->TotalSamples = totalPCMFrameCount * channels;
@@ -133,13 +139,19 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
         if (res == 0) {
             if (info.channels == 1) {
                 float *stereoBuf = (float *)malloc(info.samples * 2 * sizeof(float));
-                for (size_t i = 0; i < info.samples; i++) {
-                    stereoBuf[i*2] = info.buffer[i];
-                    stereoBuf[i*2 + 1] = info.buffer[i];
+                if (stereoBuf) {
+                    for (size_t i = 0; i < info.samples; i++) {
+                        stereoBuf[i*2] = info.buffer[i];
+                        stereoBuf[i*2 + 1] = info.buffer[i];
+                    }
+                    free(info.buffer);
+                    deck->PCMBuffer = stereoBuf;
+                    deck->TotalSamples = info.samples * 2;
+                } else {
+                    free(info.buffer);
+                    deck->PCMBuffer = NULL;
+                    deck->TotalSamples = 0;
                 }
-                free(info.buffer);
-                deck->PCMBuffer = stereoBuf;
-                deck->TotalSamples = info.samples * 2;
             } else {
                 deck->PCMBuffer = info.buffer;
                 deck->TotalSamples = info.samples;
