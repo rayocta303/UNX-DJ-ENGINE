@@ -14,6 +14,8 @@ typedef struct {
   int Rating;   // 0-5
   char Source[32];
   char FilePath[256];
+  char Label[128];
+  int Year;
   char Comment[256];
 } InfoTrack;
 

@@ -56,6 +56,7 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
         std::map<uint32_t, std::string> genres;
         std::map<uint32_t, std::string> keys;
         std::map<uint32_t, std::string> artworks;
+        std::map<uint32_t, std::string> labels;
 
         std::vector<RBTrack> rbTracks;
         std::vector<RBPlaylist> rbPlaylists;
@@ -97,6 +98,11 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
                                     artworks[r->id()] = RB_GetString(r->path());
                                     break;
                                 }
+                                case rekordbox_pdb_t::PAGE_TYPE_LABELS: {
+                                    auto r = static_cast<rekordbox_pdb_t::label_row_t*>(body);
+                                    labels[r->id()] = RB_GetString(r->name());
+                                    break;
+                                }
                                 case rekordbox_pdb_t::PAGE_TYPE_TRACKS: {
                                     auto r = static_cast<rekordbox_pdb_t::track_row_t*>(body);
                                     RBTrack t;
@@ -113,6 +119,11 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
                                     if (genres.count(r->genre_id())) strncpy(t.Genre, genres[r->genre_id()].c_str(), 255);
                                     if (keys.count(r->key_id())) strncpy(t.Key, keys[r->key_id()].c_str(), 31);
                                     if (artworks.count(r->artwork_id())) strncpy(t.ArtworkPath, artworks[r->artwork_id()].c_str(), 511);
+                                    if (labels.count(r->label_id())) strncpy(t.Label, labels[r->label_id()].c_str(), 127);
+                                    
+                                    strncpy(t.Comment, RB_GetString(r->comment()).c_str(), 255);
+                                    t.Rating = r->rating();
+                                    t.Year = r->year();
                                     strncpy(t.AnalyzePath, RB_GetString(r->analyze_path()).c_str(), 511);
 
                                     rbTracks.push_back(t);

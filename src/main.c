@@ -1080,6 +1080,12 @@ void UpdateDrawFrame(App *app) {
           InfoTrack *it = &app->infoState.Tracks[i];
           strcpy(it->Title, ds->TrackTitle);
           strcpy(it->Artist, ds->ArtistName);
+          strcpy(it->Album, ds->AlbumName);
+          strcpy(it->Genre, ds->GenreName);
+          strcpy(it->Label, ds->LabelName);
+          strcpy(it->Comment, ds->Comment);
+          it->Year = ds->Year;
+          it->Rating = ds->Rating;
           it->BPM = ds->OriginalBPM;
           strcpy(it->Key, ds->TrackKey);
           it->Duration = ds->TrackLengthMs / 1000;

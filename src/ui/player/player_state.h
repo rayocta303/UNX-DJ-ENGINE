@@ -60,6 +60,12 @@ typedef struct DeckState {
   char SourceName[32];
   char TrackTitle[128];
   char ArtistName[128];
+  char AlbumName[128];
+  char GenreName[64];
+  char LabelName[128];
+  char Comment[256];
+  int Rating;
+  int Year;
   char TrackKey[16];
   char ArtworkPath[512];
   int TrackNumber;

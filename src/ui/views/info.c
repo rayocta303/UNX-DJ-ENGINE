@@ -104,7 +104,7 @@ static void Info_Draw(Component *base) {
     char bpmStr[32];
     sprintf(bpmStr, "%.1f BPM", trk->BPM);
     UIDrawText("\xef\x80\x97", iconFace, col1IconX, startGridY + S(8), S(12),
-               ColorShadow); // Clock for timing/BPM
+               ColorShadow); // Clock
     UIDrawText("BPM", faceXXS, col1TextX, startGridY, S(7), ColorShadow);
     UIDrawText(bpmStr, faceSm, col1TextX, startGridY + S(9), S(9), ColorWhite);
 
@@ -114,29 +114,30 @@ static void Info_Draw(Component *base) {
     UIDrawText(trk->Key[0] ? trk->Key : "---", faceSm, col2TextX,
                startGridY + S(9), S(9), ColorOrange);
 
-    // Row 2: ALBUM & DURATION
+    // Row 2: ALBUM & YEAR
     char tAlbum[128];
     if (trk->Album[0] == '\0')
       strcpy(tAlbum, "---");
     else
       truncateStr(trk->Album, tAlbum, 40);
-    UIDrawText("\xef\x8a\x91", iconFace, col1IconX, startGridY + rowH + S(8),
-               S(12), ColorShadow); // CD
+    UIDrawText("\xef\x94\x9f", iconFace, col1IconX, startGridY + rowH + S(8),
+               S(12), ColorShadow); // Compact Disc (CD) Icon \uf51f
     UIDrawText("ALBUM", faceXXS, col1TextX, startGridY + rowH, S(7),
                ColorShadow);
     UIDrawText(tAlbum, faceSm, col1TextX, startGridY + rowH + S(9), S(9),
                ColorWhite);
 
-    char durStr[32];
-    sprintf(durStr, "%02d:%02d", trk->Duration / 60, trk->Duration % 60);
-    UIDrawText("\xef\x80\x97", iconFace, col2IconX, startGridY + rowH + S(8),
-               S(12), ColorShadow); // Clock
-    UIDrawText("DURATION", faceXXS, col2TextX, startGridY + rowH, S(7),
+    char yearStr[16];
+    if (trk->Year > 0) sprintf(yearStr, "%d", trk->Year);
+    else strcpy(yearStr, "---");
+    UIDrawText("\xef\x84\xb3", iconFace, col2IconX, startGridY + rowH + S(8),
+               S(12), ColorShadow); // Calendar Icon \uf133
+    UIDrawText("YEAR", faceXXS, col2TextX, startGridY + rowH, S(7),
                ColorShadow);
-    UIDrawText(durStr, faceSm, col2TextX, startGridY + rowH + S(9), S(9),
+    UIDrawText(yearStr, faceSm, col2TextX, startGridY + rowH + S(9), S(9),
                ColorWhite);
 
-    // Row 3: GENRE & RATING
+    // Row 3: GENRE & LABEL
     char tGenre[64];
     if (trk->Genre[0] == '\0')
       strcpy(tGenre, "---");
@@ -149,29 +150,57 @@ static void Info_Draw(Component *base) {
     UIDrawText(tGenre, faceSm, col1TextX, startGridY + rowH * 2 + S(9), S(9),
                ColorWhite);
 
-    UIDrawText("\xef\x80\x85", iconFace, col2IconX,
-               startGridY + rowH * 2 + S(8), S(12), ColorShadow); // Star
-    UIDrawText("RATING", faceXXS, col2TextX, startGridY + rowH * 2, S(7),
+    char tLabel[128];
+    if (trk->Label[0] == '\0')
+      strcpy(tLabel, "---");
+    else
+      truncateStr(trk->Label, tLabel, 30);
+    UIDrawText("\xef\x80\x81", iconFace, col2IconX,
+               startGridY + rowH * 2 + S(8), S(12), ColorShadow); // Music \uf001 for Label
+    UIDrawText("LABEL", faceXXS, col2TextX, startGridY + rowH * 2, S(7),
+               ColorShadow);
+    UIDrawText(tLabel, faceSm, col2TextX, startGridY + rowH * 2 + S(9), S(9),
+               ColorWhite);
+
+    // Row 4: RATING & DURATION
+    UIDrawText("\xef\x80\x85", iconFace, col1IconX,
+               startGridY + rowH * 3 + S(8), S(12), ColorShadow); // Star
+    UIDrawText("RATING", faceXXS, col1TextX, startGridY + rowH * 3, S(7),
                ColorShadow);
 
-    // Rating as Icons if possible, fallback to text
     if (trk->Rating > 0) {
       for (int i = 0; i < 5; i++) {
-        const char *starIco =
-            (i < trk->Rating) ? "\xef\x80\x85" : ""; // Star or empty
+        const char *starIco = (i < trk->Rating) ? "\xef\x80\x85" : "";
         if (starIco[0]) {
-          UIDrawText(starIco, iconFace, col2TextX + i * S(10),
-                     startGridY + rowH * 2 + S(9), S(9), ColorOrange);
+          UIDrawText(starIco, iconFace, col1TextX + i * S(10),
+                     startGridY + rowH * 3 + S(9), S(9), ColorOrange);
         } else {
-          // Outline star fa-star-o or just shadow star? FA5 has fa-star-o as
-          // part of regular Let's just use empty space or a dot
-          UIDrawText(".", faceXXS, col2TextX + i * S(10) + S(4),
-                     startGridY + rowH * 2 + S(9), S(7), ColorShadow);
+          UIDrawText(".", faceXXS, col1TextX + i * S(10) + S(4),
+                     startGridY + rowH * 3 + S(9), S(7), ColorShadow);
         }
       }
     } else {
-      UIDrawText("NOT RATED", faceSm, col2TextX, startGridY + rowH * 2 + S(9),
+      UIDrawText("---", faceSm, col1TextX, startGridY + rowH * 3 + S(9),
                  S(9), ColorShadow);
+    }
+
+    char durStr[32];
+    sprintf(durStr, "%02d:%02d", trk->Duration / 60, trk->Duration % 60);
+    UIDrawText("\xef\x80\x97", iconFace, col2IconX, startGridY + rowH * 3 + S(8),
+               S(12), ColorShadow); // Clock
+    UIDrawText("DURATION", faceXXS, col2TextX, startGridY + rowH * 3, S(7),
+               ColorShadow);
+    UIDrawText(durStr, faceSm, col2TextX, startGridY + rowH * 3 + S(9), S(9),
+               ColorWhite);
+
+    // Comment Area
+    if (trk->Comment[0]) {
+      char tComment[256];
+      truncateStr(trk->Comment, tComment, 100);
+      UIDrawText("COMMENT:", faceXXS, panelX + S(10), panelY + panelH - S(25),
+                 S(7), ColorShadow);
+      UIDrawText(tComment, faceXXS, panelX + S(55), panelY + panelH - S(25),
+                 S(7), Fade(ColorWhite, 0.7f));
     }
 
     // Small source info at absolute bottom of card

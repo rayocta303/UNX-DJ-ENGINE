@@ -47,6 +47,10 @@ typedef struct {
     char FilePath[512];
     char ArtworkPath[512];
     char AnalyzePath[512];
+    char Label[128];
+    char Comment[256];
+    int Rating;
+    int Year;
     
     // Analysis data
     RBCue* Cues;
