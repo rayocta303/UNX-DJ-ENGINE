@@ -4,6 +4,7 @@
 #include "core/logic/settings_io.h"
 #include "core/logic/sync.h"
 #include "core/midi/midi_handler.h"
+#include "core/system_info.h"
 #include "input/keyboard.h"
 #include "raylib.h"
 #include "rlgl.h"
@@ -13,36 +14,34 @@
 #include "ui/components/theme.h"
 #include "ui/player/player.h"
 #include "ui/views/about.h"
+#include "ui/views/debug_ios.h"
 #include "ui/views/info.h"
 #include "ui/views/mixer.h"
 #include "ui/views/settings.h"
 #include "ui/views/splash.h"
 #include "ui/views/topbar.h"
-#include "ui/views/debug_ios.h"
-#include "core/system_info.h"
 #include "version.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
 #ifdef _WIN32
-  #define WIN32_LEAN_AND_MEAN
-  #define NOGDI
-  #define NOUSER
-  #define Rectangle WinRectangle
-  #define CloseWindow WinCloseWindow
-  #define ShowCursor WinShowCursor
-  #define DrawText WinDrawText
-  #include <windows.h>
-  #undef Rectangle
-  #undef CloseWindow
-  #undef ShowCursor
-  #undef DrawText
+#define WIN32_LEAN_AND_MEAN
+#define NOGDI
+#define NOUSER
+#define Rectangle WinRectangle
+#define CloseWindow WinCloseWindow
+#define ShowCursor WinShowCursor
+#define DrawText WinDrawText
+#include <windows.h>
+#undef Rectangle
+#undef CloseWindow
+#undef ShowCursor
+#undef DrawText
 #else
-  #include <unistd.h>
+#include <unistd.h>
 #endif
-
 
 typedef struct {
   CurrentScreen screen;
@@ -83,38 +82,38 @@ void UpdateDrawFrame(App *app);
 #if defined(PLATFORM_IOS)
 // ghera/raylib-iOS callbacks
 void ios_ready(void) {
-    UNX_LOG_INFO("[IOS] ios_ready: Starting Force Init...");
-    
-    // 1. Initialize Window
-    InitWindow(0, 0, APP_NAME);
-    SetTargetFPS(60);
-    
-    // 2. Initialize Fonts (Optional in Debug)
-    #ifndef DEBUG_IOS_GUI
-    UIFonts_Init();
-    #endif
-    
-    // 3. Start Audio Backend
-    if (globalApp && globalApp->activeAudioConfig.SampleRate > 0) {
-        AudioBackend_Start(globalApp->activeAudioConfig, AudioProcessCallback);
-    }
-    
-    // 4. Force a clear frame to bind GPU surface
-    BeginDrawing();
-    ClearBackground(ORANGE); // Bright orange to signal success
-    DrawText("INITIALIZING...", 20, 20, 20, BLACK);
-    EndDrawing();
-    
-    UNX_LOG_INFO("[IOS] ios_ready: Final Window Size: %dx%d", GetScreenWidth(), GetScreenHeight());
+  UNX_LOG_INFO("[IOS] ios_ready: Starting Force Init...");
+
+  // 1. Initialize Window
+  InitWindow(0, 0, APP_NAME);
+  SetTargetFPS(60);
+
+// 2. Initialize Fonts (Optional in Debug)
+#ifndef DEBUG_IOS_GUI
+  UIFonts_Init();
+#endif
+
+  // 3. Start Audio Backend
+  if (globalApp && globalApp->activeAudioConfig.SampleRate > 0) {
+    AudioBackend_Start(globalApp->activeAudioConfig, AudioProcessCallback);
+  }
+
+  // 4. Force a clear frame to bind GPU surface
+  BeginDrawing();
+  ClearBackground(ORANGE); // Bright orange to signal success
+  DrawText("INITIALIZING...", 20, 20, 20, BLACK);
+  EndDrawing();
+
+  UNX_LOG_INFO("[IOS] ios_ready: Final Window Size: %dx%d", GetScreenWidth(),
+               GetScreenHeight());
 }
 
 void ios_update(void) {
-    if (globalApp) UpdateDrawFrame(globalApp);
+  if (globalApp)
+    UpdateDrawFrame(globalApp);
 }
 
-void ios_destroy(void) {
-    UNX_LOG_INFO("[IOS] ios_destroy called.");
-}
+void ios_destroy(void) { UNX_LOG_INFO("[IOS] ios_destroy called."); }
 #endif
 
 void AudioProcessCallback(float *buffer, unsigned int frames) {
@@ -139,7 +138,8 @@ void OnSettingsApply(void *ctx) {
 
   a->deckA.Waveform.GainLow = 0.5f + (a->settingsState.Items[3].Current * 0.1f);
   a->deckA.Waveform.GainMid = 0.5f + (a->settingsState.Items[4].Current * 0.1f);
-  a->deckA.Waveform.GainHigh = 0.5f + (a->settingsState.Items[5].Current * 0.1f);
+  a->deckA.Waveform.GainHigh =
+      0.5f + (a->settingsState.Items[5].Current * 0.1f);
 
   a->deckB.Waveform = a->deckA.Waveform;
 
@@ -148,12 +148,13 @@ void OnSettingsApply(void *ctx) {
   a->deckA.Waveform.VinylStopMs = a->settingsState.Items[7].Value;
   a->deckB.Waveform = a->deckA.Waveform;
 
-  UNX_LOG_INFO("[SETTINGS] Applied Style: %d, Gains: L%.2f M%.2f H%.2f, Start: %.0f, "
-               "Stop: %.0f, Lock: %d",
-               a->deckA.Waveform.Style, a->deckA.Waveform.GainLow,
-               a->deckA.Waveform.GainMid, a->deckA.Waveform.GainHigh,
-               a->deckA.Waveform.VinylStartMs, a->deckA.Waveform.VinylStopMs,
-               a->deckA.Waveform.LoadLock);
+  UNX_LOG_INFO(
+      "[SETTINGS] Applied Style: %d, Gains: L%.2f M%.2f H%.2f, Start: %.0f, "
+      "Stop: %.0f, Lock: %d",
+      a->deckA.Waveform.Style, a->deckA.Waveform.GainLow,
+      a->deckA.Waveform.GainMid, a->deckA.Waveform.GainHigh,
+      a->deckA.Waveform.VinylStartMs, a->deckA.Waveform.VinylStopMs,
+      a->deckA.Waveform.LoadLock);
 
   // Apply Audio backend settings
   AudioBackendConfig aconf = {
@@ -162,7 +163,7 @@ void OnSettingsApply(void *ctx) {
       .MasterOutL = a->settingsState.Items[9].Current,
       .MasterOutR = a->settingsState.Items[10].Current,
       // Cue items have "Blank" at index 0, so subtract 1 for physical channel
-      .CueOutL = a->settingsState.Items[11].Current - 1, 
+      .CueOutL = a->settingsState.Items[11].Current - 1,
       .CueOutR = a->settingsState.Items[12].Current - 1,
       .SampleRate = (a->settingsState.Items[14].Current == 0) ? 44100 : 48000,
   };
@@ -180,17 +181,20 @@ void OnSettingsApply(void *ctx) {
       (aconf.CueOutR != a->activeAudioConfig.CueOutR);
 
   if (audioChanged) {
-    UNX_LOG_INFO("[SETTINGS] Audio Hardware config changed, restarting backend...");
+    UNX_LOG_INFO(
+        "[SETTINGS] Audio Hardware config changed, restarting backend...");
     if (AudioBackend_Start(aconf, AudioProcessCallback)) {
-        a->activeAudioConfig = aconf;
-        
-        // Sync actual hardware sample rate back to engine
-        int actualSR = 0;
-        AudioBackend_GetActiveInfo(NULL, &actualSR, NULL, NULL);
-        if (globalAudioEngine) AudioEngine_SetOutputSampleRate(globalAudioEngine, actualSR);
+      a->activeAudioConfig = aconf;
 
-        // Update active driver info in About screen
-        AudioBackend_GetActiveInfo(NULL, NULL, a->aboutState.AudioDriver, a->aboutState.AudioDevice);
+      // Sync actual hardware sample rate back to engine
+      int actualSR = 0;
+      AudioBackend_GetActiveInfo(NULL, &actualSR, NULL, NULL);
+      if (globalAudioEngine)
+        AudioEngine_SetOutputSampleRate(globalAudioEngine, actualSR);
+
+      // Update active driver info in About screen
+      AudioBackend_GetActiveInfo(NULL, NULL, a->aboutState.AudioDriver,
+                                 a->aboutState.AudioDevice);
     }
   }
 
@@ -235,11 +239,13 @@ void UpdateChannelOptions(App *a, int deviceIdx) {
   }
 
   // Auto-Select defaults
-  // Auto-Select defaults: Start with 2-channel mirrored setup (CH 1/2 for Master and Cue)
-  // to prevent errors on fresh settings, even if more channels are available.
-  a->settingsState.Items[9].Current = 0;  // Master L -> CH1
-  a->settingsState.Items[10].Current = (channels > 1) ? 1 : 0; // Master R -> CH2
-  
+  // Auto-Select defaults: Start with 2-channel mirrored setup (CH 1/2 for
+  // Master and Cue) to prevent errors on fresh settings, even if more channels
+  // are available.
+  a->settingsState.Items[9].Current = 0; // Master L -> CH1
+  a->settingsState.Items[10].Current =
+      (channels > 1) ? 1 : 0; // Master R -> CH2
+
   a->settingsState.Items[11].Current = 1; // Cue L -> CH 1 (Index 0 is Blank)
   a->settingsState.Items[12].Current = (channels > 1) ? 2 : 1; // Cue R -> CH 2
 }
@@ -351,9 +357,10 @@ void App_Init(App *a) {
   a->browserState.BrowseLevel = 3; // Source level
   for (int i = 0; i < 3; i++)
     a->browserState.PlaylistBankIdx[i] = -1;
-    
+
 #if defined(__ANDROID__)
-  UNX_LOG_INFO("[APP] Skipping Browser_RefreshStorages on Android to prevent hang...");
+  UNX_LOG_INFO(
+      "[APP] Skipping Browser_RefreshStorages on Android to prevent hang...");
 #else
   Browser_RefreshStorages(&a->browserState);
 #endif
@@ -387,28 +394,31 @@ void App_Init(App *a) {
   strcpy(a->settingsState.Items[3].Label, "WFM LOW GAIN");
   a->settingsState.Items[3].Type = SETTING_TYPE_LIST;
   a->settingsState.Items[3].OptionsCount = 25; // 0.1 to 2.5
-  for(int i=0; i<25; i++) {
-     float v = 0.1f + (i * 0.1f);
-     sprintf(a->settingsState.Items[3].Options[i], "%.1fx", v);
-     if (fabs(a->deckA.Waveform.GainLow - v) < 0.05f) a->settingsState.Items[3].Current = i;
+  for (int i = 0; i < 25; i++) {
+    float v = 0.1f + (i * 0.1f);
+    sprintf(a->settingsState.Items[3].Options[i], "%.1fx", v);
+    if (fabs(a->deckA.Waveform.GainLow - v) < 0.05f)
+      a->settingsState.Items[3].Current = i;
   }
 
   strcpy(a->settingsState.Items[4].Label, "WFM MID GAIN");
   a->settingsState.Items[4].Type = SETTING_TYPE_LIST;
   a->settingsState.Items[4].OptionsCount = 25;
-  for(int i=0; i<25; i++) {
-     float v = 0.1f + (i * 0.1f);
-     sprintf(a->settingsState.Items[4].Options[i], "%.1fx", v);
-     if (fabs(a->deckA.Waveform.GainMid - v) < 0.05f) a->settingsState.Items[4].Current = i;
+  for (int i = 0; i < 25; i++) {
+    float v = 0.1f + (i * 0.1f);
+    sprintf(a->settingsState.Items[4].Options[i], "%.1fx", v);
+    if (fabs(a->deckA.Waveform.GainMid - v) < 0.05f)
+      a->settingsState.Items[4].Current = i;
   }
 
   strcpy(a->settingsState.Items[5].Label, "WFM HIGH GAIN");
   a->settingsState.Items[5].Type = SETTING_TYPE_LIST;
   a->settingsState.Items[5].OptionsCount = 25;
-  for(int i=0; i<25; i++) {
-     float v = 0.1f + (i * 0.1f);
-     sprintf(a->settingsState.Items[5].Options[i], "%.1fx", v);
-     if (fabs(a->deckA.Waveform.GainHigh - v) < 0.05f) a->settingsState.Items[5].Current = i;
+  for (int i = 0; i < 25; i++) {
+    float v = 0.1f + (i * 0.1f);
+    sprintf(a->settingsState.Items[5].Options[i], "%.1fx", v);
+    if (fabs(a->deckA.Waveform.GainHigh - v) < 0.05f)
+      a->settingsState.Items[5].Current = i;
   }
 
   strcpy(a->settingsState.Items[6].Label, "JOG START TIME");
@@ -438,24 +448,25 @@ void App_Init(App *a) {
     snprintf(a->settingsState.Items[8].Options[i + 1], 32, "%dCH %s",
              devs[i].NativeChannels, devs[i].Name);
   }
-  
+
   // Initial population based on loaded config
   UpdateChannelOptions(a, a->activeAudioConfig.DeviceIndex);
-  
+
   // Back-sync from loaded config to UI selection items
   a->settingsState.Items[8].Current = a->activeAudioConfig.DeviceIndex + 1;
   a->settingsState.Items[9].Current = a->activeAudioConfig.MasterOutL;
   a->settingsState.Items[10].Current = a->activeAudioConfig.MasterOutR;
   a->settingsState.Items[11].Current = a->activeAudioConfig.CueOutL + 1;
   a->settingsState.Items[12].Current = a->activeAudioConfig.CueOutR + 1;
-  
+
   int bufMap[] = {128, 256, 512, 1024};
   a->settingsState.Items[13].Current = 1; // Default 256
   for (int i = 0; i < 4; i++) {
     if (a->activeAudioConfig.BufferSizeFrames == bufMap[i])
       a->settingsState.Items[13].Current = i;
   }
-  a->settingsState.Items[14].Current = (a->activeAudioConfig.SampleRate == 44100) ? 0 : 1;
+  a->settingsState.Items[14].Current =
+      (a->activeAudioConfig.SampleRate == 44100) ? 0 : 1;
 
   strcpy(a->settingsState.Items[13].Label, "BUFFER SIZE");
   a->settingsState.Items[13].Type = SETTING_TYPE_LIST;
@@ -464,7 +475,7 @@ void App_Init(App *a) {
   strcpy(a->settingsState.Items[13].Options[1], "256");
   strcpy(a->settingsState.Items[13].Options[2], "512");
   strcpy(a->settingsState.Items[13].Options[3], "1024");
-  
+
   strcpy(a->settingsState.Items[14].Label, "SAMPLE RATE");
   a->settingsState.Items[14].Type = SETTING_TYPE_LIST;
   a->settingsState.Items[14].OptionsCount = 2;
@@ -477,8 +488,8 @@ void App_Init(App *a) {
     if (a->activeAudioConfig.BufferSizeFrames == bufMap[i])
       a->settingsState.Items[13].Current = i;
   }
-  a->settingsState.Items[14].Current = (a->activeAudioConfig.SampleRate == 44100) ? 0 : 1;
-
+  a->settingsState.Items[14].Current =
+      (a->activeAudioConfig.SampleRate == 44100) ? 0 : 1;
 
   strcpy(a->settingsState.Items[15].Label, "ABOUT");
   a->settingsState.Items[15].Type = SETTING_TYPE_ACTION;
@@ -524,9 +535,9 @@ void App_Init(App *a) {
   a->settings.OnValueChanged = OnSettingsValueChanged;
   a->settings.callbackCtx = a;
 
-  // Settings_Load (at line 360) already populated this. 
+  // Settings_Load (at line 360) already populated this.
   // We only set hardcoded defaults if you want a fallback before loading.
-  
+
   AboutRenderer_Init(&a->about, &a->aboutState);
   MixerRenderer_Init(&a->mixer, &a->mixerState);
   SplashRenderer_Init(&a->splash, &a->splashCounter);
@@ -544,11 +555,12 @@ int main(void) {
   UNX_LOG_INFO("!!! [DEBUG] ENTRY POINT main() !!!");
 
 #if defined(_WIN32)
-  // Disable QuickEdit mode to prevent application from freezing when console is clicked
+  // Disable QuickEdit mode to prevent application from freezing when console is
+  // clicked
   HANDLE hInput = GetStdHandle(STD_INPUT_HANDLE);
   DWORD prev_mode;
   if (GetConsoleMode(hInput, &prev_mode)) {
-      SetConsoleMode(hInput, prev_mode & ~ENABLE_QUICK_EDIT_MODE);
+    SetConsoleMode(hInput, prev_mode & ~ENABLE_QUICK_EDIT_MODE);
   }
 #endif
 
@@ -565,43 +577,47 @@ int main(void) {
   printf("[MAIN] Application starting...\n");
   UNX_LOG_INFO("Application starting...");
 
-  #if defined(PLATFORM_DRM)
-    // ... (DRM logic omitted for brevity in replace)
-  #elif defined(__ANDROID__)
-    UNX_LOG_INFO("[MAIN] Platform: ANDROID. Attempting InitWindow...");
-    int w = GetScreenWidth();
-    int h = GetScreenHeight();
-    if (w <= 0) w = 1920; // Fallback to common resolution
-    if (h <= 0) h = 1080;
-    InitWindow(w, h, APP_NAME);
-    UNX_LOG_INFO("[MAIN] InitWindow finished. Result: %s", IsWindowReady() ? "SUCCESS" : "FAILED");
-    SetTargetFPS(60); 
-  #else
-    // Desktop (X11, Wayland, Windows)
-    printf("[MAIN] Platform: DESKTOP (X11/Wayland/Windows)\n");
-    SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
-    
-    // Start in windowed mode (e.g., 1280x720) like Windows version
-    int winWidth = 1280;
-    int winHeight = 720;
-    
-    printf("[MAIN] Initializing Window (%dx%d)...\n", winWidth, winHeight);
-    InitWindow(winWidth, winHeight, APP_NAME);
-    
-    if (IsWindowReady()) {
-        printf("[MAIN] InitWindow SUCCESS. Window size: %dx%d\n", GetScreenWidth(), GetScreenHeight());
-        UNX_LOG_INFO("[DESKTOP] InitWindow SUCCESS.");
-    } else {
-        printf("[MAIN] InitWindow FAILED!\n");
-        UNX_LOG_ERR("[DESKTOP] InitWindow FAILED!");
-    }
-    
-    SetWindowMinSize(REF_WIDTH, REF_HEIGHT);
-    SetTargetFPS(60);
-  #endif
+#if defined(PLATFORM_DRM)
+  // ... (DRM logic omitted for brevity in replace)
+#elif defined(__ANDROID__)
+  UNX_LOG_INFO("[MAIN] Platform: ANDROID. Attempting InitWindow...");
+  int w = GetScreenWidth();
+  int h = GetScreenHeight();
+  if (w <= 0)
+    w = 1920; // Fallback to common resolution
+  if (h <= 0)
+    h = 1080;
+  InitWindow(w, h, APP_NAME);
+  UNX_LOG_INFO("[MAIN] InitWindow finished. Result: %s",
+               IsWindowReady() ? "SUCCESS" : "FAILED");
+  SetTargetFPS(60);
+#else
+  // Desktop (X11, Wayland, Windows)
+  printf("[MAIN] Platform: DESKTOP (X11/Wayland/Windows)\n");
+  SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
+
+  // Start in windowed mode (e.g., 1280x720) like Windows version
+  int winWidth = 1280;
+  int winHeight = 720;
+
+  printf("[MAIN] Initializing Window (%dx%d)...\n", winWidth, winHeight);
+  InitWindow(winWidth, winHeight, APP_NAME);
+
+  if (IsWindowReady()) {
+    printf("[MAIN] InitWindow SUCCESS. Window size: %dx%d\n", GetScreenWidth(),
+           GetScreenHeight());
+    UNX_LOG_INFO("[DESKTOP] InitWindow SUCCESS.");
+  } else {
+    printf("[MAIN] InitWindow FAILED!\n");
+    UNX_LOG_ERR("[DESKTOP] InitWindow FAILED!");
+  }
+
+  SetWindowMinSize(REF_WIDTH, REF_HEIGHT);
+  SetTargetFPS(60);
+#endif
 
   SetExitKey(KEY_NULL); // ESC is for 'back'
-  
+
 #if defined(__ANDROID__)
   UNX_LOG_INFO("[MAIN] Stability delay for hardware driver...");
   usleep(200000); // 200ms delay
@@ -611,8 +627,6 @@ int main(void) {
   UIFonts_Init();
   UNX_LOG_INFO("[MAIN] Fonts initialized.");
 #endif
-
-
 
 #if defined(PLATFORM_IOS)
   void ios_init_audio_session();
@@ -631,18 +645,18 @@ int main(void) {
   UNX_LOG_INFO("[MAIN] Audio Backend initialized.");
 
   UNX_LOG_INFO("[MAIN] Initializing App (Heap)...");
-  UNX_LOG_INFO("[MAIN] Structure Sizes - App: %.2f MB, AudioEngine: %.2f MB", 
-               (float)sizeof(App)/(1024.0f*1024.0f), 
-               (float)sizeof(AudioEngine)/(1024.0f*1024.0f));
+  UNX_LOG_INFO("[MAIN] Structure Sizes - App: %.2f MB, AudioEngine: %.2f MB",
+               (float)sizeof(App) / (1024.0f * 1024.0f),
+               (float)sizeof(AudioEngine) / (1024.0f * 1024.0f));
 
   App *app = (App *)malloc(sizeof(App));
   if (!app) {
-      UNX_LOG_ERR("[CRITICAL] Failed to allocate App on heap!");
-      return -1;
+    UNX_LOG_ERR("[CRITICAL] Failed to allocate App on heap!");
+    return -1;
   }
   memset(app, 0, sizeof(App));
-  globalApp = app; 
-  
+  globalApp = app;
+
 #ifdef DEBUG_IOS_GUI
   app->screen = ScreenDebug;
   DebugIOS_Init(&app->debugView);
@@ -666,40 +680,42 @@ int main(void) {
       .SampleRate = (app->settingsState.Items[14].Current == 0) ? 44100 : 48000,
       .BufferSizeFrames = bufMap[app->settingsState.Items[13].Current]};
 
-
 #if defined(PLATFORM_IOS)
   // Force safer defaults for iOS to prevent driver instability/crashes
   initialAudioCfg.SampleRate = 44100;
-  initialAudioCfg.BufferSizeFrames = 512; 
+  initialAudioCfg.BufferSizeFrames = 512;
 #endif
 
   app->activeAudioConfig = initialAudioCfg;
-  UNX_LOG_INFO("[MAIN] Audio config prepared. SR: %d, Buf: %d", initialAudioCfg.SampleRate, initialAudioCfg.BufferSizeFrames);
+  UNX_LOG_INFO("[MAIN] Audio config prepared. SR: %d, Buf: %d",
+               initialAudioCfg.SampleRate, initialAudioCfg.BufferSizeFrames);
   UNX_LOG_INFO("[MAIN] Retrieving active audio info...");
   // Set initial Audio Driver name for the UI
-  AudioBackend_GetActiveInfo(NULL, NULL, app->aboutState.AudioDriver, app->aboutState.AudioDevice);
+  AudioBackend_GetActiveInfo(NULL, NULL, app->aboutState.AudioDriver,
+                             app->aboutState.AudioDevice);
 
   UNX_LOG_INFO("[MAIN] Initializing Audio Engine (Heap)...");
 
   AudioEngine *audioEngine = (AudioEngine *)malloc(sizeof(AudioEngine));
   if (!audioEngine) {
-      UNX_LOG_ERR("[CRITICAL] Failed to allocate AudioEngine on heap!");
-      return -1;
+    UNX_LOG_ERR("[CRITICAL] Failed to allocate AudioEngine on heap!");
+    return -1;
   }
   AudioEngine_Init(audioEngine, initialAudioCfg.SampleRate);
   app->browserState.AudioPlugin = (struct AudioEngine *)audioEngine;
   app->browserState.DeckA = (struct DeckState *)&app->deckA;
   app->browserState.DeckB = (struct DeckState *)&app->deckB;
   app->player.AudioPlugin = audioEngine;
-  
-  UNX_LOG_INFO("[MAIN] Audio Engine initialized. Total RAM: %.2f MB", Log_GetRAMUsage());
+
+  UNX_LOG_INFO("[MAIN] Audio Engine initialized. Total RAM: %.2f MB",
+               Log_GetRAMUsage());
 
   // Register Controls after Init
   CO_Init();
   CO_Register("[Channel1]", "play", CO_TYPE_BOOL,
               &audioEngine->Decks[0].IsMotorOn, 0, 1);
-  CO_Register("[Channel1]", "volume", CO_TYPE_FLOAT, &audioEngine->Decks[0].Trim,
-              0, 2.0f);
+  CO_Register("[Channel1]", "volume", CO_TYPE_FLOAT,
+              &audioEngine->Decks[0].Trim, 0, 2.0f);
   CO_Register("[Channel1]", "filterHigh", CO_TYPE_FLOAT,
               &audioEngine->Decks[0].EqHigh, 0, 1.0f);
   CO_Register("[Channel1]", "filterMid", CO_TYPE_FLOAT,
@@ -708,11 +724,11 @@ int main(void) {
               &audioEngine->Decks[0].EqLow, 0, 1.0f);
   CO_Register("[Channel1]", "cue_default", CO_TYPE_BOOL,
               &audioEngine->Decks[0].IsCueActive, 0, 1);
- 
+
   CO_Register("[Channel2]", "play", CO_TYPE_BOOL,
               &audioEngine->Decks[1].IsMotorOn, 0, 1);
-  CO_Register("[Channel2]", "volume", CO_TYPE_FLOAT, &audioEngine->Decks[1].Trim,
-              0, 2.0f);
+  CO_Register("[Channel2]", "volume", CO_TYPE_FLOAT,
+              &audioEngine->Decks[1].Trim, 0, 2.0f);
   CO_Register("[Channel2]", "filterHigh", CO_TYPE_FLOAT,
               &audioEngine->Decks[1].EqHigh, 0, 1.0f);
   CO_Register("[Channel2]", "filterMid", CO_TYPE_FLOAT,
@@ -725,15 +741,17 @@ int main(void) {
               -1.0f, 1.0f);
 
   globalAudioEngine = audioEngine;
-  
+
 #if !defined(PLATFORM_IOS)
   UNX_LOG_INFO("[MAIN] Starting audio backend...");
   if (!AudioBackend_Start(initialAudioCfg, AudioProcessCallback)) {
-      UNX_LOG_ERR("[MAIN] Failed to start audio backend on first attempt! Retrying in 500ms...");
-      WaitTime(0.5); 
-      if (!AudioBackend_Start(initialAudioCfg, AudioProcessCallback)) {
-          UNX_LOG_ERR("[MAIN] Audio backend start failed again. Sound might not be available.");
-      }
+    UNX_LOG_ERR("[MAIN] Failed to start audio backend on first attempt! "
+                "Retrying in 500ms...");
+    WaitTime(0.5);
+    if (!AudioBackend_Start(initialAudioCfg, AudioProcessCallback)) {
+      UNX_LOG_ERR("[MAIN] Audio backend start failed again. Sound might not be "
+                  "available.");
+    }
   }
 
   // Final sync of actual hardware sample rate
@@ -744,41 +762,47 @@ int main(void) {
 
   UNX_LOG_INFO("[MAIN] Setting main loop (FPS: 60)...");
 
-
 #if defined(PLATFORM_WEB) || defined(PLATFORM_IOS)
-  #if defined(PLATFORM_WEB)
-    #include <emscripten/emscripten.h>
-    emscripten_set_main_loop_arg((void (*)(void*))UpdateDrawFrame, app, 0, 1);
-  #elif defined(PLATFORM_IOS)
-    // On iOS, we return here and let the platform layer call ios_ready/ios_update.
-    return 0;
-  #endif
+#if defined(PLATFORM_WEB)
+#include <emscripten/emscripten.h>
+  emscripten_set_main_loop_arg((void (*)(void *))UpdateDrawFrame, app, 0, 1);
+#elif defined(PLATFORM_IOS)
+  // On iOS, we return here and let the platform layer call
+  // ios_ready/ios_update.
+  return 0;
+#endif
 #else
   while (!WindowShouldClose()) {
     UpdateDrawFrame(app);
   }
-  
+
   UNX_LOG_INFO("[MAIN] Shutting down...");
   UIFonts_Unload();
-  
+
   // Browser Cleanup (Inline to reduce external functions)
-  if (app->browserState.DB) RB_FreeDatabase(app->browserState.DB);
-  if (app->browserState.SeratoDB) Serato_FreeDatabase(app->browserState.SeratoDB);
-  if (app->browserState.TrackPointers) free(app->browserState.TrackPointers);
-  if (app->browserState.SeratoTrackPointers) free(app->browserState.SeratoTrackPointers);
-  
+  if (app->browserState.DB)
+    RB_FreeDatabase(app->browserState.DB);
+  if (app->browserState.SeratoDB)
+    Serato_FreeDatabase(app->browserState.SeratoDB);
+  if (app->browserState.TrackPointers)
+    free(app->browserState.TrackPointers);
+  if (app->browserState.SeratoTrackPointers)
+    free(app->browserState.SeratoTrackPointers);
+
   MIDI_Close(&app->midiCtx);
   AudioBackend_Terminate();
   CloseWindow();
-  
+
   if (audioEngine) {
     for (int i = 0; i < MAX_DECKS; i++) {
-        if (audioEngine->Decks[i].PCMBuffer) free(audioEngine->Decks[i].PCMBuffer);
+      if (audioEngine->Decks[i].PCMBuffer)
+        free(audioEngine->Decks[i].PCMBuffer);
     }
     free(audioEngine);
   }
-  if (app) free(app);
-  
+  if (app)
+    free(app);
+
   UNX_LOG_INFO("[MAIN] Exit.");
   Log_Close();
 #endif
@@ -789,468 +813,472 @@ int main(void) {
 void UpdateDrawFrame(App *app) {
   static bool firstCall = true;
   if (firstCall) {
-      UNX_LOG_INFO("[MAIN] UpdateDrawFrame: First call (Window: %dx%d, Ready: %d, Hidden: %d, Min: %d)", 
-                   GetScreenWidth(), GetScreenHeight(), IsWindowReady(), IsWindowHidden(), IsWindowMinimized());
-      firstCall = false;
+    UNX_LOG_INFO("[MAIN] UpdateDrawFrame: First call (Window: %dx%d, Ready: "
+                 "%d, Hidden: %d, Min: %d)",
+                 GetScreenWidth(), GetScreenHeight(), IsWindowReady(),
+                 IsWindowHidden(), IsWindowMinimized());
+    firstCall = false;
   }
 
 #if defined(PLATFORM_IOS)
 #ifndef DEBUG_IOS_GUI
   // Safety: If window dimensions are not yet available, skip this frame.
   if (GetScreenWidth() <= 0 || GetScreenHeight() <= 0) {
-      static double lastWarn = 0;
-      if (GetTime() - lastWarn > 5.0) {
-          UNX_LOG_WARN("[MAIN] UpdateDrawFrame: Waiting for valid screen dimensions (%dx%d)...", GetScreenWidth(), GetScreenHeight());
-          lastWarn = GetTime();
-      }
-      return;
+    static double lastWarn = 0;
+    if (GetTime() - lastWarn > 5.0) {
+      UNX_LOG_WARN("[MAIN] UpdateDrawFrame: Waiting for valid screen "
+                   "dimensions (%dx%d)...",
+                   GetScreenWidth(), GetScreenHeight());
+      lastWarn = GetTime();
+    }
+    return;
   }
   // Grace period for non-debug mode
-  if (GetTime() > 2.0 && (IsWindowHidden() || IsWindowMinimized())) return;
+  if (GetTime() > 2.0 && (IsWindowHidden() || IsWindowMinimized()))
+    return;
 #endif
 #endif
 
   AudioEngine *audioEngine = globalAudioEngine;
-  if (!audioEngine) return;
+  if (!audioEngine)
+    return;
 
   static int lastScreen = -1;
-  
+
   if (lastScreen != (int)app->screen) {
-      UNX_LOG_INFO("[MAIN] Screen changed to: %d", (int)app->screen);
-      lastScreen = (int)app->screen;
+    UNX_LOG_INFO("[MAIN] Screen changed to: %d", (int)app->screen);
+    lastScreen = (int)app->screen;
   }
 
   // --- Sync Audio Engine State to UI State ---
   if (audioEngine->Decks[0].PCMBuffer) {
-      // Position is already frame-based (L+R pair = 1 frame)
-      double playheadFrames = audioEngine->Decks[0].Position;
-      double srA = (double)audioEngine->Decks[0].SampleRate;
-      if (srA < 8000)
-        srA = 44100.0;
+    // Position is already frame-based (L+R pair = 1 frame)
+    double playheadFrames = audioEngine->Decks[0].Position;
+    double srA = (double)audioEngine->Decks[0].SampleRate;
+    if (srA < 8000)
+      srA = 44100.0;
 
-      app->deckA.Position = (playheadFrames * 150.0) / srA;
-      app->deckA.IsPlaying = audioEngine->Decks[0].IsPlaying;
+    app->deckA.Position = (playheadFrames * 150.0) / srA;
+    app->deckA.IsPlaying = audioEngine->Decks[0].IsPlaying;
 
-      double posSec = playheadFrames / srA;
-      app->deckA.PositionMs = (long long)(posSec * 1000.0);
+    double posSec = playheadFrames / srA;
+    app->deckA.PositionMs = (long long)(posSec * 1000.0);
 
-      double lenSec =
-          ((double)audioEngine->Decks[0].TotalSamples / (double)CHANNELS) / srA;
-      app->deckA.TrackLengthMs = (long long)(lenSec * 1000.0);
+    double lenSec =
+        ((double)audioEngine->Decks[0].TotalSamples / (double)CHANNELS) / srA;
+    app->deckA.TrackLengthMs = (long long)(lenSec * 1000.0);
+  }
+  if (audioEngine->Decks[1].PCMBuffer) {
+    double playheadFrames = audioEngine->Decks[1].Position;
+    double srB = (double)audioEngine->Decks[1].SampleRate;
+    if (srB < 8000)
+      srB = 44100.0;
+
+    app->deckB.Position = (playheadFrames * 150.0) / srB;
+    app->deckB.IsPlaying = audioEngine->Decks[1].IsPlaying;
+
+    double posSec = playheadFrames / srB;
+    app->deckB.PositionMs = (long long)(posSec * 1000.0);
+
+    double lenSec =
+        ((double)audioEngine->Decks[1].TotalSamples / (double)CHANNELS) / srB;
+    app->deckB.TrackLengthMs = (long long)(lenSec * 1000.0);
+  }
+
+  // Cache scale for this frame based on current window size
+  UI_UpdateScale();
+
+  app->topbar.ActiveScreen = app->screen;
+
+  // Navigation Logic (Time-based Splash)
+  if (app->screen == ScreenSplash) {
+    static float splashTime = 0;
+    splashTime += GetFrameTime();
+    if (splashTime >= 2.0f) { // 2 Seconds splash
+      app->screen = ScreenPlayer;
     }
-    if (audioEngine->Decks[1].PCMBuffer) {
-      double playheadFrames = audioEngine->Decks[1].Position;
-      double srB = (double)audioEngine->Decks[1].SampleRate;
-      if (srB < 8000)
-        srB = 44100.0;
+  }
 
-      app->deckB.Position = (playheadFrames * 150.0) / srB;
-      app->deckB.IsPlaying = audioEngine->Decks[1].IsPlaying;
+  // Exclusive Master Logic & Auto Takeover
+  static bool lastMasterA = false;
+  static bool lastMasterB = false;
+  static int lastSyncA = 0;
+  static int lastSyncB = 0;
 
-      double posSec = playheadFrames / srB;
-      app->deckB.PositionMs = (long long)(posSec * 1000.0);
-
-      double lenSec =
-          ((double)audioEngine->Decks[1].TotalSamples / (double)CHANNELS) / srB;
-      app->deckB.TrackLengthMs = (long long)(lenSec * 1000.0);
-    }
-
-    // Cache scale for this frame based on current window size
-    UI_UpdateScale();
-
-    app->topbar.ActiveScreen = app->screen;
-
-    // Navigation Logic (Time-based Splash)
-    if (app->screen == ScreenSplash) {
-      static float splashTime = 0;
-      splashTime += GetFrameTime();
-      if (splashTime >= 2.0f) { // 2 Seconds splash
-        app->screen = ScreenPlayer;
-      }
-    }
-
-    // Exclusive Master Logic & Auto Takeover
-    static bool lastMasterA = false;
-    static bool lastMasterB = false;
-    static int lastSyncA = 0;
-    static int lastSyncB = 0;
-
-    // Auto Assign Master: If Sync is turned ON and No deck is master
-    bool noMaster = !app->deckA.IsMaster && !app->deckB.IsMaster;
-    if (noMaster) {
-      if (app->deckA.SyncMode > 0 && lastSyncA == 0)
-        app->deckB.IsMaster = true;
-      else if (app->deckB.SyncMode > 0 && lastSyncB == 0)
-        app->deckA.IsMaster = true;
-    }
-    lastSyncA = app->deckA.SyncMode;
-    lastSyncB = app->deckB.SyncMode;
-
-    // Auto Takeover: If Master stops, other deck becomes Master if playing
-    if (app->deckA.IsMaster && !app->deckA.IsPlaying && app->deckB.IsPlaying) {
-      app->deckA.IsMaster = false;
+  // Auto Assign Master: If Sync is turned ON and No deck is master
+  bool noMaster = !app->deckA.IsMaster && !app->deckB.IsMaster;
+  if (noMaster) {
+    if (app->deckA.SyncMode > 0 && lastSyncA == 0)
       app->deckB.IsMaster = true;
-    } else if (app->deckB.IsMaster && !app->deckB.IsPlaying &&
-               app->deckA.IsPlaying) {
-      app->deckB.IsMaster = false;
+    else if (app->deckB.SyncMode > 0 && lastSyncB == 0)
       app->deckA.IsMaster = true;
+  }
+  lastSyncA = app->deckA.SyncMode;
+  lastSyncB = app->deckB.SyncMode;
+
+  // Auto Takeover: If Master stops, other deck becomes Master if playing
+  if (app->deckA.IsMaster && !app->deckA.IsPlaying && app->deckB.IsPlaying) {
+    app->deckA.IsMaster = false;
+    app->deckB.IsMaster = true;
+  } else if (app->deckB.IsMaster && !app->deckB.IsPlaying &&
+             app->deckA.IsPlaying) {
+    app->deckB.IsMaster = false;
+    app->deckA.IsMaster = true;
+  }
+
+  if (app->deckA.IsMaster && !lastMasterA)
+    app->deckB.IsMaster = false;
+  if (app->deckB.IsMaster && !lastMasterB)
+    app->deckA.IsMaster = false;
+  lastMasterA = app->deckA.IsMaster;
+  lastMasterB = app->deckB.IsMaster;
+
+  HandleKeyboardInputs(&app->keyMap, &app->deckA, &app->deckB, audioEngine);
+  MIDI_Update(&app->midiCtx, &app->deckA, &app->deckB, audioEngine);
+
+  // Global UI navigation using keyMap
+  if (IsKeyPressed(app->keyMap.toggleBrowser)) {
+    if (app->screen == ScreenPlayer) {
+      app->screen = ScreenBrowser;
+      app->browserState.IsActive = true;
+    } else if (app->screen == ScreenBrowser) {
+      app->screen = ScreenPlayer;
+      app->browserState.IsActive = !app->browserState.IsActive;
+    }
+  }
+
+  // Tempo Calculation (10000 = 100%)
+  float realPitchA = 1.0f + (app->deckA.TempoPercent / 100.0f);
+  audioEngine->Decks[0].Pitch = (uint16_t)(realPitchA * 10000.0f);
+  app->deckA.CurrentBPM = app->deckA.OriginalBPM * realPitchA;
+
+  float realPitchB = 1.0f + (app->deckB.TempoPercent / 100.0f);
+  audioEngine->Decks[1].Pitch = (uint16_t)(realPitchB * 10000.0f);
+  app->deckB.CurrentBPM = app->deckB.OriginalBPM * realPitchB;
+
+  // --- Sync Control Logic ---
+  Sync_Update(&app->deckA, &app->deckB, audioEngine);
+
+  // --- Sync UI Jog/Modes back to Audio Engine ---
+  // Deck A
+  if (app->deckA.IsTouching != audioEngine->Decks[0].IsTouching) {
+    bool released = !app->deckA.IsTouching && audioEngine->Decks[0].IsTouching;
+    DeckAudio_SetJogTouch(&audioEngine->Decks[0], app->deckA.IsTouching);
+
+    // Phase Snap on release if Beat Sync is ON
+    if (released && app->deckA.SyncMode == 2 && !app->deckA.IsMaster) {
+      Sync_RequestPhaseSnap(&app->deckA, &app->deckB, audioEngine);
     }
 
-    if (app->deckA.IsMaster && !lastMasterA)
-      app->deckB.IsMaster = false;
-    if (app->deckB.IsMaster && !lastMasterB)
-      app->deckA.IsMaster = false;
-    lastMasterA = app->deckA.IsMaster;
-    lastMasterB = app->deckB.IsMaster;
+    // Immediately switch to BPM sync on touch if was in BEAT sync
+    if (app->deckA.IsTouching && app->deckA.SyncMode == 2) {
+      app->deckA.SyncMode = 1;
+    }
+  }
+  if (app->deckA.IsTouching) {
+    double dt = GetFrameTime();
+    if (dt < 0.001)
+      dt = 0.016;
+    double srA = (double)audioEngine->Decks[0].SampleRate;
+    if (srA < 8000)
+      srA = 44100.0;
 
-    HandleKeyboardInputs(&app->keyMap, &app->deckA, &app->deckB, audioEngine);
-    MIDI_Update(&app->midiCtx, &app->deckA, &app->deckB, audioEngine);
+    double framesInFrame = srA * dt;
+    // JogDelta is in 150Hz frames. Convert to PCM frames for comparison.
+    double instantaneousRate =
+        (app->deckA.JogDelta * (srA / 150.0)) / (framesInFrame);
 
-    // Global UI navigation using keyMap
-    if (IsKeyPressed(app->keyMap.toggleBrowser)) {
-      if (app->screen == ScreenPlayer) {
-        app->screen = ScreenBrowser;
-        app->browserState.IsActive = true;
-      } else if (app->screen == ScreenBrowser) {
-        app->screen = ScreenPlayer;
-        app->browserState.IsActive = !app->browserState.IsActive;
+    audioEngine->Decks[0].JogRate = instantaneousRate;
+    app->deckA.JogDelta = 0;
+  }
+  audioEngine->Decks[0].VinylModeEnabled = app->deckA.VinylModeEnabled;
+  audioEngine->Decks[0].MasterTempoActive = app->deckA.MasterTempo;
+
+  // Deck B
+  if (app->deckB.IsTouching != audioEngine->Decks[1].IsTouching) {
+    bool released = !app->deckB.IsTouching && audioEngine->Decks[1].IsTouching;
+    DeckAudio_SetJogTouch(&audioEngine->Decks[1], app->deckB.IsTouching);
+
+    // Phase Snap on release if Beat Sync is ON
+    if (released && app->deckB.SyncMode == 2 && !app->deckB.IsMaster) {
+      Sync_RequestPhaseSnap(&app->deckB, &app->deckA, audioEngine);
+    }
+
+    // Immediately switch to BPM sync on touch if was in BEAT sync
+    if (app->deckB.IsTouching && app->deckB.SyncMode == 2) {
+      app->deckB.SyncMode = 1;
+    }
+  }
+  if (app->deckB.IsTouching) {
+    double dt = GetFrameTime();
+    if (dt < 0.001)
+      dt = 0.016;
+    double srB = (double)audioEngine->Decks[1].SampleRate;
+    if (srB < 8000)
+      srB = 44100.0;
+
+    double framesInFrame = srB * dt;
+    double instantaneousRate =
+        (app->deckB.JogDelta * (srB / 150.0)) / framesInFrame;
+
+    audioEngine->Decks[1].JogRate = instantaneousRate;
+    app->deckB.JogDelta = 0;
+  }
+  audioEngine->Decks[1].VinylModeEnabled = app->deckB.VinylModeEnabled;
+  audioEngine->Decks[1].MasterTempoActive = app->deckB.MasterTempo;
+
+  // Apply Vinyl Start/Stop Physics
+  for (int i = 0; i < 2; i++) {
+    DeckState *ds = (i == 0) ? &app->deckA : &app->deckB;
+    double sr = (double)audioEngine->Decks[i].SampleRate;
+    if (sr < 8000)
+      sr = 44100.0;
+
+    // Assuming 1024 frames per block as set in InitAudio
+    float blockSize = 1024.0f;
+    float blocksPerSec = (float)sr / blockSize;
+
+    // Accel is the increment per block to reach pitch 1.0 in N seconds
+    // Since we want linear ramp: delta = (TargetRate - 0) / TotalBlocks
+    // TotalBlocks = DurationSeconds * blocksPerSec
+    audioEngine->Decks[i].VinylStartAccel =
+        1.0f / ((ds->Waveform.VinylStartMs / 1000.0f) * blocksPerSec + 1.0f);
+    audioEngine->Decks[i].VinylStopAccel =
+        1.0f / ((ds->Waveform.VinylStopMs / 1000.0f) * blocksPerSec + 1.0f);
+  }
+
+  if (IsKeyPressed(app->keyMap.toggleInfo)) {
+    if (app->screen == ScreenInfo) {
+      app->screen = ScreenPlayer;
+      app->infoState.IsActive = false;
+    } else {
+      app->screen = ScreenInfo;
+      app->infoState.IsActive = true;
+
+      // Sync Info State from Decks
+      for (int i = 0; i < 2; i++) {
+        DeckState *ds = (i == 0) ? &app->deckA : &app->deckB;
+        InfoTrack *it = &app->infoState.Tracks[i];
+        strcpy(it->Title, ds->TrackTitle);
+        strcpy(it->Artist, ds->ArtistName);
+        strcpy(it->Album, ds->AlbumName);
+        strcpy(it->Genre, ds->GenreName);
+        strcpy(it->Label, ds->LabelName);
+        strcpy(it->Comment, ds->Comment);
+        it->Year = ds->Year;
+        it->Rating = ds->Rating;
+        it->BPM = ds->OriginalBPM;
+        strcpy(it->Key, ds->TrackKey);
+        it->Duration = ds->TrackLengthMs / 1000;
+        strcpy(it->Source, ds->SourceName);
+        // Add more if available...
       }
     }
+  }
 
-    // Tempo Calculation (10000 = 100%)
-    float realPitchA = 1.0f + (app->deckA.TempoPercent / 100.0f);
-    audioEngine->Decks[0].Pitch = (uint16_t)(realPitchA * 10000.0f);
-    app->deckA.CurrentBPM = app->deckA.OriginalBPM * realPitchA;
-
-    float realPitchB = 1.0f + (app->deckB.TempoPercent / 100.0f);
-    audioEngine->Decks[1].Pitch = (uint16_t)(realPitchB * 10000.0f);
-    app->deckB.CurrentBPM = app->deckB.OriginalBPM * realPitchB;
-
-    // --- Sync Control Logic ---
-    Sync_Update(&app->deckA, &app->deckB, audioEngine);
-
-    // --- Sync UI Jog/Modes back to Audio Engine ---
-    // Deck A
-    if (app->deckA.IsTouching != audioEngine->Decks[0].IsTouching) {
-      bool released = !app->deckA.IsTouching && audioEngine->Decks[0].IsTouching;
-      DeckAudio_SetJogTouch(&audioEngine->Decks[0], app->deckA.IsTouching);
-
-      // Phase Snap on release if Beat Sync is ON
-      if (released && app->deckA.SyncMode == 2 && !app->deckA.IsMaster) {
-        Sync_RequestPhaseSnap(&app->deckA, &app->deckB, audioEngine);
-      }
-
-      // Immediately switch to BPM sync on touch if was in BEAT sync
-      if (app->deckA.IsTouching && app->deckA.SyncMode == 2) {
-        app->deckA.SyncMode = 1;
-      }
+  if (IsKeyPressed(app->keyMap.toggleSettings)) {
+    if (app->screen == ScreenSettings) {
+      app->screen = ScreenPlayer;
+      app->infoState.IsActive = false; // Typo fix
+      app->settingsState.IsActive = false;
+    } else {
+      app->screen = ScreenSettings;
+      app->settingsState.IsActive = true;
     }
-    if (app->deckA.IsTouching) {
-      double dt = GetFrameTime();
-      if (dt < 0.001)
-        dt = 0.016;
-      double srA = (double)audioEngine->Decks[0].SampleRate;
-      if (srA < 8000)
-        srA = 44100.0;
+  }
 
-      double framesInFrame = srA * dt;
-      // JogDelta is in 150Hz frames. Convert to PCM frames for comparison.
-      double instantaneousRate =
-          (app->deckA.JogDelta * (srA / 150.0)) / (framesInFrame);
-
-      audioEngine->Decks[0].JogRate = instantaneousRate;
-      app->deckA.JogDelta = 0;
+  if (IsKeyPressed(app->keyMap.toggleMixer)) {
+    if (app->screen == ScreenMixer) {
+      app->screen = ScreenPlayer;
+      app->mixerState.IsActive = false;
+    } else {
+      app->screen = ScreenMixer;
+      app->mixerState.IsActive = true;
+      // Hook audio engine up right before drawing if not earlier
+      app->mixerState.AudioPlugin = audioEngine;
     }
-    audioEngine->Decks[0].VinylModeEnabled = app->deckA.VinylModeEnabled;
-    audioEngine->Decks[0].MasterTempoActive = app->deckA.MasterTempo;
+  }
 
-    // Deck B
-    if (app->deckB.IsTouching != audioEngine->Decks[1].IsTouching) {
-      bool released = !app->deckB.IsTouching && audioEngine->Decks[1].IsTouching;
-      DeckAudio_SetJogTouch(&audioEngine->Decks[1], app->deckB.IsTouching);
-
-      // Phase Snap on release if Beat Sync is ON
-      if (released && app->deckB.SyncMode == 2 && !app->deckB.IsMaster) {
-        Sync_RequestPhaseSnap(&app->deckB, &app->deckA, audioEngine);
-      }
-
-      // Immediately switch to BPM sync on touch if was in BEAT sync
-      if (app->deckB.IsTouching && app->deckB.SyncMode == 2) {
-        app->deckB.SyncMode = 1;
-      }
-    }
-    if (app->deckB.IsTouching) {
-      double dt = GetFrameTime();
-      if (dt < 0.001)
-        dt = 0.016;
-      double srB = (double)audioEngine->Decks[1].SampleRate;
-      if (srB < 8000)
-        srB = 44100.0;
-
-      double framesInFrame = srB * dt;
-      double instantaneousRate =
-          (app->deckB.JogDelta * (srB / 150.0)) / framesInFrame;
-
-      audioEngine->Decks[1].JogRate = instantaneousRate;
-      app->deckB.JogDelta = 0;
-    }
-    audioEngine->Decks[1].VinylModeEnabled = app->deckB.VinylModeEnabled;
-    audioEngine->Decks[1].MasterTempoActive = app->deckB.MasterTempo;
-
-    // Apply Vinyl Start/Stop Physics
-    for (int i = 0; i < 2; i++) {
-      DeckState *ds = (i == 0) ? &app->deckA : &app->deckB;
-      double sr = (double)audioEngine->Decks[i].SampleRate;
-      if (sr < 8000)
-        sr = 44100.0;
-
-      // Assuming 1024 frames per block as set in InitAudio
-      float blockSize = 1024.0f;
-      float blocksPerSec = (float)sr / blockSize;
-
-      // Accel is the increment per block to reach pitch 1.0 in N seconds
-      // Since we want linear ramp: delta = (TargetRate - 0) / TotalBlocks
-      // TotalBlocks = DurationSeconds * blocksPerSec
-      audioEngine->Decks[i].VinylStartAccel =
-          1.0f / ((ds->Waveform.VinylStartMs / 1000.0f) * blocksPerSec + 1.0f);
-      audioEngine->Decks[i].VinylStopAccel =
-          1.0f / ((ds->Waveform.VinylStopMs / 1000.0f) * blocksPerSec + 1.0f);
-    }
-
-
-
-    if (IsKeyPressed(app->keyMap.toggleInfo)) {
-      if (app->screen == ScreenInfo) {
-        app->screen = ScreenPlayer;
-        app->infoState.IsActive = false;
-      } else {
-        app->screen = ScreenInfo;
-        app->infoState.IsActive = true;
-
-        // Sync Info State from Decks
-        for (int i = 0; i < 2; i++) {
-          DeckState *ds = (i == 0) ? &app->deckA : &app->deckB;
-          InfoTrack *it = &app->infoState.Tracks[i];
-          strcpy(it->Title, ds->TrackTitle);
-          strcpy(it->Artist, ds->ArtistName);
-          strcpy(it->Album, ds->AlbumName);
-          strcpy(it->Genre, ds->GenreName);
-          strcpy(it->Label, ds->LabelName);
-          strcpy(it->Comment, ds->Comment);
-          it->Year = ds->Year;
-          it->Rating = ds->Rating;
-          it->BPM = ds->OriginalBPM;
-          strcpy(it->Key, ds->TrackKey);
-          it->Duration = ds->TrackLengthMs / 1000;
-          strcpy(it->Source, ds->SourceName);
-          // Add more if available...
-        }
-      }
-    }
-
-    if (IsKeyPressed(app->keyMap.toggleSettings)) {
-      if (app->screen == ScreenSettings) {
-        app->screen = ScreenPlayer;
-        app->infoState.IsActive = false; // Typo fix
-        app->settingsState.IsActive = false;
-      } else {
-        app->screen = ScreenSettings;
-        app->settingsState.IsActive = true;
-      }
-    }
-
-    if (IsKeyPressed(app->keyMap.toggleMixer)) {
-      if (app->screen == ScreenMixer) {
-        app->screen = ScreenPlayer;
-        app->mixerState.IsActive = false;
-      } else {
-        app->screen = ScreenMixer;
-        app->mixerState.IsActive = true;
-        // Hook audio engine up right before drawing if not earlier
-        app->mixerState.AudioPlugin = audioEngine;
-      }
-    }
-
-    // ESC / Back logic
-    if (IsKeyPressed(app->keyMap.back)) {
-      if (app->screen == ScreenBrowser) {
-        if (app->browserState.BrowseLevel == 3 && !app->browserState.IsTagList) {
-          app->screen = ScreenPlayer;
-          app->browserState.IsActive = false;
-        } else {
-          Browser_Back(&app->browserState);
-        }
-      } else if (app->screen != ScreenPlayer && app->screen != ScreenSplash) {
+  // ESC / Back logic
+  if (IsKeyPressed(app->keyMap.back)) {
+    if (app->screen == ScreenBrowser) {
+      if (app->browserState.BrowseLevel == 3 && !app->browserState.IsTagList) {
         app->screen = ScreenPlayer;
         app->browserState.IsActive = false;
-        app->infoState.IsActive = false;
-        app->settingsState.IsActive = false;
-        app->aboutState.IsActive = false;
-        app->mixerState.IsActive = false;
+      } else {
+        Browser_Back(&app->browserState);
       }
+    } else if (app->screen != ScreenPlayer && app->screen != ScreenSplash) {
+      app->screen = ScreenPlayer;
+      app->browserState.IsActive = false;
+      app->infoState.IsActive = false;
+      app->settingsState.IsActive = false;
+      app->aboutState.IsActive = false;
+      app->mixerState.IsActive = false;
+    }
+  }
+
+  // Update active components
+  if (app->screen == ScreenSplash)
+    app->splash.base.Update((Component *)&app->splash);
+  if (app->screen == ScreenPlayer)
+    app->player.base.Update((Component *)&app->player);
+  if (app->screen == ScreenBrowser)
+    app->browser.base.Update((Component *)&app->browser);
+  if (app->screen == ScreenInfo)
+    app->info.base.Update((Component *)&app->info);
+  if (app->screen == ScreenSettings)
+    app->settings.base.Update((Component *)&app->settings);
+  if (app->screen == ScreenAbout)
+    app->about.base.Update((Component *)&app->about);
+  if (app->screen == ScreenMixer)
+    app->mixer.base.Update((Component *)&app->mixer);
+  if (app->screen == ScreenDebug)
+    app->debugView.base.Update((Component *)&app->debugView);
+
+  if (app->screen != ScreenSplash && app->screen != ScreenDebug) {
+    app->stripA.base.Update((Component *)&app->stripA);
+    app->stripB.base.Update((Component *)&app->stripB);
+    app->topbar.base.Update((Component *)&app->topbar);
+
+    // --- Update System Stats (CPU/RAM) every 1s ---
+    static float statsTimer = 0;
+    statsTimer += GetFrameTime();
+    if (statsTimer >= 1.0f) {
+      SystemStats stats = GetSystemStats();
+      app->topbar.CPUUsage = stats.cpuUsage;
+      app->topbar.RAMUsage = stats.ramUsageMB;
+      statsTimer = 0;
     }
 
-    // Update active components
-    if (app->screen == ScreenSplash)
-      app->splash.base.Update((Component *)&app->splash);
-    if (app->screen == ScreenPlayer)
-      app->player.base.Update((Component *)&app->player);
-    if (app->screen == ScreenBrowser)
-      app->browser.base.Update((Component *)&app->browser);
-    if (app->screen == ScreenInfo)
-      app->info.base.Update((Component *)&app->info);
-    if (app->screen == ScreenSettings)
-      app->settings.base.Update((Component *)&app->settings);
-    if (app->screen == ScreenAbout)
-      app->about.base.Update((Component *)&app->about);
-    if (app->screen == ScreenMixer)
-      app->mixer.base.Update((Component *)&app->mixer);
-    if (app->screen == ScreenDebug)
-      app->debugView.base.Update((Component *)&app->debugView);
-
-    if (app->screen != ScreenSplash && app->screen != ScreenDebug) {
-      app->stripA.base.Update((Component *)&app->stripA);
-      app->stripB.base.Update((Component *)&app->stripB);
-      app->topbar.base.Update((Component *)&app->topbar);
-
-      // --- Update System Stats (CPU/RAM) every 1s ---
-      static float statsTimer = 0;
-      statsTimer += GetFrameTime();
-      if (statsTimer >= 1.0f) {
-          SystemStats stats = GetSystemStats();
-          app->topbar.CPUUsage = stats.cpuUsage;
-          app->topbar.RAMUsage = stats.ramUsageMB;
-          statsTimer = 0;
-      }
-
-      // --- Handle Seek Requests from UI ---
-      if (app->deckA.HasSeekRequest) {
-        DeckAudio_JumpToMs(&audioEngine->Decks[0], app->deckA.SeekMs);
-        app->deckA.HasSeekRequest = false;
-      }
-      if (app->deckB.HasSeekRequest) {
-        DeckAudio_JumpToMs(&audioEngine->Decks[1], app->deckB.SeekMs);
-        app->deckB.HasSeekRequest = false;
-      }
+    // --- Handle Seek Requests from UI ---
+    if (app->deckA.HasSeekRequest) {
+      DeckAudio_JumpToMs(&audioEngine->Decks[0], app->deckA.SeekMs);
+      app->deckA.HasSeekRequest = false;
     }
-
-    if (!IsWindowReady()) return;
-
-    BeginDrawing();
-    ClearBackground(BLACK);
-
-    // Apply global offset for all UI drawing
-    rlPushMatrix();
-    rlTranslatef(UI_OffsetX, UI_OffsetY, 0);
-
-    // High-level Screen Router
-    switch (app->screen) {
-    case ScreenPlayer:
-      app->player.base.Draw((Component *)&app->player);
-      break;
-    case ScreenBrowser:
-      app->browser.base.Draw((Component *)&app->browser);
-      break;
-    case ScreenInfo:
-      app->info.base.Draw((Component *)&app->info);
-      break;
-    case ScreenSettings:
-      app->settings.base.Draw((Component *)&app->settings);
-      break;
-    case ScreenAbout:
-      app->about.base.Draw((Component *)&app->about);
-      break;
-    case ScreenMixer:
-      app->mixer.base.Draw((Component *)&app->mixer);
-      break;
-    case ScreenSplash:
-      app->splash.base.Draw((Component *)&app->splash);
-      break;
-    case ScreenDebug:
-      app->debugView.base.Draw((Component *)&app->debugView);
-      break;
-    default:
-      ClearBackground(MAGENTA); // Fail-safe color
-      DrawText("UNKNOWN SCREEN", 10, 10, 20, WHITE);
-      break;
+    if (app->deckB.HasSeekRequest) {
+      DeckAudio_JumpToMs(&audioEngine->Decks[1], app->deckB.SeekMs);
+      app->deckB.HasSeekRequest = false;
     }
+  }
 
-    // Draw Global Overlays
-    if (app->showExitConfirm) {
-      DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Fade(BLACK, 0.5f));
-      DrawRectangle(SCREEN_WIDTH / 2 - 150, SCREEN_HEIGHT / 2 - 50, 300, 100,
-                    ColorDark2);
-      DrawText("EXIT APP?", SCREEN_WIDTH / 2 - 50, SCREEN_HEIGHT / 2 - 30, 20,
-               WHITE);
-      DrawText("PRESS PLAY TO CONFIRM", SCREEN_WIDTH / 2 - 100,
-               SCREEN_HEIGHT / 2 + 10, 15, GRAY);
-    }
+  if (!IsWindowReady())
+    return;
 
-    if (app->screen != ScreenSplash) {
-      app->stripA.base.Draw((Component *)&app->stripA);
-      app->stripB.base.Draw((Component *)&app->stripB);
-      app->topbar.base.Draw((Component *)&app->topbar);
-    }
+  BeginDrawing();
+  ClearBackground(BLACK);
 
-    if (app->showExitConfirm) {
-      float pw = S(200);
-      float ph = S(100);
-      float px = (SCREEN_WIDTH - pw) / 2.0f;
-      float py = (SCREEN_HEIGHT - ph) / 2.0f;
+  // Apply global offset for all UI drawing
+  rlPushMatrix();
+  rlTranslatef(UI_OffsetX, UI_OffsetY, 0);
 
-      // Overlay
-      DrawRectangle(-UI_OffsetX, -UI_OffsetY, GetScreenWidth(),
-                    GetScreenHeight(), Fade(BLACK, 0.8f));
+  // High-level Screen Router
+  switch (app->screen) {
+  case ScreenPlayer:
+    app->player.base.Draw((Component *)&app->player);
+    break;
+  case ScreenBrowser:
+    app->browser.base.Draw((Component *)&app->browser);
+    break;
+  case ScreenInfo:
+    app->info.base.Draw((Component *)&app->info);
+    break;
+  case ScreenSettings:
+    app->settings.base.Draw((Component *)&app->settings);
+    break;
+  case ScreenAbout:
+    app->about.base.Draw((Component *)&app->about);
+    break;
+  case ScreenMixer:
+    app->mixer.base.Draw((Component *)&app->mixer);
+    break;
+  case ScreenSplash:
+    app->splash.base.Draw((Component *)&app->splash);
+    break;
+  case ScreenDebug:
+    app->debugView.base.Draw((Component *)&app->debugView);
+    break;
+  default:
+    ClearBackground(MAGENTA); // Fail-safe color
+    DrawText("UNKNOWN SCREEN", 10, 10, 20, WHITE);
+    break;
+  }
 
-      // Box
-      DrawRectangle(px, py, pw, ph, ColorBGUtil);
-      DrawRectangleLinesEx((Rectangle){px, py, pw, ph}, 1.0f, ColorGray);
+  // Draw Global Overlays
+  if (app->showExitConfirm) {
+    DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Fade(BLACK, 0.5f));
+    DrawRectangle(SCREEN_WIDTH / 2 - 150, SCREEN_HEIGHT / 2 - 50, 300, 100,
+                  ColorDark2);
+    DrawText("EXIT APP?", SCREEN_WIDTH / 2 - 50, SCREEN_HEIGHT / 2 - 30, 20,
+             WHITE);
+    DrawText("PRESS PLAY TO CONFIRM", SCREEN_WIDTH / 2 - 100,
+             SCREEN_HEIGHT / 2 + 10, 15, GRAY);
+  }
 
-      Font fMd = UIFonts_GetFace(S(12));
-      DrawCentredText("EXIT APPLICATION?", fMd, px, pw, py + S(20), S(12),
-                      ColorWhite);
-      DrawCentredText("Are you sure?", UIFonts_GetFace(S(9)), px, pw,
-                      py + S(40), S(9), ColorShadow);
+  if (app->screen != ScreenSplash) {
+    app->stripA.base.Draw((Component *)&app->stripA);
+    app->stripB.base.Draw((Component *)&app->stripB);
+    app->topbar.base.Draw((Component *)&app->topbar);
+  }
 
-      // Options
-      float btnW = S(60);
-      float btnH = S(20);
+  if (app->showExitConfirm) {
+    float pw = S(200);
+    float ph = S(100);
+    float px = (SCREEN_WIDTH - pw) / 2.0f;
+    float py = (SCREEN_HEIGHT - ph) / 2.0f;
 
-      // NO Button
-      bool noHover = CheckCollisionPointRec(
-          UIGetMousePosition(),
-          (Rectangle){px + S(30), py + S(65), btnW, btnH});
-      DrawRectangle(px + S(30), py + S(65), btnW, btnH,
-                    noHover ? ColorGray : ColorDark1);
-      DrawRectangleLines(px + S(30), py + S(65), btnW, btnH, ColorShadow);
-      DrawCentredText("NO", fMd, px + S(30), btnW, py + S(68), S(11),
-                      ColorWhite);
+    // Overlay
+    DrawRectangle(-UI_OffsetX, -UI_OffsetY, GetScreenWidth(), GetScreenHeight(),
+                  Fade(BLACK, 0.8f));
 
-      // YES Button
-      bool yesHover = CheckCollisionPointRec(
-          UIGetMousePosition(),
-          (Rectangle){px + pw - S(90), py + S(65), btnW, btnH});
-      DrawRectangle(px + pw - S(90), py + S(65), btnW, btnH,
-                    yesHover ? ColorRed : ColorDark1);
-      DrawRectangleLines(px + pw - S(90), py + S(65), btnW, btnH, ColorRed);
-      DrawCentredText("YES", fMd, px + pw - S(90), btnW, py + S(68), S(11),
-                      ColorWhite);
+    // Box
+    DrawRectangle(px, py, pw, ph, ColorBGUtil);
+    DrawRectangleLinesEx((Rectangle){px, py, pw, ph}, 1.0f, ColorGray);
 
-      if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-        if (noHover)
-          app->showExitConfirm = false;
-        if (yesHover) {
-          // In a callback-based loop, we might need a flag to exit
-          // For now, we'll just keep it as is, but it won't exit cleanly on iOS
-          // unless the platform handles it.
-        }
-      }
-      if (IsKeyPressed(KEY_ENTER)) { /* handle */ }
-      if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE))
+    Font fMd = UIFonts_GetFace(S(12));
+    DrawCentredText("EXIT APPLICATION?", fMd, px, pw, py + S(20), S(12),
+                    ColorWhite);
+    DrawCentredText("Are you sure?", UIFonts_GetFace(S(9)), px, pw, py + S(40),
+                    S(9), ColorShadow);
+
+    // Options
+    float btnW = S(60);
+    float btnH = S(20);
+
+    // NO Button
+    bool noHover = CheckCollisionPointRec(
+        UIGetMousePosition(), (Rectangle){px + S(30), py + S(65), btnW, btnH});
+    DrawRectangle(px + S(30), py + S(65), btnW, btnH,
+                  noHover ? ColorGray : ColorDark1);
+    DrawRectangleLines(px + S(30), py + S(65), btnW, btnH, ColorShadow);
+    DrawCentredText("NO", fMd, px + S(30), btnW, py + S(68), S(11), ColorWhite);
+
+    // YES Button
+    bool yesHover = CheckCollisionPointRec(
+        UIGetMousePosition(),
+        (Rectangle){px + pw - S(90), py + S(65), btnW, btnH});
+    DrawRectangle(px + pw - S(90), py + S(65), btnW, btnH,
+                  yesHover ? ColorRed : ColorDark1);
+    DrawRectangleLines(px + pw - S(90), py + S(65), btnW, btnH, ColorRed);
+    DrawCentredText("YES", fMd, px + pw - S(90), btnW, py + S(68), S(11),
+                    ColorWhite);
+
+    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+      if (noHover)
         app->showExitConfirm = false;
+      if (yesHover) {
+        // In a callback-based loop, we might need a flag to exit
+        // For now, we'll just keep it as is, but it won't exit cleanly on iOS
+        // unless the platform handles it.
+      }
     }
+    if (IsKeyPressed(KEY_ENTER)) { /* handle */
+    }
+    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE))
+      app->showExitConfirm = false;
+  }
 
-    rlPopMatrix();
+  rlPopMatrix();
 
-    EndDrawing();
+  EndDrawing();
 }
