@@ -527,20 +527,15 @@ static void DeckStrip_Draw(Component *base) {
         float ratio = (float)d->State->LoadedTrack->HotCues[h].Start / totalMs;
         if (ratio >= 0.0f && ratio <= 1.0f) {
           float rx = wx + ratio * ww;
-          Color hcClr = {d->State->LoadedTrack->HotCues[h].Color[0],
-                         d->State->LoadedTrack->HotCues[h].Color[1],
-                         d->State->LoadedTrack->HotCues[h].Color[2], 255};
+          static const Color hcPalette[8] = {
+              {0, 255, 0, 255},   {255, 0, 0, 255},   {255, 128, 0, 255},
+              {255, 255, 0, 255}, {0, 0, 255, 255},   {255, 0, 255, 255},
+              {0, 255, 255, 255}, {128, 0, 255, 255}};
           
-          // Fallback palette if color is black (0,0,0) or invalid
-          if (hcClr.r == 0 && hcClr.g == 0 && hcClr.b == 0) {
-            static const Color defPalette[8] = {
-                {0, 255, 0, 255},   {255, 0, 0, 255},   {255, 128, 0, 255},
-                {255, 255, 0, 255}, {0, 0, 255, 255},   {255, 0, 255, 255},
-                {0, 255, 255, 255}, {128, 0, 255, 255}};
-            int idx = d->State->LoadedTrack->HotCues[h].ID - 1;
-            if (idx < 0) idx = 0; if (idx > 7) idx = 7;
-            hcClr = defPalette[idx];
-          }
+          int idx = d->State->LoadedTrack->HotCues[h].ID - 1;
+          if (idx < 0) idx = 0; if (idx > 7) idx = 7;
+          
+          Color hcClr = GetCueColor(d->State->LoadedTrack->HotCues[h], hcPalette[idx]);
           
           DrawTriangle((Vector2){rx - 4, wy}, (Vector2){rx + 4, wy},
                        (Vector2){rx, wy + 6}, hcClr);
@@ -553,12 +548,7 @@ static void DeckStrip_Draw(Component *base) {
         float ratio = (float)d->State->LoadedTrack->Cues[c].Start / totalMs;
         if (ratio >= 0.0f && ratio <= 1.0f) {
           float rx = wx + ratio * ww;
-          Color cueClr = {d->State->LoadedTrack->Cues[c].Color[0],
-                          d->State->LoadedTrack->Cues[c].Color[1],
-                          d->State->LoadedTrack->Cues[c].Color[2], 255};
-          
-          // Default to orange if color is missing
-          if (cueClr.r == 0 && cueClr.g == 0 && cueClr.b == 0) cueClr = ColorOrange;
+          Color cueClr = GetCueColor(d->State->LoadedTrack->Cues[c], ColorOrange);
 
           DrawTriangle((Vector2){rx - 3, wy + wh},
                        (Vector2){rx, wy + wh - 5}, (Vector2){rx + 3, wy + wh},

@@ -26,6 +26,8 @@ struct TopBar {
   void *callbackCtx;
 
   float BatteryLevel; // 0.0 to 1.0
+  float CPUUsage;     // 0.0 to 1.0
+  float RAMUsage;     // MB
 
   // Internal layout state
   float MarginX;

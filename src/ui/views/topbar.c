@@ -40,9 +40,14 @@ static void TopBar_Draw(Component *base) {
   Font faceXS = UIFonts_GetFace(S(8));
   Font faceSm = UIFonts_GetFace(S(9));
 
-  // 1. Left
-  UIDrawText("REMAIN", faceXS, t->MarginX, S(6), S(8), ColorShadow);
-  UIDrawText("00:00:00", faceSm, t->MarginX + S(36), S(5), S(9), ColorWhite);
+  // 1. Left (CPU & RAM Usage)
+  char cpuStr[32];
+  sprintf(cpuStr, "CPU %d%%", (int)(t->CPUUsage * 100));
+  UIDrawText(cpuStr, faceXS, t->MarginX, S(6), S(8), ColorShadow);
+
+  char ramStr[32];
+  sprintf(ramStr, "RAM %dMB", (int)t->RAMUsage);
+  UIDrawText(ramStr, faceSm, t->MarginX + S(36), S(5), S(9), ColorWhite);
 
   // 2. Center Group
   float btnH = TOP_BAR_H - S(4);
@@ -133,6 +138,8 @@ void TopBar_Init(TopBar *t) {
   t->base.Draw = TopBar_Draw;
   t->MarginX = S(4);
   t->BatteryLevel = 0.85f;
+  t->CPUUsage = 0;
+  t->RAMUsage = 0;
   t->OnBrowse = NULL;
   t->OnMixer = NULL;
   t->OnInfo = NULL;

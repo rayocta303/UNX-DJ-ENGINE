@@ -1,0 +1,12 @@
+#ifndef SYSTEM_INFO_H
+#define SYSTEM_INFO_H
+
+typedef struct {
+    float cpuUsage; // 0.0 to 1.0
+    float ramUsageMB;
+    float ramTotalMB;
+} SystemStats;
+
+SystemStats GetSystemStats(void);
+
+#endif

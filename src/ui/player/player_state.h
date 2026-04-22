@@ -1,12 +1,19 @@
 #pragma once
 #include "library/rekordbox_reader.h"
 #include <stdbool.h>
+#include "raylib.h"
 
 typedef struct {
   unsigned int Start; // ms
   unsigned int ID;
   unsigned char Color[3]; // RGB
 } HotCue;
+
+// Helper to get Color from HotCue with fallback
+static inline Color GetCueColor(HotCue cue, Color fallback) {
+    if (cue.Color[0] == 0 && cue.Color[1] == 0 && cue.Color[2] == 0) return fallback;
+    return (Color){ cue.Color[0], cue.Color[1], cue.Color[2], 255 };
+}
 
 typedef enum {
   WAVEFORM_STYLE_BLUE = 0,
@@ -73,7 +80,7 @@ typedef struct DeckState {
   bool IsPlaying;
   float JogRate;
   double JogDelta; // Pending jog/touch movement from UI (half-frames)
-
+  
   TrackState *LoadedTrack;
 
   double Position; // Native half-frames (150Hz) for scrolling

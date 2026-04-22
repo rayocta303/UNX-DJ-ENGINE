@@ -19,6 +19,7 @@
 #include "ui/views/splash.h"
 #include "ui/views/topbar.h"
 #include "ui/views/debug_ios.h"
+#include "core/system_info.h"
 #include "version.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -1152,6 +1153,16 @@ void UpdateDrawFrame(App *app) {
       app->stripA.base.Update((Component *)&app->stripA);
       app->stripB.base.Update((Component *)&app->stripB);
       app->topbar.base.Update((Component *)&app->topbar);
+
+      // --- Update System Stats (CPU/RAM) every 1s ---
+      static float statsTimer = 0;
+      statsTimer += GetFrameTime();
+      if (statsTimer >= 1.0f) {
+          SystemStats stats = GetSystemStats();
+          app->topbar.CPUUsage = stats.cpuUsage;
+          app->topbar.RAMUsage = stats.ramUsageMB;
+          statsTimer = 0;
+      }
 
       // --- Handle Seek Requests from UI ---
       if (app->deckA.HasSeekRequest) {
