@@ -86,11 +86,12 @@ void ios_ready(void) {
 
   // 1. Initialize Window
   InitWindow(0, 0, APP_NAME);
-  
+
   // Stability delay for iOS surface binding
-  UNX_LOG_INFO("[IOS] ios_ready: Window Init called. Waiting for driver stabilization...");
+  UNX_LOG_INFO("[IOS] ios_ready: Window Init called. Waiting for driver "
+               "stabilization...");
   usleep(100000); // 100ms
-  
+
   SetTargetFPS(60);
 
   // 2. Initialize Fonts
@@ -108,7 +109,7 @@ void ios_ready(void) {
   // 4. Force a clear frame to bind GPU surface
   UNX_LOG_INFO("[IOS] ios_ready: Performing initial clear...");
   BeginDrawing();
-  ClearBackground(ORANGE); 
+  ClearBackground(ORANGE);
   DrawText("XDJ-UNX INITIALIZING...", 40, 40, 20, BLACK);
   EndDrawing();
 
@@ -637,8 +638,9 @@ int main(void) {
 #endif
 
 #if defined(PLATFORM_IOS)
-  void ios_init_audio_session();
-  ios_init_audio_session();
+  extern const char *ios_get_documents_path(const char *filename);
+  UNX_LOG_INFO("[MAIN] iOS Stability delay...");
+  usleep(500000); // 500ms delay to ensure surface is ready
 #endif
 
 #if defined(__ANDROID__)

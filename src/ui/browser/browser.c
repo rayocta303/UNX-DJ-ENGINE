@@ -202,8 +202,7 @@ void Browser_RefreshStorages(BrowserState *s) {
   }
 
 #ifdef PLATFORM_IOS
-  extern const char *ios_get_documents_path(void);
-  extern const char *ios_get_media_path(void);
+  extern const char *ios_get_documents_path(const char *filename);
   const char *scanDirs[] = {"DOCUMENTS_DIR", "/var/mobile/Media",
                             "/storage",      "/mnt",
                             "/media",        "/run/media"};
@@ -218,7 +217,7 @@ void Browser_RefreshStorages(BrowserState *s) {
 
 #ifdef PLATFORM_IOS
     if (strcmp(dirToScan, "DOCUMENTS_DIR") == 0) {
-      dirToScan = ios_get_documents_path();
+      dirToScan = ios_get_documents_path("");
     }
 #endif
 
