@@ -91,7 +91,21 @@ set(C_FILES
 )
 
 # Project Source Files (CPP)
-file(GLOB SOUNDTOUCH_FILES "${LIB_DIR}/soundtouch/*.cpp")
+# Exclude X86 specific files from SoundTouch
+set(SOUNDTOUCH_SRC
+    ${LIB_DIR}/soundtouch/AAFilter.cpp
+    ${LIB_DIR}/soundtouch/BPMDetect.cpp
+    ${LIB_DIR}/soundtouch/FIFOSampleBuffer.cpp
+    ${LIB_DIR}/soundtouch/FIRFilter.cpp
+    ${LIB_DIR}/soundtouch/InterpolateCubic.cpp
+    ${LIB_DIR}/soundtouch/InterpolateLinear.cpp
+    ${LIB_DIR}/soundtouch/InterpolateShannon.cpp
+    ${LIB_DIR}/soundtouch/PeakFinder.cpp
+    ${LIB_DIR}/soundtouch/RateTransposer.cpp
+    ${LIB_DIR}/soundtouch/SoundTouch.cpp
+    ${LIB_DIR}/soundtouch/TDStretch.cpp
+)
+
 set(CPP_FILES
     ${LIB_DIR}/kaitai/kaitai/kaitaistream.cpp
     ${LIB_DIR}/rekordbox-metadata/rekordbox_anlz.cpp
@@ -102,7 +116,7 @@ set(CPP_FILES
     ${PROJECT_SRC}/library/serato_reader.cpp
     ${PROJECT_SRC}/engine/util/engine_math.cpp
     ${PROJECT_SRC}/audio/engine.cpp
-    ${SOUNDTOUCH_FILES}
+    ${SOUNDTOUCH_SRC}
 )
 
 # Build shared library
@@ -114,4 +128,7 @@ target_link_libraries(xdjunx
     log
     EGL
     GLESv2
+    OpenSLES
+    m
+    dl
 )
