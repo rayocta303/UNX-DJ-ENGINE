@@ -205,8 +205,8 @@ jobs:
         mkdir -p Payload/xdjunx.app/assets
         cp -r assets/* Payload/xdjunx.app/assets/
 
-        # Create dummy icon placeholder if missing
-        touch Payload/xdjunx.app/Icon.png
+        # Copy App Icons
+        cp platform/ios/Assets.xcassets/AppIcon.appiconset/*.png Payload/xdjunx.app/
 
         zip -r xdjunx-unsigned.ipa Payload
 

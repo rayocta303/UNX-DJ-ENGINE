@@ -94,6 +94,7 @@ jobs:
       run: |
         mkdir -p platform/android/app/src/main/assets
         cp -r assets/* platform/android/app/src/main/assets/
+        rm -rf platform/android/app/src/main/assets/app_icons
 
     - name: Create CMakeLists.txt for App
       run: |

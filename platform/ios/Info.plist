@@ -20,6 +20,26 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>CFBundleIcons</key>
+	<dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict>
+			<key>CFBundleIconFiles</key>
+			<array>
+				<string>29</string>
+				<string>40</string>
+				<string>57</string>
+				<string>58</string>
+				<string>60</string>
+				<string>80</string>
+				<string>87</string>
+				<string>114</string>
+				<string>120</string>
+				<string>180</string>
+				<string>1024</string>
+			</array>
+		</dict>
+	</dict>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchScreen</key>
