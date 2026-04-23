@@ -44,67 +44,62 @@ static void About_Draw(Component *base) {
   float centerY = viewH / 2.0f;
 
   // Main Card Layout
-  float cardW = S(320);
-  float cardH = S(275); // Increased height for more labels
+  float cardW = S(380);
+  float cardH = S(240); 
   float cardX = centerX - (cardW / 2.0f);
   float cardY = centerY - (cardH / 2.0f) + (TOP_BAR_H / 2.0f);
 
-  // Card Shadow Effect
-  DrawRectangle(cardX + S(2), cardY + S(2), cardW, cardH, ColorBlack);
+  // Card Shadow & Background
+  DrawRectangle(cardX + S(4), cardY + S(4), cardW, cardH, Fade(ColorBlack, 0.5f));
   DrawRectangle(cardX, cardY, cardW, cardH, ColorDark1);
-  DrawRectangleLinesEx((Rectangle){cardX, cardY, cardW, cardH}, 1.0f,
-                       ColorGray);
+  DrawRectangleLinesEx((Rectangle){cardX, cardY, cardW, cardH}, 1.0f, ColorGray);
+  
+  // Left Sidebar of the Card (Branding)
+  float sideW = S(110);
+  DrawRectangle(cardX + 1, cardY + 1, sideW, cardH - 2, (Color){25, 25, 25, 255});
+  DrawLine(cardX + sideW, cardY + 1, cardX + sideW, cardY + cardH - 1, ColorDark2);
 
-  // Brand Section (Top part of card)
-  UIDrawText(APP_NAME " DJ ENGINE", faceLg, centerX - S(55), cardY + S(25), S(18), ColorOrange);
-  UIDrawText(r->State->Version, faceSm, centerX - S(30), cardY + S(50), S(10), ColorShadow);
+  // Large Device Icon in Sidebar
+  UIDrawText("\xef\x8a\x92", UIFonts_GetIcon(S(48)), cardX + sideW/2 - S(24), cardY + S(40), S(48), ColorShadow);
+  DrawCentredText("XDJ-UNX", faceXS, cardX, sideW, cardY + S(95), S(8), ColorGray);
+  DrawCentredText("SYSTEM", faceXS, cardX, sideW, cardY + S(105), S(8), ColorGray);
 
+  // Right Side Content
+  float contentX = cardX + sideW + S(20);
+  float startY = cardY + S(20);
+  float rowH = S(38);
 
-  DrawLine(cardX + S(20), cardY + S(75), cardX + cardW - S(20), cardY + S(75),
-           ColorGray);
+  // App Title & Version
+  UIDrawText(APP_NAME, faceLg, contentX, startY, S(18), ColorOrange);
+  UIDrawText(r->State->Version, faceSm, contentX, startY + S(22), S(10), ColorShadow);
 
-  // Content Section (Bottom part of card)
-  float labelX = cardX + S(30);
+  float detailsY = startY + S(50);
 
-  float rowSpacing = S(35);
-  float startY = cardY + S(95);
+  // --- Row 1: Developer ---
+  UIDrawText("\xef\x80\x87", iconMain, contentX, detailsY + S(2), S(12), ColorShadow);
+  UIDrawText("DEVELOPER", faceXS, contentX + S(18), detailsY - S(4), S(7), ColorShadow);
+  UIDrawText(r->State->Developer, faceMd, contentX + S(18), detailsY + S(6), S(11), ColorWhite);
 
-  // Developer Info
-  UIDrawText("\xef\x80\x87", iconMain, labelX - S(10), startY, S(14),
-             ColorShadow); // User icon
-  UIDrawText("DEVELOPER", faceXS, labelX + S(15), startY - S(6), S(8),
-             ColorShadow);
-  UIDrawText(r->State->Developer, faceMd, labelX + S(15), startY + S(6), S(13),
-             ColorWhite);
+  // --- Row 2: Instagram ---
+  UIDrawText("\xef\x85\xad", iconBrand, contentX, detailsY + rowH + S(2), S(12), ColorOrange);
+  UIDrawText("INSTAGRAM", faceXS, contentX + S(18), detailsY + rowH - S(4), S(7), ColorShadow);
+  UIDrawText(r->State->Instagram, faceMd, contentX + S(18), detailsY + rowH + S(6), S(11), ColorOrange);
 
-  // Social Info
-  UIDrawText("\xef\x85\xad", iconBrand, labelX - S(10), startY + rowSpacing,
-             S(14), ColorOrange); // Instagram icon
-  UIDrawText("INSTAGRAM", faceXS, labelX + S(15), startY + rowSpacing - S(6),
-             S(8), ColorShadow);
-  UIDrawText(r->State->Instagram, faceMd, labelX + S(15),
-             startY + rowSpacing + S(6), S(13), ColorOrange);
+  // --- Row 3: Platform ---
+  UIDrawText("\xef\x90\xbc", iconMain, contentX, detailsY + rowH * 2 + S(2), S(12), ColorShadow);
+  UIDrawText("PLATFORM", faceXS, contentX + S(18), detailsY + rowH * 2 - S(4), S(7), ColorShadow);
+  UIDrawText(APP_PLATFORM, faceMd, contentX + S(18), detailsY + rowH * 2 + S(6), S(11), ColorWhite);
 
-  // System Info
-  UIDrawText("\xef\x90\xbc", iconMain, labelX - S(10), startY + rowSpacing * 2, S(14), ColorShadow); // Microchip icon
-  UIDrawText("PLATFORM", faceXS, labelX + S(15), startY + rowSpacing * 2 - S(6), S(8), ColorShadow);
-  UIDrawText(APP_PLATFORM, faceMd, labelX + S(15), startY + rowSpacing * 2 + S(6), S(13), ColorWhite);
+  // --- Row 4: Audio ---
+  UIDrawText("\xef\x8a\x93", iconMain, contentX, detailsY + rowH * 3 + S(2), S(12), ColorShadow);
+  UIDrawText("AUDIO ENGINE", faceXS, contentX + S(18), detailsY + rowH * 3 - S(4), S(7), ColorShadow);
+  char audioBuf[128];
+  snprintf(audioBuf, 128, "%s (%s)", r->State->AudioDevice, r->State->AudioDriver);
+  UIDrawText(audioBuf, faceSm, contentX + S(18), detailsY + rowH * 3 + S(6), S(9), ColorGray);
 
-  // Audio Driver Info
-  UIDrawText("\xef\x80\x81", iconMain, labelX - S(10), startY + rowSpacing * 3, S(14), ColorShadow); // Music icon
-  UIDrawText("DRIVER", faceXS, labelX + S(15), startY + rowSpacing * 3 - S(6), S(8), ColorShadow);
-  UIDrawText(r->State->AudioDriver, faceMd, labelX + S(15), startY + rowSpacing * 3 + S(6), S(13), ColorOrange);
-
-  // Audio Device Info
-  UIDrawText("\xef\x8a\x93", iconMain, labelX - S(10), startY + rowSpacing * 4, S(14), ColorShadow); // Speaker icon
-  UIDrawText("DEVICE", faceXS, labelX + S(15), startY + rowSpacing * 4 - S(6), S(8), ColorShadow);
-  UIDrawText(r->State->AudioDevice, faceMd, labelX + S(15), startY + rowSpacing * 4 + S(6), S(13), ColorWhite);
-
-  // Bottom text hints
-  UIDrawText("Build for everyone.", faceXS, centerX - S(40),
-             viewH - S(25), S(8), ColorDark1);
-  UIDrawText("Press BACK to return", faceXS, SCREEN_WIDTH - S(110),
-             viewH - S(25), S(8), ColorShadow);
+  // Footer Hints
+  UIDrawText("Engineered for precision performance.", faceXS, centerX - S(70), viewH - S(25), S(8), ColorDark3);
+  UIDrawText("Press BACK to exit", faceXS, SCREEN_WIDTH - S(100), viewH - S(25), S(8), ColorShadow);
 }
 
 void AboutRenderer_Init(AboutRenderer *r, AboutState *state) {
