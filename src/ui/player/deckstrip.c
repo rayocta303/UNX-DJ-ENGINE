@@ -166,43 +166,9 @@ static void DeckStrip_Draw(Component *base) {
       UIDrawText(titleBuf, faceSm, titleX + S(18), y + S(5), S(9), ColorWhite);
   }
 
-  // 3. MIDDLE AREA (Cues, Time, BPM)
+  // 3. MIDDLE AREA (Time, BPM, MT)
   float midY = y + titleBgH + S(4);
   
-  // HOT CUES (Small indicators)
-  float hcW = (stripW - lColW - S(64)) / 4.0f;
-  for (int i=0; i<8; i++) {
-      int row = i / 4;
-      int col = i % 4;
-      float hcx = titleX + col * hcW;
-      float hcy = midY + row * S(11);
-      
-      Rectangle r = { hcx, hcy, hcW - S(2), S(9) };
-      DrawRectangleLinesEx(r, 1.0f, ColorDark1);
-      
-      char hcLabel[8];
-      sprintf(hcLabel, "%c", 'A' + i);
-      
-      Color hcClr = ColorShadow;
-      bool hasCue = false;
-      if (d->State->LoadedTrack != NULL) {
-          for(int h=0; h<d->State->LoadedTrack->HotCuesCount; h++) {
-              if (d->State->LoadedTrack->HotCues[h].ID == (uint32_t)(i + 1)) {
-                  hcClr = GetCueColor(d->State->LoadedTrack->HotCues[h], ColorOrange);
-                  hasCue = true;
-                  break;
-              }
-          }
-      }
-      
-      if (hasCue) {
-          DrawRectangleRec((Rectangle){ r.x + 1, r.y + 1, r.width - 2, r.height - 2 }, Fade(hcClr, 0.3f));
-          DrawCentredText(hcLabel, faceXXS, r.x, r.width, r.y + S(1), S(7), hcClr);
-      } else {
-          DrawCentredText(hcLabel, faceXXS, r.x, r.width, r.y + S(1), S(7), ColorDark1);
-      }
-  }
-
   // TIME
   float timeX = titleX + S(80);
   char timeLabel[16] = "REMAIN";
@@ -466,8 +432,13 @@ static void DeckStrip_Draw(Component *base) {
           
           Color hcClr = GetCueColor(d->State->LoadedTrack->HotCues[h], hcPalette[idx]);
           
-          DrawTriangle((Vector2){rx - 4, wy}, (Vector2){rx + 4, wy},
-                       (Vector2){rx, wy + 6}, hcClr);
+          // Downward triangle at top
+          DrawTriangle((Vector2){rx - S(3), wy}, (Vector2){rx + S(3), wy},
+                       (Vector2){rx, wy + S(5)}, hcClr);
+          
+          // Letter label
+          char hcChar[2] = { (char)('A' + idx), 0 };
+          UIDrawText(hcChar, faceXXS, rx + S(2), wy + S(1), S(7), hcClr);
         }
       }
       

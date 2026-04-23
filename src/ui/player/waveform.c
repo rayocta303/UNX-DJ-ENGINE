@@ -257,6 +257,8 @@ static void Waveform_Draw(Component *base) {
     return;
   }
 
+  Font faceXS = UIFonts_GetFace(S(8));
+
   float effectiveZoom = (float)r->State->ZoomScale;
   if (effectiveZoom < 0.1f)
     effectiveZoom = 0.1f;
@@ -530,6 +532,30 @@ static void Waveform_Draw(Component *base) {
             isBar ? Fade(ColorRed, 0.20f) : Fade(colorHigh, 0.12f);
         DrawRectangleV((Vector2){bx, wfY + S(7)},
                        (Vector2){1.0f, waveH - S(14)}, lineColor);
+      }
+    }
+  }
+
+  // Hot Cues — scrolling colored triangles with letter labels
+  if (r->State->LoadedTrack != NULL) {
+    for (int i = 0; i < r->State->LoadedTrack->HotCuesCount; i++) {
+      HotCue hc = r->State->LoadedTrack->HotCues[i];
+      double hcPosHF = (double)hc.Start * 0.15;
+      float px = (float)((hcPosHF - elapsedHalfFrames) / (double)effectiveZoom);
+      float bx = playheadX + px;
+
+      if (bx >= wfLeft - S(10) && bx <= wfRight + S(10)) {
+        Color hcClr = GetCueColor(hc, ColorOrange);
+        // Triangle pointing down at top
+        DrawTriangle((Vector2){bx - S(5), wfY}, (Vector2){bx + S(5), wfY},
+                     (Vector2){bx, wfY + S(8)}, hcClr);
+        
+        // Letter indicator
+        char hcLabel[2] = {(char)('A' + hc.ID - 1), 0};
+        UIDrawText(hcLabel, faceXS, bx + S(6), wfY + S(1), S(8), hcClr);
+        
+        // Subtle vertical line through waveform
+        DrawRectangleV((Vector2){bx, wfY + S(8)}, (Vector2){1.0f, waveH - S(8)}, Fade(hcClr, 0.3f));
       }
     }
   }
