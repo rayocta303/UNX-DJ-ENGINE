@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UNX DJ Engine | High-Performance DJ Software</title>
+    <!-- Meta Tags -->
+    <meta name="description"
+        content="A professional-grade, cross-platform DJ media player engine built for performance and precision.">
+    <meta property="og:title" content="UNX DJ Engine">
+    <meta property="og:description" content="High-fidelity DJ software for embedded and desktop platforms.">
+    <meta property="og:image" content="screenshots/Main.png">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;800&family=Inter:wght@400;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Scripts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/gsap@3.12.2/dist/gsap.min.js"></script>
+    <script src="https://unpkg.com/gsap@3.12.2/dist/ScrollTrigger.min.js"></script>
+    <script src="https://unpkg.com/gsap@3.12.2/dist/ScrollToPlugin.min.js"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            gsap.registerPlugin(ScrollToPlugin);
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    gsap.to(window, { duration: 1.5, scrollTo: { y: this.getAttribute('href'), offsetY: 50 }, ease: 'power4.inOut' });
+                });
+            });
+        });
+
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        unx: {
+                            base: '#0f0f0f',
+                            card: '#151515',
+                            sidebar: '#1a1a1a',
+                            border: '#2a2a2a',
+                            orange: '#ff7a00',
+                            glow: '#ff9500',
+                            gray: '#888888',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Outfit', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        [x-cloak] {
+            display: none !important;
+        }
+
+        body {
+            background-color: #0f0f0f;
+            background-image:
+                linear-gradient(rgba(255, 122, 0, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 122, 0, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        .unx-card {
+            background: #151515;
+            border: 1px solid #2a2a2a;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .unx-orange-gradient {
+            background: linear-gradient(135deg, #ff7a00 0%, #ff4d00 100%);
+        }
+
+        .unx-glow {
+            box-shadow: 0 0 20px rgba(255, 122, 0, 0.2);
+        }
+
+        .unx-text-glow {
+            text-shadow: 0 0 10px rgba(255, 122, 0, 0.3);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f0f0f;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #ff7a00;
+        }
+
+        .scanline {
+            width: 100%;
+            height: 2px;
+            background: rgba(255, 122, 0, 0.1);
+            position: absolute;
+            z-index: 10;
+            animation: scan 8s linear infinite;
+        }
+
+        @keyframes scan {
+            0% {
+                top: 0;
+            }
+
+            100% {
+                top: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body class="text-gray-300 selection:bg-unx-orange selection:text-white" x-data="{ scrolled: false, mobileMenu: false }"
+    @scroll.window="scrolled = (window.pageYOffset > 50)">
+
+    <!-- Navbar -->
+    <nav class="fixed w-full z-50 transition-all duration-500"
+        :class="scrolled ? 'bg-unx-base/95 backdrop-blur-xl py-3' : 'py-6'">
+        <div class="max-w-7xl mx-auto px-6 flex justify-between items-center">
+            <div class="flex items-center space-x-4 group cursor-pointer"
+                @click="window.scrollTo({top: 0, behavior: 'smooth'})">
+                <div class="flex flex-col">
+                    <span class="font-display font-bold text-lg tracking-tighter text-white leading-none">UNX <span
+                            class="text-unx-orange">ENGINE</span></span>
+                    <span class="font-mono text-[10px] text-unx-gray tracking-[0.2em] uppercase">Audio Core
+                        v0.1.4</span>
+                </div>
+            </div>
+
+            <!-- Desktop Menu -->
+            <div class="hidden md:flex items-center space-x-10 text-[11px] font-mono uppercase tracking-[0.2em]">
+                <a href="#features" class="text-unx-gray hover:text-unx-orange transition-colors">FEATURES</a>
+                <a href="#gallery" class="text-unx-gray hover:text-unx-orange transition-colors">GALLERY</a>
+                <a href="#stack" class="text-unx-gray hover:text-unx-orange transition-colors">TECH_STACK</a>
+                <a href="https://github.com/rayocta303/UNX-DJ-ENGINE"
+                    class="px-5 py-2 bg-unx-sidebar border border-unx-border text-unx-orange hover:bg-unx-orange hover:text-white transition-all">GITHUB_REPO</a>
+            </div>
+
+            <!-- Mobile Toggle -->
+            <button class="md:hidden text-white p-2" @click="mobileMenu = !mobileMenu">
+                <svg x-show="!mobileMenu" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7">
+                    </path>
+                </svg>
+                <svg x-show="mobileMenu" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                    </path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Mobile Menu Overlay -->
+        <div x-show="mobileMenu" x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0 -translate-y-4" x-transition:enter-end="opacity-100 translate-y-0"
+            class="md:hidden bg-unx-base border-b border-unx-border p-6 font-mono text-sm tracking-widest"
+            @click.away="mobileMenu = false">
+            <div class="flex flex-col space-y-6">
+                <a href="#features" @click="mobileMenu = false" class="text-unx-gray">/ FEATURES</a>
+                <a href="#gallery" @click="mobileMenu = false" class="text-unx-gray">/ GALLERY</a>
+                <a href="#stack" @click="mobileMenu = false" class="text-unx-gray">/ TECH_STACK</a>
+                <a href="https://github.com/rayocta303/UNX-DJ-ENGINE"
+                    class="text-unx-orange border border-unx-orange/20 p-4 text-center">GITHUB REPOSITORY</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section id="home" class="relative min-h-screen flex items-center pt-20 overflow-hidden">
+        <div class="scanline"></div>
+
+        <!-- Background Logo Overlay -->
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+            <img src="logo.png" alt="" class="w-[120%] max-w-none opacity-[0.03] grayscale invert">
+        </div>
+
+        <div
+            class="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 lg:gap-20 items-center relative z-10 py-12 lg:py-0">
+            <div class="hero-content">
+                <div
+                    class="inline-flex items-center space-x-3 px-4 py-1.5 bg-unx-sidebar border border-unx-border text-unx-orange font-mono text-[10px] tracking-widest uppercase mb-8">
+                    <span class="w-1.5 h-1.5 bg-unx-orange animate-pulse"></span>
+                    <span>Status: On Development</span>
+                </div>
+
+                <h1
+                    class="font-display text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black text-white leading-[0.95] lg:leading-[0.9] mb-8 uppercase italic">
+                    Precision <br>
+                    <span class="text-unx-orange unx-text-glow">Engineered</span>
+                </h1>
+
+                <p class="text-unx-gray text-base md:text-lg font-light leading-relaxed mb-10 lg:mb-12 max-w-lg">
+                    A high-performance C++ DJ media engine. Built for low-latency hardware execution, featuring a ported
+                    Mixxx Core and high-fidelity audio processing.
+                </p>
+
+                <div class="flex flex-col sm:flex-row gap-4 sm:gap-5">
+                    <a href="https://github.com/rayocta303/UNX-DJ-ENGINE"
+                        class="px-8 lg:px-10 py-4 unx-orange-gradient text-white font-bold text-xs sm:text-sm uppercase tracking-widest hover:scale-105 transition-transform flex items-center justify-center sm:justify-start space-x-3">
+                        <span>Visit GitHub Repo</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
+                                d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                        </svg>
+                    </a>
+                    <a href="#features"
+                        class="px-8 lg:px-10 py-4 bg-unx-card border border-unx-border text-white font-bold text-xs sm:text-sm uppercase tracking-widest hover:bg-unx-sidebar transition-all text-center">
+                        Documentation
+                    </a>
+                </div>
+            </div>
+
+            <div class="relative group mt-10 lg:mt-0">
+                <div
+                    class="absolute -inset-4 bg-unx-orange/20 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-1000">
+                </div>
+                <div class="relative unx-card p-1.5 sm:p-2">
+                    <div
+                        class="absolute top-0 right-0 p-3 sm:p-4 font-mono text-[8px] sm:text-[9px] text-unx-orange opacity-50">
+                        #PLAYER_MAIN_VIEW</div>
+                    <img src="screenshots/Main.png" alt="UNX UI"
+                        class="w-full grayscale group-hover:grayscale-0 transition-all duration-700">
+                    <div
+                        class="absolute bottom-0 left-0 w-full h-1 bg-unx-orange scale-x-0 group-hover:scale-x-100 transition-transform duration-700 origin-left">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- UI Components Section (New Thematic Section) -->
+    <section id="features" class="py-16 md:py-24 border-y border-unx-border bg-unx-sidebar/30">
+        <div class="max-w-7xl mx-auto px-6 grid sm:grid-cols-2 md:grid-cols-3 gap-10 md:gap-12">
+            <div class="flex flex-col space-y-4">
+                <div class="font-mono text-[10px] text-unx-orange tracking-tighter uppercase">01 // VISUALIZATION</div>
+                <h3 class="font-display font-bold text-xl md:text-2xl text-white uppercase italic">Frequency Waveforms
+                </h3>
+                <p class="text-unx-gray text-sm leading-relaxed">Multi-band frequency decomposition using RGB spectrum
+                    rendering, fully compatible with industry-standard analysis data.</p>
+            </div>
+            <div class="flex flex-col space-y-4">
+                <div class="font-mono text-[10px] text-unx-orange tracking-tighter uppercase">02 // DSP ENGINE</div>
+                <h3 class="font-display font-bold text-xl md:text-2xl text-white uppercase italic">Isolator EQ Units
+                </h3>
+                <p class="text-unx-gray text-sm leading-relaxed">High-fidelity 3-band Isolator EQs powered by Fidlib,
+                    offering clean phase-accurate frequency carving.</p>
+            </div>
+            <div class="flex flex-col space-y-4">
+                <div class="font-mono text-[10px] text-unx-orange tracking-tighter uppercase">03 // FX PROCESSING</div>
+                <h3 class="font-display font-bold text-xl md:text-2xl text-white uppercase italic">Beat & Color FX</h3>
+                <p class="text-unx-gray text-sm leading-relaxed">Advanced effects pipeline featuring high-fidelity Beat
+                    FX (Delay, Echo, Reverb) and tactile Sound Color FX units.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Gallery / Screen Router Style -->
+    <section id="gallery" class="py-20 md:py-32" x-data="{ 
+        active: 0, 
+        zoom: false,
+        screens: [
+            { id: 'MAIN', name: 'Main Deck', img: 'screenshots/Main.png', desc: 'Primary player interface with dual spectrum waveforms.' },
+            { id: 'MIXER', name: 'Mixer View', img: 'screenshots/Mixer.png', desc: 'Tactile control of EQs, Filters, and FX routing.' },
+            { id: 'BROWSER', name: 'Media Browser', img: 'screenshots/Main-Loaded.png', desc: 'High-speed library navigation for massive collections.' },
+            { id: 'ABOUT', name: 'System Info', img: 'screenshots/Info.png', desc: 'Hardware monitoring and metadata analysis overview.' }
+        ]
+    }">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="flex flex-col lg:flex-row gap-10 lg:gap-16 items-start">
+                <div class="w-full lg:w-1/3 flex flex-col space-y-2">
+                    <h2
+                        class="font-display text-3xl md:text-4xl font-black text-white uppercase italic mb-6 md:mb-8 text-center lg:text-left">
+                        System <br class="hidden md:block"> <span class="text-unx-orange">Interfaces</span></h2>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-1 gap-2">
+                        <template x-for="(screen, index) in screens" :key="index">
+                            <button @click="active = index"
+                                class="group flex flex-col lg:flex-row items-center lg:justify-between p-3 sm:p-5 lg:p-6 transition-all border-b-2 lg:border-b-0 lg:border-l-2 text-center lg:text-left"
+                                :class="active === index ? 'bg-unx-card border-unx-orange lg:translate-x-2' : 'border-transparent hover:bg-unx-sidebar/50'">
+                                <div class="flex flex-col items-center lg:items-start">
+                                    <span class="font-mono text-[7px] sm:text-[9px] mb-1 uppercase"
+                                        :class="active === index ? 'text-unx-orange' : 'text-unx-gray'">SCREEN_0<span
+                                            x-text="index+1"></span></span>
+                                    <span class="font-display font-bold text-xs sm:text-lg uppercase tracking-tight"
+                                        :class="active === index ? 'text-white' : 'text-unx-gray'"
+                                        x-text="screen.name"></span>
+                                </div>
+                                <svg class="w-4 h-4 transition-transform hidden lg:block"
+                                    :class="active === index ? 'text-unx-orange translate-x-0' : 'text-unx-border -translate-x-2'"
+                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
+                                        d="M9 5l7 7-7 7">
+                                    </path>
+                                </svg>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="w-full lg:w-2/3">
+                    <div class="relative unx-card overflow-hidden p-1 bg-unx-border group cursor-zoom-in">
+                        <template x-for="(screen, index) in screens" :key="index">
+                            <div x-show="active === index" x-transition:enter="transition ease-out duration-300"
+                                x-transition:enter-start="opacity-0 translate-y-4"
+                                x-transition:enter-end="opacity-100 translate-y-0" class="relative"
+                                @click="zoom = true">
+                                <img :src="screen.img" :alt="screen.name" class="w-full h-auto block">
+                                <div
+                                    class="absolute inset-0 bg-gradient-to-t from-unx-base via-transparent to-transparent opacity-60">
+                                </div>
+                                <div class="absolute bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-6">
+                                    <p class="font-mono text-[9px] sm:text-[10px] text-unx-orange uppercase tracking-widest mb-1"
+                                        x-text="screen.id"></p>
+                                    <p class="text-white text-sm sm:text-base font-light" x-text="screen.desc"></p>
+                                </div>
+                                <div
+                                    class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-unx-base/80 backdrop-blur-md p-2 border border-unx-border">
+                                    <svg class="w-5 h-5 text-unx-orange" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7">
+                                        </path>
+                                    </svg>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lightbox Overlay -->
+        <div x-show="zoom" x-cloak x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-[100] bg-unx-base/98 backdrop-blur-2xl flex items-center justify-center p-4 md:p-10"
+            @click="zoom = false" @keydown.escape.window="zoom = false">
+
+            <button class="absolute top-6 right-6 text-white hover:text-unx-orange transition-colors p-4"
+                @click="zoom = false">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                    </path>
+                </svg>
+            </button>
+
+            <div class="relative max-w-6xl w-full unx-card p-1 bg-unx-orange/20 animate-scale-up" @click.stop>
+                <img :src="screens[active].img" class="w-full h-auto block shadow-2xl">
+                <div class="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-unx-base text-center">
+                    <span class="font-display font-bold text-xl text-white uppercase"
+                        x-text="screens[active].name"></span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tech Stack / Under the Hood -->
+    <section id="stack" class="py-20 md:py-32 relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-unx-border to-transparent">
+        </div>
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-16 md:mb-20">
+                <h2 class="font-display text-3xl md:text-4xl font-black text-white uppercase italic mb-4">Core <span
+                        class="text-unx-orange">Architecture</span></h2>
+                <p class="font-mono text-[10px] text-unx-gray tracking-widest uppercase">Proprietary Audio Routing & DSP
+                    Pipeline</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-unx-border border border-unx-border">
+                <div
+                    class="bg-unx-base p-8 md:p-12 flex flex-col items-center group hover:bg-unx-card transition-colors">
+                    <div
+                        class="font-display font-black text-3xl md:text-4xl text-unx-orange mb-4 group-hover:scale-110 transition-transform italic uppercase">
+                        SoundTouch</div>
+                    <div class="font-mono text-[9px] text-unx-gray uppercase tracking-widest text-center">High-Fidelity
+                        <br>
+                        Pitch Shifting
+                    </div>
+                </div>
+                <div
+                    class="bg-unx-base p-8 md:p-12 flex flex-col items-center group hover:bg-unx-card transition-colors border-t sm:border-t-0 sm:border-l border-unx-border lg:border-l-0">
+                    <div
+                        class="font-display font-black text-3xl md:text-4xl text-white mb-4 group-hover:scale-110 transition-transform italic uppercase">
+                        RUBBER</div>
+                    <div class="font-mono text-[9px] text-unx-gray uppercase tracking-widest text-center">Pro-Grade <br>
+                        Time-Stretching
+                    </div>
+                </div>
+                <div
+                    class="bg-unx-base p-8 md:p-12 flex flex-col items-center group hover:bg-unx-card transition-colors border-t lg:border-t-0 lg:border-l border-unx-border">
+                    <div
+                        class="font-display font-black text-3xl md:text-4xl text-white mb-4 group-hover:scale-110 transition-transform italic uppercase">
+                        FIDLIB</div>
+                    <div class="font-mono text-[9px] text-unx-gray uppercase tracking-widest text-center">Precision ISO
+                        <br> EQ Filtering
+                    </div>
+                </div>
+                <div
+                    class="bg-unx-base p-8 md:p-12 flex flex-col items-center group hover:bg-unx-card transition-colors border-t sm:border-t-0 sm:border-l border-unx-border">
+                    <div
+                        class="font-display font-black text-3xl md:text-4xl text-unx-orange mb-4 group-hover:scale-110 transition-transform italic uppercase">
+                        MAUDIO</div>
+                    <div class="font-mono text-[9px] text-unx-gray uppercase tracking-widest text-center">Cross-Platform
+                        <br>
+                        Audio I/O
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-24 md:py-32 relative overflow-hidden">
+        <div
+            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[800px] h-[800px] bg-unx-orange/5 rounded-full blur-[160px]">
+        </div>
+        <div class="max-w-4xl mx-auto px-6 text-center relative z-10">
+            <h2
+                class="font-display text-4xl sm:text-5xl md:text-6xl font-black text-white mb-8 uppercase italic leading-tight">
+                Ready to Build the <span class="text-unx-orange">Future?</span></h2>
+            <p class="text-unx-gray text-lg md:text-xl mb-10 lg:mb-12 font-light">Join the community and help us build
+                the next generation of DJ technology.</p>
+            <div class="flex flex-col sm:flex-row justify-center gap-4 sm:gap-6">
+                <a href="https://github.com/rayocta303/UNX-DJ-ENGINE"
+                    class="px-8 lg:px-10 py-5 unx-orange-gradient text-white font-bold text-base sm:text-lg uppercase tracking-widest hover:scale-105 transition-transform flex items-center justify-center">
+                    View Repository
+                </a>
+                <!-- <a href="https://youtube.com/@unxchr"
+                    class="px-8 lg:px-10 py-5 bg-unx-card border border-unx-border text-white font-bold text-base sm:text-lg uppercase tracking-widest hover:bg-unx-sidebar transition-all flex items-center justify-center">
+                    Watch Demo
+                </a> -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-16 md:py-20 bg-unx-base border-t border-unx-border">
+        <div class="max-w-7xl mx-auto px-6">
+            <div
+                class="flex flex-col md:flex-row justify-between items-center gap-10 md:gap-12 mb-16 md:mb-20 text-center md:text-left">
+                <div class="flex flex-col md:flex-row items-center gap-6">
+                    <div class="flex flex-col">
+                        <span class="font-display font-extrabold text-2xl text-white tracking-tighter leading-none">UNX
+                            ENGINE</span>
+                        <span class="font-mono text-[10px] text-unx-orange uppercase tracking-[0.3em]">Built for
+                            Everyone</span>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap justify-center gap-6 sm:gap-10 font-mono text-[10px] tracking-widest">
+                    <a href="https://github.com/rayocta303" class="hover:text-unx-orange transition-colors">GITHUB</a>
+                    <a href="https://youtube.com/@unxchr" class="hover:text-unx-orange transition-colors">YOUTUBE</a>
+                    <a href="https://instagram.com/unxchr" class="hover:text-unx-orange transition-colors">INSTAGRAM</a>
+                </div>
+            </div>
+
+            <div
+                class="flex flex-col md:flex-row justify-between items-center pt-10 border-t border-unx-border/30 gap-6 text-center md:text-left">
+                <p class="text-[9px] sm:text-[10px] font-mono text-unx-gray uppercase tracking-widest">&copy; 2026 UNX
+                    DJ PROJECT // ALL SYSTEMS NOMINAL</p>
+                <div class="flex items-center space-x-2 text-[9px] sm:text-[10px] font-mono text-unx-gray uppercase">
+                    <span>DESIGNED BY HANIF BAGUS SAPUTRA HADI</span>
+                    <span class="text-unx-orange">_</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Entrance Animations
+        gsap.from(".hero-content > *", {
+            y: 30,
+            opacity: 0,
+            duration: 1,
+            stagger: 0.15,
+            ease: "power4.out"
+        });
+
+        gsap.from(".hero-image", {
+            x: 50,
+            opacity: 0,
+            duration: 1.5,
+            delay: 0.4,
+            ease: "expo.out"
+        });
+
+        // Section Headers
+        gsap.utils.toArray('section').forEach(section => {
+            gsap.from(section.querySelector('h2'), {
+                scrollTrigger: {
+                    trigger: section,
+                    start: "top 80%"
+                },
+                y: 30,
+                opacity: 0,
+                duration: 1,
+                ease: "power3.out"
+            });
+        });
+    </script>
+</body>
+
+</html>
