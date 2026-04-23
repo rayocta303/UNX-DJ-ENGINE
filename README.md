@@ -19,11 +19,31 @@ UNX DJ Engine is a specialized, high-performance DJ media player firmware subset
 - **Visualization**: Multi-mode waveform rendering including RGB spectrum and 3-Band frequency decomposition.
 - **Responsive Design**: Adaptive layout engine supporting varying resolutions and High-DPI hardware configurations.
 - **Hardware Accuracy**: Precise emulation of industry-standard deck strips, top bars, and control panels.
-
 ### Database and Library Management
 - **Rekordbox Integration**: Full parsing of PDB and ANLZ database structures for metadata and waveform data.
 - **Serato Compatibility**: Support for Serato metadata and waveform parsing logic.
 - **Storage Management**: Efficient scanning and indexing for USB, SD, and internal storage devices.
+
+## Project Structure
+
+```text
+├── assets/             # UI Assets (Fonts, Icons, Splash)
+├── controllers/        # MIDI/HID Controller mappings
+├── lib/                # Third-party libraries (Raylib, RubberBand, SoundTouch, etc.)
+├── screenshots/        # Application UI screenshots
+├── src/
+│   ├── core/           # Audio backend (miniaudio), Logger, Logic (Sync/Quantize)
+│   ├── engine/         # Ported Mixxx Audio Engine (Mixers, Buffers, FX, Sync)
+│   ├── library/        # Database Readers (Rekordbox PDB/ANLZ, Serato)
+│   ├── ui/
+│   │   ├── browser/    # Library navigation and search UI
+│   │   ├── components/ # Reusable UI widgets and Theme system
+│   │   ├── player/     # Deck UI, Waveform rendering, DeckStrip
+│   │   └── views/      # Main application views (Info, Settings, Mixer, About)
+│   ├── main.c          # Application entry point and main loop
+│   └── version.h       # Build metadata and versioning
+└── tools/              # Build utilities and asset generators
+```
 
 ## Technical Specifications
 
