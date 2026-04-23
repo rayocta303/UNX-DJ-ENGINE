@@ -1100,7 +1100,7 @@ void UpdateDrawFrame(App *app) {
         strcpy(it->Key, ds->TrackKey);
         it->Duration = ds->TrackLengthMs / 1000;
         strcpy(it->Source, ds->SourceName);
-        // Add more if available...
+        strcpy(it->ArtworkPath, ds->ArtworkPath);
       }
     }
   }

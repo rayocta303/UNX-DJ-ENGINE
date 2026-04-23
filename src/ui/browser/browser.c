@@ -1056,7 +1056,7 @@ static void Browser_Draw(Component *base) {
     if (isCursor) {
       DrawRectangle(listX, ry + 1, listW, rowH - 2, ColorBlue);
       if (s->BrowseLevel > 0 && !s->IsTagList) {
-        DrawSelectionTriangle(listX + S(2), ry + S(8), ColorWhite);
+        DrawSelectionTriangle(listX + S(2), ry + (rowH / 2.0f), ColorWhite);
       }
     } else if (i % 2 != 0) {
       DrawRectangle(listX, ry + 1, listW, rowH - 2, ColorDark2);

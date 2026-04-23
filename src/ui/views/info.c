@@ -24,196 +24,166 @@ static int Info_Update(Component *base) {
   return 0; // nothing to do
 }
 
+static Texture2D deckArt[2] = {0};
+static char lastArtPath[2][256] = {{0}, {0}};
+
 static void Info_Draw(Component *base) {
   InfoRenderer *r = (InfoRenderer *)base;
   if (!r->State->IsActive)
     return;
 
-  // Background shading
+  // Background
   DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ColorBlack);
 
   Font faceXXS = UIFonts_GetFace(S(7));
-  Font faceSm = UIFonts_GetFace(S(9));
-  Font faceMd = UIFonts_GetFace(S(11));
-  Font faceLg = UIFonts_GetFace(S(15));
-  Font iconFace = UIFonts_GetIcon(S(12));
-  Font iconMd = UIFonts_GetIcon(S(20));
+  Font faceMd = UIFonts_GetFace(S(10));
+  Font faceLg = UIFonts_GetFace(S(14));
+  Font faceXL = UIFonts_GetFace(S(18));
+  Font iconSm = UIFonts_GetIcon(S(10));
+  Font iconLg = UIFonts_GetIcon(S(20));
 
-  float availableH = SCREEN_HEIGHT - TOP_BAR_H - DECK_STR_H - FX_BAR_H;
+  float availableH = SCREEN_HEIGHT - TOP_BAR_H - DECK_STR_H;
   float halfH = availableH / 2.0f;
-  float centerX = SCREEN_WIDTH / 2.0f;
+  float panelH = halfH - S(4);
+  float panelW = SCREEN_WIDTH - S(16);
+  float panelX = S(8);
 
-  for (int deckIdx = 0; deckIdx < 2; deckIdx++) {
-    float offsetY = deckIdx * halfH;
-    float baseY = TOP_BAR_H + offsetY;
-    float panelH = halfH - S(6);
-    float panelW = SCREEN_WIDTH - S(20);
-    float panelX = S(10);
-    float panelY = baseY + S(3);
+  for (int i = 0; i < 2; i++) {
+    float baseY = TOP_BAR_H + (i * halfH);
+    float panelY = baseY + S(4);
+    InfoTrack *trk = &r->State->Tracks[i];
 
-    // Draw Deck Panel Card - Darker, cleaner borders
-    DrawRectangle(panelX, panelY, panelW, panelH, (Color){22, 22, 25, 255});
-    DrawRectangleLinesEx((Rectangle){panelX, panelY, panelW, panelH}, 1.0f,
-                         (Color){50, 50, 60, 255});
+    // Artwork Management
+    if (strcmp(trk->ArtworkPath, lastArtPath[i]) != 0) {
+      if (deckArt[i].id != 0)
+        UnloadTexture(deckArt[i]);
+      deckArt[i] = (Texture2D){0};
 
-    // Deck Badge
-    float badgeW = S(40);
-    DrawRectangle(panelX, panelY, badgeW, S(16), (Color){40, 40, 50, 255});
-    char deckLab[32];
-    sprintf(deckLab, "DECK %d", deckIdx + 1);
-    UIDrawText(deckLab, faceXXS, panelX + S(6), panelY + S(4.5f), S(7),
-               ColorOrange);
-
-    InfoTrack *trk = &r->State->Tracks[deckIdx];
-
-    // Main Header Area (Title & Artist)
-    float headX = panelX + S(75);
-    float headY = panelY + S(12);
-
-    // Large Music Icon - Slightly translucent
-    UIDrawText("\xef\x80\x81", iconMd, panelX + S(25), headY + S(2), S(22),
-               Fade(ColorWhite, 0.5f));
-
-    // Title
-    char tTitle[128];
-    if (trk->Title[0] == '\0')
-      strcpy(tTitle, "Waiting for track...");
-    else
-      truncateStr(trk->Title, tTitle, 60);
-    UIDrawText(tTitle, faceLg, headX, headY, S(15), ColorWhite);
-
-    // Artist
-    char tArtist[128];
-    if (trk->Artist[0] == '\0')
-      strcpy(tArtist, "---");
-    else
-      truncateStr(trk->Artist, tArtist, 75);
-    UIDrawText(tArtist, faceMd, headX, headY + S(20), S(11), ColorShadow);
-
-    // Metadata Grid - Centered in remaining space
-    float col1IconX = panelX + S(15);
-    float col1TextX = panelX + S(35);
-    float col2IconX = centerX + S(5);
-    float col2TextX = centerX + S(25);
-
-    // Adjust Y start based on panel height to center it better
-    float startGridY = panelY + S(54);
-    float rowH = S(21);
-
-    // Row 1: BPM & KEY
-    char bpmStr[32];
-    sprintf(bpmStr, "%.1f BPM", trk->BPM);
-    UIDrawText("\xef\x80\x97", iconFace, col1IconX, startGridY + S(8), S(12),
-               ColorShadow); // Clock
-    UIDrawText("BPM", faceXXS, col1TextX, startGridY, S(7), ColorShadow);
-    UIDrawText(bpmStr, faceSm, col1TextX, startGridY + S(9), S(9), ColorWhite);
-
-    UIDrawText("\xef\x82\x84", iconFace, col2IconX, startGridY + S(8), S(12),
-               ColorShadow); // Key
-    UIDrawText("KEY", faceXXS, col2TextX, startGridY, S(7), ColorShadow);
-    UIDrawText(trk->Key[0] ? trk->Key : "---", faceSm, col2TextX,
-               startGridY + S(9), S(9), ColorOrange);
-
-    // Row 2: ALBUM & YEAR
-    char tAlbum[128];
-    if (trk->Album[0] == '\0')
-      strcpy(tAlbum, "---");
-    else
-      truncateStr(trk->Album, tAlbum, 40);
-    UIDrawText("\xef\x94\x9f", iconFace, col1IconX, startGridY + rowH + S(8),
-               S(12), ColorShadow); // Compact Disc (CD) Icon \uf51f
-    UIDrawText("ALBUM", faceXXS, col1TextX, startGridY + rowH, S(7),
-               ColorShadow);
-    UIDrawText(tAlbum, faceSm, col1TextX, startGridY + rowH + S(9), S(9),
-               ColorWhite);
-
-    char yearStr[16];
-    if (trk->Year > 0) sprintf(yearStr, "%d", trk->Year);
-    else strcpy(yearStr, "---");
-    UIDrawText("\xef\x84\xb3", iconFace, col2IconX, startGridY + rowH + S(8),
-               S(12), ColorShadow); // Calendar Icon \uf133
-    UIDrawText("YEAR", faceXXS, col2TextX, startGridY + rowH, S(7),
-               ColorShadow);
-    UIDrawText(yearStr, faceSm, col2TextX, startGridY + rowH + S(9), S(9),
-               ColorWhite);
-
-    // Row 3: GENRE & LABEL
-    char tGenre[64];
-    if (trk->Genre[0] == '\0')
-      strcpy(tGenre, "---");
-    else
-      truncateStr(trk->Genre, tGenre, 30);
-    UIDrawText("\xef\x80\xac", iconFace, col1IconX,
-               startGridY + rowH * 2 + S(8), S(12), ColorShadow); // Tag
-    UIDrawText("GENRE", faceXXS, col1TextX, startGridY + rowH * 2, S(7),
-               ColorShadow);
-    UIDrawText(tGenre, faceSm, col1TextX, startGridY + rowH * 2 + S(9), S(9),
-               ColorWhite);
-
-    char tLabel[128];
-    if (trk->Label[0] == '\0')
-      strcpy(tLabel, "---");
-    else
-      truncateStr(trk->Label, tLabel, 30);
-    UIDrawText("\xef\x80\x81", iconFace, col2IconX,
-               startGridY + rowH * 2 + S(8), S(12), ColorShadow); // Music \uf001 for Label
-    UIDrawText("LABEL", faceXXS, col2TextX, startGridY + rowH * 2, S(7),
-               ColorShadow);
-    UIDrawText(tLabel, faceSm, col2TextX, startGridY + rowH * 2 + S(9), S(9),
-               ColorWhite);
-
-    // Row 4: RATING & DURATION
-    UIDrawText("\xef\x80\x85", iconFace, col1IconX,
-               startGridY + rowH * 3 + S(8), S(12), ColorShadow); // Star
-    UIDrawText("RATING", faceXXS, col1TextX, startGridY + rowH * 3, S(7),
-               ColorShadow);
-
-    if (trk->Rating > 0) {
-      for (int i = 0; i < 5; i++) {
-        const char *starIco = (i < trk->Rating) ? "\xef\x80\x85" : "";
-        if (starIco[0]) {
-          UIDrawText(starIco, iconFace, col1TextX + i * S(10),
-                     startGridY + rowH * 3 + S(9), S(9), ColorOrange);
-        } else {
-          UIDrawText(".", faceXXS, col1TextX + i * S(10) + S(4),
-                     startGridY + rowH * 3 + S(9), S(7), ColorShadow);
+      if (trk->ArtworkPath[0] != '\0') {
+        Image img = LoadImage(trk->ArtworkPath);
+        if (img.data != NULL) {
+          ImageResize(&img, (int)S(70), (int)S(70));
+          deckArt[i] = LoadTextureFromImage(img);
+          UnloadImage(img);
+          SetTextureFilter(deckArt[i], TEXTURE_FILTER_BILINEAR);
         }
       }
+      strncpy(lastArtPath[i], trk->ArtworkPath, 255);
+    }
+
+    // Panel Background
+    DrawRectangleRec((Rectangle){panelX, panelY, panelW, panelH}, ColorDark2);
+    DrawRectangleLinesEx((Rectangle){panelX, panelY, panelW, panelH}, 1.0f, ColorDark1);
+
+    // Deck Indicator
+    DrawRectangle(panelX, panelY, S(38), S(12), i == 0 ? ColorOrange : ColorBlue);
+    DrawCentredText(i == 0 ? "DECK 1" : "DECK 2", faceXXS, panelX, S(38), panelY + S(2.5f), S(7), ColorBlack);
+
+    float contentX = panelX + S(12);
+    float artSize = S(70);
+    float artY = panelY + S(22);
+
+    // Draw Artwork
+    if (deckArt[i].id != 0) {
+      DrawTexture(deckArt[i], contentX, artY, ColorWhite);
+      DrawRectangleLinesEx((Rectangle){contentX, artY, artSize, artSize}, 1, ColorShadow);
     } else {
-      UIDrawText("---", faceSm, col1TextX, startGridY + rowH * 3 + S(9),
-                 S(9), ColorShadow);
+      DrawRectangle(contentX, artY, artSize, artSize, ColorDark3);
+      DrawRectangleLinesEx((Rectangle){contentX, artY, artSize, artSize}, 1, ColorShadow);
+      DrawCentredText("\uf001", iconLg, contentX, artSize, artY + S(25), S(20), ColorShadow);
     }
 
-    char durStr[32];
-    sprintf(durStr, "%02d:%02d", trk->Duration / 60, trk->Duration % 60);
-    UIDrawText("\xef\x80\x97", iconFace, col2IconX, startGridY + rowH * 3 + S(8),
-               S(12), ColorShadow); // Clock
-    UIDrawText("DURATION", faceXXS, col2TextX, startGridY + rowH * 3, S(7),
-               ColorShadow);
-    UIDrawText(durStr, faceSm, col2TextX, startGridY + rowH * 3 + S(9), S(9),
-               ColorWhite);
+    // Title & Artist Area
+    float infoX = contentX + artSize + S(15);
+    float textY = panelY + S(18);
 
-    // Comment Area
+    if (trk->Title[0] == '\0') {
+      UIDrawText("NO TRACK LOADED", faceXL, infoX, textY + S(8), S(18), ColorShadow);
+    } else {
+      char tTitle[128], tArtist[128];
+      truncateStr(trk->Title, tTitle, 50);
+      truncateStr(trk->Artist, tArtist, 60);
+
+      UIDrawText(tTitle, faceXL, infoX, textY, S(18), ColorWhite);
+      UIDrawText(tArtist, faceLg, infoX, textY + S(22), S(14), ColorOrange);
+    }
+
+    // Metadata Grid
+    float gridY = panelY + S(64);
+    float colW = (panelW - (infoX - panelX) - S(10)) / 3.0f;
+    float rowStep = S(20);
+
+    // Column 1
+    float c1X = infoX;
+    UIDrawText("\uf017", iconSm, c1X, gridY + S(2), S(10), ColorShadow);
+    UIDrawText("BPM", faceXXS, c1X + S(15), gridY, S(7), ColorShadow);
+    char bpmStr[16]; sprintf(bpmStr, "%.1f", trk->BPM);
+    UIDrawText(bpmStr, faceMd, c1X + S(15), gridY + S(8), S(10), ColorWhite);
+
+    UIDrawText("\uf084", iconSm, c1X, gridY + rowStep + S(2), S(10), ColorShadow);
+    UIDrawText("KEY", faceXXS, c1X + S(15), gridY + rowStep, S(7), ColorShadow);
+    UIDrawText(trk->Key[0] ? trk->Key : "---", faceMd, c1X + S(15), gridY + rowStep + S(8), S(10), ColorOrange);
+
+    UIDrawText("\uf2f2", iconSm, c1X, gridY + rowStep * 2 + S(2), S(10), ColorShadow);
+    UIDrawText("DURATION", faceXXS, c1X + S(15), gridY + rowStep * 2, S(7), ColorShadow);
+    char durStr[16]; sprintf(durStr, "%02d:%02d", trk->Duration / 60, trk->Duration % 60);
+    UIDrawText(durStr, faceMd, c1X + S(15), gridY + rowStep * 2 + S(8), S(10), ColorWhite);
+
+    // Column 2
+    float c2X = infoX + colW;
+    UIDrawText("\uf51f", iconSm, c2X, gridY + S(2), S(10), ColorShadow);
+    UIDrawText("ALBUM", faceXXS, c2X + S(15), gridY, S(7), ColorShadow);
+    char tAlbum[64]; truncateStr(trk->Album, tAlbum, 30);
+    UIDrawText(tAlbum[0] ? tAlbum : "---", faceMd, c2X + S(15), gridY + S(8), S(10), ColorWhite);
+
+    UIDrawText("\uf133", iconSm, c2X, gridY + rowStep + S(2), S(10), ColorShadow);
+    UIDrawText("YEAR", faceXXS, c2X + S(15), gridY + rowStep, S(7), ColorShadow);
+    char yrStr[8]; if (trk->Year > 0) sprintf(yrStr, "%d", trk->Year); else strcpy(yrStr, "---");
+    UIDrawText(yrStr, faceMd, c2X + S(15), gridY + rowStep + S(8), S(10), ColorWhite);
+
+    UIDrawText("\uf02c", iconSm, c2X, gridY + rowStep * 2 + S(2), S(10), ColorShadow);
+    UIDrawText("GENRE", faceXXS, c2X + S(15), gridY + rowStep * 2, S(7), ColorShadow);
+    char tGenre[64]; truncateStr(trk->Genre, tGenre, 30);
+    UIDrawText(tGenre[0] ? tGenre : "---", faceMd, c2X + S(15), gridY + rowStep * 2 + S(8), S(10), ColorWhite);
+
+    // Column 3
+    float c3X = infoX + colW * 2;
+    UIDrawText("\uf001", iconSm, c3X, gridY + S(2), S(10), ColorShadow);
+    UIDrawText("LABEL", faceXXS, c3X + S(15), gridY, S(7), ColorShadow);
+    char tLabel[64]; truncateStr(trk->Label, tLabel, 30);
+    UIDrawText(tLabel[0] ? tLabel : "---", faceMd, c3X + S(15), gridY + S(8), S(10), ColorWhite);
+
+    UIDrawText("\uf005", iconSm, c3X, gridY + rowStep + S(2), S(10), ColorShadow);
+    UIDrawText("RATING", faceXXS, c3X + S(15), gridY + rowStep, S(7), ColorShadow);
+    if (trk->Rating > 0) {
+      for (int s = 0; s < 5; s++) {
+        UIDrawText("\uf005", iconSm, c3X + S(15) + s * S(10), gridY + rowStep + S(8), S(8), (s < trk->Rating) ? ColorOrange : ColorShadow);
+      }
+    } else {
+      UIDrawText("---", faceMd, c3X + S(15), gridY + rowStep + S(8), S(10), ColorShadow);
+    }
+
+    UIDrawText("\uf287", iconSm, c3X, gridY + rowStep * 2 + S(2), S(10), ColorShadow);
+    UIDrawText("SOURCE", faceXXS, c3X + S(15), gridY + rowStep * 2, S(7), ColorShadow);
+    UIDrawText(trk->Source[0] ? trk->Source : "---", faceMd, c3X + S(15), gridY + rowStep * 2 + S(8), S(10), ColorBlue);
+
+    // Comment
     if (trk->Comment[0]) {
-      char tComment[256];
-      truncateStr(trk->Comment, tComment, 80);
-      UIDrawText("COMMENT:", faceXXS, panelX + S(10), panelY + panelH - S(22),
-                 S(7), ColorShadow);
-      UIDrawText(tComment, faceXXS, panelX + S(55), panelY + panelH - S(22),
-                 S(7), Fade(ColorWhite, 0.6f));
+      float commY = panelY + panelH - S(26);
+      DrawRectangle(infoX, commY, panelW - (infoX - panelX) - S(10), S(14), ColorDark1);
+      UIDrawText("COMMENT:", faceXXS, infoX + S(5), commY + S(3.5f), S(7), ColorShadow);
+      char tComm[128]; truncateStr(trk->Comment, tComm, 85);
+      UIDrawText(tComm, faceXXS, infoX + S(50), commY + S(3.5f), S(7), ColorWhite);
     }
 
-    // Small source info at absolute bottom of card
+    // Path
     if (trk->FilePath[0]) {
-      char sourceInfo[256];
-      sprintf(sourceInfo, "[%s] %s", trk->Source, trk->FilePath);
-      char tSource[256];
-      truncateStr(sourceInfo, tSource, 110);
-      UIDrawText(tSource, faceXXS, panelX + S(10), panelY + panelH - S(10),
-                 S(7), Fade(ColorShadow, 0.4f));
+      char tPath[256]; truncateStr(trk->FilePath, tPath, 150);
+      UIDrawText(tPath, faceXXS, panelX + S(10), panelY + panelH - S(9), S(6), Fade(ColorShadow, 0.4f));
     }
   }
 }
+
 
 void InfoRenderer_Init(InfoRenderer *r, InfoState *state) {
   r->base.Update = Info_Update;

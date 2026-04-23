@@ -306,10 +306,10 @@ static void Settings_Draw(Component *base) {
   float bottomH = S(28.0f);
   float divY = viewH - bottomH;
   float tabH = S(28.0f);
-  float rowH = S(28.0f);
+  float rowH = S(32.0f); // Slightly taller rows
 
   // Draw Tabs
-  DrawRectangle(0, TOP_BAR_H, SCREEN_WIDTH, tabH, ColorDark2);
+  DrawRectangle(0, TOP_BAR_H, SCREEN_WIDTH, tabH, ColorDark3);
   const char *tabs[] = { "DECK", "AUDIO", "VIEW", "SYSTEM" };
   float tabW = SCREEN_WIDTH / (float)SETTING_CAT_COUNT;
   for (int i = 0; i < SETTING_CAT_COUNT; i++) {
@@ -317,10 +317,11 @@ static void Settings_Draw(Component *base) {
       if (r->State->SelectedTab == i) {
           DrawRectangleRec(tRect, ColorOrange);
           DrawCentredText(tabs[i], faceSm, i * tabW, tabW, TOP_BAR_H + S(8), S(11), ColorBlack);
+          DrawRectangle(i * tabW, TOP_BAR_H + tabH - S(2), tabW, S(2), ColorWhite);
       } else {
           DrawCentredText(tabs[i], faceSm, i * tabW, tabW, TOP_BAR_H + S(8), S(11), ColorGray);
       }
-      DrawLine(i * tabW, TOP_BAR_H, i * tabW, TOP_BAR_H + tabH, ColorShadow);
+      if (i > 0) DrawLine(i * tabW, TOP_BAR_H + S(4), i * tabW, TOP_BAR_H + tabH - S(4), ColorGray);
   }
   DrawLine(0, TOP_BAR_H + tabH, SCREEN_WIDTH, TOP_BAR_H + tabH, ColorOrange);
 
@@ -333,7 +334,15 @@ static void Settings_Draw(Component *base) {
     }
   }
 
-  int visibleRows = (int)((divY - (TOP_BAR_H + tabH)) / rowH);
+  float listY = TOP_BAR_H + tabH;
+  int visibleRows = (int)((divY - listY) / rowH);
+
+  // Layout params
+  float labelX = S(20);
+  float valueWidth = S(180);
+  float valueX = SCREEN_WIDTH - valueWidth - S(20);
+
+  BeginScissorMode(0, (int)listY, (int)SCREEN_WIDTH, (int)(divY - listY));
 
   for (int i = 0; i < visibleRows; i++) {
     int idx_f = r->State->Scroll + i;
@@ -342,112 +351,99 @@ static void Settings_Draw(Component *base) {
 
     int idx = filteredIndices[idx_f];
     SettingItem *item = &r->State->Items[idx];
-    float ry = TOP_BAR_H + tabH + (i * rowH);
+    float ry = listY + (i * rowH);
 
     bool selected = (i == r->State->CursorPos);
     if (selected) {
-      DrawRectangle(0, ry, SCREEN_WIDTH - S(2), rowH - S(1), ColorGray);
-    } else if (i % 2 == 0) {
-      DrawRectangle(0, ry, SCREEN_WIDTH - S(2), rowH - S(1), ColorDark1);
+      DrawRectangle(S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4), ColorGray);
+      DrawSelectionTriangle(S(12), ry + (rowH / 2.0f), ColorOrange);
+    } else if (idx_f % 2 == 0) {
+      DrawRectangle(S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4), ColorDark1);
     }
 
-    Color rowClr = ColorWhite;
-
-    if (selected) {
-      DrawSelectionTriangle(S(8), ry + S(9), ColorOrange);
-    }
-
-    UIDrawText(item->Label, faceMd, S(24), ry + S(6), S(13), rowClr);
+    // Label with clipping
+    float labelLimit = valueX - S(10);
+    BeginScissorMode((int)labelX, (int)ry, (int)(labelLimit - labelX), (int)rowH);
+    UIDrawText(item->Label, faceMd, labelX + S(12), ry + (rowH / 2.0f) - S(7), S(13), ColorWhite);
+    EndScissorMode();
 
     if (item->Type == SETTING_TYPE_LIST) {
       const char *valStr = "";
       if (item->Current < item->OptionsCount)
         valStr = item->Options[item->Current];
 
-      UIDrawText(valStr, faceMd, SCREEN_WIDTH - S(120), ry + S(6), S(13),
-                 ColorOrange);
+      float innerValX = valueX + S(25);
+      float innerValW = valueWidth - S(50);
 
       if (selected && item->OptionsCount > 1) {
-        DrawSelectionTriangleEx(SCREEN_WIDTH - S(150), ry + S(9), S(8), 1, ColorShadow); // Left
-        DrawSelectionTriangleEx(SCREEN_WIDTH - S(18), ry + S(9), S(8), 0, ColorShadow); // Right
+          DrawSelectionTriangleEx(valueX + S(10), ry + (rowH / 2.0f), S(7), 1, ColorOrange);
+          DrawSelectionTriangleEx(valueX + valueWidth - S(10), ry + (rowH / 2.0f), S(7), 0, ColorOrange);
       }
+
+      BeginScissorMode((int)innerValX, (int)ry, (int)innerValW, (int)rowH);
+      DrawCentredText(valStr, faceMd, innerValX, innerValW, ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
+      EndScissorMode();
+
     } else if (item->Type == SETTING_TYPE_KNOB) {
-      UIDrawKnob(SCREEN_WIDTH - S(80), ry + (rowH / 2.0f), S(9), item->Value,
+      UIDrawKnob(valueX + valueWidth - S(95), ry + (rowH / 2.0f), S(9), item->Value,
                  item->Min, item->Max, item->Unit, ColorOrange, false);
                  
       char valBuf[16];
       if (item->Value == (int)item->Value) sprintf(valBuf, "%d", (int)item->Value);
       else sprintf(valBuf, "%.1f", item->Value);
       
-      UIDrawText(valBuf, faceMd, SCREEN_WIDTH - S(65), ry + S(6), S(13), ColorOrange);
+      UIDrawText(valBuf, faceMd, valueX + valueWidth - S(80), ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
     } else if (item->Type == SETTING_TYPE_ACTION) {
-      UIDrawText("\uf2f5", faceSm, SCREEN_WIDTH - S(30), ry + S(6), S(12),
-                 ColorOrange);
+      UIDrawText("\uf2f5", faceSm, valueX + valueWidth - S(35), ry + (rowH / 2.0f) - S(6), S(12), ColorOrange);
     }
   }
 
-  DrawScrollbar(SCREEN_WIDTH - S(2.5f), TOP_BAR_H + tabH, S(2), divY - (TOP_BAR_H + tabH),
+  EndScissorMode();
+
+  DrawScrollbar(SCREEN_WIDTH - S(2.5f), listY, S(2), divY - listY,
                 filteredCount, r->State->Scroll, visibleRows);
 
   // Bottom Background
   DrawRectangle(0, divY, SCREEN_WIDTH, bottomH, ColorDark1);
   DrawLine(0, divY, SCREEN_WIDTH, divY, ColorGray);
 
-  // DONE Button (Blue)
+  // DONE / CLOSE
   DrawRectangle(S(15), divY + S(5), S(90), S(18), ColorBlue);
-  DrawRectangleLines(S(15), divY + S(5), S(90), S(18), ColorShadow);
   DrawCentredText("DONE", faceSm, S(15), S(90), divY + S(8), S(11), ColorWhite);
 
   char countStr[32];
-  sprintf(countStr, "%d / %d", r->State->Scroll + r->State->CursorPos + 1,
-          filteredCount);
-  UIDrawText(countStr, faceXS, SCREEN_WIDTH / 2.0f - S(24.0f), divY + S(8),
-             S(9), ColorShadow);
+  sprintf(countStr, "%d / %d", r->State->Scroll + r->State->CursorPos + 1, filteredCount);
+  UIDrawText(countStr, faceXS, SCREEN_WIDTH / 2.0f - S(24.0f), divY + S(8), S(9), ColorShadow);
 
-  // CLOSE Button
   DrawRectangle(SCREEN_WIDTH - S(105), divY + S(5), S(90), S(18), ColorDark2);
-  DrawRectangleLines(SCREEN_WIDTH - S(105), divY + S(5), S(90), S(18),
-                     ColorShadow);
   DrawCentredText("CLOSE", faceSm, SCREEN_WIDTH - S(105), S(90), divY + S(8), S(11), ColorWhite);
 
-  // Draw Dropdown Overlay
   if (r->State->IsDropdownOpen) {
-      DrawRectangle(0, 0, SCREEN_WIDTH, viewH, (Color){ 0, 0, 0, 200 }); // Dim BG
-      
+      DrawRectangle(0, 0, SCREEN_WIDTH, viewH, (Color){ 0, 0, 0, 200 });
       SettingItem *item = &r->State->Items[r->State->DropdownItemIdx];
-      float winW = GetScreenWidth();
-      float dropdownW = S(200.0f);
+      float dropdownW = S(240.0f);
       float opHeight = S(40.0f);
       float contentH = item->OptionsCount * opHeight;
       float dropdownH = contentH > (viewH * 0.7f) ? (viewH * 0.7f) : contentH;
-      float dropdownX = (winW - dropdownW) / 2.0f;
+      float dropdownX = (SCREEN_WIDTH - dropdownW) / 2.0f;
       float dropdownY = (viewH - dropdownH) / 2.0f;
       
       Rectangle dropRect = { dropdownX, dropdownY, dropdownW, dropdownH };
-      
       BeginScissorMode((int)dropRect.x, (int)dropRect.y, (int)dropRect.width, (int)dropRect.height);
       DrawRectangleRec(dropRect, ColorBGUtil);
-      
       float cy = dropdownY - r->State->DropdownScroll;
       for(int i=0; i<item->OptionsCount; i++) {
           Rectangle opRect = { dropdownX, cy, dropdownW, opHeight };
-          
           if (cy + opHeight > dropdownY && cy < dropdownY + dropdownH) {
-              if (item->Current == i) {
-                  DrawRectangleRec(opRect, ColorGray);
-              } else {
-                  DrawRectangleRec(opRect, ColorDark1);
-              }
+              if (item->Current == i) DrawRectangleRec(opRect, ColorGray);
+              else DrawRectangleRec(opRect, ColorDark1);
               DrawRectangleLinesEx(opRect, 1, ColorShadow);
               UIDrawText(item->Options[i], faceMd, dropdownX + S(20), cy + S(12), S(15), (item->Current == i) ? ColorOrange : ColorWhite);
           }
           cy += opHeight;
       }
       EndScissorMode();
-      
       DrawRectangleLinesEx(dropRect, 2, ColorOrange);
-      
-      // Draw dropdown scrollbar if needed
       if (contentH > dropdownH) {
           float sbY = dropdownY + (r->State->DropdownScroll / contentH) * dropdownH;
           float sbH = (dropdownH / contentH) * dropdownH;

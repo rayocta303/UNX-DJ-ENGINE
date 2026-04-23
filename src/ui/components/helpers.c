@@ -36,14 +36,15 @@ void DrawTopBar(int remainMin, int remainSec, int clockMin, int clockSec, bool s
 }
 
 void DrawSelectionTriangleEx(float x, float y, float size, int direction, Color col) {
+    float hSize = size / 2.0f;
     if (direction == 0) { // Right
-        DrawLine(x, y, x, y + size, col);
-        DrawLine(x, y, x + size / 2.0f, y + size / 2.0f, col);
-        DrawLine(x, y + size, x + size / 2.0f, y + size / 2.0f, col);
+        DrawLine(x, y - hSize, x, y + hSize, col);
+        DrawLine(x, y - hSize, x + hSize, y, col);
+        DrawLine(x, y + hSize, x + hSize, y, col);
     } else { // Left
-        DrawLine(x + size / 2.0f, y, x + size / 2.0f, y + size, col);
-        DrawLine(x + size / 2.0f, y, x, y + size / 2.0f, col);
-        DrawLine(x + size / 2.0f, y + size, x, y + size / 2.0f, col);
+        DrawLine(x + hSize, y - hSize, x + hSize, y + hSize, col);
+        DrawLine(x + hSize, y - hSize, x, y, col);
+        DrawLine(x + hSize, y + hSize, x, y, col);
     }
 }
 

@@ -17,6 +17,7 @@ typedef struct {
   char Label[128];
   int Year;
   char Comment[256];
+  char ArtworkPath[256];
 } InfoTrack;
 
 typedef struct {
