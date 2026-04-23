@@ -135,12 +135,15 @@ void Browser_RefreshStorages(BrowserState *s) {
 
     // Check if there's a Rekordbox DB in the container root
     char dbCheck[512];
-    snprintf(dbCheck, sizeof(dbCheck), "%s/PIONEER/rekordbox/export.pdb",
-             docPath);
+    const char *sep = "";
+    size_t pLen = strlen(docPath);
+    if (pLen > 0 && docPath[pLen-1] != '/' && docPath[pLen-1] != '\\') sep = "/";
+
+    snprintf(dbCheck, sizeof(dbCheck), "%s%sPIONEER/rekordbox/export.pdb", docPath, sep);
     if (stat(dbCheck, &st) == 0) {
       strcpy(s->AvailableStorages[s->StorageCount].Type, "Rekordbox");
     } else {
-      snprintf(dbCheck, sizeof(dbCheck), "%s/_Serato_/database V2", docPath);
+      snprintf(dbCheck, sizeof(dbCheck), "%s%s_Serato_/database V2", docPath, sep);
       if (stat(dbCheck, &st) == 0) {
         strcpy(s->AvailableStorages[s->StorageCount].Type, "Serato");
       }
@@ -717,13 +720,24 @@ static int Browser_Update(Component *base) {
             targetDeck->OriginalBPM = t->BPM;
             targetDeck->CurrentBPM = t->BPM;
 
+            if (s->SelectedStorage) {
+              strncpy(targetDeck->SourceName, s->SelectedStorage->Name, 31);
+            }
+
             // Artwork
             if (t->ArtworkPath[0] != '\0') {
               const char *artRel = t->ArtworkPath;
-              if (artRel[0] == '/' || artRel[0] == '\\')
+              while (artRel[0] == '/' || artRel[0] == '\\')
                 artRel++;
+              
+              const char *sep = "";
+              size_t pLen = strlen(s->SelectedStorage->Path);
+              if (pLen > 0 && s->SelectedStorage->Path[pLen-1] != '/' && s->SelectedStorage->Path[pLen-1] != '\\') {
+                  sep = "/";
+              }
+              
               snprintf(targetDeck->ArtworkPath, sizeof(targetDeck->ArtworkPath),
-                       "%s/%s", s->SelectedStorage->Path, artRel);
+                       "%s%s%s", s->SelectedStorage->Path, sep, artRel);
             } else
               targetDeck->ArtworkPath[0] = '\0';
 
@@ -804,12 +818,16 @@ static int Browser_Update(Component *base) {
             strcpy(targetDeck->AlbumName, t->Album);
             strcpy(targetDeck->GenreName, t->Genre);
             strcpy(targetDeck->TrackKey, t->Key);
-            strcpy(targetDeck->LabelName, "");
+            strcpy(targetDeck->LabelName, t->Label);
             strcpy(targetDeck->Comment, t->Comment);
-            targetDeck->Rating = 0;
-            targetDeck->Year = 0;
+            targetDeck->Rating = 0; // Serato rating not in DB v2
+            targetDeck->Year = t->Year;
             targetDeck->OriginalBPM = t->BPM;
             targetDeck->CurrentBPM = t->BPM;
+
+            if (s->SelectedStorage) {
+              strncpy(targetDeck->SourceName, s->SelectedStorage->Name, 31);
+            }
             targetDeck->ArtworkPath[0] =
                 '\0'; // Serato artwork not implemented yet
 

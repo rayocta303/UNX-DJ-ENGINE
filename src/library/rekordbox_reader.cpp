@@ -62,6 +62,73 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
         std::vector<RBPlaylist> rbPlaylists;
         std::map<uint32_t, std::vector<uint32_t>> playlistTracks;
 
+        // PASS 1: Metadata Tables
+        for (auto table : *pdb.tables()) {
+            auto page_ref = table->first_page();
+            while (page_ref) {
+                auto page = page_ref->body();
+                if (page->is_data_page() && page->type() == table->type()) {
+                    for (auto group : *page->row_groups()) {
+                        for (auto row : *group->rows()) {
+                            if (!row->present()) continue;
+                            auto body = row->body();
+                            switch (table->type()) {
+                                case rekordbox_pdb_t::PAGE_TYPE_ARTISTS: {
+                                    auto r = static_cast<rekordbox_pdb_t::artist_row_t*>(body);
+                                    std::string val = RB_GetString(r->name());
+                                    artists[r->id()] = val;
+                                    printf("[RB-PASS1] Artist ID %u = '%s'\n", r->id(), val.c_str());
+                                    break;
+                                }
+                                case rekordbox_pdb_t::PAGE_TYPE_ALBUMS: {
+                                    auto r = static_cast<rekordbox_pdb_t::album_row_t*>(body);
+                                    std::string val = RB_GetString(r->name());
+                                    albums[r->id()] = val;
+                                    printf("[RB-PASS1] Album ID %u = '%s'\n", r->id(), val.c_str());
+                                    break;
+                                }
+                                case rekordbox_pdb_t::PAGE_TYPE_GENRES: {
+                                    auto r = static_cast<rekordbox_pdb_t::genre_row_t*>(body);
+                                    std::string val = RB_GetString(r->name());
+                                    genres[r->id()] = val;
+                                    printf("[RB-PASS1] Genre ID %u = '%s'\n", r->id(), val.c_str());
+                                    break;
+                                }
+                                case rekordbox_pdb_t::PAGE_TYPE_KEYS: {
+                                    auto r = static_cast<rekordbox_pdb_t::key_row_t*>(body);
+                                    std::string val = RB_GetString(r->name());
+                                    keys[r->id()] = val;
+                                    printf("[RB-PASS1] Key ID %u = '%s'\n", r->id(), val.c_str());
+                                    break;
+                                }
+                                case rekordbox_pdb_t::PAGE_TYPE_ARTWORK: {
+                                    auto r = static_cast<rekordbox_pdb_t::artwork_row_t*>(body);
+                                    std::string val = RB_GetString(r->path());
+                                    artworks[r->id()] = val;
+                                    printf("[RB-PASS1] Artwork ID %u = '%s'\n", r->id(), val.c_str());
+                                    break;
+                                }
+                                case rekordbox_pdb_t::PAGE_TYPE_LABELS: {
+                                    auto r = static_cast<rekordbox_pdb_t::label_row_t*>(body);
+                                    std::string val = RB_GetString(r->name());
+                                    labels[r->id()] = val;
+                                    printf("[RB-PASS1] Label ID %u = '%s'\n", r->id(), val.c_str());
+                                    break;
+                                }
+                                default: break;
+                            }
+                        }
+                    }
+                }
+                if (page_ref->index() == table->last_page()->index()) break;
+                page_ref = page->next_page();
+            }
+        }
+        
+        printf("[RB] Metadata Loaded: Artists:%zu, Albums:%zu, Genres:%zu, Keys:%zu, Artworks:%zu, Labels:%zu\n",
+               artists.size(), albums.size(), genres.size(), keys.size(), artworks.size(), labels.size());
+
+        // PASS 2: Tracks and Playlists
         for (auto table : *pdb.tables()) {
             auto page_ref = table->first_page();
             while (page_ref) {
@@ -73,36 +140,6 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
                             auto body = row->body();
 
                             switch (table->type()) {
-                                case rekordbox_pdb_t::PAGE_TYPE_ARTISTS: {
-                                    auto r = static_cast<rekordbox_pdb_t::artist_row_t*>(body);
-                                    artists[r->id()] = RB_GetString(r->name());
-                                    break;
-                                }
-                                case rekordbox_pdb_t::PAGE_TYPE_ALBUMS: {
-                                    auto r = static_cast<rekordbox_pdb_t::album_row_t*>(body);
-                                    albums[r->id()] = RB_GetString(r->name());
-                                    break;
-                                }
-                                case rekordbox_pdb_t::PAGE_TYPE_GENRES: {
-                                    auto r = static_cast<rekordbox_pdb_t::genre_row_t*>(body);
-                                    genres[r->id()] = RB_GetString(r->name());
-                                    break;
-                                }
-                                case rekordbox_pdb_t::PAGE_TYPE_KEYS: {
-                                    auto r = static_cast<rekordbox_pdb_t::key_row_t*>(body);
-                                    keys[r->id()] = RB_GetString(r->name());
-                                    break;
-                                }
-                                case rekordbox_pdb_t::PAGE_TYPE_ARTWORK: {
-                                    auto r = static_cast<rekordbox_pdb_t::artwork_row_t*>(body);
-                                    artworks[r->id()] = RB_GetString(r->path());
-                                    break;
-                                }
-                                case rekordbox_pdb_t::PAGE_TYPE_LABELS: {
-                                    auto r = static_cast<rekordbox_pdb_t::label_row_t*>(body);
-                                    labels[r->id()] = RB_GetString(r->name());
-                                    break;
-                                }
                                 case rekordbox_pdb_t::PAGE_TYPE_TRACKS: {
                                     auto r = static_cast<rekordbox_pdb_t::track_row_t*>(body);
                                     RBTrack t;
@@ -113,7 +150,6 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
                                     t.BPM = (float)r->tempo() / 100.0f;
                                     t.Duration = r->duration();
                                     
-                                    // Map IDs
                                     if (artists.count(r->artist_id())) strncpy(t.Artist, artists[r->artist_id()].c_str(), 255);
                                     if (albums.count(r->album_id())) strncpy(t.Album, albums[r->album_id()].c_str(), 255);
                                     if (genres.count(r->genre_id())) strncpy(t.Genre, genres[r->genre_id()].c_str(), 255);
@@ -140,6 +176,10 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
                                     t.DiscNumber = r->disc_number();
                                     
                                     strncpy(t.AnalyzePath, RB_GetString(r->analyze_path()).c_str(), 511);
+
+                                    // DEBUG LOGGING
+                                    printf("[RB] Track ID %u: Title='%s', ArtistID=%u, AlbumID=%u, GenreID=%u, KeyID=%u, ArtID=%u\n", 
+                                           t.ID, t.Title, r->artist_id(), r->album_id(), r->genre_id(), r->key_id(), r->artwork_id());
 
                                     rbTracks.push_back(t);
                                     break;
