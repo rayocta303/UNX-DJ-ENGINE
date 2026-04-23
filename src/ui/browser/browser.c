@@ -746,6 +746,7 @@ static int Browser_Update(Component *base) {
             if (newTrack) {
               memset(newTrack, 0, sizeof(TrackState));
               newTrack->StaticWaveformLen = t->StaticWaveformLen;
+              newTrack->StaticWaveformType = t->StaticWaveformType;
               memcpy(newTrack->StaticWaveform, t->StaticWaveform,
                      t->StaticWaveformLen > 8192 ? 8192 : t->StaticWaveformLen);
               newTrack->DynamicWaveform = t->DynamicWaveform;

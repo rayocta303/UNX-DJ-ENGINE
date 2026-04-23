@@ -3,6 +3,7 @@
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
 
 
@@ -386,15 +387,23 @@ static void Settings_Draw(Component *base) {
 
     } else if (item->Type == SETTING_TYPE_KNOB) {
       UIDrawKnob(valueX + valueWidth - S(95), ry + (rowH / 2.0f), S(9), item->Value,
-                 item->Min, item->Max, item->Unit, ColorOrange, false);
+                 item->Min, item->Max, NULL, ColorOrange, false);
                  
-      char valBuf[16];
+      char valBuf[32];
       if (item->Value == (int)item->Value) sprintf(valBuf, "%d", (int)item->Value);
       else sprintf(valBuf, "%.1f", item->Value);
       
-      UIDrawText(valBuf, faceMd, valueX + valueWidth - S(80), ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
+      if (item->Unit[0] != '\0') {
+        char fullBuf[64];
+        sprintf(fullBuf, "%s %s", valBuf, item->Unit);
+        UIDrawText(fullBuf, faceMd, valueX + valueWidth - S(80), ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
+      } else {
+        UIDrawText(valBuf, faceMd, valueX + valueWidth - S(80), ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
+      }
     } else if (item->Type == SETTING_TYPE_ACTION) {
-      UIDrawText("\uf2f5", faceSm, valueX + valueWidth - S(35), ry + (rowH / 2.0f) - S(6), S(12), ColorOrange);
+      if (strcmp(item->Label, "ABOUT") != 0 && strcmp(item->Label, "EXIT APPLICATION") != 0) {
+        UIDrawText("\uf2f5", faceSm, valueX + valueWidth - S(35), ry + (rowH / 2.0f) - S(6), S(12), ColorOrange);
+      }
     }
   }
 
