@@ -6,11 +6,12 @@ UNX DJ Engine is a specialized, high-performance DJ media player firmware subset
 
 ## Core Architecture
 
-### Audio Processing Unit
-- **Internal Pipeline**: 32-bit floating-point internal mixing for maximum dynamic range and head-room.
+### Audio Processing Engine
+- **Engine Core**: Fully ported Mixxx Audio Engine (subset) for industry-standard reliability.
+- **Internal Pipeline**: 32-bit floating-point internal mixing for maximum dynamic range and headroom.
 - **Decoding Engine**: Native support for MP3 (minimp3), WAV, and AIFF (dr_wav) formats.
-- **Time-Stretching**: High-fidelity Master Tempo and pitch-shifting utilizing advanced WSOLA processing algorithms.
-- **Signal Processing**: Professional 3-Band Isolator EQs, Biquad Filters, and an integrated FX pipeline (Sound Color FX and BPM-synced Beat FX).
+- **Time-Stretching**: High-fidelity Master Tempo and pitch-shifting utilizing Rubber Band and SoundTouch algorithms.
+- **Signal Processing**: Professional 3-Band Isolator EQs (Fidlib), Biquad Filters, and an integrated FX pipeline (Sound Color FX and BPM-synced Beat FX).
 - **Synchronization**: Precise lock-free parameter synchronization and automatic mono-to-stereo upmixing.
 
 ### User Interface and Rendering
@@ -33,7 +34,10 @@ UNX DJ Engine is a specialized, high-performance DJ media player firmware subset
 | Framework | Raylib |
 | Compiler | Zig Toolchain |
 | Audio I/O | miniaudio |
-| DSP Logic | SoundTouch / Mixxx DSP Core |
+| Audio Engine | Ported Mixxx Core (v2.4+) |
+| Time-Stretching | Rubber Band / SoundTouch |
+| EQ/Filters | Fidlib |
+| FFT/DSP | QM-DSP |
 
 ## Deployment Platforms
 
@@ -51,7 +55,7 @@ UNX DJ Engine is a specialized, high-performance DJ media player firmware subset
 - [x] **Core Mixer**: Implementation of 3-band ISO EQs, Filters, and basic FX pipeline.
 - [x] **Metadata Engine**: Integration of Rekordbox PDB/ANLZ database parsing.
 - [x] **Cross-platform UI**: Unified rendering across desktop, embedded, and mobile platforms.
-- [/] **Master Tempo**: WSOLA-based time-stretching (Under active refinement).
+- [x] **Master Tempo**: High-fidelity time-stretching via Rubber Band/SoundTouch.
 - [/] **MIDI/HID Control**: Low-latency hardware mapping integration in progress.
 - [/] **Advanced FX**: Expansion of the Beat FX and Sound Color FX libraries.
 
@@ -91,9 +95,9 @@ Mobile builds are managed via GitHub Actions CI/CD pipelines.
 
 ## Credits and Acknowledgments
 
-UNX DJ Engine is developed within the UNX DJ project ecosystem. Strategic insights and specialized logic have been adapted from the following contributors:
-- **Mixxx Development Team**: DSP architectural insights and signal processing logic.
-- **SoundTouch**: High-quality time-stretching and pitch-shifting algorithms.
+UNX DJ Engine is developed within the UNX DJ project ecosystem. It leverages a significant portion of the Mixxx open-source engine, adapted for embedded and low-latency environments.
+- **Mixxx Development Team**: Core audio engine architecture, DSP logic, and signal processing.
+- **Rubber Band / SoundTouch**: High-quality time-stretching and pitch-shifting algorithms.
 - **Raylib, minimp3, dr_libs**: Core framework and media decoding libraries.
 
 ## Contact and Social Media
