@@ -61,9 +61,18 @@ static int Settings_Update(Component *base) {
       }
       
       if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
-         r->State->IsDropdownOpen = false;
+          r->State->IsDropdownOpen = false;
       }
       return 1; // block background UI interaction
+  }
+
+  // Get filtered indices
+  int filteredIndices[MAX_SETTINGS_ITEMS];
+  int filteredCount = 0;
+  for (int i = 0; i < r->State->ItemsCount; i++) {
+    if (r->State->Items[i].Category == (SettingCategory)r->State->SelectedTab) {
+      filteredIndices[filteredCount++] = i;
+    }
   }
 
   if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
@@ -71,10 +80,11 @@ static int Settings_Update(Component *base) {
     r->State->TouchDragAccumulator += delta.y;
     
     float viewH = SCREEN_HEIGHT - DECK_STR_H;
-    int visibleRows = (int)((viewH - S(28.0f)) / S(28.0f));
+    float tabH = S(28.0f);
+    int visibleRows = (int)((viewH - TOP_BAR_H - tabH - S(28.0f)) / S(28.0f));
     float threshold = S(20.0f);
     if (r->State->TouchDragAccumulator < -threshold) { 
-      if (r->State->Scroll + visibleRows < r->State->ItemsCount) {
+      if (r->State->Scroll + visibleRows < filteredCount) {
         r->State->Scroll++;
       }
       r->State->TouchDragAccumulator = 0;
@@ -93,8 +103,9 @@ static int Settings_Update(Component *base) {
           if (r->State->Scroll > 0) r->State->Scroll--;
       } else {
           float viewH = SCREEN_HEIGHT - DECK_STR_H;
-          int visibleRows = (int)((viewH - S(28.0f)) / S(28.0f));
-          if (r->State->Scroll + visibleRows < r->State->ItemsCount) {
+          float tabH = S(28.0f);
+          int visibleRows = (int)((viewH - TOP_BAR_H - tabH - S(28.0f)) / S(28.0f));
+          if (r->State->Scroll + visibleRows < filteredCount) {
               r->State->Scroll++;
           }
       }
@@ -106,10 +117,26 @@ static int Settings_Update(Component *base) {
 
   if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
     Vector2 mouse = UIGetMousePosition();
+    float viewH = SCREEN_HEIGHT - DECK_STR_H;
     float bottomH = S(28.0f);
-    float divY = SCREEN_HEIGHT - DECK_STR_H - bottomH;
+    float divY = viewH - bottomH;
+    float tabH = S(28.0f);
 
-    // DONE Button: DrawRectangle(S(15), divY + S(5), S(90), S(18), ...)
+    // Tab Switching Logic
+    if (mouse.y >= TOP_BAR_H && mouse.y <= TOP_BAR_H + tabH) {
+        float tabW = SCREEN_WIDTH / (float)SETTING_CAT_COUNT;
+        int tabIdx = (int)(mouse.x / tabW);
+        if (tabIdx >= 0 && tabIdx < SETTING_CAT_COUNT) {
+            if (r->State->SelectedTab != tabIdx) {
+                r->State->SelectedTab = tabIdx;
+                r->State->Scroll = 0;
+                r->State->CursorPos = 0;
+            }
+            return 1;
+        }
+    }
+
+    // DONE Button
     if (mouse.x >= S(15) && mouse.x <= S(105) && mouse.y >= divY + S(5) &&
         mouse.y <= divY + S(23)) {
       if (r->OnApply)
@@ -118,7 +145,7 @@ static int Settings_Update(Component *base) {
         r->OnClose(r->callbackCtx);
       return 1;
     }
-    // CLOSE Button: DrawRectangle(SCREEN_WIDTH - S(105), divY + S(5), S(90), S(18), ...)
+    // CLOSE Button
     if (mouse.x >= SCREEN_WIDTH - S(105) && mouse.x <= SCREEN_WIDTH - S(15) &&
         mouse.y >= divY + S(5) && mouse.y <= divY + S(23)) {
       if (r->OnClose)
@@ -128,13 +155,14 @@ static int Settings_Update(Component *base) {
 
     // List Item Selection & Action Clicking
     float rowH = S(28.0f);
-    int visibleRows = 12;
+    int visibleRows = (int)((divY - (TOP_BAR_H + tabH)) / rowH);
     for (int i = 0; i < visibleRows; i++) {
-      int idx = r->State->Scroll + i;
-      if (idx >= r->State->ItemsCount)
+      int idx_f = r->State->Scroll + i;
+      if (idx_f >= filteredCount)
         break;
 
-      float ry = TOP_BAR_H + (i * rowH);
+      int idx = filteredIndices[idx_f];
+      float ry = TOP_BAR_H + tabH + (i * rowH);
       Rectangle rowRect = {0, ry, SCREEN_WIDTH, rowH};
 
       if (CheckCollisionPointRec(mouse, rowRect) && fabsf(r->State->TouchDragAccumulator) < 10.0f) {
@@ -165,19 +193,21 @@ static int Settings_Update(Component *base) {
     float viewH = SCREEN_HEIGHT - DECK_STR_H;
     float bottomH = S(28.0f);
     float divY = viewH - bottomH;
+    float tabH = S(28.0f);
     float rowH = S(28.0f);
-    int visibleRows = (int)(divY / rowH);
+    int visibleRows = (int)((divY - (TOP_BAR_H + tabH)) / rowH);
 
     if (r->State->CursorPos < visibleRows - 1 &&
-        r->State->Scroll + r->State->CursorPos < r->State->ItemsCount - 1) {
+        r->State->Scroll + r->State->CursorPos < filteredCount - 1) {
       r->State->CursorPos++;
-    } else if (r->State->Scroll + visibleRows < r->State->ItemsCount) {
+    } else if (r->State->Scroll + visibleRows < filteredCount) {
       r->State->Scroll++;
     }
   }
 
-  int idx = r->State->Scroll + r->State->CursorPos;
-  if (idx < r->State->ItemsCount) {
+  int idx_f = r->State->Scroll + r->State->CursorPos;
+  if (idx_f < filteredCount) {
+    int idx = filteredIndices[idx_f];
     SettingItem *item = &r->State->Items[idx];
     if (item->Type == SETTING_TYPE_LIST) {
       if (IsKeyPressed(KEY_LEFT)) {
@@ -241,6 +271,14 @@ static int Settings_Update(Component *base) {
     }
   }
 
+  // Horizontal Tab Switch with Page Up/Down or similar if needed?
+  // User might like Tab key to cycle tabs
+  if (IsKeyPressed(KEY_TAB)) {
+      r->State->SelectedTab = (r->State->SelectedTab + 1) % SETTING_CAT_COUNT;
+      r->State->Scroll = 0;
+      r->State->CursorPos = 0;
+  }
+
   if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
     if (r->OnClose)
       r->OnClose(r->callbackCtx);
@@ -267,16 +305,44 @@ static void Settings_Draw(Component *base) {
 
   float bottomH = S(28.0f);
   float divY = viewH - bottomH;
+  float tabH = S(28.0f);
   float rowH = S(28.0f);
-  int visibleRows = (int)(divY / rowH);
+
+  // Draw Tabs
+  DrawRectangle(0, TOP_BAR_H, SCREEN_WIDTH, tabH, ColorDark2);
+  const char *tabs[] = { "DECK", "AUDIO", "VIEW", "SYSTEM" };
+  float tabW = SCREEN_WIDTH / (float)SETTING_CAT_COUNT;
+  for (int i = 0; i < SETTING_CAT_COUNT; i++) {
+      Rectangle tRect = { i * tabW, TOP_BAR_H, tabW, tabH };
+      if (r->State->SelectedTab == i) {
+          DrawRectangleRec(tRect, ColorOrange);
+          DrawCentredText(tabs[i], faceSm, i * tabW, tabW, TOP_BAR_H + S(8), S(11), ColorBlack);
+      } else {
+          DrawCentredText(tabs[i], faceSm, i * tabW, tabW, TOP_BAR_H + S(8), S(11), ColorGray);
+      }
+      DrawLine(i * tabW, TOP_BAR_H, i * tabW, TOP_BAR_H + tabH, ColorShadow);
+  }
+  DrawLine(0, TOP_BAR_H + tabH, SCREEN_WIDTH, TOP_BAR_H + tabH, ColorOrange);
+
+  // Get filtered indices
+  int filteredIndices[MAX_SETTINGS_ITEMS];
+  int filteredCount = 0;
+  for (int i = 0; i < r->State->ItemsCount; i++) {
+    if (r->State->Items[i].Category == (SettingCategory)r->State->SelectedTab) {
+      filteredIndices[filteredCount++] = i;
+    }
+  }
+
+  int visibleRows = (int)((divY - (TOP_BAR_H + tabH)) / rowH);
 
   for (int i = 0; i < visibleRows; i++) {
-    int idx = r->State->Scroll + i;
-    if (idx >= r->State->ItemsCount)
+    int idx_f = r->State->Scroll + i;
+    if (idx_f >= filteredCount)
       break;
 
+    int idx = filteredIndices[idx_f];
     SettingItem *item = &r->State->Items[idx];
-    float ry = TOP_BAR_H + (i * rowH);
+    float ry = TOP_BAR_H + tabH + (i * rowH);
 
     bool selected = (i == r->State->CursorPos);
     if (selected) {
@@ -315,14 +381,13 @@ static void Settings_Draw(Component *base) {
       
       UIDrawText(valBuf, faceMd, SCREEN_WIDTH - S(65), ry + S(6), S(13), ColorOrange);
     } else if (item->Type == SETTING_TYPE_ACTION) {
-      // Action items like EXIT don't have side controls, maybe just a symbol
       UIDrawText("\uf2f5", faceSm, SCREEN_WIDTH - S(30), ry + S(6), S(12),
-                 ColorOrange); // Sign-out icon placeholder
+                 ColorOrange);
     }
   }
 
-  DrawScrollbar(SCREEN_WIDTH - S(2.5f), TOP_BAR_H, S(2), divY - TOP_BAR_H,
-                r->State->ItemsCount, r->State->Scroll, visibleRows);
+  DrawScrollbar(SCREEN_WIDTH - S(2.5f), TOP_BAR_H + tabH, S(2), divY - (TOP_BAR_H + tabH),
+                filteredCount, r->State->Scroll, visibleRows);
 
   // Bottom Background
   DrawRectangle(0, divY, SCREEN_WIDTH, bottomH, ColorDark1);
@@ -335,7 +400,7 @@ static void Settings_Draw(Component *base) {
 
   char countStr[32];
   sprintf(countStr, "%d / %d", r->State->Scroll + r->State->CursorPos + 1,
-          r->State->ItemsCount);
+          filteredCount);
   UIDrawText(countStr, faceXS, SCREEN_WIDTH / 2.0f - S(24.0f), divY + S(8),
              S(9), ColorShadow);
 
@@ -360,7 +425,7 @@ static void Settings_Draw(Component *base) {
       
       Rectangle dropRect = { dropdownX, dropdownY, dropdownW, dropdownH };
       
-      BeginScissorMode(dropRect.x, dropRect.y, dropRect.width, dropRect.height);
+      BeginScissorMode((int)dropRect.x, (int)dropRect.y, (int)dropRect.width, (int)dropRect.height);
       DrawRectangleRec(dropRect, ColorBGUtil);
       
       float cy = dropdownY - r->State->DropdownScroll;
@@ -386,7 +451,7 @@ static void Settings_Draw(Component *base) {
       if (contentH > dropdownH) {
           float sbY = dropdownY + (r->State->DropdownScroll / contentH) * dropdownH;
           float sbH = (dropdownH / contentH) * dropdownH;
-          DrawRectangle(dropdownX + dropdownW - S(4), sbY, S(4), sbH, ColorOrange);
+          DrawRectangle((int)(dropdownX + dropdownW - S(4)), (int)sbY, (int)S(4), (int)sbH, ColorOrange);
       }
   }
 }

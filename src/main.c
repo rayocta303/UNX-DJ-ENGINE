@@ -229,6 +229,11 @@ void UpdateChannelOptions(App *a, int deviceIdx) {
   strcpy(a->settingsState.Items[12].Label, "CUE RIGHT");
   a->settingsState.Items[12].Type = SETTING_TYPE_LIST;
 
+  a->settingsState.Items[9].Category = SETTING_CAT_AUDIO;
+  a->settingsState.Items[10].Category = SETTING_CAT_AUDIO;
+  a->settingsState.Items[11].Category = SETTING_CAT_AUDIO;
+  a->settingsState.Items[12].Category = SETTING_CAT_AUDIO;
+
   // Master L/R: CH 1..N
   a->settingsState.Items[9].OptionsCount = channels;
   a->settingsState.Items[10].OptionsCount = channels;
@@ -384,11 +389,13 @@ void App_Init(App *a) {
   strcpy(a->settingsState.Items[0].Options[0], "CONTINUE");
   strcpy(a->settingsState.Items[0].Options[1], "SINGLE");
   a->settingsState.Items[0].OptionsCount = 2;
+  a->settingsState.Items[0].Category = SETTING_CAT_DECK;
 
   strcpy(a->settingsState.Items[1].Label, "LOAD LOCK");
   strcpy(a->settingsState.Items[1].Options[0], "OFF");
   strcpy(a->settingsState.Items[1].Options[1], "ON");
   a->settingsState.Items[1].OptionsCount = 2;
+  a->settingsState.Items[1].Category = SETTING_CAT_DECK;
 
   // Load persisted settings
   Settings_Load(&a->deckA.Waveform, &a->deckB.Waveform, &a->activeAudioConfig);
@@ -399,6 +406,7 @@ void App_Init(App *a) {
   strcpy(a->settingsState.Items[2].Options[2], "3-BAND");
   a->settingsState.Items[2].OptionsCount = 3;
   a->settingsState.Items[2].Current = a->deckA.Waveform.Style;
+  a->settingsState.Items[2].Category = SETTING_CAT_VIEW;
 
   strcpy(a->settingsState.Items[3].Label, "WFM LOW GAIN");
   a->settingsState.Items[3].Type = SETTING_TYPE_LIST;
@@ -409,6 +417,7 @@ void App_Init(App *a) {
     if (fabs(a->deckA.Waveform.GainLow - v) < 0.05f)
       a->settingsState.Items[3].Current = i;
   }
+  a->settingsState.Items[3].Category = SETTING_CAT_VIEW;
 
   strcpy(a->settingsState.Items[4].Label, "WFM MID GAIN");
   a->settingsState.Items[4].Type = SETTING_TYPE_LIST;
@@ -419,6 +428,7 @@ void App_Init(App *a) {
     if (fabs(a->deckA.Waveform.GainMid - v) < 0.05f)
       a->settingsState.Items[4].Current = i;
   }
+  a->settingsState.Items[4].Category = SETTING_CAT_VIEW;
 
   strcpy(a->settingsState.Items[5].Label, "WFM HIGH GAIN");
   a->settingsState.Items[5].Type = SETTING_TYPE_LIST;
@@ -429,6 +439,7 @@ void App_Init(App *a) {
     if (fabs(a->deckA.Waveform.GainHigh - v) < 0.05f)
       a->settingsState.Items[5].Current = i;
   }
+  a->settingsState.Items[5].Category = SETTING_CAT_VIEW;
 
   strcpy(a->settingsState.Items[6].Label, "JOG START TIME");
   a->settingsState.Items[6].Type = SETTING_TYPE_KNOB;
@@ -436,6 +447,7 @@ void App_Init(App *a) {
   a->settingsState.Items[6].Max = 2000;
   a->settingsState.Items[6].Value = a->deckA.Waveform.VinylStartMs;
   strcpy(a->settingsState.Items[6].Unit, "ms");
+  a->settingsState.Items[6].Category = SETTING_CAT_DECK;
 
   strcpy(a->settingsState.Items[7].Label, "JOG RELEASE TIME");
   a->settingsState.Items[7].Type = SETTING_TYPE_KNOB;
@@ -443,6 +455,7 @@ void App_Init(App *a) {
   a->settingsState.Items[7].Max = 2000;
   a->settingsState.Items[7].Value = a->deckA.Waveform.VinylStopMs;
   strcpy(a->settingsState.Items[7].Unit, "ms");
+  a->settingsState.Items[7].Category = SETTING_CAT_DECK;
 
   // --- Audio Configurations ---
   AudioDeviceInfo devs[MAX_AUDIO_DEVICES];
@@ -457,6 +470,7 @@ void App_Init(App *a) {
     snprintf(a->settingsState.Items[8].Options[i + 1], 32, "%dCH %s",
              devs[i].NativeChannels, devs[i].Name);
   }
+  a->settingsState.Items[8].Category = SETTING_CAT_AUDIO;
 
   // Initial population based on loaded config
   UpdateChannelOptions(a, a->activeAudioConfig.DeviceIndex);
@@ -484,12 +498,14 @@ void App_Init(App *a) {
   strcpy(a->settingsState.Items[13].Options[1], "256");
   strcpy(a->settingsState.Items[13].Options[2], "512");
   strcpy(a->settingsState.Items[13].Options[3], "1024");
+  a->settingsState.Items[13].Category = SETTING_CAT_AUDIO;
 
   strcpy(a->settingsState.Items[14].Label, "SAMPLE RATE");
   a->settingsState.Items[14].Type = SETTING_TYPE_LIST;
   a->settingsState.Items[14].OptionsCount = 2;
   strcpy(a->settingsState.Items[14].Options[0], "44100 Hz");
   strcpy(a->settingsState.Items[14].Options[1], "48000 Hz");
+  a->settingsState.Items[14].Category = SETTING_CAT_AUDIO;
 
   // Sync again to make sure labels/options are set before setting Current
   a->settingsState.Items[13].Current = 1; // Default 256
@@ -502,9 +518,11 @@ void App_Init(App *a) {
 
   strcpy(a->settingsState.Items[15].Label, "ABOUT");
   a->settingsState.Items[15].Type = SETTING_TYPE_ACTION;
+  a->settingsState.Items[15].Category = SETTING_CAT_SYSTEM;
 
   strcpy(a->settingsState.Items[16].Label, "EXIT APPLICATION");
   a->settingsState.Items[16].Type = SETTING_TYPE_ACTION;
+  a->settingsState.Items[16].Category = SETTING_CAT_SYSTEM;
   a->settingsState.ItemsCount = 17;
 
   // Set Load Lock current opt

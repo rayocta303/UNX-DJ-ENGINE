@@ -12,9 +12,18 @@ typedef enum {
   SETTING_TYPE_ACTION
 } SettingType;
 
+typedef enum {
+  SETTING_CAT_DECK,
+  SETTING_CAT_AUDIO,
+  SETTING_CAT_VIEW,
+  SETTING_CAT_SYSTEM,
+  SETTING_CAT_COUNT
+} SettingCategory;
+
 typedef struct {
   char Label[64];
   SettingType Type;
+  SettingCategory Category;
 
   // List part
   char Options[MAX_SETTING_OPTIONS][32];
@@ -35,6 +44,7 @@ typedef struct {
   int ItemsCount;
   int CursorPos;
   int Scroll;
+  int SelectedTab;
   float TouchDragAccumulator;
   bool IsDropdownOpen;
   int DropdownItemIdx;
