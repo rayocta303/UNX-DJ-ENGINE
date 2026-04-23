@@ -1,9 +1,10 @@
 #include "ui/views/about.h"
-#include "version.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
+#include "version.h"
 #include <stdio.h>
+
 
 static int About_Update(Component *base) {
   AboutRenderer *r = (AboutRenderer *)base;
@@ -45,24 +46,31 @@ static void About_Draw(Component *base) {
 
   // Main Card Layout
   float cardW = S(380);
-  float cardH = S(240); 
+  float cardH = S(240);
   float cardX = centerX - (cardW / 2.0f);
   float cardY = centerY - (cardH / 2.0f) + (TOP_BAR_H / 2.0f);
 
   // Card Shadow & Background
-  DrawRectangle(cardX + S(4), cardY + S(4), cardW, cardH, Fade(ColorBlack, 0.5f));
+  DrawRectangle(cardX + S(4), cardY + S(4), cardW, cardH,
+                Fade(ColorBlack, 0.5f));
   DrawRectangle(cardX, cardY, cardW, cardH, ColorDark1);
-  DrawRectangleLinesEx((Rectangle){cardX, cardY, cardW, cardH}, 1.0f, ColorGray);
-  
+  DrawRectangleLinesEx((Rectangle){cardX, cardY, cardW, cardH}, 1.0f,
+                       ColorGray);
+
   // Left Sidebar of the Card (Branding)
   float sideW = S(110);
-  DrawRectangle(cardX + 1, cardY + 1, sideW, cardH - 2, (Color){25, 25, 25, 255});
-  DrawLine(cardX + sideW, cardY + 1, cardX + sideW, cardY + cardH - 1, ColorDark2);
+  DrawRectangle(cardX + 1, cardY + 1, sideW, cardH - 2,
+                (Color){25, 25, 25, 255});
+  DrawLine(cardX + sideW, cardY + 1, cardX + sideW, cardY + cardH - 1,
+           ColorDark2);
 
   // Large Device Icon in Sidebar
-  UIDrawText("\xef\x8a\x92", UIFonts_GetIcon(S(48)), cardX + sideW/2 - S(24), cardY + S(40), S(48), ColorShadow);
-  DrawCentredText("XDJ-UNX", faceXS, cardX, sideW, cardY + S(95), S(8), ColorGray);
-  DrawCentredText("SYSTEM", faceXS, cardX, sideW, cardY + S(105), S(8), ColorGray);
+  UIDrawText("\xef\x8a\x92", UIFonts_GetIcon(S(48)), cardX + sideW / 2 - S(24),
+             cardY + S(40), S(48), ColorShadow);
+  DrawCentredText("XDJ-UNX", faceXS, cardX, sideW, cardY + S(95), S(8),
+                  ColorGray);
+  DrawCentredText("SYSTEM", faceXS, cardX, sideW, cardY + S(105), S(8),
+                  ColorGray);
 
   // Right Side Content
   float contentX = cardX + sideW + S(20);
@@ -71,35 +79,45 @@ static void About_Draw(Component *base) {
 
   // App Title & Version
   UIDrawText(APP_NAME, faceLg, contentX, startY, S(18), ColorOrange);
-  UIDrawText(r->State->Version, faceSm, contentX, startY + S(22), S(10), ColorShadow);
+  UIDrawText(r->State->Version, faceSm, contentX, startY + S(22), S(10),
+             ColorShadow);
 
   float detailsY = startY + S(50);
 
   // --- Row 1: Developer ---
-  UIDrawText("\xef\x80\x87", iconMain, contentX, detailsY + S(2), S(12), ColorShadow);
-  UIDrawText("DEVELOPER", faceXS, contentX + S(18), detailsY - S(4), S(7), ColorShadow);
-  UIDrawText(r->State->Developer, faceMd, contentX + S(18), detailsY + S(6), S(11), ColorWhite);
+  UIDrawText("\xef\x80\x87", iconMain, contentX, detailsY + S(2), S(12),
+             ColorShadow);
+  UIDrawText("DEVELOPER", faceXS, contentX + S(18), detailsY - S(4), S(7),
+             ColorShadow);
+  UIDrawText(r->State->Developer, faceMd, contentX + S(18), detailsY + S(6),
+             S(11), ColorWhite);
 
   // --- Row 2: Instagram ---
-  UIDrawText("\xef\x85\xad", iconBrand, contentX, detailsY + rowH + S(2), S(12), ColorOrange);
-  UIDrawText("INSTAGRAM", faceXS, contentX + S(18), detailsY + rowH - S(4), S(7), ColorShadow);
-  UIDrawText(r->State->Instagram, faceMd, contentX + S(18), detailsY + rowH + S(6), S(11), ColorOrange);
+  UIDrawText("\xef\x85\xad", iconBrand, contentX, detailsY + rowH + S(2), S(12),
+             ColorOrange);
+  UIDrawText("INSTAGRAM", faceXS, contentX + S(18), detailsY + rowH - S(4),
+             S(7), ColorShadow);
+  UIDrawText(r->State->Instagram, faceMd, contentX + S(18),
+             detailsY + rowH + S(6), S(11), ColorOrange);
 
   // --- Row 3: Platform ---
-  UIDrawText("\xef\x90\xbc", iconMain, contentX, detailsY + rowH * 2 + S(2), S(12), ColorShadow);
-  UIDrawText("PLATFORM", faceXS, contentX + S(18), detailsY + rowH * 2 - S(4), S(7), ColorShadow);
-  UIDrawText(APP_PLATFORM, faceMd, contentX + S(18), detailsY + rowH * 2 + S(6), S(11), ColorWhite);
+  UIDrawText("\xef\x90\xbc", iconMain, contentX, detailsY + rowH * 2 + S(2),
+             S(12), ColorShadow);
+  UIDrawText("PLATFORM", faceXS, contentX + S(18), detailsY + rowH * 2 - S(4),
+             S(7), ColorShadow);
+  UIDrawText(APP_PLATFORM, faceMd, contentX + S(18), detailsY + rowH * 2 + S(6),
+             S(11), ColorWhite);
 
   // --- Row 4: Audio ---
-  UIDrawText("\xef\x8a\x93", iconMain, contentX, detailsY + rowH * 3 + S(2), S(12), ColorShadow);
+  UIDrawText("\xef\x80\x81", iconMain, contentX, detailsY + rowH * 3 + S(2), S(12), ColorShadow); // Changed to music icon for better compatibility
   UIDrawText("AUDIO ENGINE", faceXS, contentX + S(18), detailsY + rowH * 3 - S(4), S(7), ColorShadow);
   char audioBuf[128];
   snprintf(audioBuf, 128, "%s (%s)", r->State->AudioDevice, r->State->AudioDriver);
   UIDrawText(audioBuf, faceSm, contentX + S(18), detailsY + rowH * 3 + S(6), S(9), ColorGray);
 
-  // Footer Hints
-  UIDrawText("Engineered for precision performance.", faceXS, centerX - S(70), viewH - S(25), S(8), ColorDark3);
-  UIDrawText("Press BACK to exit", faceXS, SCREEN_WIDTH - S(100), viewH - S(25), S(8), ColorShadow);
+  // Footer Hints (Inside the card now)
+  UIDrawText("Engineered for precision performance.", faceXS, contentX, cardY + cardH - S(15), S(7), ColorDark3);
+  UIDrawText("BACK to exit", faceXS, cardX + cardW - S(60), cardY + cardH - S(15), S(7), ColorShadow);
 }
 
 void AboutRenderer_Init(AboutRenderer *r, AboutState *state) {
