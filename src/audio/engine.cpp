@@ -236,7 +236,10 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
 
     if (!deck->IsPlaying && !noiseActive && !hasActiveFX && !hasTails) {
         // Fully silent and stopped
-        if (deck->MasterTempoActive && deck->SoundTouchHandle) ((SoundTouch*)deck->SoundTouchHandle)->clear();
+        if (deck->MasterTempoActive && deck->SoundTouchHandle && wasMTActive[deckIndex]) {
+            ((SoundTouch*)deck->SoundTouchHandle)->clear();
+            wasMTActive[deckIndex] = false;
+        }
         return;
     }
 
@@ -245,10 +248,21 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
     double targetRate = deck->OutlinedRate;
     
     // EQ Setup
-    EngineLR4_SetLowpass(&deck->EqLowStateL, 350.0f, engine->OutputSampleRate);
-    EngineLR4_SetLowpass(&deck->EqLowStateR, 350.0f, engine->OutputSampleRate);
-    EngineLR4_SetHighpass(&deck->EqHighStateL, 2500.0f, engine->OutputSampleRate);
-    EngineLR4_SetHighpass(&deck->EqHighStateR, 2500.0f, engine->OutputSampleRate);
+    static float lastFreqL[MAX_DECKS] = {0};
+    static float lastFreqH[MAX_DECKS] = {0};
+    static uint32_t lastSR[MAX_DECKS] = {0};
+
+    if (lastFreqL[deckIndex] != 350.0f || lastSR[deckIndex] != engine->OutputSampleRate) {
+        EngineLR4_SetLowpass(&deck->EqLowStateL, 350.0f, engine->OutputSampleRate);
+        EngineLR4_SetLowpass(&deck->EqLowStateR, 350.0f, engine->OutputSampleRate);
+        lastFreqL[deckIndex] = 350.0f;
+    }
+    if (lastFreqH[deckIndex] != 2500.0f || lastSR[deckIndex] != engine->OutputSampleRate) {
+        EngineLR4_SetHighpass(&deck->EqHighStateL, 2500.0f, engine->OutputSampleRate);
+        EngineLR4_SetHighpass(&deck->EqHighStateR, 2500.0f, engine->OutputSampleRate);
+        lastFreqH[deckIndex] = 2500.0f;
+    }
+    lastSR[deckIndex] = engine->OutputSampleRate;
 
     float gainL = (deck->EqLow < 0.5f) ? (deck->EqLow * 2.0f) : (1.0f + (deck->EqLow - 0.5f) * 4.0f);
     float gainM = (deck->EqMid < 0.5f) ? (deck->EqMid * 2.0f) : (1.0f + (deck->EqMid - 0.5f) * 4.0f);
