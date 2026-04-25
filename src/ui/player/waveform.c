@@ -51,11 +51,29 @@ static int Waveform_Update(Component *base) {
   if (inWaveform) {
     float wheel = GetMouseWheelMove();
     if (wheel != 0.0f) {
-      r->State->ZoomScale -= wheel * 0.5f;
-      if (r->State->ZoomScale < 0.25f)
-        r->State->ZoomScale = 0.25f;
-      if (r->State->ZoomScale > 32.0f)
-        r->State->ZoomScale = 32.0f;
+      int currentIndex = 0;
+      float minDiff = 99999.0f;
+      for (int i = 0; i < NUM_ZOOM_LEVELS; i++) {
+        float diff = fabsf(r->State->ZoomScale - ZOOM_LEVELS[i]);
+        if (diff < minDiff) {
+          minDiff = diff;
+          currentIndex = i;
+        }
+      }
+
+      float deadZone = 0.05f;
+      // Use a small deadzone to ignore microscopic trackpad jitters
+      if (wheel > deadZone) {
+        currentIndex--; // Positive wheel decreases zoom
+      } else if (wheel < -deadZone) {
+        currentIndex++; // Negative wheel increases zoom
+      }
+
+      // Clamp the index
+      if (currentIndex < 0) currentIndex = 0;
+      if (currentIndex >= NUM_ZOOM_LEVELS) currentIndex = NUM_ZOOM_LEVELS - 1;
+
+      r->State->ZoomScale = ZOOM_LEVELS[currentIndex];
     }
   }
 
@@ -259,7 +277,12 @@ static void Waveform_Draw(Component *base) {
 
   Font faceXS = UIFonts_GetFace(S(8));
 
-  float effectiveZoom = (float)r->State->ZoomScale;
+  float pitchRatio = 1.0f + (r->State->TempoPercent / 100.0f);
+  
+  // Apply the pitch ratio to the zoom scale.
+  // Faster BPM (ratio > 1.0) increases effective zoom -> squishes waveform
+  // Slower BPM (ratio < 1.0) decreases effective zoom -> stretches waveform
+  float effectiveZoom = (float)r->State->ZoomScale * pitchRatio;
   if (effectiveZoom < 0.1f)
     effectiveZoom = 0.1f;
   double elapsedHalfFrames = r->State->Position;
