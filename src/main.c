@@ -74,6 +74,7 @@ typedef struct {
   
   char midiPresetPaths[32][256];
   int midiPresetCount;
+  char activeControllerPath[256];
 } App;
 
 void PopulateMidiSettings(App *a);
@@ -212,7 +213,7 @@ void OnSettingsApply(void *ctx) {
     }
   }
 
-  Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig);
+  Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig, a->activeControllerPath);
 }
 
 void UpdateChannelOptions(App *a, int deviceIdx) {
@@ -276,9 +277,12 @@ void OnSettingsValueChanged(void *ctx, int idx) {
   } else if (idx == 17) { // MIDI PRESET changed
     int presetIdx = a->settingsState.Items[17].Current;
     if (presetIdx < a->midiPresetCount) {
-        MIDI_RefreshMapping(a->midiPresetPaths[presetIdx]);
+        strncpy(a->activeControllerPath, a->midiPresetPaths[presetIdx], 255);
+        MIDI_RefreshMapping(a->activeControllerPath);
         // Refresh the MIDI mapping tab items
         PopulateMidiSettings(a);
+        // Save immediately when preset changes
+        Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig, a->activeControllerPath);
     }
   }
 }
@@ -302,8 +306,13 @@ void PopulateMidiSettings(App *a) {
   a->settingsState.Items[17].Type = SETTING_TYPE_LIST;
   a->settingsState.Items[17].Category = SETTING_CAT_CONTROLLERS;
   a->settingsState.Items[17].OptionsCount = a->midiPresetCount;
+  a->settingsState.Items[17].Current = 0;
+  
   for (int i = 0; i < a->midiPresetCount; i++) {
-    strncpy(a->settingsState.Items[17].Options[i], names[i], 31);
+      strncpy(a->settingsState.Items[17].Options[i], names[i], 31);
+      if (strcmp(a->activeControllerPath, a->midiPresetPaths[i]) == 0) {
+          a->settingsState.Items[17].Current = i;
+      }
   }
   // Try to find current mapping name to set default
   MidiMapping *currentMap = MIDI_GetGlobalMapping();
@@ -335,12 +344,8 @@ void PopulateMidiSettings(App *a) {
   }
   
   int totalCount = baseIdx + map->count;
-  if (totalCount > a->settingsState.ItemsCount) {
-    a->settingsState.ItemsCount = totalCount;
-  } else {
-    // If mapping shrank, we should probably reset the count or clear the rest
-    a->settingsState.ItemsCount = totalCount;
-  }
+  if (totalCount > MAX_SETTINGS_ITEMS) totalCount = MAX_SETTINGS_ITEMS;
+  a->settingsState.ItemsCount = totalCount;
 }
 
 void TopBar_OnBrowse(void *ctx) {
@@ -460,7 +465,10 @@ void App_Init(App *a) {
   a->settingsState.Items[1].Category = SETTING_CAT_DECK;
 
   // Load persisted settings
-  Settings_Load(&a->deckA.Waveform, &a->deckB.Waveform, &a->activeAudioConfig);
+  Settings_Load(&a->deckA.Waveform, &a->deckB.Waveform, &a->activeAudioConfig, a->activeControllerPath);
+  if (a->activeControllerPath[0] != '\0') {
+      MIDI_RefreshMapping(a->activeControllerPath);
+  }
 
   strcpy(a->settingsState.Items[2].Label, "WFM STYLE");
   strcpy(a->settingsState.Items[2].Options[0], "BLUE");
@@ -1251,6 +1259,10 @@ void UpdateDrawFrame(App *app) {
     app->mixer.base.Update((Component *)&app->mixer);
   if (app->screen == ScreenDebug)
     app->debugView.base.Update((Component *)&app->debugView);
+  if (app->screen == ScreenSplash) {
+    app->splash.base.Update((Component *)&app->splash);
+    if (app->splashCounter > 0) app->splashCounter--;
+  }
 
   if (app->screen != ScreenSplash && app->screen != ScreenDebug) {
     app->stripA.base.Update((Component *)&app->stripA);

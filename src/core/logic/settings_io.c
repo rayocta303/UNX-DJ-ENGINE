@@ -43,10 +43,24 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         if (sscanf(strstr(p, "\"sr\""), "\"sr\": %d", &ival) == 1) audio->SampleRate = ival;
         if (sscanf(strstr(p, "\"buf\""), "\"buf\": %d", &ival) == 1) audio->BufferSizeFrames = ival;
     }
+    // Controllers
+    if ((p = strstr(json, "\"controllers\""))) {
+        char *start = strstr(p, "\"path\": \"");
+        if (start) {
+            start += 9;
+            char *end = strchr(start, '\"');
+            if (end) {
+                int len = end - start;
+                // We'd need to pass controllerPath to LoadFromJSON, 
+                // but let's just do it directly in Settings_Load for now or change signature.
+            }
+        }
+    }
 }
 
-void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio) {
+void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, char *controllerPath) {
     // Defaults
+    controllerPath[0] = '\0';
     wfmA->Style = WAVEFORM_STYLE_3BAND;
     wfmA->GainLow = 1.0f; wfmA->GainMid = 1.0f; wfmA->GainHigh = 1.0f;
     wfmA->VinylStartMs = 500.0f; wfmA->VinylStopMs = 1200.0f; wfmA->LoadLock = true;
@@ -76,7 +90,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     }
 
     if (!f) {
-        Settings_Save(*wfmA, *wfmB, *audio);
+        Settings_Save(*wfmA, *wfmB, *audio, controllerPath);
         return;
     }
 
@@ -89,12 +103,28 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
         fread(buf, 1, size, f);
         buf[size] = '\0';
         LoadFromJSON(buf, wfmA, wfmB, audio);
+        
+        // Extract controller path manually to avoid changing too many signatures
+        const char *p;
+        if ((p = strstr(buf, "\"controllers\""))) {
+            char *start = strstr(p, "\"path\": \"");
+            if (start) {
+                start += 9;
+                char *end = strchr(start, '\"');
+                if (end) {
+                    int len = end - start;
+                    if (len > 255) len = 255;
+                    strncpy(controllerPath, start, len);
+                    controllerPath[len] = '\0';
+                }
+            }
+        }
         free(buf);
     }
     fclose(f);
 }
 
-void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendConfig audio) {
+void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendConfig audio, const char *controllerPath) {
     char path[512];
     const char *basePath = "";
 
@@ -120,8 +150,9 @@ void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendCon
             wfmA.Style, wfmA.GainLow, wfmA.GainMid, wfmA.GainHigh, wfmA.VinylStartMs, wfmA.VinylStopMs, wfmA.LoadLock ? 1 : 0);
     fprintf(f, "  \"wfmB\": { \"style\": %d, \"low\": %.2f, \"mid\": %.2f, \"high\": %.2f, \"start\": %.1f, \"stop\": %.1f, \"lock\": %d },\n", 
             wfmB.Style, wfmB.GainLow, wfmB.GainMid, wfmB.GainHigh, wfmB.VinylStartMs, wfmB.VinylStopMs, wfmB.LoadLock ? 1 : 0);
-    fprintf(f, "  \"audio\": { \"devIdx\": %d, \"mastL\": %d, \"mastR\": %d, \"cueL\": %d, \"cueR\": %d, \"sr\": %d, \"buf\": %d }\n",
+    fprintf(f, "  \"audio\": { \"devIdx\": %d, \"mastL\": %d, \"mastR\": %d, \"cueL\": %d, \"cueR\": %d, \"sr\": %d, \"buf\": %d },\n",
             audio.DeviceIndex, audio.MasterOutL, audio.MasterOutR, audio.CueOutL, audio.CueOutR, audio.SampleRate, audio.BufferSizeFrames);
+    fprintf(f, "  \"controllers\": { \"path\": \"%s\" }\n", controllerPath ? controllerPath : "");
     fprintf(f, "}\n");
 
     fclose(f);

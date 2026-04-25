@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #define MAX_SETTING_OPTIONS 32
-#define MAX_SETTINGS_ITEMS 128
+#define MAX_SETTINGS_ITEMS 512
 
 typedef enum {
   SETTING_TYPE_LIST,

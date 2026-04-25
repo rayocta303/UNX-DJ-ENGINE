@@ -108,45 +108,55 @@ void SplashRenderer_Init(SplashRenderer *s, int *progress) {
 
 #if !defined(PLATFORM_IOS)
   bool loadedAny = false;
-  for (int i = 0; i < s->frameCount; i++) {
-    // Try memory bundle first (newly added)
+  int framesToLoad = s->frameCount;
+  
+  for (int i = 0; i < framesToLoad; i++) {
+    bool frameLoaded = false;
+    
+    // 1. Try memory bundle first
 #ifdef SPLASH_FRAME_COUNT
-    Image img = LoadImageFromMemory(".png", splash_frames[i], splash_frames_size[i]);
-    if (img.data != NULL) {
-      // Cap resolution to 1080px width for VRAM safety
-      if (img.width > 1080) {
-          float aspect = (float)img.height / (float)img.width;
-          ImageResize(&img, 1080, (int)(1080.0f * aspect));
+    if (splash_frames[i] != NULL) {
+      Image img = LoadImageFromMemory(".png", splash_frames[i], splash_frames_size[i]);
+      if (img.data != NULL) {
+        if (img.width > 1080) {
+            float aspect = (float)img.height / (float)img.width;
+            ImageResize(&img, 1080, (int)(1080.0f * aspect));
+        }
+        s->frames[i] = LoadTextureFromImage(img);
+        SetTextureFilter(s->frames[i], TEXTURE_FILTER_BILINEAR);
+        UnloadImage(img);
+        frameLoaded = true;
+        loadedAny = true;
       }
-      s->frames[i] = LoadTextureFromImage(img);
-      GenTextureMipmaps(&s->frames[i]);
-      SetTextureFilter(s->frames[i], TEXTURE_FILTER_BILINEAR);
-      UnloadImage(img);
-      loadedAny = true;
-      continue;
     }
 #endif
 
-    // Fallback to disk
-    char path[256];
-    sprintf(path, "assets/splash/frame_%03d_delay-0.04s.png", i);
-    if (!FileExists(path)) {
-      sprintf(path, "assets/splash/frame_%03d_delay-0.05s.png", i);
+    // 2. Fallback to disk ONLY if memory load failed AND we aren't purely using memory bundle
+    if (!frameLoaded) {
+      char path[256];
+      sprintf(path, "assets/splash/frame_%03d_delay-0.04s.png", i);
+      if (!FileExists(path)) {
+        sprintf(path, "assets/splash/frame_%03d_delay-0.05s.png", i);
+      }
+
+      if (FileExists(path)) {
+        Image imgDisk = LoadImage(path);
+        if (imgDisk.data != NULL) {
+          if (imgDisk.width > 1080) {
+              float aspect = (float)imgDisk.height / (float)imgDisk.width;
+              ImageResize(&imgDisk, 1080, (int)(1080.0f * aspect));
+          }
+          s->frames[i] = LoadTextureFromImage(imgDisk);
+          SetTextureFilter(s->frames[i], TEXTURE_FILTER_BILINEAR);
+          UnloadImage(imgDisk);
+          frameLoaded = true;
+          loadedAny = true;
+        }
+      }
     }
 
-    Image imgDisk = LoadImage(path);
-    if (imgDisk.data != NULL) {
-      // Cap resolution to 1080px width for VRAM safety
-      if (imgDisk.width > 1080) {
-          float aspect = (float)imgDisk.height / (float)imgDisk.width;
-          ImageResize(&imgDisk, 1080, (int)(1080.0f * aspect));
-      }
-      s->frames[i] = LoadTextureFromImage(imgDisk);
-      GenTextureMipmaps(&s->frames[i]);
-      SetTextureFilter(s->frames[i], TEXTURE_FILTER_BILINEAR);
-      UnloadImage(imgDisk);
-      loadedAny = true;
-    } else {
+    // 3. Last resort: reuse previous frame
+    if (!frameLoaded) {
       if (i > 0)
         s->frames[i] = s->frames[i - 1];
       else
