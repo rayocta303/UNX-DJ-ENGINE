@@ -16,7 +16,11 @@ struct WaveformRenderer {
   float lastMouseX;
 };
 
-
+static const float ZOOM_LEVELS[] = {
+    0.25f, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f, 3.0f, 
+    4.0f, 6.0f, 8.0f, 12.0f, 16.0f, 24.0f, 32.0f
+};
+static const int NUM_ZOOM_LEVELS = sizeof(ZOOM_LEVELS) / sizeof(ZOOM_LEVELS[0]);
 
 void WaveformRenderer_Init(WaveformRenderer *r, int id, DeckState *state,
                            DeckState *otherDeck);
