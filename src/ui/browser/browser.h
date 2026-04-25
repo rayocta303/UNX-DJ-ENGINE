@@ -57,6 +57,13 @@ typedef struct {
     // Animation for Marquee
     float MarqueeScrollX;
     double LastAnimTime;
+
+    // MIDI/External Interaction Flags
+    bool MidiRequestEnter;
+    bool MidiRequestBack;
+    int MidiBrowseDelta;
+    bool MidiRequestLoadA;
+    bool MidiRequestLoadB;
 } BrowserState;
 
 void Browser_RefreshStorages(BrowserState *s);

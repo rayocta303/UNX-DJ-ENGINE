@@ -74,8 +74,8 @@ static int Settings_Update(Component *base) {
       if (MIDI_GetLastMessage(&status, &midino)) {
           int idx = r->State->LearningItemIdx;
           MidiMapping *map = MIDI_GetGlobalMapping();
-          // The MIDI items in Settings start from index 17
-          int mapIdx = idx - 17;
+          // The MIDI items in Settings start from index 18 (after PRESET item at 17)
+          int mapIdx = idx - 18;
           if (mapIdx >= 0 && mapIdx < map->count) {
               map->entries[mapIdx].status = status;
               map->entries[mapIdx].midino = midino;
@@ -201,7 +201,7 @@ static int Settings_Update(Component *base) {
             r->State->DropdownItemIdx = idx;
             r->State->DropdownScroll = 0;
             return 1;
-        } else if (clickedItem->Category == SETTING_CAT_MIDI) {
+        } else if (clickedItem->Category == SETTING_CAT_CONTROLLERS && idx >= 18) {
             r->State->IsLearningMidi = true;
             r->State->LearningItemIdx = idx;
             // Flush any old messages
@@ -341,7 +341,7 @@ static void Settings_Draw(Component *base) {
 
   // Draw Tabs
   DrawRectangle(0, TOP_BAR_H, SCREEN_WIDTH, tabH, ColorDark3);
-  const char *tabs[] = { "DECK", "AUDIO", "VIEW", "SYSTEM", "MIDI" };
+  const char *tabs[] = { "DECK", "AUDIO", "VIEW", "SYSTEM", "CONTROLLERS" };
   float tabW = SCREEN_WIDTH / (float)SETTING_CAT_COUNT;
   for (int i = 0; i < SETTING_CAT_COUNT; i++) {
       Rectangle tRect = { i * tabW, TOP_BAR_H, tabW, tabH };
@@ -356,6 +356,18 @@ static void Settings_Draw(Component *base) {
   }
   DrawLine(0, TOP_BAR_H + tabH, SCREEN_WIDTH, TOP_BAR_H + tabH, ColorOrange);
 
+  // Table Header for Controllers
+  float listY = TOP_BAR_H + tabH;
+  if (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) {
+      float headH = S(20);
+      DrawRectangle(0, listY, SCREEN_WIDTH, headH, ColorDark2);
+      UIDrawText("CONTROL / TARGET", faceSm, S(32), listY + S(4), S(10), ColorGray);
+      UIDrawText("CHANNEL : MSG", faceSm, SCREEN_WIDTH - S(150), listY + S(4), S(10), ColorGray);
+      UIDrawText("TYPE", faceSm, SCREEN_WIDTH - S(60), listY + S(4), S(10), ColorGray);
+      DrawLine(0, listY + headH, SCREEN_WIDTH, listY + headH, ColorGray);
+      listY += headH;
+  }
+
   // Get filtered indices
   int filteredIndices[MAX_SETTINGS_ITEMS];
   int filteredCount = 0;
@@ -365,7 +377,6 @@ static void Settings_Draw(Component *base) {
     }
   }
 
-  float listY = TOP_BAR_H + tabH;
   int visibleRows = (int)((divY - listY) / rowH);
 
   // Layout params
@@ -411,9 +422,15 @@ static void Settings_Draw(Component *base) {
           DrawSelectionTriangleEx(valueX + valueWidth - S(10), ry + (rowH / 2.0f), S(7), 0, ColorOrange);
       }
 
-      BeginScissorMode((int)innerValX, (int)ry, (int)innerValW, (int)rowH);
-      DrawCentredText(valStr, faceMd, innerValX, innerValW, ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
-      EndScissorMode();
+      if (item->Category == SETTING_CAT_CONTROLLERS) {
+          // Highlight the preset selection row more prominently
+          DrawRectangle(valueX, ry + S(4), valueWidth, rowH - S(8), ColorDark2);
+          DrawCentredText(valStr, faceMd, valueX, valueWidth, ry + (rowH / 2.0f) - S(7), S(12), ColorOrange);
+      } else {
+          BeginScissorMode((int)innerValX, (int)ry, (int)innerValW, (int)rowH);
+          DrawCentredText(valStr, faceMd, innerValX, innerValW, ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
+          EndScissorMode();
+      }
 
     } else if (item->Type == SETTING_TYPE_KNOB) {
       UIDrawKnob(valueX + valueWidth - S(95), ry + (rowH / 2.0f), S(9), item->Value,
@@ -431,9 +448,36 @@ static void Settings_Draw(Component *base) {
         UIDrawText(valBuf, faceMd, valueX + valueWidth - S(80), ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
       }
     } else if (item->Type == SETTING_TYPE_ACTION) {
-      if (item->Category == SETTING_CAT_MIDI) {
-          // Special display for MIDI mapping: show the mapping hex in the value area
-          UIDrawText(item->Unit, faceMd, valueX + valueWidth - S(90), ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
+      if (item->Category == SETTING_CAT_CONTROLLERS) {
+          // Table Layout for Controllers with column lines
+          if (idx >= 18) { // Mapping entries
+              // Column Dividers
+              DrawLine(SCREEN_WIDTH - S(160), ry + S(2), SCREEN_WIDTH - S(160), ry + rowH - S(2), ColorGray);
+              DrawLine(SCREEN_WIDTH - S(75), ry + S(2), SCREEN_WIDTH - S(75), ry + rowH - S(2), ColorGray);
+
+              // Channel:Msg as a "badge"
+              Rectangle badgeRect = { SCREEN_WIDTH - S(155), ry + S(6), S(75), rowH - S(12) };
+              DrawRectangleRounded(badgeRect, 0.5f, 4, ColorDark2);
+              DrawCentredText(item->Unit, faceSm, badgeRect.x, badgeRect.width, ry + (rowH / 2.0f) - S(6), S(10), ColorOrange);
+
+              // Type Badge
+              Color typeColor = ColorGray;
+              const char *typeIcon = "";
+              if (strcmp(item->Options[0], "SCRIPT") == 0) { typeColor = ColorBlue; typeIcon = "\uf121"; }
+              else if (strcmp(item->Options[0], "REL") == 0) { typeColor = ColorOrange; typeIcon = "\uf01e"; }
+              else if (strcmp(item->Options[0], "14BIT") == 0) { typeColor = ColorDGreen; typeIcon = "\uf0c9"; }
+
+              UIDrawText(typeIcon, faceSm, SCREEN_WIDTH - S(68), ry + (rowH / 2.0f) - S(6), S(10), typeColor);
+              UIDrawText(item->Options[0], faceSm, SCREEN_WIDTH - S(52), ry + (rowH / 2.0f) - S(6), S(9), typeColor);
+
+              if (r->State->IsLearningMidi && r->State->LearningItemIdx == idx) {
+                  DrawRectangleLinesEx((Rectangle){S(6), ry + S(3), SCREEN_WIDTH - S(12), rowH - S(6)}, 2.0f, ColorBlue);
+                  UIDrawText("WAITING...", faceSm, SCREEN_WIDTH - S(155), ry + (rowH / 2.0f) - S(6), S(10), ColorBlue);
+              }
+
+          } else { // Preset Selection
+              UIDrawText(item->Unit, faceMd, valueX + valueWidth - S(90), ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
+          }
           UIDrawText("\uf35a", faceSm, valueX + valueWidth - S(25), ry + (rowH / 2.0f) - S(6), S(12), ColorGray);
       } else if (strcmp(item->Label, "ABOUT") != 0 && strcmp(item->Label, "EXIT APPLICATION") != 0) {
         UIDrawText("\uf2f5", faceSm, valueX + valueWidth - S(35), ry + (rowH / 2.0f) - S(6), S(12), ColorOrange);

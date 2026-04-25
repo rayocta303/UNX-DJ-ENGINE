@@ -71,7 +71,12 @@ typedef struct {
   MidiContext midiCtx;
   bool showExitConfirm;
   AudioBackendConfig activeAudioConfig;
+  
+  char midiPresetPaths[32][256];
+  int midiPresetCount;
 } App;
+
+void PopulateMidiSettings(App *a);
 
 AudioEngine *globalAudioEngine = NULL;
 App *globalApp = NULL; // Needed for iOS callbacks
@@ -268,6 +273,13 @@ void OnSettingsValueChanged(void *ctx, int idx) {
   App *a = (App *)ctx;
   if (idx == 8) { // AUDIO DEVICE changed
     UpdateChannelOptions(a, a->settingsState.Items[8].Current - 1);
+  } else if (idx == 17) { // MIDI PRESET changed
+    int presetIdx = a->settingsState.Items[17].Current;
+    if (presetIdx < a->midiPresetCount) {
+        MIDI_RefreshMapping(a->midiPresetPaths[presetIdx]);
+        // Refresh the MIDI mapping tab items
+        PopulateMidiSettings(a);
+    }
   }
 }
 
@@ -282,23 +294,52 @@ void OnSettingsAction(void *ctx, int idx) {
 }
 
 void PopulateMidiSettings(App *a) {
+  // --- PRESET SELECTION ITEM (Index 17) ---
+  char names[32][64];
+  a->midiPresetCount = MIDI_ListControllers("controllers", names, a->midiPresetPaths);
+  
+  strcpy(a->settingsState.Items[17].Label, "MAPPING PRESET");
+  a->settingsState.Items[17].Type = SETTING_TYPE_LIST;
+  a->settingsState.Items[17].Category = SETTING_CAT_CONTROLLERS;
+  a->settingsState.Items[17].OptionsCount = a->midiPresetCount;
+  for (int i = 0; i < a->midiPresetCount; i++) {
+    strncpy(a->settingsState.Items[17].Options[i], names[i], 31);
+  }
+  // Try to find current mapping name to set default
+  MidiMapping *currentMap = MIDI_GetGlobalMapping();
+  for (int i = 0; i < a->midiPresetCount; i++) {
+    if (strcmp(names[i], currentMap->name) == 0) {
+        a->settingsState.Items[17].Current = i;
+        break;
+    }
+  }
+
+  // --- MAPPING ENTRIES (Starting from Index 18) ---
   MidiMapping *map = MIDI_GetGlobalMapping();
   if (!map) return;
 
-  // Clear existing MIDI items (items starting from 17)
-  int baseIdx = 17;
+  int baseIdx = 18;
   for (int i = 0; i < map->count && (baseIdx + i) < MAX_SETTINGS_ITEMS; i++) {
     MappingEntry *e = &map->entries[i];
     snprintf(a->settingsState.Items[baseIdx + i].Label, 64, "%s %s", e->group, e->key);
     a->settingsState.Items[baseIdx + i].Type = SETTING_TYPE_ACTION;
-    a->settingsState.Items[baseIdx + i].Category = SETTING_CAT_MIDI;
+    a->settingsState.Items[baseIdx + i].Category = SETTING_CAT_CONTROLLERS;
     
-    // Use the unit field or something to store the current mapping as a string for display
     snprintf(a->settingsState.Items[baseIdx + i].Unit, 16, "0x%02X:0x%02X", e->status, e->midino);
+    
+    // Store type in Options[0] for display
+    if (e->options & 4) strcpy(a->settingsState.Items[baseIdx + i].Options[0], "SCRIPT");
+    else if (e->options & 1) strcpy(a->settingsState.Items[baseIdx + i].Options[0], "REL");
+    else if (e->options & 8 || e->options & 16) strcpy(a->settingsState.Items[baseIdx + i].Options[0], "14BIT");
+    else strcpy(a->settingsState.Items[baseIdx + i].Options[0], "NORM");
   }
   
-  if (baseIdx + map->count > a->settingsState.ItemsCount) {
-    a->settingsState.ItemsCount = baseIdx + map->count;
+  int totalCount = baseIdx + map->count;
+  if (totalCount > a->settingsState.ItemsCount) {
+    a->settingsState.ItemsCount = totalCount;
+  } else {
+    // If mapping shrank, we should probably reset the count or clear the rest
+    a->settingsState.ItemsCount = totalCount;
   }
 }
 
@@ -776,7 +817,8 @@ int main(void) {
               &audioEngine->Decks[0].EqLow, 0, 1.0f);
   CO_Register("[Channel1]", "cue_default", CO_TYPE_BOOL,
               &audioEngine->Decks[0].IsCueActive, 0, 1);
-
+  CO_Register("[Channel1]", "jog", CO_TYPE_FLOAT, &app->deckA.JogDelta, -100.0f, 100.0f);
+  
   CO_Register("[Channel2]", "play", CO_TYPE_BOOL,
               &audioEngine->Decks[1].IsMotorOn, 0, 1);
   CO_Register("[Channel2]", "volume", CO_TYPE_FLOAT,
@@ -789,8 +831,30 @@ int main(void) {
               &audioEngine->Decks[1].EqLow, 0, 1.0f);
   CO_Register("[Channel2]", "cue_default", CO_TYPE_BOOL,
               &audioEngine->Decks[1].IsCueActive, 0, 1);
+  CO_Register("[Channel2]", "jog", CO_TYPE_FLOAT, &app->deckB.JogDelta, -100.0f, 100.0f);
   CO_Register("[Master]", "crossfader", CO_TYPE_FLOAT, &audioEngine->Crossfader,
               -1.0f, 1.0f);
+  CO_Register("[Master]", "volume", CO_TYPE_FLOAT, &audioEngine->MasterVolume, 0, 1.0f);
+
+  // --- Color FX ---
+  CO_Register("[Channel1]", "colorfx_select", CO_TYPE_INT, &audioEngine->Decks[0].ColorFX.activeFX, 0, 6);
+  CO_Register("[Channel1]", "colorfx_parameter", CO_TYPE_FLOAT, &audioEngine->Decks[0].ColorFX.parameter, 0, 1.0f);
+  CO_Register("[Channel2]", "colorfx_select", CO_TYPE_INT, &audioEngine->Decks[1].ColorFX.activeFX, 0, 6);
+  CO_Register("[Channel2]", "colorfx_parameter", CO_TYPE_FLOAT, &audioEngine->Decks[1].ColorFX.parameter, 0, 1.0f);
+
+  // --- Beat FX ---
+  CO_Register("[Master]", "beatfx_select", CO_TYPE_INT, &audioEngine->BeatFX.activeFX, 0, 13);
+  CO_Register("[Master]", "beatfx_drywet", CO_TYPE_FLOAT, &audioEngine->BeatFX.levelDepth, 0, 1.0f);
+  CO_Register("[Master]", "beatfx_time", CO_TYPE_FLOAT, &audioEngine->BeatFX.beatMs, 0, 2000.0f);
+  CO_Register("[Master]", "beatfx_on", CO_TYPE_BOOL, &audioEngine->BeatFX.isFxOn, 0, 1);
+  CO_Register("[Master]", "beatfx_channel", CO_TYPE_INT, &audioEngine->BeatFX.targetChannel, 0, 2);
+
+  // --- Library / Browser ---
+  CO_Register("[Library]", "browse", CO_TYPE_FLOAT, &app->browserState.MidiBrowseDelta, -10.0f, 10.0f);
+  CO_Register("[Library]", "enter", CO_TYPE_BOOL, &app->browserState.MidiRequestEnter, 0, 1);
+  CO_Register("[Library]", "back", CO_TYPE_BOOL, &app->browserState.MidiRequestBack, 0, 1);
+  CO_Register("[Library]", "loadA", CO_TYPE_BOOL, &app->browserState.MidiRequestLoadA, 0, 1);
+  CO_Register("[Library]", "loadB", CO_TYPE_BOOL, &app->browserState.MidiRequestLoadB, 0, 1);
 
   globalAudioEngine = audioEngine;
 

@@ -94,6 +94,7 @@ typedef struct AudioEngine {
     DeckAudioState Decks[MAX_DECKS];
     BeatFXManager BeatFX;
     float Crossfader; // -1.0 (Deck A) to 1.0 (Deck B)
+    float MasterVolume; // 0.0 to 1.0
     uint32_t OutputSampleRate; // Actual hardware sample rate
 } AudioEngine;
 

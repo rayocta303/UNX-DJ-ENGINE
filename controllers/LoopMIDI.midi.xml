@@ -1,19 +1,96 @@
 <?xml version='1.0' encoding='utf-8'?>
-<info>
-    <name>LoopMIDI</name>
-</info>
-<mapping>
-    <!-- Master Deck 1 -->
-    <control>
-        <group>[Channel1]</group>
-        <key>volume</key>
-        <status>0xB0</status>
-        <midino>0x07</midino>
-    </control>
-    <control>
-        <group>[Channel1]</group>
-        <key>play</key>
-        <status>0x90</status>
-        <midino>0x3C</midino>
-    </control>
-</mapping>
+<UNXMIDIPreset schemaVersion="1">
+    <info>
+        <name>LoopMIDI Default</name>
+        <author>UNX</author>
+        <description>Default mapping template for LoopMIDI</description>
+    </info>
+    <controller id="LoopMIDI">
+        <controls>
+            <!-- PLAYER DECK 1 -->
+            <control>
+                <group>[Channel1]</group>
+                <key>play</key>
+                <status>0x90</status>
+                <midino>0x0B</midino>
+                <options><Normal/></options>
+            </control>
+            <control>
+                <group>[Channel1]</group>
+                <key>cue_default</key>
+                <status>0x90</status>
+                <midino>0x0C</midino>
+                <options><Normal/></options>
+            </control>
+            <control>
+                <group>[Channel1]</group>
+                <key>volume</key>
+                <status>0xB0</status>
+                <midino>0x13</midino>
+                <options><fourteen-bit-msb/></options>
+            </control>
+            <control>
+                <group>[Channel1]</group>
+                <key>volume</key>
+                <status>0xB0</status>
+                <midino>0x33</midino>
+                <options><fourteen-bit-lsb/></options>
+            </control>
+            <control>
+                <group>[Channel1]</group>
+                <key>PioneerDDJ400.jogTurn</key>
+                <status>0xB0</status>
+                <midino>0x22</midino>
+                <options><Script-Binding/></options>
+            </control>
+            <control>
+                <group>[Channel1]</group>
+                <key>PioneerDDJ400.shiftPressed</key>
+                <status>0x90</status>
+                <midino>0x3F</midino>
+                <options><Script-Binding/></options>
+            </control>
+
+            <!-- PLAYER DECK 2 -->
+            <control>
+                <group>[Channel2]</group>
+                <key>play</key>
+                <status>0x91</status>
+                <midino>0x0B</midino>
+                <options><Normal/></options>
+            </control>
+            
+            <!-- MIXER / MASTER -->
+            <control>
+                <group>[Master]</group>
+                <key>crossfader</key>
+                <status>0xB0</status>
+                <midino>0x1F</midino>
+                <options><fourteen-bit-msb/></options>
+            </control>
+
+            <!-- LIBRARY / NAVIGATION -->
+            <control>
+                <group>[Library]</group>
+                <key>MoveVertical</key>
+                <status>0xB0</status>
+                <midino>0x3C</midino>
+                <options><SelectKnob/></options>
+            </control>
+            <control>
+                <group>[Library]</group>
+                <key>MoveFocusForward</key>
+                <status>0x90</status>
+                <midino>0x3D</midino>
+                <options><Normal/></options>
+            </control>
+            <control>
+                <group>[Channel1]</group>
+                <key>LoadSelectedTrack</key>
+                <status>0x90</status>
+                <midino>0x46</midino>
+                <options><Normal/></options>
+            </control>
+        </controls>
+    </controller>
+</UNXMIDIPreset>

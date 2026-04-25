@@ -123,6 +123,12 @@ MidiMapping* MIDI_GetGlobalMapping(void) {
     return &global_mapping;
 }
 
+void MIDI_RefreshMapping(const char *path) {
+    if (path) {
+        MIDI_LoadMapping(&global_mapping, path);
+    }
+}
+
 bool MIDI_GetLastMessage(uint8_t *status, uint8_t *midino) {
     if (!lastMsgSet) return false;
     *status = lastStatus;

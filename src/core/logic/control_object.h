@@ -23,5 +23,6 @@ void CO_Init();
 void CO_Register(const char *group, const char *key, COType type, void *ptr, float min, float max);
 void* CO_Find(const char *group, const char *key, COType *outType);
 void CO_SetValue(const char *group, const char *key, float normalizedValue);
+void CO_AddValue(const char *group, const char *key, float delta);
 
 #endif

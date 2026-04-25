@@ -49,3 +49,17 @@ void CO_SetValue(const char *group, const char *key, float normalizedValue) {
         }
     }
 }
+
+void CO_AddValue(const char *group, const char *key, float delta) {
+    for (int i = 0; i < controlCount; i++) {
+        if (strcmp(registry[i].group, group) == 0 && strcmp(registry[i].key, key) == 0) {
+            ControlObject *co = &registry[i];
+            if (co->type == CO_TYPE_FLOAT) {
+                *((float*)co->ptr) += delta;
+            } else if (co->type == CO_TYPE_INT) {
+                *((int*)co->ptr) += (int)delta;
+            }
+            return;
+        }
+    }
+}

@@ -320,6 +320,43 @@ static int Browser_Update(Component *base) {
     return 0;
 
   int loadToDeck = -1;
+  bool triggerEnter = false;
+
+  // MIDI Navigation
+  if (s->MidiBrowseDelta != 0) {
+      if (s->MidiBrowseDelta > 0) {
+          for (int i = 0; i < s->MidiBrowseDelta; i++) {
+              if (s->CursorPos < 9) s->CursorPos++;
+              else s->ScrollOffset++;
+          }
+      } else {
+          for (int i = 0; i < -s->MidiBrowseDelta; i++) {
+              if (s->CursorPos > 0) s->CursorPos--;
+              else if (s->ScrollOffset > 0) s->ScrollOffset--;
+          }
+      }
+      s->MidiBrowseDelta = 0;
+  }
+  
+  if (s->MidiRequestEnter) {
+      triggerEnter = true;
+      s->MidiRequestEnter = false;
+  }
+  
+  if (s->MidiRequestBack) {
+      Browser_Back(s);
+      s->MidiRequestBack = false;
+  }
+
+  if (s->MidiRequestLoadA) {
+      loadToDeck = 0;
+      s->MidiRequestLoadA = false;
+  }
+  if (s->MidiRequestLoadB) {
+      loadToDeck = 1;
+      s->MidiRequestLoadB = false;
+  }
+
   int targetIdx = s->ScrollOffset + s->CursorPos;
   Vector2 mousePos = UIGetMousePosition();
 
@@ -478,8 +515,6 @@ static int Browser_Update(Component *base) {
       break;
     }
   }
-
-  bool triggerEnter = false;
 
   if (!s->ShowLoadPopup) {
     for (int i = 0; i < totalVisible; i++) {

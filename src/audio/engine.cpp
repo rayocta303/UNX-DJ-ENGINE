@@ -23,6 +23,7 @@ using namespace soundtouch;
 void AudioEngine_Init(AudioEngine *engine, uint32_t outputSampleRate) {
     memset(engine, 0, sizeof(AudioEngine));
     engine->OutputSampleRate = outputSampleRate;
+    engine->MasterVolume = 1.0f;
 
     for (int i = 0; i < MAX_DECKS; i++) {
         DeckAudioState *deck = &engine->Decks[i];
@@ -402,8 +403,8 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
         if (engine->BeatFX.targetChannel == 0) {
             BeatFXManager_Process(&engine->BeatFX, &masterMix[s*2], &masterMix[s*2+1], masterMix[s*2], masterMix[s*2+1], engine->OutputSampleRate);
         }
-        outBuffer[s*4] = fmaxf(-1.0f, fminf(1.0f, masterMix[s*2]));
-        outBuffer[s*4 + 1] = fmaxf(-1.0f, fminf(1.0f, masterMix[s*2+1]));
+        outBuffer[s*4] = fmaxf(-1.0f, fminf(1.0f, masterMix[s*2] * engine->MasterVolume));
+        outBuffer[s*4 + 1] = fmaxf(-1.0f, fminf(1.0f, masterMix[s*2+1] * engine->MasterVolume));
         outBuffer[s*4 + 2] = fmaxf(-1.0f, fminf(1.0f, cueMix[s*2]));
         outBuffer[s*4 + 3] = fmaxf(-1.0f, fminf(1.0f, cueMix[s*2+1]));
     }
