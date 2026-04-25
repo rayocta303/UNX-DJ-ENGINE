@@ -227,8 +227,14 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
     ProcessDeckPhysics(deck);
     static bool wasMTActive[MAX_DECKS] = {false};
 
-    if (!deck->IsPlaying && !noiseActive) {
-        deck->VuMeterL *= 0.95f; deck->VuMeterR *= 0.95f;
+    bool hasActiveFX = (deck->ColorFX.activeFX != COLORFX_NONE && deck->ColorFX.colorValue != 0.0f) || 
+                       (engine->BeatFX.targetChannel == deckIndex + 1 && engine->BeatFX.isFxOn);
+    
+    // Check for tails: even if FX is OFF or deck is STOPPED, we continue if VU is still audible
+    bool hasTails = (deck->VuMeterL > 0.0001f || deck->VuMeterR > 0.0001f);
+
+    if (!deck->IsPlaying && !noiseActive && !hasActiveFX && !hasTails) {
+        // Fully silent and stopped
         if (deck->MasterTempoActive && deck->SoundTouchHandle) ((SoundTouch*)deck->SoundTouchHandle)->clear();
         return;
     }

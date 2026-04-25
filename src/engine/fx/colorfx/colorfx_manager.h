@@ -7,6 +7,7 @@
 #include "noise.h"
 #include "crush.h"
 #include "filter.h"
+#include "jet.h"
 
 typedef enum {
     COLORFX_NONE = -1,
@@ -15,7 +16,8 @@ typedef enum {
     COLORFX_SWEEP = 2,
     COLORFX_NOISE = 3,
     COLORFX_CRUSH = 4,
-    COLORFX_FILTER = 5
+    COLORFX_FILTER = 5,
+    COLORFX_JET = 6
 } ColorFXType;
 
 typedef struct {
@@ -30,6 +32,7 @@ typedef struct {
     ColorFX_Noise noise;
     ColorFX_Crush crush;
     ColorFX_Filter filter;
+    ColorFX_Jet jet;
 } ColorFXManager;
 
 void ColorFXManager_Init(ColorFXManager* mgr);

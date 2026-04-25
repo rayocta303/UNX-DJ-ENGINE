@@ -2,6 +2,7 @@
 #define MIDI_HANDLER_H
 
 #include "core/midi/midi_message.h"
+#include "core/midi/midi_mapper.h"
 #include "audio/engine.h"
 #include "ui/player/player.h" // For DeckState etc
 
@@ -25,5 +26,7 @@ void MIDI_Close(MidiContext *ctx);
  * Checks for new MIDI messages and applies them to the engine
  */
 void MIDI_Update(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine *engine);
+MidiMapping* MIDI_GetGlobalMapping(void);
+bool MIDI_GetLastMessage(uint8_t *status, uint8_t *midino);
 
 #endif // MIDI_HANDLER_H

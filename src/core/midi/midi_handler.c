@@ -25,6 +25,9 @@ static MidiMapping global_mapping;
 static MidiMessage midiQueue[MAX_MIDI_QUEUE];
 static int queueHead = 0;
 static int queueTail = 0;
+static uint8_t lastStatus = 0;
+static uint8_t lastMidino = 0;
+static bool lastMsgSet = false;
 
 static void EnqueueMIDI(uint8_t b1, uint8_t b2, uint8_t b3) {
     int next = (queueHead + 1) % MAX_MIDI_QUEUE;
@@ -108,7 +111,22 @@ void MIDI_Update(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine *en
 
     while (queueTail != queueHead) {
         MidiMessage *m = &midiQueue[queueTail];
+        lastStatus = m->status;
+        lastMidino = m->control;
+        lastMsgSet = true;
         MIDI_HandleMapping(&global_mapping, m->status, m->control, m->value / 127.0f);
         queueTail = (queueTail + 1) % MAX_MIDI_QUEUE;
     }
+}
+
+MidiMapping* MIDI_GetGlobalMapping(void) {
+    return &global_mapping;
+}
+
+bool MIDI_GetLastMessage(uint8_t *status, uint8_t *midino) {
+    if (!lastMsgSet) return false;
+    *status = lastStatus;
+    *midino = lastMidino;
+    lastMsgSet = false;
+    return true;
 }

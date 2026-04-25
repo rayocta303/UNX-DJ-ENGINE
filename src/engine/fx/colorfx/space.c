@@ -31,7 +31,7 @@ void Space_Process(ColorFX_Space* fx, float* outL, float* outR, float inL, float
     // colorVal < 0 = lowpass + short decay
     // colorVal > 0 = highpass + long decay
     float absVal = fabsf(colorVal);
-    float decay = (colorVal < 0.0f) ? 0.3f + 0.4f * absVal : 0.4f + 0.5f * absVal;
+    float decay = (colorVal < 0.0f) ? 0.4f + 0.5f * absVal : 0.5f + 0.45f * absVal;
     
     // Filters based on knob side
     if (colorVal < 0.0f) { // Left: Darker

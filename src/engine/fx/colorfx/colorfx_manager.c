@@ -12,6 +12,7 @@ void ColorFXManager_Init(ColorFXManager* mgr) {
     Noise_Init(&mgr->noise);
     Crush_Init(&mgr->crush);
     Filter_Init(&mgr->filter);
+    Jet_Init(&mgr->jet);
 }
 
 void ColorFXManager_Free(ColorFXManager* mgr) {
@@ -21,6 +22,7 @@ void ColorFXManager_Free(ColorFXManager* mgr) {
     Noise_Free(&mgr->noise);
     Crush_Free(&mgr->crush);
     Filter_Free(&mgr->filter);
+    Jet_Free(&mgr->jet);
 }
 
 void ColorFXManager_SetFX(ColorFXManager* mgr, ColorFXType type) {
@@ -55,6 +57,9 @@ void ColorFXManager_Process(ColorFXManager* mgr, float* outL, float* outR, float
             break;
         case COLORFX_FILTER:
             Filter_Process(&mgr->filter, outL, outR, inL, inR, mgr->colorValue, sampleRate);
+            break;
+        case COLORFX_JET:
+            Jet_Process(&mgr->jet, outL, outR, inL, inR, mgr->colorValue, sampleRate);
             break;
         default:
             *outL = inL;

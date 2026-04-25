@@ -251,13 +251,13 @@ static void Mixer_Draw(Component *base) {
   // LEFT COLUMN: SOUND COLOR FX
   DrawCentredText("SOUND COLOR FX", fTiny, leftX, colW, fxY, S(8), ColorShadow);
   float cfy = fxY + S(14);
-  char *cfxNames[] = {"SPACE", "DUB ECHO", "SWEEP", "NOISE", "CRUSH", "FILTER"};
-  ColorFXType cfxTypes[] = {COLORFX_SPACE, COLORFX_DUBECHO, COLORFX_SWEEP, COLORFX_NOISE, COLORFX_CRUSH, COLORFX_FILTER};
+  char *cfxNames[] = {"SPACE", "DUB ECHO", "SWEEP", "NOISE", "CRUSH", "FILTER", "JET"};
+  ColorFXType cfxTypes[] = {COLORFX_SPACE, COLORFX_DUBECHO, COLORFX_SWEEP, COLORFX_NOISE, COLORFX_CRUSH, COLORFX_FILTER, COLORFX_JET};
   float btnW = colW - S(16);
-  float btnH = S(16);
-  for (int i = 0; i < 6; i++) {
+  float btnH = S(14); // Slightly shorter buttons to fit 7
+  for (int i = 0; i < 7; i++) {
     float bx = leftX + S(8);
-    float by = cfy + i * (btnH + S(4));
+    float by = cfy + i * (btnH + S(3));
     if (DrawFXButton(cfxNames[i], bx, by, btnW, btnH, eng->Decks[0].ColorFX.activeFX == cfxTypes[i])) {
       if (eng->Decks[0].ColorFX.activeFX == cfxTypes[i]) {
         ColorFXManager_SetFX(&eng->Decks[0].ColorFX, COLORFX_NONE);

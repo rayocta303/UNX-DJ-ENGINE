@@ -281,6 +281,27 @@ void OnSettingsAction(void *ctx, int idx) {
   }
 }
 
+void PopulateMidiSettings(App *a) {
+  MidiMapping *map = MIDI_GetGlobalMapping();
+  if (!map) return;
+
+  // Clear existing MIDI items (items starting from 17)
+  int baseIdx = 17;
+  for (int i = 0; i < map->count && (baseIdx + i) < MAX_SETTINGS_ITEMS; i++) {
+    MappingEntry *e = &map->entries[i];
+    snprintf(a->settingsState.Items[baseIdx + i].Label, 64, "%s %s", e->group, e->key);
+    a->settingsState.Items[baseIdx + i].Type = SETTING_TYPE_ACTION;
+    a->settingsState.Items[baseIdx + i].Category = SETTING_CAT_MIDI;
+    
+    // Use the unit field or something to store the current mapping as a string for display
+    snprintf(a->settingsState.Items[baseIdx + i].Unit, 16, "0x%02X:0x%02X", e->status, e->midino);
+  }
+  
+  if (baseIdx + map->count > a->settingsState.ItemsCount) {
+    a->settingsState.ItemsCount = baseIdx + map->count;
+  }
+}
+
 void TopBar_OnBrowse(void *ctx) {
   App *a = (App *)ctx;
   if (a->screen == ScreenBrowser) {
@@ -570,6 +591,8 @@ void App_Init(App *a) {
   SplashRenderer_Init(&a->splash, &a->splashCounter);
   a->keyMap = GetDefaultMapping();
   memset(&a->midiCtx, 0, sizeof(MidiContext));
+  
+  PopulateMidiSettings(a);
 }
 
 #if defined(PLATFORM_IOS)

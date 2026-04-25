@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #define MAX_SETTING_OPTIONS 32
-#define MAX_SETTINGS_ITEMS 32
+#define MAX_SETTINGS_ITEMS 128
 
 typedef enum {
   SETTING_TYPE_LIST,
@@ -17,6 +17,7 @@ typedef enum {
   SETTING_CAT_AUDIO,
   SETTING_CAT_VIEW,
   SETTING_CAT_SYSTEM,
+  SETTING_CAT_MIDI,
   SETTING_CAT_COUNT
 } SettingCategory;
 
@@ -49,6 +50,9 @@ typedef struct {
   bool IsDropdownOpen;
   int DropdownItemIdx;
   float DropdownScroll;
+  
+  bool IsLearningMidi;
+  int LearningItemIdx;
 } SettingsState;
 
 typedef struct SettingsRenderer SettingsRenderer;

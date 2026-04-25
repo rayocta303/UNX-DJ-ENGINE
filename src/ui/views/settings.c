@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <stdint.h>
+#include "core/midi/midi_handler.h"
 
 
 static int Settings_Update(Component *base) {
@@ -65,6 +67,27 @@ static int Settings_Update(Component *base) {
           r->State->IsDropdownOpen = false;
       }
       return 1; // block background UI interaction
+  }
+  
+  if (r->State->IsLearningMidi) {
+      uint8_t status, midino;
+      if (MIDI_GetLastMessage(&status, &midino)) {
+          int idx = r->State->LearningItemIdx;
+          MidiMapping *map = MIDI_GetGlobalMapping();
+          // The MIDI items in Settings start from index 17
+          int mapIdx = idx - 17;
+          if (mapIdx >= 0 && mapIdx < map->count) {
+              map->entries[mapIdx].status = status;
+              map->entries[mapIdx].midino = midino;
+              // Update display unit
+              snprintf(r->State->Items[idx].Unit, 16, "0x%02X:0x%02X", status, midino);
+          }
+          r->State->IsLearningMidi = false;
+      }
+      if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
+          r->State->IsLearningMidi = false;
+      }
+      return 1;
   }
 
   // Get filtered indices
@@ -177,6 +200,13 @@ static int Settings_Update(Component *base) {
             r->State->IsDropdownOpen = true;
             r->State->DropdownItemIdx = idx;
             r->State->DropdownScroll = 0;
+            return 1;
+        } else if (clickedItem->Category == SETTING_CAT_MIDI) {
+            r->State->IsLearningMidi = true;
+            r->State->LearningItemIdx = idx;
+            // Flush any old messages
+            uint8_t s, m;
+            while(MIDI_GetLastMessage(&s, &m)); 
             return 1;
         }
       }
@@ -311,7 +341,7 @@ static void Settings_Draw(Component *base) {
 
   // Draw Tabs
   DrawRectangle(0, TOP_BAR_H, SCREEN_WIDTH, tabH, ColorDark3);
-  const char *tabs[] = { "DECK", "AUDIO", "VIEW", "SYSTEM" };
+  const char *tabs[] = { "DECK", "AUDIO", "VIEW", "SYSTEM", "MIDI" };
   float tabW = SCREEN_WIDTH / (float)SETTING_CAT_COUNT;
   for (int i = 0; i < SETTING_CAT_COUNT; i++) {
       Rectangle tRect = { i * tabW, TOP_BAR_H, tabW, tabH };
@@ -401,7 +431,11 @@ static void Settings_Draw(Component *base) {
         UIDrawText(valBuf, faceMd, valueX + valueWidth - S(80), ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
       }
     } else if (item->Type == SETTING_TYPE_ACTION) {
-      if (strcmp(item->Label, "ABOUT") != 0 && strcmp(item->Label, "EXIT APPLICATION") != 0) {
+      if (item->Category == SETTING_CAT_MIDI) {
+          // Special display for MIDI mapping: show the mapping hex in the value area
+          UIDrawText(item->Unit, faceMd, valueX + valueWidth - S(90), ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
+          UIDrawText("\uf35a", faceSm, valueX + valueWidth - S(25), ry + (rowH / 2.0f) - S(6), S(12), ColorGray);
+      } else if (strcmp(item->Label, "ABOUT") != 0 && strcmp(item->Label, "EXIT APPLICATION") != 0) {
         UIDrawText("\uf2f5", faceSm, valueX + valueWidth - S(35), ry + (rowH / 2.0f) - S(6), S(12), ColorOrange);
       }
     }
@@ -458,6 +492,13 @@ static void Settings_Draw(Component *base) {
           float sbH = (dropdownH / contentH) * dropdownH;
           DrawRectangle((int)(dropdownX + dropdownW - S(4)), (int)sbY, (int)S(4), (int)sbH, ColorOrange);
       }
+  }
+  
+  if (r->State->IsLearningMidi) {
+      DrawRectangle(0, 0, SCREEN_WIDTH, viewH, (Color){ 0, 0, 0, 200 });
+      DrawCentredText("MIDI LEARN", faceMd, 0, SCREEN_WIDTH, viewH/2.0f - S(30), S(20), ColorOrange);
+      DrawCentredText("Move a controller or press a button...", faceSm, 0, SCREEN_WIDTH, viewH/2.0f + S(10), S(12), ColorWhite);
+      DrawCentredText("ESC to cancel", faceXS, 0, SCREEN_WIDTH, viewH/2.0f + S(40), S(9), ColorGray);
   }
 }
 

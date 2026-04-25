@@ -22,7 +22,7 @@ void DubEcho_Process(ColorFX_DubEcho* fx, float* outL, float* outR, float inL, f
     }
 
     float absVal = fabsf(colorVal);
-    fx->feedback = 0.5f + 0.45f * absVal; // High feedback
+    fx->feedback = 0.6f + 0.38f * absVal; // Increased base feedback for longer tail
 
     // Filters based on knob side
     if (colorVal < 0.0f) { // Left: Dub Echo (Lowpass)
