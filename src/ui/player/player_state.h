@@ -32,7 +32,7 @@ typedef struct {
 } WaveformSettings;
 
 typedef struct TrackState {
-  RBBeat BeatGrid[1024];
+  RBBeat* BeatGrid;
   unsigned int GridOffset;
   int BeatGridCount;
   unsigned char StaticWaveform[8192];

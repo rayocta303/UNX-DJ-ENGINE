@@ -789,10 +789,13 @@ static int Browser_Update(Component *base) {
               newTrack->WaveformType = t->WaveformType;
 
               // Cues and Beats
-              newTrack->BeatGridCount =
-                  t->BeatGridCount > 1024 ? 1024 : t->BeatGridCount;
-              for (int i = 0; i < newTrack->BeatGridCount; i++)
-                newTrack->BeatGrid[i] = t->BeatGrid[i];
+              newTrack->BeatGridCount = t->BeatGridCount;
+              if (newTrack->BeatGridCount > 0) {
+                  newTrack->BeatGrid = (RBBeat*)malloc(sizeof(RBBeat) * newTrack->BeatGridCount);
+                  memcpy(newTrack->BeatGrid, t->BeatGrid, sizeof(RBBeat) * newTrack->BeatGridCount);
+              } else {
+                  newTrack->BeatGrid = NULL;
+              }
 
               for (uint32_t i = 0; i < t->CueCount && i < 32; i++) {
                 if (t->Cues[i].ID >= 1 && t->Cues[i].ID <= 8) {
@@ -812,8 +815,11 @@ static int Browser_Update(Component *base) {
 
               TrackState *oldTrack = targetDeck->LoadedTrack;
               targetDeck->LoadedTrack = newTrack;
-              if (oldTrack)
+              if (oldTrack){
+                if (oldTrack->BeatGrid != NULL) free(oldTrack->BeatGrid);
                 free(oldTrack);
+              }
+                
               targetDeck->PositionMs = (newTrack->CuesCount > 0)
                                            ? newTrack->Cues[0].Start
                                            : (newTrack->BeatGridCount > 0
