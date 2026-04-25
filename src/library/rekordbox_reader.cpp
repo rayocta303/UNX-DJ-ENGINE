@@ -244,6 +244,7 @@ extern "C" void RB_FreeDatabase(RBDatabase* db) {
             if (db->Tracks[i].Cues) delete[] db->Tracks[i].Cues;
             if (db->Tracks[i].Phrases) delete[] db->Tracks[i].Phrases;
             if (db->Tracks[i].DynamicWaveform) delete[] db->Tracks[i].DynamicWaveform;
+            if (db->Tracks[i].BeatGrid) delete[] db->Tracks[i].BeatGrid;
         }
         delete[] db->Tracks;
     }
@@ -270,7 +271,10 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
             if (tag == rekordbox_anlz_t::SECTION_TAGS_BEAT_GRID) {
                 auto bg = static_cast<rekordbox_anlz_t::beat_grid_tag_t*>(section->body());
                 track->BeatGridCount = bg->num_beats();
-                for (uint32_t i = 0; i < bg->num_beats() && i < 1024; i++) {
+
+                if (track->BeatGrid) delete[] track->BeatGrid;
+                track->BeatGrid = new RBBeat[track->BeatGridCount];
+                for (uint32_t i = 0; i < bg->num_beats(); i++) {
                     auto b = (*bg->beats())[i].get();
                     track->BeatGrid[i].Time = b->time();
                     track->BeatGrid[i].BPM = b->tempo();

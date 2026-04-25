@@ -506,7 +506,7 @@ static void Waveform_Draw(Component *base) {
   // Beat Grid — ticks use semi-transparent overlay to preserve waveform pixels
   // beneath
   if (r->State->LoadedTrack != NULL) {
-    for (int i = 0; i < 1024; i++) {
+    for (int i = 0; i < r->State->LoadedTrack->BeatGridCount; i++) {
       unsigned int originalMs = r->State->LoadedTrack->BeatGrid[i].Time;
       uint16_t beatNum = r->State->LoadedTrack->BeatGrid[i].BeatNumber;
       if (originalMs == 0xFFFFFFFF || originalMs == 0)
