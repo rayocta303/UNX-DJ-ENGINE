@@ -42,6 +42,9 @@ extern const Color ColorOrange;
 extern const Color ColorBlue;
 extern const Color ColorCue;
 extern const Color ColorGray;
+extern const Color ColorGreen;
+extern const Color ColorYellow;
+extern const Color ColorPink;
 
 // Screen modes
 #define MODE_PLAYER     0
