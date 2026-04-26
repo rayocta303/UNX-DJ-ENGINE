@@ -30,7 +30,7 @@ void AudioEngine_Init(AudioEngine *engine, uint32_t outputSampleRate) {
         deck->BaseRate = 1.0f;
         deck->OutlinedRate = 0.0f; 
         deck->Pitch = 10000;
-        deck->Trim = 1.0f;
+        deck->Trim = 0.5f; // Calibrated 12 o'clock to -6dB for headroom
         deck->Fader = 1.0f;
         deck->EqLow = 0.5f;
         deck->EqMid = 0.5f;
@@ -138,6 +138,7 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
         int res = mp3dec_load(&mp3d, filePath, &info, NULL, NULL);
 
         if (res == 0) {
+            // minmp3 with MINIMP3_FLOAT_OUTPUT already returns normalized floats in [-1, 1]
             if (info.channels == 1) {
                 float *stereoBuf = (float *)malloc(info.samples * 2 * sizeof(float));
                 if (stereoBuf) {
@@ -399,8 +400,20 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
     }
 
     deck->LastRate = targetRate;
-    deck->VuMeterL = deck->VuMeterL * 0.9f + maxL * 0.1f;
-    deck->VuMeterR = deck->VuMeterR * 0.9f + maxR * 0.1f;
+    
+    // VU Meter Calibration & Ballistics
+    // Scaling: 0.5 (unity) peak -> 0.8 VU (First Orange segment)
+    float peakL = maxL * 1.6f;
+    float peakR = maxR * 1.6f;
+    if (peakL > 1.0f) peakL = 1.0f;
+    if (peakR > 1.0f) peakR = 1.0f;
+
+    // Instant attack, smooth decay
+    if (peakL > deck->VuMeterL) deck->VuMeterL = peakL;
+    else deck->VuMeterL = deck->VuMeterL * 0.92f + peakL * 0.08f;
+
+    if (peakR > deck->VuMeterR) deck->VuMeterR = peakR;
+    else deck->VuMeterR = deck->VuMeterR * 0.92f + peakR * 0.08f;
 }
 
 void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
@@ -413,15 +426,40 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
         ProcessDeckAudio(&engine->Decks[i], masterMix, cueMix, frames, engine, i);
     }
 
+    float mPeakL = 0, mPeakR = 0;
     for (int s = 0; s < frames; s++) {
         if (engine->BeatFX.targetChannel == 0) {
             BeatFXManager_Process(&engine->BeatFX, &masterMix[s*2], &masterMix[s*2+1], masterMix[s*2], masterMix[s*2+1], engine->OutputSampleRate);
         }
-        outBuffer[s*4] = fmaxf(-1.0f, fminf(1.0f, masterMix[s*2] * engine->MasterVolume));
-        outBuffer[s*4 + 1] = fmaxf(-1.0f, fminf(1.0f, masterMix[s*2+1] * engine->MasterVolume));
+
+        // --- Master Gain & Soft Limiting ---
+        float l = masterMix[s*2] * engine->MasterVolume;
+        float r = masterMix[s*2+1] * engine->MasterVolume;
+        
+        mPeakL = fmaxf(mPeakL, fabsf(l));
+        mPeakR = fmaxf(mPeakR, fabsf(r));
+
+        // Transparent Hard Limiter (Clamping)
+        // This ensures zero distortion for signals <= 0dB (1.0)
+        if (l > 1.0f) l = 1.0f; else if (l < -1.0f) l = -1.0f;
+        if (r > 1.0f) r = 1.0f; else if (r < -1.0f) r = -1.0f;
+
+        outBuffer[s*4] = l;
+        outBuffer[s*4 + 1] = r;
+
         outBuffer[s*4 + 2] = fmaxf(-1.0f, fminf(1.0f, cueMix[s*2]));
         outBuffer[s*4 + 3] = fmaxf(-1.0f, fminf(1.0f, cueMix[s*2+1]));
     }
+
+    // Master VU Ballistics
+    // Scaling: 0.5 (unity) peak -> 0.7 VU (Healthy level)
+    float pML = mPeakL * 1.4f;
+    float pMR = mPeakR * 1.4f;
+    if (pML > 1.0f) pML = 1.0f; if (pMR > 1.0f) pMR = 1.0f;
+    if (pML > engine->MasterVuL) engine->MasterVuL = pML;
+    else engine->MasterVuL = engine->MasterVuL * 0.92f + pML * 0.08f;
+    if (pMR > engine->MasterVuR) engine->MasterVuR = pMR;
+    else engine->MasterVuR = engine->MasterVuR * 0.92f + pMR * 0.08f;
 }
 
 void DeckAudio_Play(DeckAudioState *deck) { deck->IsMotorOn = true; }

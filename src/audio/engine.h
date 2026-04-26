@@ -96,6 +96,8 @@ typedef struct AudioEngine {
     float Crossfader; // -1.0 (Deck A) to 1.0 (Deck B)
     float MasterVolume; // 0.0 to 1.0
     uint32_t OutputSampleRate; // Actual hardware sample rate
+    float MasterVuL;
+    float MasterVuR;
 } AudioEngine;
 
 void AudioEngine_Init(AudioEngine *engine, uint32_t outputSampleRate);

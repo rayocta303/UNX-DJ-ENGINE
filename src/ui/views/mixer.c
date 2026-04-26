@@ -196,9 +196,9 @@ static void Mixer_Draw(Component *base) {
     // UIDrawText(i == 0 ? "CH 1" : "CH 2", fSub, eqCx - S(10), ky - S(18),
     // S(9), ColorOrange);
 
-    Mixer_DrawKnob(eqCx, ky, kR, d->Trim, 0.0f, 2.0f, "TRIM",
+    Mixer_DrawKnob(eqCx, ky, kR, d->Trim, 0.0f, 1.0f, "TRIM",
                    (Color){0, 150, 255, 255}, true);
-    HandleKnob(&d->Trim, eqCx, ky, kR, 0.0f, 2.0f, true, mousePos, mDown);
+    HandleKnob(&d->Trim, eqCx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
 
     ky += kStep;
     Mixer_DrawKnob(eqCx, ky, kR, d->EqHigh, 0.0f, 1.0f, "HIGH",
@@ -279,10 +279,24 @@ static void Mixer_Draw(Component *base) {
     HandleKnob(&eng->Decks[0].ColorFX.parameter, leftX + colW / 2.0f, paramY, S(13), 0.0f, 1.0f, true, mousePos, mDown);
     eng->Decks[1].ColorFX.parameter = eng->Decks[0].ColorFX.parameter; // Sync
   }
+  
+  // --- CENTER: Master VU (In the gap between FX columns) ---
+  float mVuW = S(6);
+  float mVuH = S(140);
+  float mVuX = rightX;
+  float mVuY = panelY + S(28);
+  DrawVertVU(mVuX - S(7), mVuY, mVuW, mVuH, eng->MasterVuL);
+  DrawVertVU(mVuX + S(1), mVuY, mVuW, mVuH, eng->MasterVuR);
 
-  // RIGHT COLUMN: BEAT FX
-  DrawCentredText("BEAT FX", fTiny, rightX, colW, fxY, S(8), ColorShadow);
-  float bfy = fxY + S(14);
+  // RIGHT COLUMN: MASTER & BEAT FX
+  float masterKnobY = panelY + S(28);
+  Mixer_DrawKnob(rightX + colW / 2.0f, masterKnobY, S(16), eng->MasterVolume, 0.0f, 1.0f, "MASTER LEVEL", ColorRed, false);
+  HandleKnob(&eng->MasterVolume, rightX + colW / 2.0f, masterKnobY, S(16), 0.0f, 1.0f, false, mousePos, mDown);
+
+  float bfxTitleY = masterKnobY + S(35);
+  DrawCentredText("BEAT FX", fTiny, rightX, colW, bfxTitleY, S(8), ColorShadow);
+
+  float bfy = bfxTitleY + S(14);
   const char *bfxNames[] = {"DELAY",    "ECHO",   "P-PONG",  "SPIRAL", "REVERB",
                             "TRANS",    "FILTER", "FLANGER", "PHASER", "PITCH",
                             "SLIPROLL", "ROLL",   "BRAKE",   "HELIX"};
@@ -302,7 +316,7 @@ static void Mixer_Draw(Component *base) {
   if (DrawFXButton(targetNames[eng->BeatFX.targetChannel], rightX + S(8), bfy, bItemW, S(18), false)) {
     eng->BeatFX.targetChannel = (eng->BeatFX.targetChannel + 1) % 3;
   }
-  bfy += S(35);
+  bfy += S(28); // Slightly reduced spacing
 
   // Beat FX Controls pushed to bottom
   fxBtnH = S(32);
