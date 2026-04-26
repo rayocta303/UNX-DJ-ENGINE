@@ -105,7 +105,12 @@ static int Settings_Update(Component *base) {
     
     float viewH = SCREEN_HEIGHT - DECK_STR_H;
     float tabH = S(28.0f);
-    int visibleRows = (int)((viewH - TOP_BAR_H - tabH - S(28.0f)) / S(28.0f));
+    float rowH = S(32.0f);
+    float bottomH = S(28.0f);
+    float listY = TOP_BAR_H + tabH;
+    if (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) listY += S(20);
+    int visibleRows = (int)((viewH - listY - bottomH) / rowH);
+    
     float threshold = S(20.0f);
     if (r->State->TouchDragAccumulator < -threshold) { 
       if (r->State->Scroll + visibleRows < filteredCount) {
@@ -128,7 +133,12 @@ static int Settings_Update(Component *base) {
       } else {
           float viewH = SCREEN_HEIGHT - DECK_STR_H;
           float tabH = S(28.0f);
-          int visibleRows = (int)((viewH - TOP_BAR_H - tabH - S(28.0f)) / S(28.0f));
+          float rowH = S(32.0f);
+          float bottomH = S(28.0f);
+          float listY = TOP_BAR_H + tabH;
+          if (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) listY += S(20);
+          int visibleRows = (int)((viewH - listY - bottomH) / rowH);
+          
           if (r->State->Scroll + visibleRows < filteredCount) {
               r->State->Scroll++;
           }
@@ -178,15 +188,20 @@ static int Settings_Update(Component *base) {
     }
 
     // List Item Selection & Action Clicking
-    float rowH = S(28.0f);
-    int visibleRows = (int)((divY - (TOP_BAR_H + tabH)) / rowH);
+    float rowH = S(32.0f); // Match Settings_Draw
+    float listY = TOP_BAR_H + tabH;
+    if (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) {
+        listY += S(20); // Match header in Settings_Draw
+    }
+
+    int visibleRows = (int)((divY - listY) / rowH);
     for (int i = 0; i < visibleRows; i++) {
       int idx_f = r->State->Scroll + i;
       if (idx_f >= filteredCount)
         break;
 
       int idx = filteredIndices[idx_f];
-      float ry = TOP_BAR_H + tabH + (i * rowH);
+      float ry = listY + (i * rowH);
       Rectangle rowRect = {0, ry, SCREEN_WIDTH, rowH};
 
       if (CheckCollisionPointRec(mouse, rowRect) && fabsf(r->State->TouchDragAccumulator) < 10.0f) {
@@ -225,8 +240,10 @@ static int Settings_Update(Component *base) {
     float bottomH = S(28.0f);
     float divY = viewH - bottomH;
     float tabH = S(28.0f);
-    float rowH = S(28.0f);
-    int visibleRows = (int)((divY - (TOP_BAR_H + tabH)) / rowH);
+    float rowH = S(32.0f); // Match Settings_Draw
+    float listY = TOP_BAR_H + tabH;
+    if (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) listY += S(20);
+    int visibleRows = (int)((divY - listY) / rowH);
 
     if (r->State->CursorPos < visibleRows - 1 &&
         r->State->Scroll + r->State->CursorPos < filteredCount - 1) {
