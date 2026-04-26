@@ -390,7 +390,8 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
                 deck->MT_ReadPos += (targetRate > 0) ? 1.0 : -1.0;
                 
                 if (deck->IsLooping && deck->MT_ReadPos >= deck->LoopEndPos) {
-                    deck->MT_ReadPos = deck->LoopStartPos;
+                    double diff = deck->MT_ReadPos - deck->LoopEndPos;
+                    deck->MT_ReadPos = deck->LoopStartPos + diff;
                 }
             }
             st->putSamples(inBuf, toRead);
@@ -407,7 +408,8 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
         // Logical position update: Accurate linear progression
         deck->Position += (double)received * targetRate;
         if (deck->IsLooping && deck->Position >= deck->LoopEndPos) {
-            deck->Position = deck->LoopStartPos;
+            double diff = deck->Position - deck->LoopEndPos;
+            deck->Position = deck->LoopStartPos + diff;
         }
 
         if (deck->SlipActive) {
@@ -469,7 +471,8 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
             }
 
             if (deck->IsLooping && deck->Position >= deck->LoopEndPos) {
-                deck->Position = deck->LoopStartPos;
+                double diff = deck->Position - deck->LoopEndPos;
+                deck->Position = deck->LoopStartPos + diff;
             }
 
             if (deck->SlipActive) {
