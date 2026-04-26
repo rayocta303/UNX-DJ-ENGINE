@@ -441,31 +441,20 @@ static void Waveform_Draw(Component *base) {
   if (endFrame > wfFrames)
     endFrame = wfFrames;
 
-  // We use step = 1 to ensure every frame is processed for the smoothing filter.
-  // Skipping frames causes missing peaks and dimming when zoomed out.
-  int step = 1;
+  int renderStep = (int)floor(framesPerPixel);
+  if (renderStep < 1) renderStep = 1;
 
-  float lastDrawX = -9999.0f;
+  int64_t lastDrawnFrame = startFrame;
   float pLo = smLo, pMi = smMi, pHi = smHi;
   Color pCol = smCol;
-  bool firstDraw = true;
+  bool firstFrame = true;
 
   rlBegin(RL_TRIANGLES);
-  for (int64_t i = startFrame; i < endFrame - step; i += step) {
-    float x0 = (float)(((double)i - elapsedHalfFrames * r->dataDensity) /
-                           framesPerPixel +
-                       centerX);
-    float x1 = (float)(((double)(i + 1) - elapsedHalfFrames * r->dataDensity) /
-                           framesPerPixel +
-                       centerX);
-
-    // Instead of skipping decoding, we decode every frame to keep the smoother accurate.
-    // We only skip drawing (pushing vertices) until a full pixel width is covered.
-    
+  for (int64_t i = startFrame; i < endFrame; i++) {
+    // 1. Sample raw data (decode every frame for smoother accuracy)
     float rL = 0, rM = 0, rH = 0;
     Color colRaw = {0, 0, 0, 255};
 
-    // Sample raw data
     if (wfType == 3) {
       rM = (float)wfData[i * 3] * MID_SCALE * NORM * waveCenter * gMid;
       rH = (float)wfData[i * 3 + 1] * HIGH_SCALE * NORM * waveCenter * gHigh;
@@ -480,27 +469,19 @@ static void Waveform_Draw(Component *base) {
       if (userStyle == WAVEFORM_STYLE_3BAND) {
         float baseH = h * PWV2_HSCALE;
         if (colRaw.r > colRaw.b && colRaw.r > colRaw.g) {
-          rL = baseH * 0.4f;
-          rM = baseH * 0.9f;
-          rH = baseH * 0.2f;
+          rL = baseH * 0.4f; rM = baseH * 0.9f; rH = baseH * 0.2f;
         } else if (colRaw.b > colRaw.r && colRaw.b > colRaw.g) {
-          rL = baseH * 0.95f;
-          rM = baseH * 0.6f;
-          rH = baseH * 0.1f;
+          rL = baseH * 0.95f; rM = baseH * 0.6f; rH = baseH * 0.1f;
         } else {
-          rL = baseH * 0.8f;
-          rM = baseH * 0.8f;
-          rH = baseH * 0.6f;
+          rL = baseH * 0.8f; rM = baseH * 0.8f; rH = baseH * 0.6f;
         }
-        rL *= gLow;
-        rM *= gMid;
-        rH *= gHigh;
+        rL *= gLow; rM *= gMid; rH *= gHigh;
       } else {
         rL = h * PWV2_HSCALE * gLow;
       }
     }
 
-    // Update smoothed state
+    // 2. Update smoothed state (essential for visual stability)
     smLo += (rL - smLo) * ((rL > smLo) ? ATK : REL);
     smMi += (rM - smMi) * ((rM > smMi) ? ATK : REL);
     smHi += (rH - smHi) * ((rH > smHi) ? ATK : REL);
@@ -511,56 +492,39 @@ static void Waveform_Draw(Component *base) {
       smCol.a = 255;
     }
 
-    if (firstDraw) {
-        lastDrawX = x0;
-        pLo = smLo; pMi = smMi; pHi = smHi; pCol = smCol;
-        firstDraw = false;
-        continue;
+    if (firstFrame) {
+      lastDrawnFrame = i;
+      pLo = smLo; pMi = smMi; pHi = smHi; pCol = smCol;
+      firstFrame = false;
+      continue;
     }
 
-    // Only issue drawing commands if we have covered at least 1 pixel of width,
-    // or if we are at the very last frame. This prevents drawing thousands of 
-    // overlapping sub-pixel triangles (efficient buffer usage).
-    if ((x1 - lastDrawX >= 1.0f) || (i == endFrame - step - 1)) {
-        if (x1 >= wfLeft - 2 && lastDrawX <= wfRight + 2) {
-            float cx0 = lastDrawX;
-            float cx1 = x1;
-            
-            if (userStyle == WAVEFORM_STYLE_BLUE || userStyle == WAVEFORM_STYLE_RGB) {
-              if (pLo > 0.1f || smLo > 0.1f) {
-                rlColor4ub(pCol.r, pCol.g, pCol.b, 255);
-                rlVertex2f(cx0, yy - pLo);
-                rlVertex2f(cx0, yy + pLo);
-                rlColor4ub(smCol.r, smCol.g, smCol.b, 255);
-                rlVertex2f(cx1, yy + smLo);
-                rlColor4ub(pCol.r, pCol.g, pCol.b, 255);
-                rlVertex2f(cx0, yy - pLo);
-                rlColor4ub(smCol.r, smCol.g, smCol.b, 255);
-                rlVertex2f(cx1, yy + smLo);
-                rlVertex2f(cx1, yy - smLo);
-              }
-            } else {
-              // 3-BAND
-              if (pLo > 0.1f || smLo > 0.1f) {
-                rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 255);
-                DRAW_TRAP(pLo, smLo);
-              }
-              if (pMi > 0.1f || smMi > 0.1f) {
-                rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 255);
-                DRAW_TRAP(pMi, smMi);
-              }
-              if (pHi > 0.1f || smHi > 0.1f) {
-                rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 255);
-                DRAW_TRAP(pHi, smHi);
-              }
-            }
+    // 3. Output geometry at fixed frame intervals (anchored to data, not screen)
+    // This fixes the "Jello" effect because the binning doesn't shift every frame.
+    if ((i % renderStep == 0) || (i == endFrame - 1)) {
+      float cx0 = (float)(((double)lastDrawnFrame - elapsedHalfFrames * r->dataDensity) / framesPerPixel + centerX);
+      float cx1 = (float)(((double)i - elapsedHalfFrames * r->dataDensity) / framesPerPixel + centerX);
+
+      if (cx1 >= wfLeft - 2 && cx0 <= wfRight + 2) {
+        if (userStyle == WAVEFORM_STYLE_BLUE || userStyle == WAVEFORM_STYLE_RGB) {
+          if (pLo > 0.1f || smLo > 0.1f) {
+            rlColor4ub(pCol.r, pCol.g, pCol.b, 255);
+            rlVertex2f(cx0, yy - pLo); rlVertex2f(cx0, yy + pLo);
+            rlColor4ub(smCol.r, smCol.g, smCol.b, 255);
+            rlVertex2f(cx1, yy + smLo);
+            rlColor4ub(pCol.r, pCol.g, pCol.b, 255);
+            rlVertex2f(cx0, yy - pLo);
+            rlColor4ub(smCol.r, smCol.g, smCol.b, 255);
+            rlVertex2f(cx1, yy + smLo); rlVertex2f(cx1, yy - smLo);
+          }
+        } else {
+          if (pLo > 0.1f || smLo > 0.1f) { rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 255); DRAW_TRAP(pLo, smLo); }
+          if (pMi > 0.1f || smMi > 0.1f) { rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 255); DRAW_TRAP(pMi, smMi); }
+          if (pHi > 0.1f || smHi > 0.1f) { rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 255); DRAW_TRAP(pHi, smHi); }
         }
-        
-        lastDrawX = x1;
-        pLo = smLo;
-        pMi = smMi;
-        pHi = smHi;
-        pCol = smCol;
+      }
+      lastDrawnFrame = i;
+      pLo = smLo; pMi = smMi; pHi = smHi; pCol = smCol;
     }
   }
   rlEnd();
