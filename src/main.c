@@ -1009,6 +1009,26 @@ void UpdateDrawFrame(App *app) {
     app->deckB.TrackLengthMs = (long long)(lenSec * 1000.0);
   }
 
+  // --- Auto Stop at End of Track / Beatgrid ---
+  for (int i = 0; i < 2; i++) {
+    DeckState *ds = (i == 0) ? &app->deckA : &app->deckB;
+    if (ds->IsPlaying && ds->LoadedTrack) {
+      long long endMs = ds->TrackLengthMs;
+      if (ds->LoadedTrack->BeatGridCount > 0) {
+        endMs = (long long)ds->LoadedTrack->BeatGrid[ds->LoadedTrack->BeatGridCount - 1].Time;
+      }
+      
+      // Stop if we passed the end marker
+      if (ds->PositionMs >= endMs) {
+        DeckAudio_Stop(&audioEngine->Decks[i]);
+        // Also ensure position doesn't drift too far past
+        DeckAudio_JumpToMs(&audioEngine->Decks[i], endMs);
+        ds->IsPlaying = false;
+        ds->PositionMs = endMs;
+      }
+    }
+  }
+
   // Cache scale for this frame based on current window size
   UI_UpdateScale();
 

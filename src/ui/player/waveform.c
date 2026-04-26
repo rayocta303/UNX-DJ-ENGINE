@@ -542,9 +542,12 @@ static void Waveform_Draw(Component *base) {
 
       if (bx >= wfLeft && bx <= wfRight) {
         bool isBar = (beatNum == 1);
+        bool isLastBeat = (i == r->State->LoadedTrack->BeatGridCount - 1);
 
         // Top cap tick (3px wide) — solid but semi-transparent
         Color capColor = isBar ? Fade(ColorRed, 0.85f) : Fade(colorHigh, 0.55f);
+        if (isLastBeat) capColor = ColorRed; // Bright red for end marker
+
         DrawRectangleV((Vector2){bx - 1.0f, wfY}, (Vector2){3.0f, S(7)},
                        capColor);
         DrawRectangleV((Vector2){bx - 1.0f, wfY + waveH - S(7)},
@@ -553,8 +556,14 @@ static void Waveform_Draw(Component *base) {
         // Hairline body — nearly invisible so waveform shows through
         Color lineColor =
             isBar ? Fade(ColorRed, 0.20f) : Fade(colorHigh, 0.12f);
-        DrawRectangleV((Vector2){bx, wfY + S(7)},
-                       (Vector2){1.0f, waveH - S(14)}, lineColor);
+        
+        if (isLastBeat) {
+            // Stronger boundary at the end
+            DrawRectangleV((Vector2){bx - 1.0f, wfY + S(7)}, (Vector2){3.0f, waveH - S(14)}, Fade(ColorRed, 0.8f));
+        } else {
+            DrawRectangleV((Vector2){bx, wfY + S(7)},
+                           (Vector2){1.0f, waveH - S(14)}, lineColor);
+        }
       }
     }
   }
