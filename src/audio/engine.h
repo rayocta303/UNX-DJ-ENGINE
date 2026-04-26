@@ -30,7 +30,7 @@ typedef struct BiquadState {
 } BiquadState;
 
 typedef struct DeckAudioState {
-    float *PCMBuffer;           // Full track audio decoded (interleaved L/R)
+    int16_t *PCMBuffer;           // Full track audio decoded (interleaved L/R)
     uint32_t TotalSamples;      // Total samples in buffer
     uint32_t SampleRate;        // Original sample rate (e.g. 44100, 48000)
     

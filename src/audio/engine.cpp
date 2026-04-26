@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <algorithm>
 
-#define MINIMP3_FLOAT_OUTPUT
 #define MINIMP3_API static
 #define MINIMP3_IMPLEMENTATION
 #include "minimp3.h"
@@ -80,8 +79,8 @@ void AudioEngine_Destroy(AudioEngine *engine) {
 
 void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
     if (deck->PCMBuffer) {
-        float *oldBuf = deck->PCMBuffer;
-        deck->PCMBuffer = NULL; 
+        int16_t *oldBuf = deck->PCMBuffer;
+        deck->PCMBuffer = NULL;
         deck->TotalSamples = 0;
         free(oldBuf);
     }
@@ -108,11 +107,11 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
         unsigned int channels;
         unsigned int sampleRate;
         drwav_uint64 totalPCMFrameCount;
-        float *pSampleData = drwav_open_file_and_read_pcm_frames_f32(filePath, &channels, &sampleRate, &totalPCMFrameCount, NULL);
+        int16_t *pSampleData = drwav_open_file_and_read_pcm_frames_s16(filePath, &channels, &sampleRate, &totalPCMFrameCount, NULL);
 
         if (pSampleData) {
             if (channels == 1) {
-                float *stereoBuf = (float *)malloc(totalPCMFrameCount * 2 * sizeof(float));
+                int16_t *stereoBuf = (int16_t *)malloc(totalPCMFrameCount * 2 * sizeof(int16_t));
                 if (stereoBuf) {
                     for (drwav_uint64 i = 0; i < totalPCMFrameCount; i++) {
                         stereoBuf[i*2] = pSampleData[i];
@@ -138,9 +137,8 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
         int res = mp3dec_load(&mp3d, filePath, &info, NULL, NULL);
 
         if (res == 0) {
-            // minmp3 with MINIMP3_FLOAT_OUTPUT already returns normalized floats in [-1, 1]
             if (info.channels == 1) {
-                float *stereoBuf = (float *)malloc(info.samples * 2 * sizeof(float));
+                int16_t *stereoBuf = (int16_t *)malloc(info.samples * 2 * sizeof(int16_t));
                 if (stereoBuf) {
                     for (size_t i = 0; i < info.samples; i++) {
                         stereoBuf[i*2] = info.buffer[i];
@@ -191,8 +189,8 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
 
 static inline void AudioEngine_GetSampleDirect(DeckAudioState* deck, int i, float* l, float* r) {
     if (i < 0 || i >= (int)(deck->TotalSamples / 2)) { *l = 0; *r = 0; return; }
-    *l = deck->PCMBuffer[i * 2];
-    *r = deck->PCMBuffer[i * 2 + 1];
+    *l = (float)deck->PCMBuffer[i * 2] / 32768.0f;
+    *r = (float)deck->PCMBuffer[i * 2 + 1] / 32768.0f;
 }
 
 static inline void AudioEngine_GetSample(DeckAudioState* deck, double pos, float* l, float* r) {
@@ -201,12 +199,22 @@ static inline void AudioEngine_GetSample(DeckAudioState* deck, double pos, float
     float f = (float)(pos - i);
     if (i >= (int)((deck->TotalSamples / 2) - 3)) { *l = 0; *r = 0; return; }
 
+    float y0_l = (float)deck->PCMBuffer[(i - 1) * 2] / 32768.0f;
+    float y1_l = (float)deck->PCMBuffer[i * 2] / 32768.0f;
+    float y2_l = (float)deck->PCMBuffer[(i + 1) * 2] / 32768.0f;
+    float y3_l = (float)deck->PCMBuffer[(i + 2) * 2] / 32768.0f;
+
+    float y0_r = (float)deck->PCMBuffer[(i - 1) * 2 + 1] / 32768.0f;
+    float y1_r = (float)deck->PCMBuffer[i * 2 + 1] / 32768.0f;
+    float y2_r = (float)deck->PCMBuffer[(i + 1) * 2 + 1] / 32768.0f;
+    float y3_r = (float)deck->PCMBuffer[(i + 2) * 2 + 1] / 32768.0f;
+
     if (f < 0.0001f) {
-        *l = deck->PCMBuffer[i * 2];
-        *r = deck->PCMBuffer[i * 2 + 1];
+        *l = y1_l;
+        *r = y1_r;
     } else {
-        *l = Engine_InterpolateHermite4(f, deck->PCMBuffer[(i - 1) * 2], deck->PCMBuffer[i * 2], deck->PCMBuffer[(i + 1) * 2], deck->PCMBuffer[(i + 2) * 2]);
-        *r = Engine_InterpolateHermite4(f, deck->PCMBuffer[(i - 1) * 2 + 1], deck->PCMBuffer[i * 2 + 1], deck->PCMBuffer[(i + 1) * 2 + 1], deck->PCMBuffer[(i + 2) * 2 + 1]);
+        *l = Engine_InterpolateHermite4(f, y0_l, y1_l, y2_l, y3_l);
+        *r = Engine_InterpolateHermite4(f, y0_r, y1_r, y2_r, y3_r);
     }
 }
 

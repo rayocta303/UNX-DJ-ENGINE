@@ -424,10 +424,15 @@ static void Waveform_Draw(Component *base) {
   // samples themselves. This ensures that every peak is consistently shaped
   // and height-stable during scrolling.
   double framesPerPixel = zoomDelta;
-  double halfVisibleFrames = (centerX / 1.0f) * framesPerPixel;
+  
+  // Calculate exact visible distance from center to edges, plus a 10px buffer
+  float distLeft = centerX - wfLeft;
+  float distRight = wfRight - centerX;
+  float maxVisibleDist = (distLeft > distRight) ? distLeft : distRight;
+  double halfVisibleFrames = (maxVisibleDist + 10.0f) * framesPerPixel;
+  
   int64_t startFrame =
-      (int64_t)floor(elapsedHalfFrames * r->dataDensity - halfVisibleFrames) -
-      1;
+      (int64_t)floor(elapsedHalfFrames * r->dataDensity - halfVisibleFrames) - 1;
   int64_t endFrame =
       (int64_t)ceil(elapsedHalfFrames * r->dataDensity + halfVisibleFrames) + 1;
 
@@ -436,11 +441,14 @@ static void Waveform_Draw(Component *base) {
   if (endFrame > wfFrames)
     endFrame = wfFrames;
 
-  // Optimized drawing loop: Skip frames if zoomed out too much to reduce GPU load
+  // We use step = 1 to ensure every frame is processed for the smoothing filter.
+  // Skipping frames causes missing peaks and dimming when zoomed out.
   int step = 1;
-#if defined(PLATFORM_IOS)
-  if (zoomDelta < 1.0f) step = 2; // Simple LOD for older iOS devices
-#endif
+
+  float lastDrawX = -9999.0f;
+  float pLo = smLo, pMi = smMi, pHi = smHi;
+  Color pCol = smCol;
+  bool firstDraw = true;
 
   rlBegin(RL_TRIANGLES);
   for (int64_t i = startFrame; i < endFrame - step; i += step) {
@@ -451,10 +459,9 @@ static void Waveform_Draw(Component *base) {
                            framesPerPixel +
                        centerX);
 
-    // Safety skip for off-screen data
-    if (x1 < wfLeft - 2 || x0 > wfRight + 2)
-      continue;
-
+    // Instead of skipping decoding, we decode every frame to keep the smoother accurate.
+    // We only skip drawing (pushing vertices) until a full pixel width is covered.
+    
     float rL = 0, rM = 0, rH = 0;
     Color colRaw = {0, 0, 0, 255};
 
@@ -494,9 +501,6 @@ static void Waveform_Draw(Component *base) {
     }
 
     // Update smoothed state
-    float pLo = smLo, pMi = smMi, pHi = smHi;
-    Color pCol = smCol;
-
     smLo += (rL - smLo) * ((rL > smLo) ? ATK : REL);
     smMi += (rM - smMi) * ((rM > smMi) ? ATK : REL);
     smHi += (rH - smHi) * ((rH > smHi) ? ATK : REL);
@@ -507,36 +511,56 @@ static void Waveform_Draw(Component *base) {
       smCol.a = 255;
     }
 
-    // DRAW
-    if (userStyle == WAVEFORM_STYLE_BLUE || userStyle == WAVEFORM_STYLE_RGB) {
-      if (pLo > 0.1f || smLo > 0.1f) {
-        float cx0 = x0, cx1 = x1;
-        rlColor4ub(pCol.r, pCol.g, pCol.b, 255);
-        rlVertex2f(cx0, yy - pLo);
-        rlVertex2f(cx0, yy + pLo);
-        rlColor4ub(smCol.r, smCol.g, smCol.b, 255);
-        rlVertex2f(cx1, yy + smLo);
-        rlColor4ub(pCol.r, pCol.g, pCol.b, 255);
-        rlVertex2f(cx0, yy - pLo);
-        rlColor4ub(smCol.r, smCol.g, smCol.b, 255);
-        rlVertex2f(cx1, yy + smLo);
-        rlVertex2f(cx1, yy - smLo);
-      }
-    } else {
-      // 3-BAND
-      float cx0 = x0, cx1 = x1;
-      if (pLo > 0.1f || smLo > 0.1f) {
-        rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 255);
-        DRAW_TRAP(pLo, smLo);
-      }
-      if (pMi > 0.1f || smMi > 0.1f) {
-        rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 255);
-        DRAW_TRAP(pMi, smMi);
-      }
-      if (pHi > 0.1f || smHi > 0.1f) {
-        rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 255);
-        DRAW_TRAP(pHi, smHi);
-      }
+    if (firstDraw) {
+        lastDrawX = x0;
+        pLo = smLo; pMi = smMi; pHi = smHi; pCol = smCol;
+        firstDraw = false;
+        continue;
+    }
+
+    // Only issue drawing commands if we have covered at least 1 pixel of width,
+    // or if we are at the very last frame. This prevents drawing thousands of 
+    // overlapping sub-pixel triangles (efficient buffer usage).
+    if ((x1 - lastDrawX >= 1.0f) || (i == endFrame - step - 1)) {
+        if (x1 >= wfLeft - 2 && lastDrawX <= wfRight + 2) {
+            float cx0 = lastDrawX;
+            float cx1 = x1;
+            
+            if (userStyle == WAVEFORM_STYLE_BLUE || userStyle == WAVEFORM_STYLE_RGB) {
+              if (pLo > 0.1f || smLo > 0.1f) {
+                rlColor4ub(pCol.r, pCol.g, pCol.b, 255);
+                rlVertex2f(cx0, yy - pLo);
+                rlVertex2f(cx0, yy + pLo);
+                rlColor4ub(smCol.r, smCol.g, smCol.b, 255);
+                rlVertex2f(cx1, yy + smLo);
+                rlColor4ub(pCol.r, pCol.g, pCol.b, 255);
+                rlVertex2f(cx0, yy - pLo);
+                rlColor4ub(smCol.r, smCol.g, smCol.b, 255);
+                rlVertex2f(cx1, yy + smLo);
+                rlVertex2f(cx1, yy - smLo);
+              }
+            } else {
+              // 3-BAND
+              if (pLo > 0.1f || smLo > 0.1f) {
+                rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 255);
+                DRAW_TRAP(pLo, smLo);
+              }
+              if (pMi > 0.1f || smMi > 0.1f) {
+                rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 255);
+                DRAW_TRAP(pMi, smMi);
+              }
+              if (pHi > 0.1f || smHi > 0.1f) {
+                rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 255);
+                DRAW_TRAP(pHi, smHi);
+              }
+            }
+        }
+        
+        lastDrawX = x1;
+        pLo = smLo;
+        pMi = smMi;
+        pHi = smHi;
+        pCol = smCol;
     }
   }
   rlEnd();
