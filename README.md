@@ -8,7 +8,8 @@ UNX DJ Engine is a specialized, high-performance DJ media player firmware subset
 
 ### Audio Processing Engine
 - **Engine Core**: Fully ported Mixxx Audio Engine (subset) for industry-standard reliability.
-- **Internal Pipeline**: 32-bit floating-point internal mixing for maximum dynamic range and headroom.
+- **Internal Pipeline**: 32-bit floating-point internal mixing and DSP for maximum dynamic range and headroom.
+- **Memory Optimization**: High-efficiency 16-bit PCM audio buffering, reducing RAM footprint by 50% for long-duration tracks.
 - **Decoding Engine**: Native support for MP3 (minimp3), WAV, and AIFF (dr_wav) formats.
 - **Time-Stretching**: High-fidelity Master Tempo and pitch-shifting utilizing Rubber Band and SoundTouch algorithms.
 - **Signal Processing**: Professional 3-Band Isolator EQs (Fidlib), Biquad Filters, and an integrated FX pipeline (Sound Color FX and BPM-synced Beat FX).
@@ -16,8 +17,9 @@ UNX DJ Engine is a specialized, high-performance DJ media player firmware subset
 
 ### User Interface and Rendering
 - **Graphics Engine**: Low-latency rendering via Raylib and OpenGL/GLES.
-- **Visualization**: Multi-mode waveform rendering including RGB spectrum and 3-Band frequency decomposition.
+- **Visualization**: Optimized multi-mode waveform rendering with "Range-Vision" culling and Peak Binning (LOD) for flicker-free performance.
 - **Responsive Design**: Adaptive layout engine supporting varying resolutions and High-DPI hardware configurations.
+- **PAD View**: Integrated Performance Pads (4x2 grid) for instant Hot-Cue triggering and deck interaction.
 - **Hardware Accuracy**: Precise emulation of industry-standard deck strips, top bars, and control panels.
 ### Database and Library Management
 - **Rekordbox Integration**: Full parsing of PDB and ANLZ database structures for metadata and waveform data.
@@ -76,6 +78,7 @@ UNX DJ Engine is a specialized, high-performance DJ media player firmware subset
 - [x] **Metadata Engine**: Integration of Rekordbox PDB/ANLZ database parsing.
 - [x] **Cross-platform UI**: Unified rendering across desktop, embedded, and mobile platforms.
 - [x] **Master Tempo**: High-fidelity time-stretching via Rubber Band/SoundTouch.
+- [x] **Performance Pads**: Native PAD view for hot-cue and deck control integration.
 - [/] **MIDI/HID Control**: Low-latency hardware mapping integration in progress.
 - [/] **Advanced FX**: Expansion of the Beat FX and Sound Color FX libraries.
 
