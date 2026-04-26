@@ -31,6 +31,45 @@
 static const char *categories[] = {"FILENAME", "FOLDER", "PLAYLIST", "TRACK",
                                    "SEARCH"};
 
+static void Browser_SwitchStorageByPath(BrowserState *s, const char *path) {
+  // Find storage in AvailableStorages
+  int foundIdx = -1;
+  for (int j = 0; j < s->StorageCount; j++) {
+    if (strcmp(s->AvailableStorages[j].Path, path) == 0) {
+      foundIdx = j;
+      break;
+    }
+  }
+
+  if (foundIdx != -1) {
+    s->SelectedStorage = &s->AvailableStorages[foundIdx];
+    if (s->DB)
+      RB_FreeDatabase(s->DB);
+    if (s->SeratoDB)
+      Serato_FreeDatabase(s->SeratoDB);
+    s->DB = NULL;
+    s->SeratoDB = NULL;
+
+    s->DB = RB_LoadDatabase(s->SelectedStorage->Path);
+    s->SeratoDB = Serato_LoadDatabase(s->SelectedStorage->Path);
+    s->HasBothDatabases = (s->DB != NULL && s->SeratoDB != NULL);
+
+    if (s->DB) {
+      s->DatabaseType = 0;
+      if (s->TrackPointers)
+        free(s->TrackPointers);
+      s->TrackPointers = (RBTrack **)malloc(s->DB->TrackCount * sizeof(RBTrack *));
+    }
+    if (s->SeratoDB) {
+      if (s->SeratoTrackPointers)
+        free(s->SeratoTrackPointers);
+      s->SeratoTrackPointers = (SeratoTrack **)malloc(s->SeratoDB->TrackCount * sizeof(SeratoTrack *));
+      if (!s->DB)
+        s->DatabaseType = 1;
+    }
+  }
+}
+
 static void Browser_UpdateActiveTracks(BrowserState *s) {
   if (s->DatabaseType == 0) { // Rekordbox
     if (!s->DB) {
@@ -443,8 +482,13 @@ static int Browser_Update(Component *base) {
         } else {
           // Playlist Bank Jump
           int bankIdx = i - 4;
-          if (s->PlaylistBankIdx[bankIdx] >= 0) {
-            s->CurrentPlaylistIdx = s->PlaylistBankIdx[bankIdx];
+          if (s->PlaylistBank[bankIdx].PlaylistIdx >= 0) {
+            // Check if we need to switch storage
+            if (s->SelectedStorage && strcmp(s->PlaylistBank[bankIdx].StoragePath, s->SelectedStorage->Path) != 0) {
+              Browser_SwitchStorageByPath(s, s->PlaylistBank[bankIdx].StoragePath);
+            }
+            
+            s->CurrentPlaylistIdx = s->PlaylistBank[bankIdx].PlaylistIdx;
             s->BrowseLevel = 0; // Tracks
             Browser_UpdateActiveTracks(s);
             s->CursorPos = s->ScrollOffset = 0;
@@ -457,9 +501,18 @@ static int Browser_Update(Component *base) {
         if (i >= 4) {
           int bankIdx = i - 4;
           if (s->DraggingType == 1) { // Only playlists can be banked
-            s->PlaylistBankIdx[bankIdx] = s->DraggingIdx;
-            printf("[BROWSER] Banked Playlist %d to Slot %d\n", s->DraggingIdx,
-                   bankIdx + 1);
+            s->PlaylistBank[bankIdx].PlaylistIdx = s->DraggingIdx;
+            if (s->SelectedStorage) {
+              strncpy(s->PlaylistBank[bankIdx].StoragePath, s->SelectedStorage->Path, 511);
+            }
+            // Cache the name
+            if (s->DatabaseType == 0 && s->DB && s->DraggingIdx < (int)s->DB->PlaylistCount) {
+              strncpy(s->PlaylistBank[bankIdx].Name, s->DB->Playlists[s->DraggingIdx].Name, 63);
+            } else if (s->DatabaseType == 1 && s->SeratoDB && s->DraggingIdx < (int)s->SeratoDB->PlaylistCount) {
+              strncpy(s->PlaylistBank[bankIdx].Name, s->SeratoDB->Playlists[s->DraggingIdx].Name, 63);
+            }
+
+            printf("[BROWSER] Banked Playlist '%s' to Slot %d\n", s->PlaylistBank[bankIdx].Name, bankIdx + 1);
           }
         }
         s->IsDragging = false;
@@ -957,7 +1010,7 @@ static void Browser_Draw(Component *base) {
     Rectangle boxRect = {0, boxY, sidebarW, sidebarW};
     bool isHovered = CheckCollisionPointRec(mPos, boxRect);
     bool isBank = (i >= 4);
-    bool isAssigned = isBank && (s->PlaylistBankIdx[i - 4] >= 0);
+    bool isAssigned = isBank && (s->PlaylistBank[i - 4].PlaylistIdx >= 0);
 
     bool isActiveNav = false;
     if (!isBank) {
@@ -996,13 +1049,19 @@ static void Browser_Draw(Component *base) {
                                   : (isHovered ? ColorWhite : ColorShadow));
     } else {
       // Playlist Bank Placeholders (1-3)
-      char bankNum[4];
-      sprintf(bankNum, "P%d", i - 3);
-      // Draw a bookmark icon as a background for the bank spot
-      DrawCentredText("\uf02e", faceIcon, 0, sidebarW, boxY + S(8), S(14),
-                      isAssigned ? ColorWhite : ColorShadow);
-      DrawCentredText(bankNum, faceXS, 0, sidebarW, boxY + S(24), S(10),
-                      isAssigned ? ColorWhite : ColorShadow);
+      int bankIdx = i - 4;
+      if (s->PlaylistBank[bankIdx].PlaylistIdx >= 0) {
+        // Show truncated name (e.g. "Techno")
+        char displayName[8];
+        strncpy(displayName, s->PlaylistBank[bankIdx].Name, 7);
+        displayName[7] = '\0';
+        DrawCentredText(displayName, faceXS, 0, sidebarW, boxY + S(15), S(9), ColorWhite);
+      } else {
+        char bankNum[4];
+        sprintf(bankNum, "P%d", bankIdx + 1);
+        DrawCentredText("\uf02e", faceIcon, 0, sidebarW, boxY + S(8), S(14), ColorShadow);
+        DrawCentredText(bankNum, faceXS, 0, sidebarW, boxY + S(24), S(10), ColorShadow);
+      }
     }
   }
 

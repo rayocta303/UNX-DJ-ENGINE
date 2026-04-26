@@ -600,7 +600,7 @@ void App_Init(App *a) {
   a->browserState.IsActive = false;
   a->browserState.BrowseLevel = 3; // Source level
   for (int i = 0; i < 3; i++)
-    a->browserState.PlaylistBankIdx[i] = -1;
+    a->browserState.PlaylistBank[i].PlaylistIdx = -1;
 
 #if defined(__ANDROID__)
   UNX_LOG_INFO(

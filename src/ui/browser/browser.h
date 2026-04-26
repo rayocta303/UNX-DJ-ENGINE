@@ -42,7 +42,11 @@ typedef struct {
     struct DeckState *DeckB;
 
     // Playlist Bank (Slot shortcuts)
-    int PlaylistBankIdx[3]; // Stores index of playlist in DB->Playlists (-1 if empty)
+    struct {
+        int PlaylistIdx;       // -1 if empty
+        char StoragePath[512]; // Source storage path
+        char Name[64];         // Cached name for display
+    } PlaylistBank[3];
     
     // Drag and Drop (Mouse interaction)
     bool IsDragging;
