@@ -424,10 +424,54 @@ void TopBar_OnPad(void *ctx) {
 void OnPadPress(void *ctx, int deckIdx, int padIdx) {
   App *a = (App *)ctx;
   DeckState *ds = (deckIdx == 0) ? &a->deckA : &a->deckB;
-  if (ds->LoadedTrack && padIdx < ds->LoadedTrack->HotCuesCount) {
-    HotCue hc = ds->LoadedTrack->HotCues[padIdx];
-    ds->SeekMs = hc.Start;
-    ds->HasSeekRequest = true;
+  DeckAudioState *audio = &globalAudioEngine->Decks[deckIdx];
+  PadMode mode = a->padState.Mode[deckIdx];
+
+  if (!ds->LoadedTrack) return;
+
+  if (mode == PAD_MODE_HOT_CUE) {
+    if (padIdx < ds->LoadedTrack->HotCuesCount) {
+      HotCue hc = ds->LoadedTrack->HotCues[padIdx];
+      ds->SeekMs = hc.Start;
+      ds->HasSeekRequest = true;
+    }
+  } else if (mode == PAD_MODE_BEAT_LOOP || mode == PAD_MODE_SLIP_LOOP) {
+    // Loop lengths in beats
+    static float beatLengths[] = {0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f, 16.0f, 32.0f};
+    float beats = beatLengths[padIdx];
+    
+    double startPos = audio->Position;
+    if (ds->QuantizeEnabled && ds->LoadedTrack->BeatGridCount > 0) {
+        // Find nearest beat
+        double currentMs = (startPos / 44100.0) * 1000.0;
+        double nearestMs = currentMs;
+        double minDist = 10000.0;
+        for(int i=0; i<ds->LoadedTrack->BeatGridCount; i++) {
+            double d = fabs(ds->LoadedTrack->BeatGrid[i].Time - currentMs);
+            if (d < minDist) { minDist = d; nearestMs = ds->LoadedTrack->BeatGrid[i].Time; }
+        }
+        startPos = (nearestMs / 1000.0) * 44100.0;
+    }
+
+    double beatDurationMs = 60000.0 / (ds->CurrentBPM > 0 ? ds->CurrentBPM : 120.0);
+    double loopLengthSamples = (beats * beatDurationMs / 1000.0) * 44100.0;
+    
+    if (mode == PAD_MODE_SLIP_LOOP) {
+        DeckAudio_SetSlip(audio, true);
+    }
+    
+    DeckAudio_SetLoop(audio, true, startPos, startPos + loopLengthSamples);
+  }
+}
+
+void OnPadRelease(void *ctx, int deckIdx, int padIdx) {
+  App *a = (App *)ctx;
+  DeckAudioState *audio = &globalAudioEngine->Decks[deckIdx];
+  PadMode mode = a->padState.Mode[deckIdx];
+
+  if (mode == PAD_MODE_SLIP_LOOP) {
+    DeckAudio_ExitLoop(audio);
+    DeckAudio_SetSlip(audio, false);
   }
 }
 
@@ -690,6 +734,7 @@ void App_Init(App *a) {
   a->padState.Decks[1] = &a->deckB;
   PadRenderer_Init(&a->pad, &a->padState);
   a->pad.OnPadPress = OnPadPress;
+  a->pad.OnPadRelease = OnPadRelease;
   a->pad.callbackCtx = a;
 
   SplashRenderer_Init(&a->splash, &a->splashCounter);

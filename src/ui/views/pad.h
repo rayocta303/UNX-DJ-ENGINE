@@ -23,6 +23,7 @@ typedef struct {
     Component base;
     PadState *State;
     void (*OnPadPress)(void *ctx, int deckIdx, int padIdx);
+    void (*OnPadRelease)(void *ctx, int deckIdx, int padIdx);
     void (*OnModeChange)(void *ctx, int deckIdx, PadMode mode);
     void *callbackCtx;
 } PadRenderer;

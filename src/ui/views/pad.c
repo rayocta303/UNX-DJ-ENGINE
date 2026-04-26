@@ -13,6 +13,9 @@ static int Pad_Update(Component *base) {
     PadRenderer *r = (PadRenderer *)base;
     if (!r->State->IsActive) return 0;
 
+    static int pressedPad = -1;
+    static int pressedDeck = -1;
+
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         Vector2 mouse = UIGetMousePosition();
         float availableH = SCREEN_HEIGHT - TOP_BAR_H - DECK_STR_H;
@@ -55,10 +58,19 @@ static int Pad_Update(Component *base) {
                 Rectangle rect = { px, py, padW, padH };
 
                 if (CheckCollisionPointRec(mouse, rect)) {
+                    pressedPad = i;
+                    pressedDeck = d;
                     if (r->OnPadPress) r->OnPadPress(r->callbackCtx, d, i);
                     return 1;
                 }
             }
+        }
+    } else if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+        if (pressedPad != -1) {
+            if (r->OnPadRelease) r->OnPadRelease(r->callbackCtx, pressedDeck, pressedPad);
+            pressedPad = -1;
+            pressedDeck = -1;
+            return 1;
         }
     }
     return 0;
@@ -191,6 +203,7 @@ void PadRenderer_Init(PadRenderer *r, PadState *state) {
     r->base.Draw = Pad_Draw;
     r->State = state;
     r->OnPadPress = NULL;
+    r->OnPadRelease = NULL;
     r->OnModeChange = NULL;
     r->callbackCtx = NULL;
 }

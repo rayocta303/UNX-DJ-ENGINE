@@ -388,6 +388,10 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
                 // Use interpolation if position is fractional for high quality feeding
                 AudioEngine_GetSample(deck, deck->MT_ReadPos, &inBuf[j*2], &inBuf[j*2+1]);
                 deck->MT_ReadPos += (targetRate > 0) ? 1.0 : -1.0;
+                
+                if (deck->IsLooping && deck->MT_ReadPos >= deck->LoopEndPos) {
+                    deck->MT_ReadPos = deck->LoopStartPos;
+                }
             }
             st->putSamples(inBuf, toRead);
         }
@@ -402,6 +406,13 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
 
         // Logical position update: Accurate linear progression
         deck->Position += (double)received * targetRate;
+        if (deck->IsLooping && deck->Position >= deck->LoopEndPos) {
+            deck->Position = deck->LoopStartPos;
+        }
+
+        if (deck->SlipActive) {
+            deck->SlipPosition += (double)received * targetRate;
+        }
 
         for (int i = 0; i < (int)received; i++) {
             float l = outBuf[i*2], r = outBuf[i*2+1];
@@ -455,6 +466,14 @@ static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outC
             } else {
                 AudioEngine_GetSample(deck, deck->Position, &l, &r);
                 deck->Position += currentRate * (double)sampleRateRatio;
+            }
+
+            if (deck->IsLooping && deck->Position >= deck->LoopEndPos) {
+                deck->Position = deck->LoopStartPos;
+            }
+
+            if (deck->SlipActive) {
+                deck->SlipPosition += currentRate * (double)sampleRateRatio;
             }
             float lowL = EngineLR4_Process(&deck->EqLowStateL, l);
             float highL = EngineLR4_Process(&deck->EqHighStateL, l);
@@ -574,4 +593,35 @@ void DeckAudio_JumpToMs(DeckAudioState *deck, int64_t ms) {
         deck->MT_ReadPos = deck->Position;
     }
     if (deck->MasterTempoActive && deck->SoundTouchHandle) ((SoundTouch*)deck->SoundTouchHandle)->clear();
+}
+
+void DeckAudio_SetSlip(DeckAudioState *deck, bool active) {
+    if (active && !deck->SlipActive) {
+        deck->SlipPosition = deck->Position;
+    } else if (!active && deck->SlipActive) {
+        deck->Position = deck->SlipPosition;
+        deck->MT_ReadPos = deck->Position;
+        if (deck->SoundTouchHandle) {
+            ((soundtouch::SoundTouch*)deck->SoundTouchHandle)->clear();
+        }
+    }
+    deck->SlipActive = active;
+}
+
+void DeckAudio_SetLoop(DeckAudioState *deck, bool active, double startPos, double endPos) {
+    deck->LoopStartPos = startPos;
+    deck->LoopEndPos = endPos;
+    deck->IsLooping = active;
+    
+    if (active && deck->Position >= endPos) {
+        deck->Position = startPos;
+        deck->MT_ReadPos = startPos;
+        if (deck->SoundTouchHandle) {
+            ((soundtouch::SoundTouch*)deck->SoundTouchHandle)->clear();
+        }
+    }
+}
+
+void DeckAudio_ExitLoop(DeckAudioState *deck) {
+    deck->IsLooping = false;
 }

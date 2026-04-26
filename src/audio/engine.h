@@ -87,6 +87,13 @@ typedef struct DeckAudioState {
 
     bool IsCueActive; // Channel monitoring for headphones (Ch 3-4)
 
+    // Slip Mode & Looping
+    bool SlipActive;
+    double SlipPosition;        // "Ghost" position for slip mode
+    bool IsLooping;
+    double LoopStartPos;
+    double LoopEndPos;
+
     // VU Meter (Real-time tracking of DSP output peak for UI)
     float VuMeterL;
     float VuMeterR;
@@ -118,6 +125,10 @@ void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching);
 void DeckAudio_JumpToMs(DeckAudioState *deck, int64_t ms);
 void DeckAudio_QueueJumpMs(DeckAudioState *deck, uint32_t targetMs, uint32_t waitMs);
 void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch);
+
+void DeckAudio_SetSlip(DeckAudioState *deck, bool active);
+void DeckAudio_SetLoop(DeckAudioState *deck, bool active, double startPos, double endPos);
+void DeckAudio_ExitLoop(DeckAudioState *deck);
 
 #ifdef __cplusplus
 }
