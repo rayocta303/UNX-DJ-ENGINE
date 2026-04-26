@@ -17,6 +17,7 @@ typedef struct {
     bool IsActive;
     DeckState *Decks[2];
     PadMode Mode[2];
+    int ActiveLoopIdx[2]; // Index of active loop pad, -1 if none
 } PadState;
 
 typedef struct {

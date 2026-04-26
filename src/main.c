@@ -436,6 +436,13 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
       ds->HasSeekRequest = true;
     }
   } else if (mode == PAD_MODE_BEAT_LOOP || mode == PAD_MODE_SLIP_LOOP) {
+    if (mode == PAD_MODE_BEAT_LOOP && a->padState.ActiveLoopIdx[deckIdx] == padIdx) {
+        // Toggle OFF
+        DeckAudio_ExitLoop(audio);
+        a->padState.ActiveLoopIdx[deckIdx] = -1;
+        return;
+    }
+
     // Loop lengths in beats
     static float beatLengths[] = {0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f, 16.0f, 32.0f};
     float beats = beatLengths[padIdx];
@@ -458,6 +465,8 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
     
     if (mode == PAD_MODE_SLIP_LOOP) {
         DeckAudio_SetSlip(audio, true);
+    } else {
+        a->padState.ActiveLoopIdx[deckIdx] = padIdx;
     }
     
     DeckAudio_SetLoop(audio, true, startPos, startPos + loopLengthSamples);
@@ -472,6 +481,7 @@ void OnPadRelease(void *ctx, int deckIdx, int padIdx) {
   if (mode == PAD_MODE_SLIP_LOOP) {
     DeckAudio_ExitLoop(audio);
     DeckAudio_SetSlip(audio, false);
+    a->padState.ActiveLoopIdx[deckIdx] = -1;
   }
 }
 
@@ -732,6 +742,8 @@ void App_Init(App *a) {
   memset(&a->padState, 0, sizeof(PadState));
   a->padState.Decks[0] = &a->deckA;
   a->padState.Decks[1] = &a->deckB;
+  a->padState.ActiveLoopIdx[0] = -1;
+  a->padState.ActiveLoopIdx[1] = -1;
   PadRenderer_Init(&a->pad, &a->padState);
   a->pad.OnPadPress = OnPadPress;
   a->pad.OnPadRelease = OnPadRelease;

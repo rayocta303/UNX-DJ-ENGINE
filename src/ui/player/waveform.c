@@ -1,4 +1,5 @@
 #include "ui/player/waveform.h"
+#include "audio/engine.h"
 #include "core/logic/quantize.h"
 #include "rlgl.h"
 #include "ui/components/assets_bundle.h"
@@ -603,6 +604,36 @@ static void Waveform_Draw(Component *base) {
         // Subtle vertical line through waveform
         DrawRectangleV((Vector2){bx, wfY + S(8)}, (Vector2){1.0f, waveH - S(8)}, Fade(hcClr, 0.3f));
       }
+    }
+  }
+
+  // --- LOOP HIGHLIGHT ---
+  extern AudioEngine *globalAudioEngine;
+  if (globalAudioEngine) {
+    DeckAudioState *audio = &globalAudioEngine->Decks[r->ID];
+    if (audio->IsLooping) {
+        double loopStartHF = audio->LoopStartPos / 294.0;
+        double loopEndHF = audio->LoopEndPos / 294.0;
+        
+        float xStart = (float)((loopStartHF - elapsedHalfFrames) / (double)effectiveZoom);
+        float xEnd = (float)((loopEndHF - elapsedHalfFrames) / (double)effectiveZoom);
+        
+        float bxStart = playheadX + xStart;
+        float bxEnd = playheadX + xEnd;
+        
+        // Only draw if visible
+        if (bxEnd >= wfLeft && bxStart <= wfRight) {
+            float drawLeft = fmaxf(bxStart, wfLeft);
+            float drawRight = fminf(bxEnd, wfRight);
+            Color loopCol = r->State->IsMaster ? ColorOrange : ColorWhite;
+            DrawRectangleRec((Rectangle){drawLeft, wfY, drawRight - drawLeft, waveH}, Fade(loopCol, 0.25f));
+            
+            // Draw boundaries
+            if (bxStart >= wfLeft && bxStart <= wfRight)
+                DrawLineEx((Vector2){bxStart, wfY}, (Vector2){bxStart, wfY + waveH}, 2.0f, loopCol);
+            if (bxEnd >= wfLeft && bxEnd <= wfRight)
+                DrawLineEx((Vector2){bxEnd, wfY}, (Vector2){bxEnd, wfY + waveH}, 2.0f, loopCol);
+        }
     }
   }
 

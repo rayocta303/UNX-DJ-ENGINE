@@ -165,10 +165,11 @@ static void Pad_Draw(Component *base) {
                     padColor = GetCueColor(hc, ColorOrange);
                     hasData = true;
                 }
-            } else if (mode == PAD_MODE_BEAT_LOOP) {
-                padColor = ColorGreen; hasData = true;
-            } else if (mode == PAD_MODE_SLIP_LOOP) {
-                padColor = ColorYellow; hasData = true;
+            } else if (mode == PAD_MODE_BEAT_LOOP || mode == PAD_MODE_SLIP_LOOP) {
+                bool isActive = (r->State->ActiveLoopIdx[d] == i);
+                if (mode == PAD_MODE_BEAT_LOOP) padColor = ColorGreen;
+                else padColor = ColorYellow;
+                hasData = isActive;
             } else if (mode == PAD_MODE_BEAT_JUMP) {
                 padColor = ColorOrange; hasData = true;
             } else if (mode == PAD_MODE_GATE_CUE) {
