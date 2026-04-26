@@ -426,6 +426,9 @@ static void Waveform_Draw(Component *base) {
   double framesPerPixel = zoomDelta;
   
   // Calculate exact visible distance from center to edges, plus a 10px buffer
+  // --- STEP 1: CALCULATE VISIBLE RANGE (RANGE-VISION) ---
+  // We only process frames that are within the viewport (plus a small margin).
+  // This allows the engine to handle hours-long tracks with constant, low CPU usage.
   float distLeft = centerX - wfLeft;
   float distRight = wfRight - centerX;
   float maxVisibleDist = (distLeft > distRight) ? distLeft : distRight;
@@ -441,6 +444,9 @@ static void Waveform_Draw(Component *base) {
   if (endFrame > wfFrames)
     endFrame = wfFrames;
 
+  // --- STEP 2: LEVEL OF DETAIL (LOD) & PIXEL BINNING ---
+  // 'renderStep' determines how many audio frames represent one visual pixel.
+  // Grouping frames reduces GPU vertex traffic significantly when zoomed out.
   int renderStep = (int)floor(framesPerPixel);
   if (renderStep < 1) renderStep = 1;
 
@@ -451,7 +457,9 @@ static void Waveform_Draw(Component *base) {
 
   rlBegin(RL_TRIANGLES);
   for (int64_t i = startFrame; i < endFrame; i++) {
-    // 1. Sample raw data (decode every frame for smoother accuracy)
+    // --- STEP 3A: SAMPLE & DECODE EVERY FRAME ---
+    // We decode every single frame (step = 1) to ensure the smoothing filter
+    // captures all peaks. Skipping frames causes missing data and flickering.
     float rL = 0, rM = 0, rH = 0;
     Color colRaw = {0, 0, 0, 255};
 
@@ -481,7 +489,8 @@ static void Waveform_Draw(Component *base) {
       }
     }
 
-    // 2. Update smoothed state (essential for visual stability)
+    // --- STEP 3B: ATTACK/RELEASE SMOOTHING ---
+    // Simulates an analog-style envelope for smooth peak transitions.
     smLo += (rL - smLo) * ((rL > smLo) ? ATK : REL);
     smMi += (rM - smMi) * ((rM > smMi) ? ATK : REL);
     smHi += (rH - smHi) * ((rH > smHi) ? ATK : REL);
@@ -499,8 +508,9 @@ static void Waveform_Draw(Component *base) {
       continue;
     }
 
-    // 3. Output geometry at fixed frame intervals (anchored to data, not screen)
-    // This fixes the "Jello" effect because the binning doesn't shift every frame.
+    // --- STEP 3C: ANCHORED BINNING GEOMETRY OUTPUT ---
+    // We only push vertices to the GPU at fixed frame intervals (i % renderStep).
+    // This 'anchoring' to frame indices prevents the "Jello" effect during scroll.
     if ((i % renderStep == 0) || (i == endFrame - 1)) {
       float cx0 = (float)(((double)lastDrawnFrame - elapsedHalfFrames * r->dataDensity) / framesPerPixel + centerX);
       float cx1 = (float)(((double)i - elapsedHalfFrames * r->dataDensity) / framesPerPixel + centerX);
