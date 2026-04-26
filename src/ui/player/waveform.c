@@ -612,8 +612,9 @@ static void Waveform_Draw(Component *base) {
   if (globalAudioEngine) {
     DeckAudioState *audio = &globalAudioEngine->Decks[r->ID];
     if (audio->IsLooping) {
-        double loopStartHF = audio->LoopStartPos / 294.0;
-        double loopEndHF = audio->LoopEndPos / 294.0;
+        double ratioHF = (double)audio->SampleRate / 150.0;
+        double loopStartHF = audio->LoopStartPos / ratioHF;
+        double loopEndHF = audio->LoopEndPos / ratioHF;
         
         float xStart = (float)((loopStartHF - elapsedHalfFrames) / (double)effectiveZoom);
         float xEnd = (float)((loopEndHF - elapsedHalfFrames) / (double)effectiveZoom);

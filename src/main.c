@@ -449,10 +449,11 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
     
     double startPos = audio->Position;
     double loopLengthSamples = 0;
+    double trackSR = (double)audio->SampleRate;
 
     if (ds->QuantizeEnabled && ds->LoadedTrack && ds->LoadedTrack->BeatGridCount > 0) {
         // Find nearest beat index
-        double currentMs = (startPos / 44100.0) * 1000.0;
+        double currentMs = (startPos / trackSR) * 1000.0;
         int nearestIdx = 0;
         double minDist = 10000.0;
         for(int i=0; i<ds->LoadedTrack->BeatGridCount; i++) {
@@ -460,7 +461,7 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
             if (d < minDist) { minDist = d; nearestIdx = i; }
         }
         
-        startPos = (ds->LoadedTrack->BeatGrid[nearestIdx].Time / 1000.0) * 44100.0;
+        startPos = (ds->LoadedTrack->BeatGrid[nearestIdx].Time / 1000.0) * trackSR;
         
         // Calculate end pos using grid if possible (assuming 1 grid entry per beat)
         int beatsCount = (int)beats;
@@ -470,22 +471,22 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
                                 ds->LoadedTrack->BeatGrid[nearestIdx+1].Time : 
                                 (ds->LoadedTrack->BeatGrid[nearestIdx].Time + (60000.0 / ds->CurrentBPM));
             double beatDurationMs = nextBeatMs - ds->LoadedTrack->BeatGrid[nearestIdx].Time;
-            loopLengthSamples = (beats * beatDurationMs / 1000.0) * 44100.0;
+            loopLengthSamples = (beats * beatDurationMs / 1000.0) * trackSR;
         } else {
             int endIdx = nearestIdx + beatsCount;
             if (endIdx < ds->LoadedTrack->BeatGridCount) {
                 double endMs = ds->LoadedTrack->BeatGrid[endIdx].Time;
-                loopLengthSamples = ((endMs - ds->LoadedTrack->BeatGrid[nearestIdx].Time) / 1000.0) * 44100.0;
+                loopLengthSamples = ((endMs - ds->LoadedTrack->BeatGrid[nearestIdx].Time) / 1000.0) * trackSR;
             } else {
                 // Fallback to BPM
                 double beatDurationMs = 60000.0 / (ds->CurrentBPM > 0 ? ds->CurrentBPM : 120.0);
-                loopLengthSamples = (beats * beatDurationMs / 1000.0) * 44100.0;
+                loopLengthSamples = (beats * beatDurationMs / 1000.0) * trackSR;
             }
         }
     } else {
         // Standard BPM based loop
         double beatDurationMs = 60000.0 / (ds->CurrentBPM > 0 ? ds->CurrentBPM : 120.0);
-        loopLengthSamples = (beats * beatDurationMs / 1000.0) * 44100.0;
+        loopLengthSamples = (beats * beatDurationMs / 1000.0) * trackSR;
     }
     
     if (mode == PAD_MODE_SLIP_LOOP) {
