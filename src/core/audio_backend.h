@@ -23,6 +23,7 @@ typedef struct {
     int CueOutR;          // Index of channel (e.g. 3 for CH 4)
     int SampleRate;       // 44100, 48000, etc.
     int BufferSizeFrames; // 128, 256, 512, 1024
+    int PCMBitDepth;      // 16 or 24
 } AudioBackendConfig;
 
 typedef void (*AudioBackendCallback)(float* buffer, unsigned int frames);

@@ -30,9 +30,10 @@ typedef struct BiquadState {
 } BiquadState;
 
 typedef struct DeckAudioState {
-    int16_t *PCMBuffer;           // Full track audio decoded (interleaved L/R)
+    void *PCMBuffer;            // Full track audio decoded (interleaved L/R)
     uint32_t TotalSamples;      // Total samples in buffer
     uint32_t SampleRate;        // Original sample rate (e.g. 44100, 48000)
+    int BitDepth;               // 16 or 24
     
     // Core playback state (from XDJ-X firmware concept)
     double Position;            // Read head position (exact fractional sample index)
@@ -102,6 +103,7 @@ typedef struct AudioEngine {
 
 void AudioEngine_Init(AudioEngine *engine, uint32_t outputSampleRate);
 void AudioEngine_SetOutputSampleRate(AudioEngine *engine, uint32_t sampleRate);
+void AudioEngine_SetPCMBitDepth(AudioEngine *engine, int bitDepth);
 void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames);
 
 void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath);

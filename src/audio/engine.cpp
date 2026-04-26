@@ -68,6 +68,12 @@ void AudioEngine_SetOutputSampleRate(AudioEngine *engine, uint32_t sampleRate) {
     }
 }
 
+void AudioEngine_SetPCMBitDepth(AudioEngine *engine, int bitDepth) {
+    for (int i = 0; i < MAX_DECKS; i++) {
+        engine->Decks[i].BitDepth = bitDepth;
+    }
+}
+
 void AudioEngine_Destroy(AudioEngine *engine) {
     for (int i = 0; i < MAX_DECKS; i++) {
         if (engine->Decks[i].SoundTouchHandle) {
@@ -79,7 +85,7 @@ void AudioEngine_Destroy(AudioEngine *engine) {
 
 void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
     if (deck->PCMBuffer) {
-        int16_t *oldBuf = deck->PCMBuffer;
+        void *oldBuf = deck->PCMBuffer;
         deck->PCMBuffer = NULL;
         deck->TotalSamples = 0;
         free(oldBuf);
@@ -107,29 +113,55 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
         unsigned int channels;
         unsigned int sampleRate;
         drwav_uint64 totalPCMFrameCount;
-        int16_t *pSampleData = drwav_open_file_and_read_pcm_frames_s16(filePath, &channels, &sampleRate, &totalPCMFrameCount, NULL);
-
-        if (pSampleData) {
-            if (channels == 1) {
-                int16_t *stereoBuf = (int16_t *)malloc(totalPCMFrameCount * 2 * sizeof(int16_t));
-                if (stereoBuf) {
-                    for (drwav_uint64 i = 0; i < totalPCMFrameCount; i++) {
-                        stereoBuf[i*2] = pSampleData[i];
-                        stereoBuf[i*2 + 1] = pSampleData[i];
+        
+        if (deck->BitDepth == 24) {
+            int32_t *pSampleData = drwav_open_file_and_read_pcm_frames_s32(filePath, &channels, &sampleRate, &totalPCMFrameCount, NULL);
+            if (pSampleData) {
+                if (channels == 1) {
+                    int32_t *stereoBuf = (int32_t *)malloc(totalPCMFrameCount * 2 * sizeof(int32_t));
+                    if (stereoBuf) {
+                        for (drwav_uint64 i = 0; i < totalPCMFrameCount; i++) {
+                            stereoBuf[i*2] = pSampleData[i];
+                            stereoBuf[i*2 + 1] = pSampleData[i];
+                        }
+                        drwav_free(pSampleData, NULL);
+                        deck->PCMBuffer = stereoBuf;
+                        deck->TotalSamples = totalPCMFrameCount * 2;
+                    } else {
+                        drwav_free(pSampleData, NULL);
+                        deck->PCMBuffer = NULL;
+                        deck->TotalSamples = 0;
                     }
-                    drwav_free(pSampleData, NULL);
-                    deck->PCMBuffer = stereoBuf;
-                    deck->TotalSamples = totalPCMFrameCount * 2;
                 } else {
-                    drwav_free(pSampleData, NULL);
-                    deck->PCMBuffer = NULL;
-                    deck->TotalSamples = 0;
+                    deck->PCMBuffer = pSampleData;
+                    deck->TotalSamples = totalPCMFrameCount * channels;
                 }
-            } else {
-                deck->PCMBuffer = pSampleData;
-                deck->TotalSamples = totalPCMFrameCount * channels;
+                deck->SampleRate = sampleRate;
             }
-            deck->SampleRate = sampleRate;
+        } else {
+            int16_t *pSampleData = drwav_open_file_and_read_pcm_frames_s16(filePath, &channels, &sampleRate, &totalPCMFrameCount, NULL);
+            if (pSampleData) {
+                if (channels == 1) {
+                    int16_t *stereoBuf = (int16_t *)malloc(totalPCMFrameCount * 2 * sizeof(int16_t));
+                    if (stereoBuf) {
+                        for (drwav_uint64 i = 0; i < totalPCMFrameCount; i++) {
+                            stereoBuf[i*2] = pSampleData[i];
+                            stereoBuf[i*2 + 1] = pSampleData[i];
+                        }
+                        drwav_free(pSampleData, NULL);
+                        deck->PCMBuffer = stereoBuf;
+                        deck->TotalSamples = totalPCMFrameCount * 2;
+                    } else {
+                        drwav_free(pSampleData, NULL);
+                        deck->PCMBuffer = NULL;
+                        deck->TotalSamples = 0;
+                    }
+                } else {
+                    deck->PCMBuffer = pSampleData;
+                    deck->TotalSamples = totalPCMFrameCount * channels;
+                }
+                deck->SampleRate = sampleRate;
+            }
         }
     } else {
         mp3dec_t mp3d;
@@ -137,24 +169,49 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
         int res = mp3dec_load(&mp3d, filePath, &info, NULL, NULL);
 
         if (res == 0) {
-            if (info.channels == 1) {
-                int16_t *stereoBuf = (int16_t *)malloc(info.samples * 2 * sizeof(int16_t));
-                if (stereoBuf) {
-                    for (size_t i = 0; i < info.samples; i++) {
-                        stereoBuf[i*2] = info.buffer[i];
-                        stereoBuf[i*2 + 1] = info.buffer[i];
+            if (deck->BitDepth == 24) {
+                // Convert 16-bit MP3 samples to 24-bit (stored in 32-bit int)
+                int32_t *buf24 = (int32_t *)malloc(info.samples * (info.channels == 1 ? 2 : 1) * sizeof(int32_t));
+                if (buf24) {
+                    if (info.channels == 1) {
+                        for (size_t i = 0; i < info.samples; i++) {
+                            int32_t s = (int32_t)info.buffer[i] << 16;
+                            buf24[i*2] = s;
+                            buf24[i*2 + 1] = s;
+                        }
+                    } else {
+                        for (size_t i = 0; i < info.samples; i++) {
+                            buf24[i] = (int32_t)info.buffer[i] << 16;
+                        }
                     }
                     free(info.buffer);
-                    deck->PCMBuffer = stereoBuf;
-                    deck->TotalSamples = info.samples * 2;
+                    deck->PCMBuffer = buf24;
+                    deck->TotalSamples = info.samples * (info.channels == 1 ? 2 : 1);
                 } else {
                     free(info.buffer);
                     deck->PCMBuffer = NULL;
                     deck->TotalSamples = 0;
                 }
             } else {
-                deck->PCMBuffer = info.buffer;
-                deck->TotalSamples = info.samples;
+                if (info.channels == 1) {
+                    int16_t *stereoBuf = (int16_t *)malloc(info.samples * 2 * sizeof(int16_t));
+                    if (stereoBuf) {
+                        for (size_t i = 0; i < info.samples; i++) {
+                            stereoBuf[i*2] = info.buffer[i];
+                            stereoBuf[i*2 + 1] = info.buffer[i];
+                        }
+                        free(info.buffer);
+                        deck->PCMBuffer = stereoBuf;
+                        deck->TotalSamples = info.samples * 2;
+                    } else {
+                        free(info.buffer);
+                        deck->PCMBuffer = NULL;
+                        deck->TotalSamples = 0;
+                    }
+                } else {
+                    deck->PCMBuffer = info.buffer;
+                    deck->TotalSamples = info.samples;
+                }
             }
             deck->SampleRate = info.hz;
         }
@@ -187,10 +244,18 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
     deck->IsPlaying = (fabs(deck->OutlinedRate) > 0.001);
 }
 
+static inline float SampleToFloat(void* buffer, int index, int bitDepth) {
+    if (bitDepth == 24) {
+        return (float)((int32_t*)buffer)[index] / 2147483648.0f;
+    } else {
+        return (float)((int16_t*)buffer)[index] / 32768.0f;
+    }
+}
+
 static inline void AudioEngine_GetSampleDirect(DeckAudioState* deck, int i, float* l, float* r) {
     if (i < 0 || i >= (int)(deck->TotalSamples / 2)) { *l = 0; *r = 0; return; }
-    *l = (float)deck->PCMBuffer[i * 2] / 32768.0f;
-    *r = (float)deck->PCMBuffer[i * 2 + 1] / 32768.0f;
+    *l = SampleToFloat(deck->PCMBuffer, i * 2, deck->BitDepth);
+    *r = SampleToFloat(deck->PCMBuffer, i * 2 + 1, deck->BitDepth);
 }
 
 static inline void AudioEngine_GetSample(DeckAudioState* deck, double pos, float* l, float* r) {
@@ -199,15 +264,15 @@ static inline void AudioEngine_GetSample(DeckAudioState* deck, double pos, float
     float f = (float)(pos - i);
     if (i >= (int)((deck->TotalSamples / 2) - 3)) { *l = 0; *r = 0; return; }
 
-    float y0_l = (float)deck->PCMBuffer[(i - 1) * 2] / 32768.0f;
-    float y1_l = (float)deck->PCMBuffer[i * 2] / 32768.0f;
-    float y2_l = (float)deck->PCMBuffer[(i + 1) * 2] / 32768.0f;
-    float y3_l = (float)deck->PCMBuffer[(i + 2) * 2] / 32768.0f;
+    float y0_l = SampleToFloat(deck->PCMBuffer, (i - 1) * 2, deck->BitDepth);
+    float y1_l = SampleToFloat(deck->PCMBuffer, i * 2, deck->BitDepth);
+    float y2_l = SampleToFloat(deck->PCMBuffer, (i + 1) * 2, deck->BitDepth);
+    float y3_l = SampleToFloat(deck->PCMBuffer, (i + 2) * 2, deck->BitDepth);
 
-    float y0_r = (float)deck->PCMBuffer[(i - 1) * 2 + 1] / 32768.0f;
-    float y1_r = (float)deck->PCMBuffer[i * 2 + 1] / 32768.0f;
-    float y2_r = (float)deck->PCMBuffer[(i + 1) * 2 + 1] / 32768.0f;
-    float y3_r = (float)deck->PCMBuffer[(i + 2) * 2 + 1] / 32768.0f;
+    float y0_r = SampleToFloat(deck->PCMBuffer, (i - 1) * 2 + 1, deck->BitDepth);
+    float y1_r = SampleToFloat(deck->PCMBuffer, i * 2 + 1, deck->BitDepth);
+    float y2_r = SampleToFloat(deck->PCMBuffer, (i + 1) * 2 + 1, deck->BitDepth);
+    float y3_r = SampleToFloat(deck->PCMBuffer, (i + 2) * 2 + 1, deck->BitDepth);
 
     if (f < 0.0001f) {
         *l = y1_l;

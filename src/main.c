@@ -184,6 +184,7 @@ void OnSettingsApply(void *ctx) {
       .CueOutL = a->settingsState.Items[11].Current - 1,
       .CueOutR = a->settingsState.Items[12].Current - 1,
       .SampleRate = (a->settingsState.Items[14].Current == 0) ? 44100 : 48000,
+      .PCMBitDepth = (a->settingsState.Items[15].Current == 0) ? 16 : 24,
   };
   int bufMap[] = {128, 256, 512, 1024};
   aconf.BufferSizeFrames = bufMap[a->settingsState.Items[13].Current];
@@ -209,10 +210,22 @@ void OnSettingsApply(void *ctx) {
       AudioBackend_GetActiveInfo(NULL, &actualSR, NULL, NULL);
       if (globalAudioEngine)
         AudioEngine_SetOutputSampleRate(globalAudioEngine, actualSR);
+      
+      // Update bit depth in engine
+      if (globalAudioEngine)
+        AudioEngine_SetPCMBitDepth(globalAudioEngine, aconf.PCMBitDepth);
 
       // Update active driver info in About screen
       AudioBackend_GetActiveInfo(NULL, NULL, a->aboutState.AudioDriver,
                                  a->aboutState.AudioDevice);
+    }
+  } else {
+    // Hardware didn't change, but software preference might have
+    if (aconf.PCMBitDepth != a->activeAudioConfig.PCMBitDepth) {
+      a->activeAudioConfig.PCMBitDepth = aconf.PCMBitDepth;
+      if (globalAudioEngine)
+        AudioEngine_SetPCMBitDepth(globalAudioEngine, aconf.PCMBitDepth);
+      UNX_LOG_INFO("[SETTINGS] PCM Bit Depth changed to %d-bit", aconf.PCMBitDepth);
     }
   }
 
@@ -610,14 +623,22 @@ void App_Init(App *a) {
   a->settingsState.Items[14].Current =
       (a->activeAudioConfig.SampleRate == 44100) ? 0 : 1;
 
-  strcpy(a->settingsState.Items[15].Label, "ABOUT");
-  a->settingsState.Items[15].Type = SETTING_TYPE_ACTION;
-  a->settingsState.Items[15].Category = SETTING_CAT_SYSTEM;
+  strcpy(a->settingsState.Items[15].Label, "PCM BIT DEPTH");
+  a->settingsState.Items[15].Type = SETTING_TYPE_LIST;
+  a->settingsState.Items[15].OptionsCount = 2;
+  strcpy(a->settingsState.Items[15].Options[0], "16-bit (RAM Save)");
+  strcpy(a->settingsState.Items[15].Options[1], "24-bit (Quality)");
+  a->settingsState.Items[15].Current = (a->activeAudioConfig.PCMBitDepth == 24) ? 1 : 0;
+  a->settingsState.Items[15].Category = SETTING_CAT_AUDIO;
 
-  strcpy(a->settingsState.Items[16].Label, "EXIT APPLICATION");
+  strcpy(a->settingsState.Items[16].Label, "ABOUT");
   a->settingsState.Items[16].Type = SETTING_TYPE_ACTION;
   a->settingsState.Items[16].Category = SETTING_CAT_SYSTEM;
-  a->settingsState.ItemsCount = 17;
+
+  strcpy(a->settingsState.Items[17].Label, "EXIT APPLICATION");
+  a->settingsState.Items[17].Type = SETTING_TYPE_ACTION;
+  a->settingsState.Items[17].Category = SETTING_CAT_SYSTEM;
+  a->settingsState.ItemsCount = 18;
 
   // Set Load Lock current opt
   a->settingsState.Items[1].Current = a->deckA.Waveform.LoadLock ? 1 : 0;

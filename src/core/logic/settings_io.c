@@ -42,6 +42,7 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         if (sscanf(strstr(p, "\"cueR\""), "\"cueR\": %d", &ival) == 1) audio->CueOutR = ival;
         if (sscanf(strstr(p, "\"sr\""), "\"sr\": %d", &ival) == 1) audio->SampleRate = ival;
         if (sscanf(strstr(p, "\"buf\""), "\"buf\": %d", &ival) == 1) audio->BufferSizeFrames = ival;
+        if (sscanf(strstr(p, "\"bitdepth\""), "\"bitdepth\": %d", &ival) == 1) audio->PCMBitDepth = ival;
     }
     // Controllers
     if ((p = strstr(json, "\"controllers\""))) {
@@ -69,7 +70,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     audio->DeviceIndex = -1;
     audio->MasterOutL = 0; audio->MasterOutR = 1;
     audio->CueOutL = 2; audio->CueOutR = 3;
-    audio->SampleRate = 48000; audio->BufferSizeFrames = 256;
+    audio->SampleRate = 48000; audio->BufferSizeFrames = 256; audio->PCMBitDepth = 16;
 
     char path[512];
     const char *basePath = "";
@@ -150,8 +151,8 @@ void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendCon
             wfmA.Style, wfmA.GainLow, wfmA.GainMid, wfmA.GainHigh, wfmA.VinylStartMs, wfmA.VinylStopMs, wfmA.LoadLock ? 1 : 0);
     fprintf(f, "  \"wfmB\": { \"style\": %d, \"low\": %.2f, \"mid\": %.2f, \"high\": %.2f, \"start\": %.1f, \"stop\": %.1f, \"lock\": %d },\n", 
             wfmB.Style, wfmB.GainLow, wfmB.GainMid, wfmB.GainHigh, wfmB.VinylStartMs, wfmB.VinylStopMs, wfmB.LoadLock ? 1 : 0);
-    fprintf(f, "  \"audio\": { \"devIdx\": %d, \"mastL\": %d, \"mastR\": %d, \"cueL\": %d, \"cueR\": %d, \"sr\": %d, \"buf\": %d },\n",
-            audio.DeviceIndex, audio.MasterOutL, audio.MasterOutR, audio.CueOutL, audio.CueOutR, audio.SampleRate, audio.BufferSizeFrames);
+    fprintf(f, "  \"audio\": { \"devIdx\": %d, \"mastL\": %d, \"mastR\": %d, \"cueL\": %d, \"cueR\": %d, \"sr\": %d, \"buf\": %d, \"bitdepth\": %d },\n",
+            audio.DeviceIndex, audio.MasterOutL, audio.MasterOutR, audio.CueOutL, audio.CueOutR, audio.SampleRate, audio.BufferSizeFrames, audio.PCMBitDepth);
     fprintf(f, "  \"controllers\": { \"path\": \"%s\" }\n", controllerPath ? controllerPath : "");
     fprintf(f, "}\n");
 
