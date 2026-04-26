@@ -8,7 +8,23 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+// Helper to find the current beat number (1, 2, 3, or 4) based on playhead position
+static int GetCurrentBeat(TrackState *track, double positionMs) {
+  if (!track || !track->BeatGrid) return 1;
+  int currentBeat = 1;
 
+  for (int i = 0; i < track->BeatGridCount; i++) {
+    unsigned int ms = track->BeatGrid[i].Time;
+    if (ms == 0xFFFFFFFF || ms == 0) break; 
+    
+    if ((double)ms <= positionMs) {
+      currentBeat = track->BeatGrid[i].BeatNumber;
+    } else {
+      break;
+    }
+  }
+  return currentBeat;
+}
 static int Waveform_Update(Component *base) {
   WaveformRenderer *r = (WaveformRenderer *)base;
 
@@ -609,40 +625,53 @@ static void Waveform_Draw(Component *base) {
   EndScissorMode();
 
   // --- Phase Meter UI ---
-  if (r->State->LoadedTrack && r->OtherDeck && r->OtherDeck->LoadedTrack) {
-    float pmY = wfY + S(4);
-    float pmW = S(160);
+  if (r->State->LoadedTrack) {
+    float pmW = S(140); // Total width of the 4 blocks
+    float pmH = S(10);  // Height of main blocks
     float pmX = wfLeft + (wfW / 2.0f) - (pmW / 2.0f);
-    float pmH = S(8);
+    float pmY = wfY + S(4);
 
-    DrawRectangleLines(pmX, pmY, pmW, pmH, ColorShadow);
-    DrawLine(pmX + pmW / 2, pmY, pmX + pmW / 2, pmY + pmH, ColorOrange);
+    // Get current beat (1-4) and map it to a 0-3 index for the blocks
+    int myBeat = GetCurrentBeat(r->State->LoadedTrack, r->State->PositionMs);
+    int myDisplayBeat = ((myBeat - 1) % 4);
 
-    int32_t myPhase =
-        Quantize_GetPhaseErrorMs(r->State->LoadedTrack, r->State->PositionMs);
-    int32_t otherPhase = Quantize_GetPhaseErrorMs(r->OtherDeck->LoadedTrack,
-                                                  r->OtherDeck->PositionMs);
+    float blockSpacing = S(4);
+    float blockW = (pmW - (3 * blockSpacing)) / 4.0f;
 
-    int32_t phaseDiff = myPhase - otherPhase;
+    // Draw Main Deck (This Deck) - Large Blocks
+    for (int i = 0; i < 4; i++) {
+      float bx = pmX + i * (blockW + blockSpacing);
+      
+      // Draw empty box outline
+      DrawRectangleLines(bx, pmY, blockW, pmH, ColorShadow);
+      
+      // Fill the box if it's the current beat
+      if (i == myDisplayBeat) {
+        Color c = r->State->IsMaster ? ColorOrange : ColorWhite;
+        DrawRectangle(bx, pmY, blockW, pmH, c);
+      }
+    }
 
-    float maxDrift = 150.0f;
-    float driftRatio = (float)phaseDiff / maxDrift;
-    if (driftRatio > 1.0f)
-      driftRatio = 1.0f;
-    if (driftRatio < -1.0f)
-      driftRatio = -1.0f;
-
-    float blockW = S(16);
-    float blockX =
-        (pmX + pmW / 2) + (driftRatio * (pmW / 2.0f)) - (blockW / 2.0f);
-
-    Color blockColor = ColorWhite;
-    if (r->State->IsMaster)
-      blockColor = ColorOrange;
-    else if (r->State->SyncMode == 2 && abs(phaseDiff) < 5)
-      blockColor = (Color){0, 255, 255, 255};
-
-    DrawRectangle(blockX, pmY + S(1), blockW, pmH - S(2), blockColor);
+    // Draw Other Deck - Small blocks underneath (for visual beat matching)
+    if (r->OtherDeck && r->OtherDeck->LoadedTrack) {
+      int otherBeat = GetCurrentBeat(r->OtherDeck->LoadedTrack, r->OtherDeck->PositionMs);
+      int otherDisplayBeat = ((otherBeat - 1) % 4);
+      
+      float otherY = pmY + pmH + S(2);
+      float otherH = S(4); // Smaller height for the secondary track
+      
+      for (int i = 0; i < 4; i++) {
+        float bx = pmX + i * (blockW + blockSpacing);
+        
+        DrawRectangleLines(bx, otherY, blockW, otherH, ColorShadow);
+        
+        if (i == otherDisplayBeat) {
+          // Dim the other deck's color slightly unless it's the master
+          Color c = r->OtherDeck->IsMaster ? ColorOrange : Fade(ColorWhite, 0.6f);
+          DrawRectangle(bx, otherY, blockW, otherH, c);
+        }
+      }
+    }
   }
 }
 
