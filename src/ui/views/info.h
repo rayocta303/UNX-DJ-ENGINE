@@ -18,6 +18,7 @@ typedef struct {
   int Year;
   char Comment[256];
   char ArtworkPath[256];
+  void *ArtworkTexture; // Pointer to Texture2D in DeckState
 } InfoTrack;
 
 typedef struct {

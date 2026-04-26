@@ -24,9 +24,6 @@ static int Info_Update(Component *base) {
   return 0; // nothing to do
 }
 
-static Texture2D deckArt[2] = {0};
-static char lastArtPath[2][256] = {{0}, {0}};
-
 static void Info_Draw(Component *base) {
   InfoRenderer *r = (InfoRenderer *)base;
   if (!r->State->IsActive)
@@ -54,23 +51,9 @@ static void Info_Draw(Component *base) {
     float panelY = baseY + S(4);
     InfoTrack *trk = &r->State->Tracks[i];
 
-    // Artwork Management
-    if (strcmp(trk->ArtworkPath, lastArtPath[i]) != 0) {
-      if (deckArt[i].id != 0)
-        UnloadTexture(deckArt[i]);
-      deckArt[i] = (Texture2D){0};
-
-      if (trk->ArtworkPath[0] != '\0') {
-        Image img = LoadImage(trk->ArtworkPath);
-        if (img.data != NULL) {
-          ImageResize(&img, (int)S(70), (int)S(70));
-          deckArt[i] = LoadTextureFromImage(img);
-          UnloadImage(img);
-          SetTextureFilter(deckArt[i], TEXTURE_FILTER_BILINEAR);
-        }
-      }
-      strncpy(lastArtPath[i], trk->ArtworkPath, 255);
-    }
+    // Use global artwork from DeckState
+    Texture2D *tex = (Texture2D *)trk->ArtworkTexture;
+    bool hasArtwork = (tex && tex->id != 0);
 
     // Panel Background
     DrawRectangleRec((Rectangle){panelX, panelY, panelW, panelH}, ColorDark2);
@@ -88,10 +71,11 @@ static void Info_Draw(Component *base) {
     float artY = panelY + S(22);
 
     // Draw Artwork
-    if (deckArt[i].id != 0) {
-      DrawTexture(deckArt[i], contentX, artY, ColorWhite);
-      DrawRectangleLinesEx((Rectangle){contentX, artY, artSize, artSize}, 1,
-                           ColorShadow);
+    if (hasArtwork) {
+      Rectangle src = {0, 0, (float)tex->width, (float)tex->height};
+      Rectangle dest = {contentX, artY, artSize, artSize};
+      DrawTexturePro(*tex, src, dest, (Vector2){0, 0}, 0, ColorWhite);
+      DrawRectangleLinesEx(dest, 1, ColorShadow);
     } else {
       DrawRectangle(contentX, artY, artSize, artSize, ColorDark3);
       DrawRectangleLinesEx((Rectangle){contentX, artY, artSize, artSize}, 1,
@@ -228,9 +212,10 @@ static void Info_Draw(Component *base) {
     }
 
     // DEBUG: Artwork Path (Always show if present)
-    if (trk->ArtworkPath[0]) {
-      UIDrawText(trk->ArtworkPath, faceXXS, panelX + S(10), panelY + panelH - S(16), S(6), ColorRed);
-    }
+    // if (trk->ArtworkPath[0]) {
+    //   UIDrawText(trk->ArtworkPath, faceXXS, panelX + S(10), panelY + panelH -
+    //   S(16), S(6), ColorRed);
+    // }
   }
 }
 

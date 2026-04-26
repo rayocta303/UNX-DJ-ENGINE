@@ -25,6 +25,7 @@ static void drawLeftBadgeColumn(DeckStrip *d, float x, float y, float h) {
   }
   
   DrawRectangle(lColX, y, lColW, h, ColorDark3);
+
   DrawRectangle(lColX, y, lColW, S(headH), headColor);
   DrawRectangle(lColX, y + S(headH) - S(1), lColW, S(1), ColorShadow);
 

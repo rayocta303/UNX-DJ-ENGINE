@@ -44,6 +44,32 @@
 #include <unistd.h>
 #endif
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+// Custom loader to bypass Raylib DLL format limitations (e.g. missing JPG support)
+Image LoadImageManual(const char *path) {
+  int width, height, channels;
+  unsigned char *data = stbi_load(path, &width, &height, &channels, 4);
+  if (!data) {
+    printf("[STBI] Failed to load '%s': %s\n", path, stbi_failure_reason());
+    return (Image){0};
+  }
+
+  // Create a Raylib-compatible image and copy data to avoid memory management issues
+  Image img = {
+    .data = RL_MALLOC(width * height * 4),
+    .width = width,
+    .height = height,
+    .mipmaps = 1,
+    .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8
+  };
+  memcpy(img.data, data, width * height * 4);
+  stbi_image_free(data);
+  
+  return img;
+}
+
 typedef struct {
   CurrentScreen screen;
   int splashCounter;
@@ -833,6 +859,7 @@ int main(void) {
 #if !defined(PLATFORM_IOS)
   printf("[MAIN] Application starting...\n");
   UNX_LOG_INFO("Application starting...");
+#endif
 
 #if defined(PLATFORM_DRM)
   // ... (DRM logic omitted for brevity in replace)
@@ -883,7 +910,6 @@ int main(void) {
   UNX_LOG_INFO("[MAIN] Initializing Fonts...");
   UIFonts_Init();
   UNX_LOG_INFO("[MAIN] Fonts initialized.");
-#endif
 
 #if defined(PLATFORM_IOS)
   extern const char *ios_get_documents_path(const char *filename);
@@ -1092,6 +1118,48 @@ int main(void) {
   return 0;
 }
 
+// Helper to manage artwork texture loading/unloading
+void ManageArtwork(DeckState *ds) {
+  if (strcmp(ds->ArtworkPath, ds->LastLoadedArtPath) != 0) {
+    printf("[ARTWORK] Path changed: '%s'\n", ds->ArtworkPath);
+    if (ds->ArtworkTexture.id != 0)
+      UnloadTexture(ds->ArtworkTexture);
+    ds->ArtworkTexture = (Texture2D){0};
+
+    if (ds->ArtworkPath[0] != '\0') {
+      char fixedPath[512];
+      strncpy(fixedPath, ds->ArtworkPath, 511);
+      fixedPath[511] = '\0';
+      
+      // Remove trailing ']' if present
+      size_t len = strlen(fixedPath);
+      if (len > 0 && fixedPath[len-1] == ']') fixedPath[len-1] = '\0';
+
+      // Normalize slashes for Windows
+      for (int p = 0; fixedPath[p]; p++)
+        if (fixedPath[p] == '\\')
+          fixedPath[p] = '/';
+
+      if (FileExists(fixedPath)) {
+        printf("[ARTWORK] File found: '%s'\n", fixedPath);
+        Image img = LoadImageManual(fixedPath);
+        if (img.data != NULL) {
+          printf("[ARTWORK] Image data loaded: %dx%d\n", img.width, img.height);
+          // Resize to a standard size for UI consistency
+          ImageResize(&img, 128, 128);
+          ds->ArtworkTexture = LoadTextureFromImage(img);
+          UnloadImage(img);
+          if (ds->ArtworkTexture.id != 0)
+            SetTextureFilter(ds->ArtworkTexture, TEXTURE_FILTER_BILINEAR);
+        }
+      } else {
+        printf("[ARTWORK] File NOT FOUND: '%s'\n", fixedPath);
+      }
+    }
+    strncpy(ds->LastLoadedArtPath, ds->ArtworkPath, 511);
+  }
+}
+
 void UpdateDrawFrame(App *app) {
   static bool firstCall = true;
   if (firstCall) {
@@ -1130,6 +1198,32 @@ void UpdateDrawFrame(App *app) {
   if (lastScreen != (int)app->screen) {
     UNX_LOG_INFO("[MAIN] Screen changed to: %d", (int)app->screen);
     lastScreen = (int)app->screen;
+  }
+
+  // Manage Artwork Textures
+  ManageArtwork(&app->deckA);
+  ManageArtwork(&app->deckB);
+
+  // Keep Info screen in sync if active
+  if (app->screen == ScreenInfo) {
+      for (int i = 0; i < 2; i++) {
+        DeckState *ds = (i == 0) ? &app->deckA : &app->deckB;
+        InfoTrack *it = &app->infoState.Tracks[i];
+        strcpy(it->Title, ds->TrackTitle);
+        strcpy(it->Artist, ds->ArtistName);
+        strcpy(it->Album, ds->AlbumName);
+        strcpy(it->Genre, ds->GenreName);
+        strcpy(it->Label, ds->LabelName);
+        strcpy(it->Comment, ds->Comment);
+        it->Year = ds->Year;
+        it->Rating = ds->Rating;
+        it->BPM = ds->OriginalBPM;
+        strcpy(it->Key, ds->TrackKey);
+        it->Duration = ds->TrackLengthMs / 1000;
+        strcpy(it->Source, ds->SourceName);
+        strcpy(it->ArtworkPath, ds->ArtworkPath);
+        it->ArtworkTexture = &ds->ArtworkTexture;
+      }
   }
 
   // --- Sync Audio Engine State to UI State ---
@@ -1375,6 +1469,7 @@ void UpdateDrawFrame(App *app) {
         it->Duration = ds->TrackLengthMs / 1000;
         strcpy(it->Source, ds->SourceName);
         strcpy(it->ArtworkPath, ds->ArtworkPath);
+        it->ArtworkTexture = &ds->ArtworkTexture;
       }
     }
   }

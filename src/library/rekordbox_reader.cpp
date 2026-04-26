@@ -32,11 +32,16 @@ static std::string RB_GetString(rekordbox_pdb_t::device_sql_string_t* rbs) {
     // However, the generated code for device_sql_string_t doesn't have a generic "text()" method.
     // It's in the body.
     
-    if (auto b = dynamic_cast<rekordbox_pdb_t::device_sql_long_utf16le_t*>(body)) return b->text();
-    if (auto b = dynamic_cast<rekordbox_pdb_t::device_sql_long_ascii_t*>(body)) return b->text();
-    if (auto b = dynamic_cast<rekordbox_pdb_t::device_sql_short_ascii_t*>(body)) return b->text();
+    std::string result = "";
+    if (auto b = dynamic_cast<rekordbox_pdb_t::device_sql_long_utf16le_t*>(body)) result = b->text();
+    else if (auto b = dynamic_cast<rekordbox_pdb_t::device_sql_long_ascii_t*>(body)) result = b->text();
+    else if (auto b = dynamic_cast<rekordbox_pdb_t::device_sql_short_ascii_t*>(body)) result = b->text();
     
-    return "";
+    // Cleanup: Remove any trailing garbage like ']' or non-printable chars
+    while (!result.empty() && (unsigned char)result.back() <= 32) result.pop_back();
+    if (!result.empty() && result.back() == ']') result.pop_back();
+    
+    return result;
 }
 
 extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {

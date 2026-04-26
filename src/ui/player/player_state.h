@@ -106,6 +106,8 @@ typedef struct DeckState {
   bool HasSeekRequest;
   bool IsLoading;
   float LoadingProgress; // 0.0 to 1.0
+  Texture2D ArtworkTexture;
+  char LastLoadedArtPath[512]; // Internal cache key
 } DeckState;
 
 typedef struct BeatFXState {
