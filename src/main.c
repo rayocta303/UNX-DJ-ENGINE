@@ -20,6 +20,7 @@
 #include "ui/views/settings.h"
 #include "ui/views/splash.h"
 #include "ui/views/topbar.h"
+#include "ui/views/pad.h"
 #include "version.h"
 #include <math.h>
 #include <stdio.h>
@@ -55,6 +56,7 @@ typedef struct {
   SettingsState settingsState;
   AboutState aboutState;
   MixerState mixerState;
+  PadState padState;
 
   TopBar topbar;
   DeckStrip stripA;
@@ -65,6 +67,7 @@ typedef struct {
   SettingsRenderer settings;
   AboutRenderer about;
   MixerRenderer mixer;
+  PadRenderer pad;
   SplashRenderer splash;
   DebugIOSView debugView;
   KeyboardMapping keyMap;
@@ -394,6 +397,27 @@ void TopBar_OnInfo(void *ctx) {
   }
 }
 
+void TopBar_OnPad(void *ctx) {
+  App *a = (App *)ctx;
+  if (a->screen == ScreenPad) {
+    a->screen = ScreenPlayer;
+    a->padState.IsActive = false;
+  } else {
+    a->screen = ScreenPad;
+    a->padState.IsActive = true;
+  }
+}
+
+void OnPadPress(void *ctx, int deckIdx, int padIdx) {
+  App *a = (App *)ctx;
+  DeckState *ds = (deckIdx == 0) ? &a->deckA : &a->deckB;
+  if (ds->LoadedTrack && padIdx < ds->LoadedTrack->HotCuesCount) {
+    HotCue hc = ds->LoadedTrack->HotCues[padIdx];
+    ds->SeekMs = hc.Start;
+    ds->HasSeekRequest = true;
+  }
+}
+
 void TopBar_OnSettings(void *ctx) {
   App *a = (App *)ctx;
   if (a->screen == ScreenSettings) {
@@ -619,6 +643,7 @@ void App_Init(App *a) {
   a->topbar.OnMixer = TopBar_OnMixer;
   a->topbar.OnInfo = TopBar_OnInfo;
   a->topbar.OnSettings = TopBar_OnSettings;
+  a->topbar.OnPad = TopBar_OnPad;
 
   DeckStrip_Init(&a->stripA, 0, &a->deckA);
   DeckStrip_Init(&a->stripB, 1, &a->deckB);
@@ -637,6 +662,15 @@ void App_Init(App *a) {
 
   AboutRenderer_Init(&a->about, &a->aboutState);
   MixerRenderer_Init(&a->mixer, &a->mixerState);
+
+  // Init Pad View
+  memset(&a->padState, 0, sizeof(PadState));
+  a->padState.Decks[0] = &a->deckA;
+  a->padState.Decks[1] = &a->deckB;
+  PadRenderer_Init(&a->pad, &a->padState);
+  a->pad.OnPadPress = OnPadPress;
+  a->pad.callbackCtx = a;
+
   SplashRenderer_Init(&a->splash, &a->splashCounter);
   a->keyMap = GetDefaultMapping();
   memset(&a->midiCtx, 0, sizeof(MidiContext));
@@ -1277,6 +1311,8 @@ void UpdateDrawFrame(App *app) {
     app->about.base.Update((Component *)&app->about);
   if (app->screen == ScreenMixer)
     app->mixer.base.Update((Component *)&app->mixer);
+  if (app->screen == ScreenPad)
+    app->pad.base.Update((Component *)&app->pad);
   if (app->screen == ScreenDebug)
     app->debugView.base.Update((Component *)&app->debugView);
   if (app->screen == ScreenSplash) {
@@ -1345,6 +1381,9 @@ void UpdateDrawFrame(App *app) {
     break;
   case ScreenDebug:
     app->debugView.base.Draw((Component *)&app->debugView);
+    break;
+  case ScreenPad:
+    app->pad.base.Draw((Component *)&app->pad);
     break;
   default:
     ClearBackground(MAGENTA); // Fail-safe color

@@ -10,7 +10,8 @@ typedef enum {
     ScreenAbout,
     ScreenMixer,
     ScreenSplash,
-    ScreenDebug
+    ScreenDebug,
+    ScreenPad
 } CurrentScreen;
 
 typedef struct TopBar TopBar;
@@ -23,6 +24,7 @@ struct TopBar {
   void (*OnMixer)(void *);
   void (*OnInfo)(void *);
   void (*OnSettings)(void *);
+  void (*OnPad)(void *);
   void *callbackCtx;
 
   float BatteryLevel; // 0.0 to 1.0
@@ -35,6 +37,7 @@ struct TopBar {
   float btnMixerX, btnMixerW;
   float btnInfoX, btnInfoW;
   float btnSettingsX, btnSettingsW;
+  float btnPadX, btnPadW;
   
   CurrentScreen ActiveScreen; // Defines current app screen to highlight
 };

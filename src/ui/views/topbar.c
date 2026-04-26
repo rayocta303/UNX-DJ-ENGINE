@@ -27,6 +27,10 @@ static int TopBar_Update(Component *base) {
         if (t->OnSettings)
           t->OnSettings(t->callbackCtx);
       }
+      if (mouse.x >= t->btnPadX && mouse.x <= t->btnPadX + t->btnPadW) {
+        if (t->OnPad)
+          t->OnPad(t->callbackCtx);
+      }
     }
   }
   return 0;
@@ -54,17 +58,19 @@ static void TopBar_Draw(Component *base) {
   float btnY = S(2);
   float btnSpacing = S(8);
 
-  t->btnBrowseW = S(84);
+  t->btnBrowseW = S(72); // Reduced width to fit 5 buttons
   t->btnMixerW = t->btnBrowseW;
   t->btnInfoW = t->btnBrowseW;
   t->btnSettingsW = t->btnBrowseW;
+  t->btnPadW = t->btnBrowseW;
 
-  float totalCenterW = (t->btnBrowseW * 4) + (btnSpacing * 3);
+  float totalCenterW = (t->btnBrowseW * 5) + (btnSpacing * 4);
   float centerX = (SCREEN_WIDTH - totalCenterW) / 2.0f;
 
   t->btnBrowseX = centerX;
   t->btnMixerX = t->btnBrowseX + t->btnBrowseW + btnSpacing;
-  t->btnInfoX = t->btnMixerX + t->btnMixerW + btnSpacing;
+  t->btnPadX = t->btnMixerX + t->btnMixerW + btnSpacing;
+  t->btnInfoX = t->btnPadX + t->btnPadW + btnSpacing;
   t->btnSettingsX = t->btnInfoX + t->btnInfoW + btnSpacing;
 
   Font faceBold = UIFonts_GetBoldFace(S(9));
@@ -80,6 +86,12 @@ static void TopBar_Draw(Component *base) {
                 t->ActiveScreen == ScreenMixer ? ColorBlue : ColorDark1);
   DrawRectangleLines(t->btnMixerX, btnY, t->btnMixerW, btnH, ColorShadow);
   DrawCentredText("MIXER", faceBold, t->btnMixerX, t->btnMixerW, btnY + S(2.5f), S(9), ColorWhite);
+
+  // Draw PAD
+  DrawRectangle(t->btnPadX, btnY, t->btnPadW, btnH,
+                t->ActiveScreen == ScreenPad ? ColorBlue : ColorDark1);
+  DrawRectangleLines(t->btnPadX, btnY, t->btnPadW, btnH, ColorShadow);
+  DrawCentredText("PAD", faceBold, t->btnPadX, t->btnPadW, btnY + S(2.5f), S(9), ColorWhite);
 
   // Draw INFO
   DrawRectangle(t->btnInfoX, btnY, t->btnInfoW, btnH,
@@ -144,5 +156,6 @@ void TopBar_Init(TopBar *t) {
   t->OnMixer = NULL;
   t->OnInfo = NULL;
   t->OnSettings = NULL;
+  t->OnPad = NULL;
   t->callbackCtx = NULL;
 }
