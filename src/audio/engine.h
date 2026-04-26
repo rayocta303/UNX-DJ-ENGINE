@@ -129,6 +129,7 @@ void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch);
 void DeckAudio_SetSlip(DeckAudioState *deck, bool active);
 void DeckAudio_SetLoop(DeckAudioState *deck, bool active, double startPos, double endPos);
 void DeckAudio_ExitLoop(DeckAudioState *deck);
+void DeckAudio_ClearMT(DeckAudioState *deck);
 
 #ifdef __cplusplus
 }

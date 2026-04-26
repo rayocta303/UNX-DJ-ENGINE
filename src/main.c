@@ -448,6 +448,11 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
     float beats = beatLengths[padIdx];
     
     double startPos = audio->Position;
+    bool isResizing = audio->IsLooping;
+    if (isResizing) {
+        startPos = audio->LoopStartPos;
+    }
+
     double loopLengthSamples = 0;
     double trackSR = (double)audio->SampleRate;
 
@@ -496,6 +501,21 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
     }
     
     DeckAudio_SetLoop(audio, true, startPos, startPos + loopLengthSamples);
+    
+    // For Roll (Slip Loop), or if it's a NEW loop, jump to start.
+    // If we are resizing, we don't necessarily want to jump unless the playhead is now outside the loop.
+    if (mode == PAD_MODE_SLIP_LOOP || !isResizing) {
+        audio->Position = startPos;
+        audio->MT_ReadPos = startPos;
+        DeckAudio_ClearMT(audio);
+    } else {
+        // If resizing a normal loop, and we are now beyond the new endPos, wrap immediately
+        if (audio->Position >= startPos + loopLengthSamples) {
+            audio->Position = startPos;
+            audio->MT_ReadPos = startPos;
+            DeckAudio_ClearMT(audio);
+        }
+    }
   }
 }
 

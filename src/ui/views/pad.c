@@ -167,9 +167,15 @@ static void Pad_Draw(Component *base) {
                 }
             } else if (mode == PAD_MODE_BEAT_LOOP || mode == PAD_MODE_SLIP_LOOP) {
                 bool isActive = (r->State->ActiveLoopIdx[d] == i);
-                if (mode == PAD_MODE_BEAT_LOOP) padColor = ColorGreen;
-                else padColor = ColorYellow;
-                hasData = isActive;
+                if (mode == PAD_MODE_BEAT_LOOP) {
+                    padColor = ColorGreen;
+                    hasData = isActive;
+                } else {
+                    // Slip Loop (Roll) - All pads usually dimmed, active is bright
+                    padColor = ColorYellow;
+                    hasData = true; // Show all pads as available
+                    if (!isActive) padColor = Fade(ColorYellow, 0.3f);
+                }
             } else if (mode == PAD_MODE_BEAT_JUMP) {
                 padColor = ColorOrange; hasData = true;
             } else if (mode == PAD_MODE_GATE_CUE) {
@@ -184,7 +190,7 @@ static void Pad_Draw(Component *base) {
             
             // Pad Label (A-H or numbers depending on mode)
             char lbl[16];
-            if (mode == PAD_MODE_BEAT_LOOP) {
+            if (mode == PAD_MODE_BEAT_LOOP || mode == PAD_MODE_SLIP_LOOP) {
                 static const char* loops[] = {"1/4", "1/2", "1", "2", "4", "8", "16", "32"};
                 strcpy(lbl, loops[i]);
             } else {

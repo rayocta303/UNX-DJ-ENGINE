@@ -628,3 +628,9 @@ void DeckAudio_SetLoop(DeckAudioState *deck, bool active, double startPos, doubl
 void DeckAudio_ExitLoop(DeckAudioState *deck) {
     deck->IsLooping = false;
 }
+
+void DeckAudio_ClearMT(DeckAudioState *deck) {
+    if (deck->SoundTouchHandle) {
+        ((soundtouch::SoundTouch*)deck->SoundTouchHandle)->clear();
+    }
+}

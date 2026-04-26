@@ -638,6 +638,24 @@ static void Waveform_Draw(Component *base) {
     }
   }
 
+  // --- GHOST PLAYHEAD (SLIP MODE) ---
+  if (globalAudioEngine) {
+    DeckAudioState *audio = &globalAudioEngine->Decks[r->ID];
+    if (audio->SlipActive) {
+        double ratioHF = (double)audio->SampleRate / 150.0;
+        double slipPosHF = audio->SlipPosition / ratioHF;
+        float xSlip = (float)((slipPosHF - elapsedHalfFrames) / (double)effectiveZoom);
+        float bxSlip = playheadX + xSlip;
+        
+        if (bxSlip >= wfLeft && bxSlip <= wfRight) {
+            // Draw a dimmed/ghost playhead line
+            DrawLineEx((Vector2){bxSlip, wfY}, (Vector2){bxSlip, wfY + waveH}, 1.0f, Fade(ColorWhite, 0.4f));
+            // Tiny arrow at top
+            DrawTriangle((Vector2){bxSlip - S(3), wfY}, (Vector2){bxSlip + S(3), wfY}, (Vector2){bxSlip, wfY + S(5)}, Fade(ColorWhite, 0.6f));
+        }
+    }
+  }
+
   // Playhead — solid bright line with subtle glow shadow behind it
   Color playheadColor = colorHigh;
   // Shadow (slightly wider, low alpha)
