@@ -1197,6 +1197,7 @@ void UpdateDrawFrame(App *app) {
     static float splashTime = 0;
     splashTime += GetFrameTime();
     if (splashTime >= 2.0f) { // 2 Seconds splash
+      SplashRenderer_Unload(&app->splash);
       app->screen = ScreenPlayer;
     }
   }

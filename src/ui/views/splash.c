@@ -185,3 +185,24 @@ void SplashRenderer_Init(SplashRenderer *s, int *progress) {
 
   s->Progress = progress;
 }
+
+void SplashRenderer_Unload(SplashRenderer *s) {
+  if (s->frames != NULL) {
+    for (int i = 0; i < s->frameCount; i++) {
+      if (s->frames[i].id != 0) {
+        // Only unload if it's not a shared texture (in case of re-use logic)
+        bool isShared = false;
+        for(int j=0; j<i; j++) {
+            if(s->frames[i].id == s->frames[j].id) {
+                isShared = true;
+                break;
+            }
+        }
+        if(!isShared) UnloadTexture(s->frames[i]);
+      }
+    }
+    free(s->frames);
+    s->frames = NULL;
+    s->frameCount = 0;
+  }
+}

@@ -16,3 +16,4 @@ struct SplashRenderer {
 };
 
 void SplashRenderer_Init(SplashRenderer *s, int *progress);
+void SplashRenderer_Unload(SplashRenderer *s);
