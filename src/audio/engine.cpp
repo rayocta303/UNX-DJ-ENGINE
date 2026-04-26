@@ -6,6 +6,8 @@
 #include <math.h>
 #include <stdio.h>
 #include <algorithm>
+#include <thread>
+#include <string>
 
 #define MINIMP3_API static
 #define MINIMP3_IMPLEMENTATION
@@ -18,6 +20,20 @@
 #include "dr_wav.h"
 
 using namespace soundtouch;
+
+void DeckAudio_LoadTrackAsync(DeckAudioState *deck, const char *filePath) {
+    if (deck->IsLoading) return;
+    
+    deck->IsLoading = true;
+    deck->LoadingProgress = 0.0f;
+    
+    std::string path = filePath;
+    std::thread([deck, path]() {
+        DeckAudio_LoadTrack(deck, path.c_str());
+        deck->IsLoading = false;
+        deck->LoadingProgress = 1.0f;
+    }).detach();
+}
 
 void AudioEngine_Init(AudioEngine *engine, uint32_t outputSampleRate) {
     memset(engine, 0, sizeof(AudioEngine));
@@ -297,7 +313,7 @@ static inline void AudioEngine_GetSample(DeckAudioState* deck, double pos, float
 
 static void ProcessDeckAudio(DeckAudioState* deck, float* outMaster, float* outCue, int frames, AudioEngine* engine, int deckIndex) {
     bool noiseActive = (deck->ColorFX.activeFX == COLORFX_NOISE && deck->ColorFX.colorValue != 0.0f);
-    if (!deck->PCMBuffer && !noiseActive) return;
+    if ((!deck->PCMBuffer || deck->IsLoading) && !noiseActive) return;
 
     if (deck->HasQueuedJump) {
         if (deck->QueuedWaitSamples >= (uint32_t)frames) {

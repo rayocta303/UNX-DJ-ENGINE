@@ -94,6 +94,9 @@ typedef struct DeckAudioState {
     double LoopStartPos;
     double LoopEndPos;
 
+    bool IsLoading;             // Track is currently being decoded in background
+    float LoadingProgress;      // 0.0 to 1.0 (if supported by decoder)
+
     // VU Meter (Real-time tracking of DSP output peak for UI)
     float VuMeterL;
     float VuMeterR;
@@ -115,6 +118,7 @@ void AudioEngine_SetPCMBitDepth(AudioEngine *engine, int bitDepth);
 void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames);
 
 void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath);
+void DeckAudio_LoadTrackAsync(DeckAudioState *deck, const char *filePath);
 void DeckAudio_Play(DeckAudioState *deck);
 void DeckAudio_Stop(DeckAudioState *deck);
 void DeckAudio_SetPlaying(DeckAudioState *deck, bool playing);

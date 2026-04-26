@@ -104,6 +104,8 @@ typedef struct DeckState {
   int TimeMode; // 0=Elapsed, 1=Remaining
   long long SeekMs;
   bool HasSeekRequest;
+  bool IsLoading;
+  float LoadingProgress; // 0.0 to 1.0
 } DeckState;
 
 typedef struct BeatFXState {

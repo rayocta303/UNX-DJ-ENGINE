@@ -738,7 +738,7 @@ static int Browser_Update(Component *base) {
               relPath++;
             snprintf(fullPath, sizeof(fullPath), "%s/%s",
                      s->SelectedStorage->Path, relPath);
-            DeckAudio_LoadTrack(&s->AudioPlugin->Decks[loadToDeck], fullPath);
+            DeckAudio_LoadTrackAsync(&s->AudioPlugin->Decks[loadToDeck], fullPath);
           }
 
           struct DeckState *targetDeck = loadToDeck == 0 ? s->DeckA : s->DeckB;

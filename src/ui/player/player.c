@@ -15,6 +15,9 @@ static int Player_Update(Component *base) {
   p->InfoB.base.Update((Component *)&p->InfoB);
   p->BeatFX.base.Update((Component *)&p->BeatFX);
   p->FXBar.base.Update((Component *)&p->FXBar);
+  
+  p->DeckA->IsLoading = p->AudioPlugin->Decks[0].IsLoading;
+  p->DeckB->IsLoading = p->AudioPlugin->Decks[1].IsLoading;
 
   // Sync BeatFX state to AudioEngine
   float masterBpm = 120.0f;

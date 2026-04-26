@@ -19,8 +19,13 @@ static void drawLeftBadgeColumn(DeckStrip *d, float x, float y, float h) {
 
   // 1. DECK Header
   float headH = 21;
+  Color headColor = ColorBGUtil;
+  if (d->State->IsLoading && ((int)(GetTime() * 4.0f) % 2 == 0)) {
+      headColor = ColorOrange;
+  }
+  
   DrawRectangle(lColX, y, lColW, h, ColorDark3);
-  DrawRectangle(lColX, y, lColW, S(headH), ColorBGUtil);
+  DrawRectangle(lColX, y, lColW, S(headH), headColor);
   DrawRectangle(lColX, y + S(headH) - S(1), lColW, S(1), ColorShadow);
 
   DrawCentredText("DECK", faceXXS, lColX, lColW, y + S(2), S(7), ColorPaper);
@@ -546,6 +551,12 @@ static void DeckStrip_Draw(Component *base) {
       if (ratio < 0) ratio = 0; if (ratio > 1) ratio = 1;
       float px = wx + ratio * ww;
       DrawRectangle(px - 1, wy, 2, wh, ColorRed);
+    }
+    
+    // --- LOADING OVERLAY ---
+    if (d->State->IsLoading) {
+        float pulse = (sinf(GetTime() * 10.0f) * 0.5f + 0.5f);
+        DrawRectangle(wx, wy, ww, wh, Fade(ColorOrange, 0.1f + pulse * 0.3f));
     }
   }
 

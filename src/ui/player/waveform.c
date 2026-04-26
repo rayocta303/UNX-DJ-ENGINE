@@ -721,6 +721,12 @@ static void Waveform_Draw(Component *base) {
       }
     }
   }
+
+  // --- LOADING OVERLAY ---
+  if (r->State->IsLoading) {
+      float pulse = (sinf(GetTime() * 10.0f) * 0.5f + 0.5f); // 0.0 to 1.0
+      DrawRectangle(wfLeft, wfY, wfRight - wfLeft, waveH, Fade(ColorOrange, 0.1f + pulse * 0.2f));
+  }
 }
 
 void WaveformRenderer_Init(WaveformRenderer *r, int id, DeckState *state,
