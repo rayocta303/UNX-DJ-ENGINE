@@ -179,7 +179,19 @@ int AudioBackend_GetDevices(AudioDeviceInfo* outDevices, int maxDevices) {
 bool AudioBackend_Start(AudioBackendConfig config, AudioBackendCallback callback) {
     if (!g_isContextInitialized) return false;
     
+    // Optimization: If hardware-critical settings haven't changed, 
+    // just update routing and return to avoid glitches.
+    if (g_isDeviceInitialized &&
+        g_currentConfig.DeviceIndex == config.DeviceIndex &&
+        g_currentConfig.SampleRate == config.SampleRate &&
+        g_currentConfig.BufferSizeFrames == config.BufferSizeFrames) 
+    {
+        g_currentConfig = config;
+        return true;
+    }
+
     if (g_isDeviceInitialized) {
+        ma_device_stop(&g_maDevice); // Safe stop first
         ma_device_uninit(&g_maDevice);
         g_isDeviceInitialized = false;
     }

@@ -70,7 +70,17 @@ void AudioEngine_SetOutputSampleRate(AudioEngine *engine, uint32_t sampleRate) {
 
 void AudioEngine_SetPCMBitDepth(AudioEngine *engine, int bitDepth) {
     for (int i = 0; i < MAX_DECKS; i++) {
-        engine->Decks[i].BitDepth = bitDepth;
+        if (engine->Decks[i].BitDepth != bitDepth) {
+            engine->Decks[i].BitDepth = bitDepth;
+            // Auto-reinit audio if a track is loaded
+            if (engine->Decks[i].FilePath[0] != '\0') {
+                double currentPos = engine->Decks[i].Position;
+                bool wasPlaying = engine->Decks[i].IsPlaying;
+                DeckAudio_LoadTrack(&engine->Decks[i], engine->Decks[i].FilePath);
+                engine->Decks[i].Position = currentPos;
+                engine->Decks[i].IsPlaying = wasPlaying;
+            }
+        }
     }
 }
 
@@ -103,6 +113,8 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
     if (deck->SoundTouchHandle) {
         ((SoundTouch*)deck->SoundTouchHandle)->clear();
     }
+    strncpy(deck->FilePath, filePath, 511);
+    deck->FilePath[511] = '\0';
 
     if (!filePath || strlen(filePath) == 0) return;
 

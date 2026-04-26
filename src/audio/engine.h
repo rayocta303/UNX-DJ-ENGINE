@@ -34,6 +34,7 @@ typedef struct DeckAudioState {
     uint32_t TotalSamples;      // Total samples in buffer
     uint32_t SampleRate;        // Original sample rate (e.g. 44100, 48000)
     int BitDepth;               // 16 or 24
+    char FilePath[512];         // Path to the loaded track for auto-reinit
     
     // Core playback state (from XDJ-X firmware concept)
     double Position;            // Read head position (exact fractional sample index)
