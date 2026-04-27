@@ -53,6 +53,9 @@ typedef struct {
   
   bool IsLearningMidi;
   int LearningItemIdx;
+
+  int MidiBrowseDelta;
+  bool MidiRequestEnter;
 } SettingsState;
 
 typedef struct SettingsRenderer SettingsRenderer;

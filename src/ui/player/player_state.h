@@ -108,6 +108,21 @@ typedef struct DeckState {
   float LoadingProgress; // 0.0 to 1.0
   Texture2D ArtworkTexture;
   char LastLoadedArtPath[512]; // Internal cache key
+
+  // MIDI Interaction Flags
+  bool MidiRequestHotCue[8];
+  bool MidiRequestLoopIn;
+  bool MidiRequestLoopOut;
+  bool MidiRequestLoopExit;
+  bool MidiRequestLoopHalve;
+  bool MidiRequestLoopDouble;
+  bool MidiRequestPitchBendPlus;
+  bool MidiRequestPitchBendMinus;
+  bool MidiRequestSync;
+  bool MidiRequestMaster;
+  bool MidiRequestBeatJumpForward;
+  bool MidiRequestBeatJumpBackward;
+  bool MidiRequestAutoLoop[5]; // 1, 2, 4, 8, 16 beats
 } DeckState;
 
 typedef struct BeatFXState {

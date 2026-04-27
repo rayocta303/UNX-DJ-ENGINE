@@ -136,3 +136,17 @@ bool MIDI_GetLastMessage(uint8_t *status, uint8_t *midino) {
     lastMsgSet = false;
     return true;
 }
+
+bool MIDI_SaveCurrentMapping(const char *name) {
+    char path[512];
+    snprintf(path, 512, "controllers/%s.midi.xml", name);
+    strncpy(global_mapping.name, name, 127);
+    return MIDI_SaveMapping(&global_mapping, path);
+}
+
+bool MIDI_PeekLastMessage(uint8_t *status, uint8_t *midino) {
+    if (!lastMsgSet) return false;
+    *status = lastStatus;
+    *midino = lastMidino;
+    return true;
+}

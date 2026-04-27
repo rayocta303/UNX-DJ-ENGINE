@@ -251,3 +251,61 @@ void MIDI_HandleMapping(MidiMapping *map, uint8_t status, uint8_t midino, float 
     }
 }
 
+bool MIDI_SaveMapping(MidiMapping *map, const char *path) {
+    FILE *f = fopen(path, "w");
+    if (!f) return false;
+
+    fprintf(f, "<?xml version='1.0' encoding='utf-8'?>\n");
+    fprintf(f, "<UNXMIDIPreset schemaVersion=\"1\">\n");
+    fprintf(f, "    <info>\n");
+    fprintf(f, "        <name>%s</name>\n", map->name);
+    fprintf(f, "        <author>%s</author>\n", map->author);
+    fprintf(f, "        <description>%s</description>\n", map->description);
+    fprintf(f, "    </info>\n");
+    fprintf(f, "    <controller id=\"%s\">\n", map->name);
+    fprintf(f, "        <controls>\n");
+
+    for (int i = 0; i < map->count; i++) {
+        MappingEntry *e = &map->entries[i];
+        fprintf(f, "            <control>\n");
+        fprintf(f, "                <group>%s</group>\n", e->group);
+        fprintf(f, "                <key>%s</key>\n", e->key);
+        fprintf(f, "                <status>0x%02X</status>\n", e->status);
+        fprintf(f, "                <midino>0x%02X</midino>\n", e->midino);
+        fprintf(f, "                <options>");
+        bool hasOpt = false;
+        if (e->options & 1) { fprintf(f, "<SelectKnob/>"); hasOpt = true; }
+        if (e->options & 4) { fprintf(f, "<Script-Binding/>"); hasOpt = true; }
+        if (e->options & 8) { fprintf(f, "<fourteen-bit-msb/>"); hasOpt = true; }
+        if (e->options & 16) { fprintf(f, "<fourteen-bit-lsb/>"); hasOpt = true; }
+        if (!hasOpt) fprintf(f, "<Normal/>");
+        fprintf(f, "</options>\n");
+        fprintf(f, "            </control>\n");
+    }
+
+    fprintf(f, "        </controls>\n");
+    fprintf(f, "    </controller>\n");
+    fprintf(f, "</UNXMIDIPreset>\n");
+
+    fclose(f);
+    return true;
+}
+
+void MIDI_CreateTemplate(MidiMapping *out) {
+    memset(out, 0, sizeof(MidiMapping));
+    strncpy(out->name, "New Custom Mapping", 127);
+    strncpy(out->author, "User", 127);
+    strncpy(out->description, "Created using UNX MIDI Learn", 255);
+    
+    int coCount = CO_GetCount();
+    for (int i = 0; i < coCount && i < 512; i++) {
+        ControlObject *co = CO_GetByIndex(i);
+        MappingEntry *e = &out->entries[out->count++];
+        strncpy(e->group, co->group, 63);
+        strncpy(e->key, co->key, 63);
+        e->status = 0x00;
+        e->midino = 0x00;
+        e->options = 0;
+    }
+}
+

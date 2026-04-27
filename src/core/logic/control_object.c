@@ -63,3 +63,12 @@ void CO_AddValue(const char *group, const char *key, float delta) {
         }
     }
 }
+
+int CO_GetCount() {
+    return controlCount;
+}
+
+ControlObject* CO_GetByIndex(int idx) {
+    if (idx < 0 || idx >= controlCount) return NULL;
+    return &registry[idx];
+}

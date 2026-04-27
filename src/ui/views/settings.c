@@ -74,8 +74,8 @@ static int Settings_Update(Component *base) {
       if (MIDI_GetLastMessage(&status, &midino)) {
           int idx = r->State->LearningItemIdx;
           MidiMapping *map = MIDI_GetGlobalMapping();
-          // The MIDI items in Settings start from index 18 (after PRESET item at 17)
-          int mapIdx = idx - 18;
+          // The MIDI items in Settings start from index 20 (after Actions at 18, 19)
+          int mapIdx = idx - 20;
           if (mapIdx >= 0 && mapIdx < map->count) {
               map->entries[mapIdx].status = status;
               map->entries[mapIdx].midino = midino;
@@ -88,6 +88,19 @@ static int Settings_Update(Component *base) {
           r->State->IsLearningMidi = false;
       }
       return 1;
+  }
+
+  // Handle MIDI navigation for Settings
+  if (r->State->MidiBrowseDelta != 0) {
+      r->State->CursorPos += r->State->MidiBrowseDelta;
+      r->State->MidiBrowseDelta = 0;
+      if (r->State->CursorPos < 0) r->State->CursorPos = 0;
+      if (r->State->CursorPos >= r->State->ItemsCount) r->State->CursorPos = r->State->ItemsCount - 1;
+  }
+  if (r->State->MidiRequestEnter) {
+      // Logic to trigger the action at CursorPos
+      r->OnAction(r->callbackCtx, r->State->CursorPos);
+      r->State->MidiRequestEnter = false;
   }
 
   // Get filtered indices
@@ -216,7 +229,7 @@ static int Settings_Update(Component *base) {
             r->State->DropdownItemIdx = idx;
             r->State->DropdownScroll = 0;
             return 1;
-        } else if (clickedItem->Category == SETTING_CAT_CONTROLLERS && idx >= 18) {
+        } else if (clickedItem->Category == SETTING_CAT_CONTROLLERS && idx >= 20) {
             r->State->IsLearningMidi = true;
             r->State->LearningItemIdx = idx;
             // Flush any old messages
@@ -350,6 +363,8 @@ static void Settings_Draw(Component *base) {
   Font faceXS = UIFonts_GetFace(S(9));
   Font faceSm = UIFonts_GetFace(S(11));
   Font faceMd = UIFonts_GetFace(S(13));
+  Font faceIcon = UIFonts_GetIcon(S(12));
+  Font faceIconSm = UIFonts_GetIcon(S(10));
 
   float bottomH = S(28.0f);
   float divY = viewH - bottomH;
@@ -376,11 +391,11 @@ static void Settings_Draw(Component *base) {
   // Table Header for Controllers
   float listY = TOP_BAR_H + tabH;
   if (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) {
-      float headH = S(20);
+      float headH = S(24);
       DrawRectangle(0, listY, SCREEN_WIDTH, headH, ColorDark2);
-      UIDrawText("CONTROL / TARGET", faceSm, S(32), listY + S(4), S(10), ColorGray);
-      UIDrawText("CHANNEL : MSG", faceSm, SCREEN_WIDTH - S(150), listY + S(4), S(10), ColorGray);
-      UIDrawText("TYPE", faceSm, SCREEN_WIDTH - S(60), listY + S(4), S(10), ColorGray);
+      UIDrawText("TARGET ENGINE CONTROL", faceXS, S(36), listY + S(7), S(9), ColorGray);
+      UIDrawText("ADDRESS", faceXS, SCREEN_WIDTH - S(155), listY + S(7), S(9), ColorGray);
+      UIDrawText("TYPE", faceXS, SCREEN_WIDTH - S(65), listY + S(7), S(9), ColorGray);
       DrawLine(0, listY + headH, SCREEN_WIDTH, listY + headH, ColorGray);
       listY += headH;
   }
@@ -467,37 +482,44 @@ static void Settings_Draw(Component *base) {
     } else if (item->Type == SETTING_TYPE_ACTION) {
       if (item->Category == SETTING_CAT_CONTROLLERS) {
           // Table Layout for Controllers with column lines
-          if (idx >= 18) { // Mapping entries
+          if (idx >= 20) { // Mapping entries
               // Column Dividers
               DrawLine(SCREEN_WIDTH - S(160), ry + S(2), SCREEN_WIDTH - S(160), ry + rowH - S(2), ColorGray);
               DrawLine(SCREEN_WIDTH - S(75), ry + S(2), SCREEN_WIDTH - S(75), ry + rowH - S(2), ColorGray);
 
-              // Channel:Msg as a "badge"
-              Rectangle badgeRect = { SCREEN_WIDTH - S(155), ry + S(6), S(75), rowH - S(12) };
-              DrawRectangleRounded(badgeRect, 0.5f, 4, ColorDark2);
-              DrawCentredText(item->Unit, faceSm, badgeRect.x, badgeRect.width, ry + (rowH / 2.0f) - S(6), S(10), ColorOrange);
+                bool isLearning = (r->State->IsLearningMidi && r->State->LearningItemIdx == idx);
 
-              // Type Badge
-              Color typeColor = ColorGray;
-              const char *typeIcon = "";
-              if (strcmp(item->Options[0], "SCRIPT") == 0) { typeColor = ColorBlue; typeIcon = "\uf121"; }
-              else if (strcmp(item->Options[0], "REL") == 0) { typeColor = ColorOrange; typeIcon = "\uf01e"; }
-              else if (strcmp(item->Options[0], "14BIT") == 0) { typeColor = ColorDGreen; typeIcon = "\uf0c9"; }
+                if (isLearning) {
+                    float alpha = (sinf(GetTime() * 12.0f) * 0.4f + 0.6f);
+                    Color pulseColor = { 0, 121, 241, (unsigned char)(alpha * 255) };
+                    DrawRectangleRounded((Rectangle){S(6), ry + S(3), SCREEN_WIDTH - S(12), rowH - S(6)}, 0.2f, 4, (Color){0, 40, 80, 200});
+                    DrawRectangleRoundedLines((Rectangle){S(6), ry + S(3), SCREEN_WIDTH - S(12), rowH - S(6)}, 0.2f, 4, 2.0f, pulseColor);
+                    DrawCentredText("WAITING FOR MIDI INPUT...", faceSm, 0, SCREEN_WIDTH, ry + (rowH / 2.0f) - S(6), S(11), pulseColor);
+                } else {
+                    // Channel:Msg as a "badge"
+                    Rectangle badgeRect = { SCREEN_WIDTH - S(160), ry + S(6), S(80), rowH - S(12) };
+                    DrawRectangleRounded(badgeRect, 0.4f, 4, ColorDark2);
+                    DrawRectangleRoundedLines(badgeRect, 0.4f, 4, 1.0f, ColorGray);
+                    DrawCentredText(item->Unit, faceSm, badgeRect.x, badgeRect.width, ry + (rowH / 2.0f) - S(6), S(10), ColorOrange);
+                    
+                    // Type Badge
+                    Color typeColor = ColorGray;
+                    const char *typeIcon = "";
+                    if (strcmp(item->Options[0], "SCRIPT") == 0) { typeColor = ColorBlue; typeIcon = "\uf121"; }
+                    else if (strcmp(item->Options[0], "REL") == 0) { typeColor = ColorOrange; typeIcon = "\uf01e"; }
+                    else if (strcmp(item->Options[0], "14BIT") == 0) { typeColor = ColorDGreen; typeIcon = "\uf0c9"; }
 
-              UIDrawText(typeIcon, faceSm, SCREEN_WIDTH - S(68), ry + (rowH / 2.0f) - S(6), S(10), typeColor);
-              UIDrawText(item->Options[0], faceSm, SCREEN_WIDTH - S(52), ry + (rowH / 2.0f) - S(6), S(9), typeColor);
+                    // Type Icon & Text
+                    UIDrawText(typeIcon, faceIconSm, SCREEN_WIDTH - S(72), ry + (rowH / 2.0f) - S(5), S(10), typeColor);
+                    UIDrawText(item->Options[0], faceSm, SCREEN_WIDTH - S(55), ry + (rowH / 2.0f) - S(6), S(9), typeColor);
+                }
 
-              if (r->State->IsLearningMidi && r->State->LearningItemIdx == idx) {
-                  DrawRectangleLinesEx((Rectangle){S(6), ry + S(3), SCREEN_WIDTH - S(12), rowH - S(6)}, 2.0f, ColorBlue);
-                  UIDrawText("WAITING...", faceSm, SCREEN_WIDTH - S(155), ry + (rowH / 2.0f) - S(6), S(10), ColorBlue);
-              }
-
-          } else { // Preset Selection
-              UIDrawText(item->Unit, faceMd, valueX + valueWidth - S(90), ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
-          }
-          UIDrawText("\uf35a", faceSm, valueX + valueWidth - S(25), ry + (rowH / 2.0f) - S(6), S(12), ColorGray);
+           } else { // Preset Selection Actions (CREATE/SAVE)
+               UIDrawText(item->Unit, faceMd, valueX + valueWidth - S(90), ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
+               UIDrawText("\uf35a", faceIcon, valueX + valueWidth - S(25), ry + (rowH / 2.0f) - S(6), S(12), ColorGray);
+           }
       } else if (strcmp(item->Label, "ABOUT") != 0 && strcmp(item->Label, "EXIT APPLICATION") != 0) {
-        UIDrawText("\uf2f5", faceSm, valueX + valueWidth - S(35), ry + (rowH / 2.0f) - S(6), S(12), ColorOrange);
+        UIDrawText("\uf2f5", faceIcon, valueX + valueWidth - S(35), ry + (rowH / 2.0f) - S(6), S(12), ColorOrange);
       }
     }
   }
@@ -511,16 +533,38 @@ static void Settings_Draw(Component *base) {
   DrawRectangle(0, divY, SCREEN_WIDTH, bottomH, ColorDark1);
   DrawLine(0, divY, SCREEN_WIDTH, divY, ColorGray);
 
-  // DONE / CLOSE
-  DrawRectangle(S(15), divY + S(5), S(90), S(18), ColorBlue);
-  DrawCentredText("DONE", faceSm, S(15), S(90), divY + S(8), S(11), ColorWhite);
+  // DONE / CLOSE Buttons
+  Rectangle doneRect = { S(15), divY + S(5), S(90), S(18) };
+  DrawRectangleRounded(doneRect, 0.5f, 4, ColorBlue);
+  DrawRectangleRoundedLines(doneRect, 0.5f, 4, 1.0f, ColorWhite);
+  DrawCentredText("DONE", faceSm, doneRect.x, doneRect.width, divY + S(8), S(11), ColorWhite);
 
   char countStr[32];
   sprintf(countStr, "%d / %d", r->State->Scroll + r->State->CursorPos + 1, filteredCount);
-  UIDrawText(countStr, faceXS, SCREEN_WIDTH / 2.0f - S(24.0f), divY + S(8), S(9), ColorShadow);
+  UIDrawText(countStr, faceXS, SCREEN_WIDTH / 2.0f - S(24.0f), divY + S(8), S(9), ColorGray);
 
-  DrawRectangle(SCREEN_WIDTH - S(105), divY + S(5), S(90), S(18), ColorDark2);
-  DrawCentredText("CLOSE", faceSm, SCREEN_WIDTH - S(105), S(90), divY + S(8), S(11), ColorWhite);
+  Rectangle closeRect = { SCREEN_WIDTH - S(105), divY + S(5), S(90), S(18) };
+  DrawRectangleRounded(closeRect, 0.5f, 4, ColorDark2);
+  DrawRectangleRoundedLines(closeRect, 0.5f, 4, 1.0f, ColorGray);
+  DrawCentredText("CLOSE", faceSm, closeRect.x, closeRect.width, divY + S(8), S(11), ColorWhite);
+
+  // MIDI Monitor (OLED Style)
+  if (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) {
+      uint8_t s, m;
+      Rectangle monRect = { S(115), divY + S(6), S(150), S(16) };
+      DrawRectangleRounded(monRect, 0.2f, 4, ColorBlack);
+      DrawRectangleRoundedLines(monRect, 0.2f, 4, 1.0f, ColorDark2);
+      
+      if (MIDI_PeekLastMessage(&s, &m)) {
+          char monBuf[64];
+          snprintf(monBuf, 64, "MIDI: 0x%02X : 0x%02X", s, m);
+          UIDrawText(monBuf, faceXS, monRect.x + S(18), divY + S(9), S(9), ColorDGreen);
+          DrawCircle(monRect.x + S(10), divY + S(14), S(3), ColorDGreen);
+      } else {
+          UIDrawText("MIDI IDLE", faceXS, monRect.x + S(18), divY + S(9), S(9), ColorDark2);
+          DrawCircle(monRect.x + S(10), divY + S(14), S(3), ColorDark2);
+      }
+  }
 
   if (r->State->IsDropdownOpen) {
       DrawRectangle(0, 0, SCREEN_WIDTH, viewH, (Color){ 0, 0, 0, 200 });

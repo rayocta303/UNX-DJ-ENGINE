@@ -28,5 +28,7 @@ bool MIDI_LoadMapping(MidiMapping *map, const char *path);
 bool MIDI_ScanControllers(const char *dir, const char *deviceName, MidiMapping *out);
 int MIDI_ListControllers(const char *dir, char outNames[32][64], char outPaths[32][256]);
 void MIDI_HandleMapping(MidiMapping *map, uint8_t status, uint8_t midino, float normalizedValue);
+bool MIDI_SaveMapping(MidiMapping *map, const char *path);
+void MIDI_CreateTemplate(MidiMapping *out);
 
 #endif

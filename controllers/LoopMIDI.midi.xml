@@ -7,7 +7,9 @@
     </info>
     <controller id="LoopMIDI">
         <controls>
-            <!-- PLAYER DECK 1 -->
+            <!-- ============================================================= -->
+            <!-- PLAYER DECK 1                                                 -->
+            <!-- ============================================================= -->
             <control>
                 <group>[Channel1]</group>
                 <key>play</key>
@@ -24,18 +26,61 @@
             </control>
             <control>
                 <group>[Channel1]</group>
-                <key>volume</key>
+                <key>pfl</key> <!-- Headphone Cue -->
+                <status>0x90</status>
+                <midino>0x54</midino>
+                <options><Normal/></options>
+            </control>
+
+            <!-- MIXER CH 1 -->
+            <control>
+                <group>[Channel1]</group>
+                <key>volume</key> <!-- TRIM / GAIN -->
                 <status>0xB0</status>
-                <midino>0x13</midino>
-                <options><fourteen-bit-msb/></options>
+                <midino>0x04</midino>
+                <options><Normal/></options>
             </control>
             <control>
                 <group>[Channel1]</group>
-                <key>volume</key>
+                <key>fader</key> <!-- Channel Fader -->
                 <status>0xB0</status>
-                <midino>0x33</midino>
-                <options><fourteen-bit-lsb/></options>
+                <midino>0x13</midino>
+                <options><Normal/></options>
             </control>
+
+            <!-- EQ CH 1 (Using Mixxx Aliases) -->
+            <control>
+                <group>[EqualizerRack1_[Channel1]_Effect1]</group>
+                <key>parameter3</key> <!-- HI -->
+                <status>0xB0</status>
+                <midino>0x07</midino>
+                <options><Normal/></options>
+            </control>
+            <control>
+                <group>[EqualizerRack1_[Channel1]_Effect1]</group>
+                <key>parameter2</key> <!-- MID -->
+                <status>0xB0</status>
+                <midino>0x0B</midino>
+                <options><Normal/></options>
+            </control>
+            <control>
+                <group>[EqualizerRack1_[Channel1]_Effect1]</group>
+                <key>parameter1</key> <!-- LOW -->
+                <status>0xB0</status>
+                <midino>0x0F</midino>
+                <options><Normal/></options>
+            </control>
+
+            <!-- COLOR FX CH 1 -->
+            <control>
+                <group>[Channel1]</group>
+                <key>colorfx_value</key>
+                <status>0xB0</status>
+                <midino>0x15</midino>
+                <options><Normal/></options>
+            </control>
+
+            <!-- JOG CH 1 -->
             <control>
                 <group>[Channel1]</group>
                 <key>PioneerDDJ400.jogTurn</key>
@@ -51,7 +96,9 @@
                 <options><Script-Binding/></options>
             </control>
 
-            <!-- PLAYER DECK 2 -->
+            <!-- ============================================================= -->
+            <!-- PLAYER DECK 2                                                 -->
+            <!-- ============================================================= -->
             <control>
                 <group>[Channel2]</group>
                 <key>play</key>
@@ -59,35 +106,159 @@
                 <midino>0x0B</midino>
                 <options><Normal/></options>
             </control>
-            
-            <!-- MIXER / MASTER -->
+            <control>
+                <group>[Channel2]</group>
+                <key>cue_default</key>
+                <status>0x91</status>
+                <midino>0x0C</midino>
+                <options><Normal/></options>
+            </control>
+            <control>
+                <group>[Channel2]</group>
+                <key>pfl</key> <!-- Headphone Cue -->
+                <status>0x91</status>
+                <midino>0x54</midino>
+                <options><Normal/></options>
+            </control>
+
+            <!-- MIXER CH 2 -->
+            <control>
+                <group>[Channel2]</group>
+                <key>volume</key> <!-- TRIM / GAIN -->
+                <status>0xB1</status>
+                <midino>0x04</midino>
+                <options><Normal/></options>
+            </control>
+            <control>
+                <group>[Channel2]</group>
+                <key>fader</key> <!-- Channel Fader -->
+                <status>0xB1</status>
+                <midino>0x13</midino>
+                <options><Normal/></options>
+            </control>
+
+            <!-- EQ CH 2 -->
+            <control>
+                <group>[EqualizerRack1_[Channel2]_Effect1]</group>
+                <key>parameter3</key> <!-- HI -->
+                <status>0xB1</status>
+                <midino>0x07</midino>
+                <options><Normal/></options>
+            </control>
+            <control>
+                <group>[EqualizerRack1_[Channel2]_Effect1]</group>
+                <key>parameter2</key> <!-- MID -->
+                <status>0xB1</status>
+                <midino>0x0B</midino>
+                <options><Normal/></options>
+            </control>
+            <control>
+                <group>[EqualizerRack1_[Channel2]_Effect1]</group>
+                <key>parameter1</key> <!-- LOW -->
+                <status>0xB1</status>
+                <midino>0x0F</midino>
+                <options><Normal/></options>
+            </control>
+
+            <!-- COLOR FX CH 2 -->
+            <control>
+                <group>[Channel2]</group>
+                <key>colorfx_value</key>
+                <status>0xB1</status>
+                <midino>0x15</midino>
+                <options><Normal/></options>
+            </control>
+
+            <!-- ============================================================= -->
+            <!-- MIXER / MASTER                                                -->
+            <!-- ============================================================= -->
             <control>
                 <group>[Master]</group>
                 <key>crossfader</key>
                 <status>0xB0</status>
                 <midino>0x1F</midino>
-                <options><fourteen-bit-msb/></options>
+                <options><Normal/></options>
+            </control>
+            <control>
+                <group>[Master]</group>
+                <key>volume</key> <!-- Master Volume -->
+                <status>0xB0</status>
+                <midino>0x14</midino>
+                <options><Normal/></options>
             </control>
 
-            <!-- LIBRARY / NAVIGATION -->
+            <!-- BEAT FX -->
+            <control>
+                <group>[Master]</group>
+                <key>beatfx_drywet</key>
+                <status>0xB0</status>
+                <midino>0x1B</midino>
+                <options><Normal/></options>
+            </control>
+            <control>
+                <group>[Master]</group>
+                <key>beatfx_time</key>
+                <status>0xB0</status>
+                <midino>0x1C</midino>
+                <options><Normal/></options>
+            </control>
+            <control>
+                <group>[Master]</group>
+                <key>beatfx_select</key>
+                <status>0xB0</status>
+                <midino>0x1E</midino>
+                <options><Normal/></options>
+            </control>
+            <control>
+                <group>[Master]</group>
+                <key>beatfx_on</key>
+                <status>0x90</status>
+                <midino>0x47</midino>
+                <options><Normal/></options>
+            </control>
+            <control>
+                <group>[Master]</group>
+                <key>beatfx_channel</key>
+                <status>0x90</status>
+                <midino>0x48</midino>
+                <options><Normal/></options>
+            </control>
+
+            <!-- ============================================================= -->
+            <!-- LIBRARY / NAVIGATION                                          -->
+            <!-- ============================================================= -->
             <control>
                 <group>[Library]</group>
-                <key>MoveVertical</key>
+                <key>browse</key>
                 <status>0xB0</status>
                 <midino>0x3C</midino>
                 <options><SelectKnob/></options>
             </control>
             <control>
                 <group>[Library]</group>
-                <key>MoveFocusForward</key>
+                <key>enter</key>
                 <status>0x90</status>
                 <midino>0x3D</midino>
                 <options><Normal/></options>
             </control>
             <control>
-                <group>[Channel1]</group>
-                <key>LoadSelectedTrack</key>
+                <group>[Library]</group>
+                <key>back</key>
                 <status>0x90</status>
+                <midino>0x3E</midino>
+                <options><Normal/></options>
+            </control>
+            <control>
+                <group>[Channel1]</group>
+                <key>loadA</key>
+                <status>0x90</status>
+                <midino>0x46</midino>
+                <options><Normal/></options>
+            </control>
+            <control>
+                <group>[Channel2]</group>
+                <key>loadB</key>
+                <status>0x91</status>
                 <midino>0x46</midino>
                 <options><Normal/></options>
             </control>

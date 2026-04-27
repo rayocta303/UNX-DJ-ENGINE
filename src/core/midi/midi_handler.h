@@ -29,5 +29,7 @@ void MIDI_Update(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine *en
 MidiMapping* MIDI_GetGlobalMapping(void);
 void MIDI_RefreshMapping(const char *path);
 bool MIDI_GetLastMessage(uint8_t *status, uint8_t *midino);
+bool MIDI_PeekLastMessage(uint8_t *status, uint8_t *midino);
+bool MIDI_SaveCurrentMapping(const char *name);
 
 #endif // MIDI_HANDLER_H

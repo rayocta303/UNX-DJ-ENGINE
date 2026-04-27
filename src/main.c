@@ -111,6 +111,11 @@ typedef struct {
   bool showExitConfirm;
   AudioBackendConfig activeAudioConfig;
   
+  bool MidiRequestSettings;
+  bool MidiRequestInfo;
+  bool MidiRequestMixer;
+  bool MidiRequestBrowser;
+
   char midiPresetPaths[32][256];
   int midiPresetCount;
   char activeControllerPath[256];
@@ -346,6 +351,19 @@ void OnSettingsAction(void *ctx, int idx) {
     a->aboutState.IsActive = true;
   } else if (idx == 16) { // EXIT APPLICATION
     a->showExitConfirm = true;
+  } else if (idx == 18) { // CREATE NEW MAPPING
+    MIDI_CreateTemplate(MIDI_GetGlobalMapping());
+    PopulateMidiSettings(a);
+  } else if (idx == 19) { // SAVE CURRENT AS
+    // For simplicity, we use the current map name or a default
+    MidiMapping *map = MIDI_GetGlobalMapping();
+    char nameBuf[128];
+    static int saveCounter = 0;
+    snprintf(nameBuf, 128, "Custom_%d", ++saveCounter);
+    if (MIDI_SaveCurrentMapping(nameBuf)) {
+        printf("[MIDI] Mapping saved to controllers/%s.midi.xml\n", nameBuf);
+    }
+    PopulateMidiSettings(a);
   }
 }
 
@@ -366,20 +384,23 @@ void PopulateMidiSettings(App *a) {
           a->settingsState.Items[17].Current = i;
       }
   }
-  // Try to find current mapping name to set default
-  MidiMapping *currentMap = MIDI_GetGlobalMapping();
-  for (int i = 0; i < a->midiPresetCount; i++) {
-    if (strcmp(names[i], currentMap->name) == 0) {
-        a->settingsState.Items[17].Current = i;
-        break;
-    }
-  }
 
-  // --- MAPPING ENTRIES (Starting from Index 18) ---
+  // --- ACTIONS (18, 19) ---
+  strcpy(a->settingsState.Items[18].Label, "CREATE NEW MAPPING");
+  a->settingsState.Items[18].Type = SETTING_TYPE_ACTION;
+  a->settingsState.Items[18].Category = SETTING_CAT_CONTROLLERS;
+  strcpy(a->settingsState.Items[18].Unit, "RESET");
+
+  strcpy(a->settingsState.Items[19].Label, "SAVE CURRENT MAPPING");
+  a->settingsState.Items[19].Type = SETTING_TYPE_ACTION;
+  a->settingsState.Items[19].Category = SETTING_CAT_CONTROLLERS;
+  strcpy(a->settingsState.Items[19].Unit, "SAVE");
+
+  // --- MAPPING ENTRIES (Starting from Index 20) ---
   MidiMapping *map = MIDI_GetGlobalMapping();
   if (!map) return;
 
-  int baseIdx = 18;
+  int baseIdx = 20;
   for (int i = 0; i < map->count && (baseIdx + i) < MAX_SETTINGS_ITEMS; i++) {
     MappingEntry *e = &map->entries[i];
     snprintf(a->settingsState.Items[baseIdx + i].Label, 64, "%s %s", e->group, e->key);
@@ -1019,7 +1040,48 @@ int main(void) {
               &audioEngine->Decks[0].EqLow, 0, 1.0f);
   CO_Register("[Channel1]", "cue_default", CO_TYPE_BOOL,
               &audioEngine->Decks[0].IsCueActive, 0, 1);
+  CO_Register("[Channel1]", "pfl", CO_TYPE_BOOL,
+              &audioEngine->Decks[0].IsCueActive, 0, 1);
+  CO_Register("[Channel1]", "fader", CO_TYPE_FLOAT,
+              &audioEngine->Decks[0].Fader, 0, 1.0f);
   CO_Register("[Channel1]", "jog", CO_TYPE_FLOAT, &app->deckA.JogDelta, -100.0f, 100.0f);
+  CO_Register("[Channel1]", "loadA", CO_TYPE_BOOL, &app->deckA.IsLoading, 0, 1);
+  CO_Register("[Channel1]", "slip", CO_TYPE_BOOL, &audioEngine->Decks[0].SlipActive, 0, 1);
+  CO_Register("[Channel1]", "vinyl_mode", CO_TYPE_BOOL, &app->deckA.VinylModeEnabled, 0, 1);
+  CO_Register("[Channel1]", "master_tempo", CO_TYPE_BOOL, &app->deckA.MasterTempo, 0, 1);
+  CO_Register("[Channel1]", "quantize", CO_TYPE_BOOL, &app->deckA.QuantizeEnabled, 0, 1);
+  CO_Register("[Channel1]", "sync", CO_TYPE_BOOL, &app->deckA.MidiRequestSync, 0, 1);
+  CO_Register("[Channel1]", "master", CO_TYPE_BOOL, &app->deckA.MidiRequestMaster, 0, 1);
+  
+  // Loops
+  CO_Register("[Channel1]", "loop_in", CO_TYPE_BOOL, &app->deckA.MidiRequestLoopIn, 0, 1);
+  CO_Register("[Channel1]", "loop_out", CO_TYPE_BOOL, &app->deckA.MidiRequestLoopOut, 0, 1);
+  CO_Register("[Channel1]", "loop_exit", CO_TYPE_BOOL, &app->deckA.MidiRequestLoopExit, 0, 1);
+  CO_Register("[Channel1]", "loop_halve", CO_TYPE_BOOL, &app->deckA.MidiRequestLoopHalve, 0, 1);
+  CO_Register("[Channel1]", "loop_double", CO_TYPE_BOOL, &app->deckA.MidiRequestLoopDouble, 0, 1);
+
+  // Pitch Bend
+  CO_Register("[Channel1]", "pitch_bend_plus", CO_TYPE_BOOL, &app->deckA.MidiRequestPitchBendPlus, 0, 1);
+  CO_Register("[Channel1]", "pitch_bend_minus", CO_TYPE_BOOL, &app->deckA.MidiRequestPitchBendMinus, 0, 1);
+
+  // Hot Cues 1-8
+  CO_Register("[Channel1]", "hotcue_1", CO_TYPE_BOOL, &app->deckA.MidiRequestHotCue[0], 0, 1);
+  CO_Register("[Channel1]", "hotcue_2", CO_TYPE_BOOL, &app->deckA.MidiRequestHotCue[1], 0, 1);
+  CO_Register("[Channel1]", "hotcue_3", CO_TYPE_BOOL, &app->deckA.MidiRequestHotCue[2], 0, 1);
+  CO_Register("[Channel1]", "hotcue_4", CO_TYPE_BOOL, &app->deckA.MidiRequestHotCue[3], 0, 1);
+  CO_Register("[Channel1]", "hotcue_5", CO_TYPE_BOOL, &app->deckA.MidiRequestHotCue[4], 0, 1);
+  CO_Register("[Channel1]", "hotcue_6", CO_TYPE_BOOL, &app->deckA.MidiRequestHotCue[5], 0, 1);
+  CO_Register("[Channel1]", "hotcue_7", CO_TYPE_BOOL, &app->deckA.MidiRequestHotCue[6], 0, 1);
+  CO_Register("[Channel1]", "hotcue_8", CO_TYPE_BOOL, &app->deckA.MidiRequestHotCue[7], 0, 1);
+
+  // Beat Jump & Auto Loop
+  CO_Register("[Channel1]", "beatjump_forward", CO_TYPE_BOOL, &app->deckA.MidiRequestBeatJumpForward, 0, 1);
+  CO_Register("[Channel1]", "beatjump_backward", CO_TYPE_BOOL, &app->deckA.MidiRequestBeatJumpBackward, 0, 1);
+  CO_Register("[Channel1]", "autoloop_1", CO_TYPE_BOOL, &app->deckA.MidiRequestAutoLoop[0], 0, 1);
+  CO_Register("[Channel1]", "autoloop_2", CO_TYPE_BOOL, &app->deckA.MidiRequestAutoLoop[1], 0, 1);
+  CO_Register("[Channel1]", "autoloop_4", CO_TYPE_BOOL, &app->deckA.MidiRequestAutoLoop[2], 0, 1);
+  CO_Register("[Channel1]", "autoloop_8", CO_TYPE_BOOL, &app->deckA.MidiRequestAutoLoop[3], 0, 1);
+  CO_Register("[Channel1]", "autoloop_16", CO_TYPE_BOOL, &app->deckA.MidiRequestAutoLoop[4], 0, 1);
   
   CO_Register("[Channel2]", "play", CO_TYPE_BOOL,
               &audioEngine->Decks[1].IsMotorOn, 0, 1);
@@ -1033,7 +1095,48 @@ int main(void) {
               &audioEngine->Decks[1].EqLow, 0, 1.0f);
   CO_Register("[Channel2]", "cue_default", CO_TYPE_BOOL,
               &audioEngine->Decks[1].IsCueActive, 0, 1);
+  CO_Register("[Channel2]", "pfl", CO_TYPE_BOOL,
+              &audioEngine->Decks[1].IsCueActive, 0, 1);
+  CO_Register("[Channel2]", "fader", CO_TYPE_FLOAT,
+              &audioEngine->Decks[1].Fader, 0, 1.0f);
   CO_Register("[Channel2]", "jog", CO_TYPE_FLOAT, &app->deckB.JogDelta, -100.0f, 100.0f);
+  CO_Register("[Channel2]", "loadB", CO_TYPE_BOOL, &app->deckB.IsLoading, 0, 1);
+  CO_Register("[Channel2]", "slip", CO_TYPE_BOOL, &audioEngine->Decks[1].SlipActive, 0, 1);
+  CO_Register("[Channel2]", "vinyl_mode", CO_TYPE_BOOL, &app->deckB.VinylModeEnabled, 0, 1);
+  CO_Register("[Channel2]", "master_tempo", CO_TYPE_BOOL, &app->deckB.MasterTempo, 0, 1);
+  CO_Register("[Channel2]", "quantize", CO_TYPE_BOOL, &app->deckB.QuantizeEnabled, 0, 1);
+  CO_Register("[Channel2]", "sync", CO_TYPE_BOOL, &app->deckB.MidiRequestSync, 0, 1);
+  CO_Register("[Channel2]", "master", CO_TYPE_BOOL, &app->deckB.MidiRequestMaster, 0, 1);
+
+  // Loops
+  CO_Register("[Channel2]", "loop_in", CO_TYPE_BOOL, &app->deckB.MidiRequestLoopIn, 0, 1);
+  CO_Register("[Channel2]", "loop_out", CO_TYPE_BOOL, &app->deckB.MidiRequestLoopOut, 0, 1);
+  CO_Register("[Channel2]", "loop_exit", CO_TYPE_BOOL, &app->deckB.MidiRequestLoopExit, 0, 1);
+  CO_Register("[Channel2]", "loop_halve", CO_TYPE_BOOL, &app->deckB.MidiRequestLoopHalve, 0, 1);
+  CO_Register("[Channel2]", "loop_double", CO_TYPE_BOOL, &app->deckB.MidiRequestLoopDouble, 0, 1);
+
+  // Pitch Bend
+  CO_Register("[Channel2]", "pitch_bend_plus", CO_TYPE_BOOL, &app->deckB.MidiRequestPitchBendPlus, 0, 1);
+  CO_Register("[Channel2]", "pitch_bend_minus", CO_TYPE_BOOL, &app->deckB.MidiRequestPitchBendMinus, 0, 1);
+
+  // Hot Cues 1-8
+  CO_Register("[Channel2]", "hotcue_1", CO_TYPE_BOOL, &app->deckB.MidiRequestHotCue[0], 0, 1);
+  CO_Register("[Channel2]", "hotcue_2", CO_TYPE_BOOL, &app->deckB.MidiRequestHotCue[1], 0, 1);
+  CO_Register("[Channel2]", "hotcue_3", CO_TYPE_BOOL, &app->deckB.MidiRequestHotCue[2], 0, 1);
+  CO_Register("[Channel2]", "hotcue_4", CO_TYPE_BOOL, &app->deckB.MidiRequestHotCue[3], 0, 1);
+  CO_Register("[Channel2]", "hotcue_5", CO_TYPE_BOOL, &app->deckB.MidiRequestHotCue[4], 0, 1);
+  CO_Register("[Channel2]", "hotcue_6", CO_TYPE_BOOL, &app->deckB.MidiRequestHotCue[5], 0, 1);
+  CO_Register("[Channel2]", "hotcue_7", CO_TYPE_BOOL, &app->deckB.MidiRequestHotCue[6], 0, 1);
+  CO_Register("[Channel2]", "hotcue_8", CO_TYPE_BOOL, &app->deckB.MidiRequestHotCue[7], 0, 1);
+
+  // Beat Jump & Auto Loop
+  CO_Register("[Channel2]", "beatjump_forward", CO_TYPE_BOOL, &app->deckB.MidiRequestBeatJumpForward, 0, 1);
+  CO_Register("[Channel2]", "beatjump_backward", CO_TYPE_BOOL, &app->deckB.MidiRequestBeatJumpBackward, 0, 1);
+  CO_Register("[Channel2]", "autoloop_1", CO_TYPE_BOOL, &app->deckB.MidiRequestAutoLoop[0], 0, 1);
+  CO_Register("[Channel2]", "autoloop_2", CO_TYPE_BOOL, &app->deckB.MidiRequestAutoLoop[1], 0, 1);
+  CO_Register("[Channel2]", "autoloop_4", CO_TYPE_BOOL, &app->deckB.MidiRequestAutoLoop[2], 0, 1);
+  CO_Register("[Channel2]", "autoloop_8", CO_TYPE_BOOL, &app->deckB.MidiRequestAutoLoop[3], 0, 1);
+  CO_Register("[Channel2]", "autoloop_16", CO_TYPE_BOOL, &app->deckB.MidiRequestAutoLoop[4], 0, 1);
   CO_Register("[Master]", "crossfader", CO_TYPE_FLOAT, &audioEngine->Crossfader,
               -1.0f, 1.0f);
   CO_Register("[Master]", "volume", CO_TYPE_FLOAT, &audioEngine->MasterVolume, 0, 1.0f);
@@ -1041,8 +1144,10 @@ int main(void) {
   // --- Color FX ---
   CO_Register("[Channel1]", "colorfx_select", CO_TYPE_INT, &audioEngine->Decks[0].ColorFX.activeFX, 0, 6);
   CO_Register("[Channel1]", "colorfx_parameter", CO_TYPE_FLOAT, &audioEngine->Decks[0].ColorFX.parameter, 0, 1.0f);
+  CO_Register("[Channel1]", "colorfx_value", CO_TYPE_FLOAT, &audioEngine->Decks[0].ColorFX.colorValue, -1.0f, 1.0f);
   CO_Register("[Channel2]", "colorfx_select", CO_TYPE_INT, &audioEngine->Decks[1].ColorFX.activeFX, 0, 6);
   CO_Register("[Channel2]", "colorfx_parameter", CO_TYPE_FLOAT, &audioEngine->Decks[1].ColorFX.parameter, 0, 1.0f);
+  CO_Register("[Channel2]", "colorfx_value", CO_TYPE_FLOAT, &audioEngine->Decks[1].ColorFX.colorValue, -1.0f, 1.0f);
 
   // --- Beat FX ---
   CO_Register("[Master]", "beatfx_select", CO_TYPE_INT, &audioEngine->BeatFX.activeFX, 0, 13);
@@ -1055,8 +1160,20 @@ int main(void) {
   CO_Register("[Library]", "browse", CO_TYPE_FLOAT, &app->browserState.MidiBrowseDelta, -10.0f, 10.0f);
   CO_Register("[Library]", "enter", CO_TYPE_BOOL, &app->browserState.MidiRequestEnter, 0, 1);
   CO_Register("[Library]", "back", CO_TYPE_BOOL, &app->browserState.MidiRequestBack, 0, 1);
+  CO_Register("[Library]", "up", CO_TYPE_BOOL, &app->browserState.MidiRequestUp, 0, 1);
+  CO_Register("[Library]", "down", CO_TYPE_BOOL, &app->browserState.MidiRequestDown, 0, 1);
   CO_Register("[Library]", "loadA", CO_TYPE_BOOL, &app->browserState.MidiRequestLoadA, 0, 1);
   CO_Register("[Library]", "loadB", CO_TYPE_BOOL, &app->browserState.MidiRequestLoadB, 0, 1);
+
+  // --- Settings Navigation ---
+  CO_Register("[Settings]", "browse", CO_TYPE_FLOAT, &app->settingsState.MidiBrowseDelta, -10.0f, 10.0f);
+  CO_Register("[Settings]", "enter", CO_TYPE_BOOL, &app->settingsState.MidiRequestEnter, 0, 1);
+
+  // --- App / UI Navigation ---
+  CO_Register("[App]", "settings_toggle", CO_TYPE_BOOL, &app->MidiRequestSettings, 0, 1);
+  CO_Register("[App]", "info_toggle", CO_TYPE_BOOL, &app->MidiRequestInfo, 0, 1);
+  CO_Register("[App]", "mixer_toggle", CO_TYPE_BOOL, &app->MidiRequestMixer, 0, 1);
+  CO_Register("[App]", "browser_toggle", CO_TYPE_BOOL, &app->MidiRequestBrowser, 0, 1);
 
   globalAudioEngine = audioEngine;
 
@@ -1343,14 +1460,105 @@ void UpdateDrawFrame(App *app) {
   HandleKeyboardInputs(&app->keyMap, &app->deckA, &app->deckB, audioEngine);
   MIDI_Update(&app->midiCtx, &app->deckA, &app->deckB, audioEngine);
 
-  // Global UI navigation using keyMap
-  if (IsKeyPressed(app->keyMap.toggleBrowser)) {
-    if (app->screen == ScreenPlayer) {
-      app->screen = ScreenBrowser;
-      app->browserState.IsActive = true;
-    } else if (app->screen == ScreenBrowser) {
-      app->screen = ScreenPlayer;
-      app->browserState.IsActive = !app->browserState.IsActive;
+  // --- MIDI UI Navigation ---
+  if (app->MidiRequestBrowser || IsKeyPressed(app->keyMap.toggleBrowser)) {
+    TopBar_OnBrowse(app);
+    app->MidiRequestBrowser = false;
+  }
+  if (app->MidiRequestSettings) {
+    TopBar_OnSettings(app);
+    app->MidiRequestSettings = false;
+  }
+  if (app->MidiRequestInfo) {
+    TopBar_OnInfo(app);
+    app->MidiRequestInfo = false;
+  }
+  if (app->MidiRequestMixer) {
+    TopBar_OnMixer(app);
+    app->MidiRequestMixer = false;
+  }
+
+  // Handle Library Up/Down requests
+  if (app->browserState.MidiRequestUp) {
+      app->browserState.MidiBrowseDelta = -1;
+      app->browserState.MidiRequestUp = false;
+  }
+  if (app->browserState.MidiRequestDown) {
+      app->browserState.MidiBrowseDelta = 1;
+      app->browserState.MidiRequestDown = false;
+  }
+
+  // Handle Deck MIDI Requests
+  for (int i = 0; i < 2; i++) {
+    DeckState *ds = (i == 0) ? &app->deckA : &app->deckB;
+    DeckAudioState *audio = &audioEngine->Decks[i];
+
+    // Hot Cues
+    for (int j = 0; j < 8; j++) {
+      if (ds->MidiRequestHotCue[j]) {
+        if (ds->LoadedTrack && j < ds->LoadedTrack->HotCuesCount) {
+          ds->SeekMs = ds->LoadedTrack->HotCues[j].Start;
+          ds->HasSeekRequest = true;
+        }
+        ds->MidiRequestHotCue[j] = false;
+      }
+    }
+
+    // Looping
+    if (ds->MidiRequestLoopIn) {
+        DeckAudio_SetLoop(audio, true, audio->Position, audio->Position + 44100 * 4); // Default 4 beat loop
+        ds->MidiRequestLoopIn = false;
+    }
+    if (ds->MidiRequestLoopOut) {
+        if (audio->IsLooping) DeckAudio_ExitLoop(audio);
+        ds->MidiRequestLoopOut = false;
+    }
+    if (ds->MidiRequestLoopExit) {
+        DeckAudio_ExitLoop(audio);
+        ds->MidiRequestLoopExit = false;
+    }
+    
+    // Pitch Bend
+    if (ds->MidiRequestPitchBendPlus) {
+        CO_AddValue(i == 0 ? "[Channel1]" : "[Channel2]", "jog", 5.0f);
+        ds->MidiRequestPitchBendPlus = false;
+    }
+    if (ds->MidiRequestPitchBendMinus) {
+        CO_AddValue(i == 0 ? "[Channel1]" : "[Channel2]", "jog", -5.0f);
+        ds->MidiRequestPitchBendMinus = false;
+    }
+
+    // Sync & Master
+    if (ds->MidiRequestSync) {
+        ds->SyncMode = (ds->SyncMode == 0) ? 1 : 0;
+        ds->MidiRequestSync = false;
+    }
+    if (ds->MidiRequestMaster) {
+        ds->IsMaster = !ds->IsMaster;
+        ds->MidiRequestMaster = false;
+    }
+
+    // Beat Jump
+    if (ds->MidiRequestBeatJumpForward) {
+        ds->SeekMs += 2000; // Simplified 2s jump
+        ds->HasSeekRequest = true;
+        ds->MidiRequestBeatJumpForward = false;
+    }
+    if (ds->MidiRequestBeatJumpBackward) {
+        ds->SeekMs -= 2000;
+        ds->HasSeekRequest = true;
+        ds->MidiRequestBeatJumpBackward = false;
+    }
+
+    // Auto Loop
+    int loopSizes[] = {1, 2, 4, 8, 16};
+    for(int k=0; k<5; k++) {
+        if (ds->MidiRequestAutoLoop[k]) {
+            double beatMs = (60000.0f / ds->CurrentBPM);
+            double loopLenFrames = (beatMs * loopSizes[k] * audio->SampleRate) / 1000.0f;
+            DeckAudio_SetLoop(audio, true, audio->Position, audio->Position + loopLenFrames);
+            ds->MidiRequestAutoLoop[k] = false;
+        }
     }
   }
 
