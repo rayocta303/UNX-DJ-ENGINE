@@ -44,6 +44,10 @@
 #include <unistd.h>
 #endif
 
+#ifdef _WIN32
+#define STBI_NO_SIMD
+#define STBI_ASSERT(x)
+#define STB_IMAGE_STATIC
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -69,6 +73,12 @@ Image LoadImageManual(const char *path) {
   
   return img;
 }
+#else
+// On other platforms (Android, iOS), we build Raylib from source with full format support
+Image LoadImageManual(const char *path) {
+  return LoadImage(path);
+}
+#endif
 
 typedef struct {
   CurrentScreen screen;

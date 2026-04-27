@@ -120,7 +120,12 @@ int InitPlatform(void) {
             if (window) break;
         }
     }
-    if (!window) window = [UIApplication sharedApplication].keyWindow;
+    if (!window) {
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        window = [UIApplication sharedApplication].keyWindow;
+        #pragma clang diagnostic pop
+    }
     
     UIView *rootView = window.rootViewController.view;
     if (!rootView) {
