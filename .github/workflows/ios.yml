@@ -140,6 +140,7 @@ jobs:
         # - any tests/test folders
         C_FILES=$(find src lib -name "*.c" \
           | grep -v "midi_backend_win.c" \
+          | grep -v "hid_backend_win.c" \
           | grep -v "src/core/audio_backend.c" \
           | grep -v "lib/linux_arm64" \
           | grep -v "lib/qm-dsp/hmm" \

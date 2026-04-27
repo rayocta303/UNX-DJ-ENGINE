@@ -1,3 +1,4 @@
+#if defined(_WIN32) || defined(__CYGWIN__)
 #include "core/hid/hid_backend.h"
 #include <windows.h>
 #include <setupapi.h>
@@ -88,3 +89,4 @@ int HID_Write(HidDevice *dev, const uint8_t *buffer, int length) {
     }
     return -1;
 }
+#endif
