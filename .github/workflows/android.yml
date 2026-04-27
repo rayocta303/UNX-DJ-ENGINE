@@ -132,7 +132,6 @@ jobs:
         
         # Exclude platform specific
         list(FILTER SRC_FILES EXCLUDE REGEX "midi_backend_win.c")
-        list(FILTER SRC_FILES EXCLUDE REGEX "hid_backend_win.c")
         
         add_definitions(-DKS_STR_ENCODING_NONE)
         

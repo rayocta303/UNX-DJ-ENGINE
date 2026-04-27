@@ -62,6 +62,7 @@ SRC_C = src/main.c \
         src/core/midi/midi_handler.c \
         src/core/midi/midi_mapper.c \
         src/core/midi/midi_backend_win.c \
+        src/core/hid/hid_backend_win.c \
         $(wildcard src/engine/fx/colorfx/*.c) \
         $(wildcard src/engine/fx/beatfx/*.c)
 

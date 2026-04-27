@@ -89,4 +89,14 @@ int HID_Write(HidDevice *dev, const uint8_t *buffer, int length) {
     }
     return -1;
 }
+#else
+// Stub implementations for non-Windows platforms to satisfy the linker
+#include "core/hid/hid_backend.h"
+
+bool HID_Init(void) { return true; }
+int HID_Scan(HidDevice *outDevices, int maxDevices) { (void)outDevices; (void)maxDevices; return 0; }
+bool HID_Open(HidDevice *dev) { (void)dev; return false; }
+void HID_Close(HidDevice *dev) { (void)dev; }
+int HID_Read(HidDevice *dev, uint8_t *buffer, int length) { (void)dev; (void)buffer; (void)length; return -1; }
+int HID_Write(HidDevice *dev, const uint8_t *buffer, int length) { (void)dev; (void)buffer; (void)length; return -1; }
 #endif
