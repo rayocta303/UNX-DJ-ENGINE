@@ -806,6 +806,7 @@ void App_Init(App *a) {
 
   // Init FX State
   memset(&a->fxState, 0, sizeof(BeatFXState));
+  a->fxState.LevelDepth = 0.5f;
 
   // Init About State
   memset(&a->aboutState, 0, sizeof(AboutState));
@@ -839,6 +840,7 @@ void App_Init(App *a) {
   // We only set hardcoded defaults if you want a fallback before loading.
 
   AboutRenderer_Init(&a->about, &a->aboutState);
+  a->mixerState.FXState = &a->fxState;
   MixerRenderer_Init(&a->mixer, &a->mixerState);
 
   // Init Pad View

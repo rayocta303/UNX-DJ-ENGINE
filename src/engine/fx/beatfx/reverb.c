@@ -2,23 +2,25 @@
 #include <math.h>
 
 void Reverb_Init(BeatFX_Reverb *fx) {
-  DelayLine_Init(&fx->delayL[0], 2000);
-  DelayLine_Init(&fx->delayL[1], 3001);
-  DelayLine_Init(&fx->delayL[2], 4111);
-  DelayLine_Init(&fx->delayL[3], 5227);
-  DelayLine_Init(&fx->delayL[4], 1553);
-  DelayLine_Init(&fx->delayL[5], 6311);
-  DelayLine_Init(&fx->delayL[6], 7457);
-  DelayLine_Init(&fx->delayL[7], 8923);
+  DelayLine_Init(&fx->delayL[0], 1553);
+  DelayLine_Init(&fx->delayL[1], 2011);
+  DelayLine_Init(&fx->delayL[2], 2657);
+  DelayLine_Init(&fx->delayL[3], 3181);
+  DelayLine_Init(&fx->delayL[4], 3733);
+  DelayLine_Init(&fx->delayL[5], 4273);
+  DelayLine_Init(&fx->delayL[6], 4937);
+  DelayLine_Init(&fx->delayL[7], 5651);
 
-  DelayLine_Init(&fx->delayR[0], 2111);
-  DelayLine_Init(&fx->delayR[1], 3181);
-  DelayLine_Init(&fx->delayR[2], 4217);
-  DelayLine_Init(&fx->delayR[3], 5323);
-  DelayLine_Init(&fx->delayR[4], 1621);
-  DelayLine_Init(&fx->delayR[5], 6427);
-  DelayLine_Init(&fx->delayR[6], 7583);
-  DelayLine_Init(&fx->delayR[7], 9011);
+  DelayLine_Init(&fx->delayR[0], 1621);
+  DelayLine_Init(&fx->delayR[1], 2131);
+  DelayLine_Init(&fx->delayR[2], 2713);
+  DelayLine_Init(&fx->delayR[3], 3251);
+  DelayLine_Init(&fx->delayR[4], 3821);
+  DelayLine_Init(&fx->delayR[5], 4349);
+  DelayLine_Init(&fx->delayR[6], 5011);
+  DelayLine_Init(&fx->delayR[7], 5737);
+  
+  for(int i=0; i<8; i++) { fx->lastL[i] = 0; fx->lastR[i] = 0; }
 
   Biquad_Init(&fx->lpfL);
   Biquad_Init(&fx->lpfR);
@@ -36,10 +38,13 @@ void Reverb_Free(BeatFX_Reverb *fx) {
 void Reverb_Process(BeatFX_Reverb *fx, float *outL, float *outR, float inL,
                     float inR, float beatMs, float levelDepth, float scrubVal,
                     float sampleRate) {
-  // Room size (decay) finite release
-  float decay = 0.94f + (beatMs / 10000.0f) * 0.01f + levelDepth * 0.045f;
-  if (decay > 0.995f)
-    decay = 0.995f;
+  // Room size (decay) - Adjusted for slightly faster release
+  // min: 0.85, max: 0.985
+  float decay = 0.85f + (beatMs / 10000.0f) * 0.01f + levelDepth * 0.125f;
+  if (decay > 0.985f)
+    decay = 0.985f;
+  
+  float damp = 0.35f + levelDepth * 0.15f; // High-frequency damping
 
   float wetL = 0, wetR = 0;
 
@@ -63,6 +68,12 @@ void Reverb_Process(BeatFX_Reverb *fx, float *outL, float *outR, float inL,
       fbR = 1.0f + (fbR - 1.0f) / (1.0f + (fbR - 1.0f) * (fbR - 1.0f));
     else if (fbR < -1.0f)
       fbR = -1.0f + (fbR + 1.0f) / (1.0f + (fbR + 1.0f) * (fbR + 1.0f));
+
+    // Feedback damping (one-pole LPF) for smoother tail
+    fbL = fbL * (1.0f - damp) + fx->lastL[i] * damp;
+    fbR = fbR * (1.0f - damp) + fx->lastR[i] * damp;
+    fx->lastL[i] = fbL;
+    fx->lastR[i] = fbR;
 
     DelayLine_Write(&fx->delayL[i], fbL);
     DelayLine_Write(&fx->delayR[i], fbR);

@@ -2,12 +2,23 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
+#include "ui/player/player_state.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
 
 static int Mixer_Update(Component *base) {
-  (void)base;
+  MixerRenderer *r = (MixerRenderer *)base;
+  if (r->State->AudioPlugin && r->State->FXState) {
+    AudioEngine *eng = r->State->AudioPlugin;
+    BeatFXState *fx = r->State->FXState;
+    // Pull any changes from engine (e.g. MIDI) or push UI changes
+    // Here we ensure the UI state matches the engine
+    fx->LevelDepth = eng->BeatFX.levelDepth;
+    fx->SelectedChannel = eng->BeatFX.targetChannel;
+    fx->SelectedFX = eng->BeatFX.activeFX;
+    fx->IsFXOn = eng->BeatFX.isFxOn;
+  }
   return 0;
 }
 

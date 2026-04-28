@@ -346,7 +346,7 @@ static inline void AudioEngine_GetSample(DeckAudioState *deck, double pos,
 
 static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
                              float *outCue, int frames, AudioEngine *engine,
-                             int deckIndex) {
+                             int deckIndex, float *outCleanMaster) {
   bool noiseActive = (deck->ColorFX.activeFX == COLORFX_NOISE &&
                       deck->ColorFX.colorValue != 0.0f);
   if ((!deck->PCMBuffer || deck->IsLoading) && !noiseActive)
@@ -441,7 +441,7 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     }
     received = st->receiveSamples(outBuf, frames);
     deck->Position += (double)received * targetRate;
-  } else {
+  } else if (deck->IsPlaying || noiseActive) {
     if (wasMTActive[deckIndex]) { st->clear(); wasMTActive[deckIndex] = false; }
     double currentRate = deck->LastRate;
     double rateDelta = (targetRate - currentRate) / (double)frames;
@@ -453,6 +453,11 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
         deck->Position = deck->LoopStartPos + (deck->Position - deck->LoopEndPos);
       }
     }
+    received = frames;
+  } else {
+    // Deck is paused and no noise: output silence so VU meter can decay
+    if (wasMTActive[deckIndex]) { st->clear(); wasMTActive[deckIndex] = false; }
+    memset(outBuf, 0, frames * 2 * sizeof(float));
     received = frames;
   }
 
@@ -492,19 +497,23 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     if (engine->RoutingMode == FX_ROUTING_POST_FADER) {
       // MASTER gets Dry signal (Post-Fader)
       outMaster[i * 2] += sendL; outMaster[i * 2 + 1] += sendR;
+      // Also add to clean sum for Master FX
+      outCleanMaster[i * 2] += sendL; outCleanMaster[i * 2 + 1] += sendR;
+
       // BEAT FX gets Send signal (Post-Fader), MASTER gets Wet signal (Return)
       float wetL = 0, wetR = 0;
       if (engine->BeatFX.targetChannel == deckIndex + 1) {
         BeatFXManager_ProcessWetOnly(&engine->BeatFX, &wetL, &wetR, sendL, sendR, fs);
       }
       outMaster[i * 2] += wetL; outMaster[i * 2 + 1] += wetR;
-    } else {
+      } else {
       // INSERT MODE: Beat FX sits between Fader and Master
       float fxOutL = sendL, fxOutR = sendR;
       if (engine->BeatFX.targetChannel == deckIndex + 1) {
         BeatFXManager_Process(&engine->BeatFX, &fxOutL, &fxOutR, sendL, sendR, fs);
       }
       outMaster[i * 2] += fxOutL; outMaster[i * 2 + 1] += fxOutR;
+      outCleanMaster[i * 2] += fxOutL; outCleanMaster[i * 2 + 1] += fxOutR;
     }
   }
 
@@ -514,9 +523,9 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
   float peakL = maxL * 1.6f; float peakR = maxR * 1.6f;
   if (peakL > 1.0f) peakL = 1.0f; if (peakR > 1.0f) peakR = 1.0f;
   if (peakL > deck->VuMeterL) deck->VuMeterL = peakL;
-  else deck->VuMeterL = deck->VuMeterL * 0.92f + peakL * 0.08f;
+  else deck->VuMeterL = deck->VuMeterL * 0.88f + peakL * 0.12f;
   if (peakR > deck->VuMeterR) deck->VuMeterR = peakR;
-  else deck->VuMeterR = deck->VuMeterR * 0.92f + peakR * 0.08f;
+  else deck->VuMeterR = deck->VuMeterR * 0.88f + peakR * 0.12f;
 }
 
 void AudioEngine_SetFXRouting(AudioEngine *engine, FXRoutingMode mode) {
@@ -525,12 +534,14 @@ void AudioEngine_SetFXRouting(AudioEngine *engine, FXRoutingMode mode) {
 
 void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
   static float masterMix[4096 * 2];
+  static float cleanMasterMix[4096 * 2];
   static float cueMix[4096 * 2];
   memset(masterMix, 0, frames * 2 * sizeof(float));
+  memset(cleanMasterMix, 0, frames * 2 * sizeof(float));
   memset(cueMix, 0, frames * 2 * sizeof(float));
 
   for (int i = 0; i < MAX_DECKS; i++) {
-    ProcessDeckAudio(&engine->Decks[i], masterMix, cueMix, frames, engine, i);
+    ProcessDeckAudio(&engine->Decks[i], masterMix, cueMix, frames, engine, i, cleanMasterMix);
   }
 
   float mPeakL = 0, mPeakR = 0;
@@ -538,7 +549,8 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
     // Professional Master FX Send/Return (If assigned to Master)
     if (engine->BeatFX.targetChannel == 0) {
        float wetL = 0, wetR = 0;
-       BeatFXManager_ProcessWetOnly(&engine->BeatFX, &wetL, &wetR, masterMix[s*2], masterMix[s*2+1], engine->OutputSampleRate);
+       // Take input from cleanMasterMix to avoid feedback loops with deck tails
+       BeatFXManager_ProcessWetOnly(&engine->BeatFX, &wetL, &wetR, cleanMasterMix[s*2], cleanMasterMix[s*2+1], engine->OutputSampleRate);
        masterMix[s*2] += wetL; masterMix[s*2+1] += wetR;
     }
 
@@ -563,9 +575,9 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
   float pML = mPeakL * 1.4f; float pMR = mPeakR * 1.4f;
   if (pML > 1.0f) pML = 1.0f; if (pMR > 1.0f) pMR = 1.0f;
   if (pML > engine->MasterVuL) engine->MasterVuL = pML;
-  else engine->MasterVuL = engine->MasterVuL * 0.92f + pML * 0.08f;
+  else engine->MasterVuL = engine->MasterVuL * 0.88f + pML * 0.12f;
   if (pMR > engine->MasterVuR) engine->MasterVuR = pMR;
-  else engine->MasterVuR = engine->MasterVuR * 0.92f + pMR * 0.08f;
+  else engine->MasterVuR = engine->MasterVuR * 0.88f + pMR * 0.12f;
   engine->LastCrossfader = engine->Crossfader;
 }
 

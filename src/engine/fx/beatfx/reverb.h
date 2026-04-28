@@ -6,6 +6,8 @@
 typedef struct {
     DelayLine delayL[8];
     DelayLine delayR[8];
+    float lastL[8];
+    float lastR[8];
     BiquadFilter lpfL, lpfR, hpfL, hpfR;
 } BeatFX_Reverb;
 

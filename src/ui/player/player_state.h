@@ -133,6 +133,7 @@ typedef struct BeatFXState {
   bool FXDropdownOpen;
   bool ShowBeatFXTab; // false = STATUS, true = BEAT FX
   bool IsFXOn;
+  float LevelDepth; // Persist knob depth
   float XPadScrubValue; // -1.0 to 1.0 for Reverb LPF/HPF and Flanger Sweep
   bool IsXPadScrubbing; // True when holding the scrub line
   bool Quantize;

@@ -45,7 +45,7 @@ static int Player_Update(Component *base) {
   p->AudioPlugin->BeatFX.targetChannel = p->FXState->SelectedChannel;
   p->AudioPlugin->BeatFX.isFxOn = p->FXState->IsFXOn;
   p->AudioPlugin->BeatFX.beatMs = fxMs;
-  p->AudioPlugin->BeatFX.levelDepth = 0.5f; // Hardcoded default for now
+  p->AudioPlugin->BeatFX.levelDepth = p->FXState->LevelDepth;
   p->AudioPlugin->BeatFX.scrubVal = p->FXState->XPadScrubValue;
   p->AudioPlugin->BeatFX.isScrubbing = p->FXState->IsXPadScrubbing;
 
