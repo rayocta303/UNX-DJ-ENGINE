@@ -108,6 +108,9 @@ typedef struct DeckState {
   float LoadingProgress; // 0.0 to 1.0
   Texture2D ArtworkTexture;
   char LastLoadedArtPath[512]; // Internal cache key
+  long long MainCueMs;
+  bool IsCueHeld;
+  bool IsCueActive; // For blinking or UI feedback
 
   // MIDI Interaction Flags
   bool MidiRequestHotCue[8];

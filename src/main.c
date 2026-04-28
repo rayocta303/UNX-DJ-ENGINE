@@ -1459,8 +1459,30 @@ void UpdateDrawFrame(App *app) {
   lastMasterA = app->deckA.IsMaster;
   lastMasterB = app->deckB.IsMaster;
 
-  HandleKeyboardInputs(&app->keyMap, &app->deckA, &app->deckB, audioEngine);
+  HandleKeyboardInputs(&app->keyMap, &app->deckA, &app->deckB, audioEngine, &app->fxState);
   MIDI_Update(&app->midiCtx, &app->deckA, &app->deckB, audioEngine);
+
+  // --- Global Beat FX Sync ---
+  float masterBpm = 120.0f;
+  if (app->deckA.IsMaster) masterBpm = app->deckA.CurrentBPM;
+  else if (app->deckB.IsMaster) masterBpm = app->deckB.CurrentBPM;
+  else masterBpm = app->deckA.CurrentBPM;
+  if (masterBpm < 1.0f) masterBpm = 120.0f;
+
+  static const float XPadRatios[] = {0.125f, 0.25f, 0.5f, 0.75f, 1.0f, 2.0f};
+  int padIdx = app->fxState.SelectedPad;
+  if (padIdx < 0) padIdx = 4;
+  if (padIdx >= 6) padIdx = 5;
+  float ratio = XPadRatios[padIdx];
+  float fxMs = (60000.0f / masterBpm) * ratio;
+
+  audioEngine->BeatFX.activeFX = app->fxState.SelectedFX;
+  audioEngine->BeatFX.targetChannel = app->fxState.SelectedChannel;
+  audioEngine->BeatFX.isFxOn = app->fxState.IsFXOn;
+  audioEngine->BeatFX.beatMs = fxMs;
+  audioEngine->BeatFX.levelDepth = app->fxState.LevelDepth;
+  audioEngine->BeatFX.scrubVal = app->fxState.XPadScrubValue;
+  audioEngine->BeatFX.isScrubbing = app->fxState.IsXPadScrubbing;
 
   // --- MIDI UI Navigation ---
   if (app->MidiRequestBrowser || IsKeyPressed(app->keyMap.toggleBrowser)) {
@@ -1779,10 +1801,12 @@ void UpdateDrawFrame(App *app) {
     if (app->deckA.HasSeekRequest) {
       DeckAudio_JumpToMs(&audioEngine->Decks[0], app->deckA.SeekMs);
       app->deckA.HasSeekRequest = false;
+      app->padState.ActiveLoopIdx[0] = -1;
     }
     if (app->deckB.HasSeekRequest) {
       DeckAudio_JumpToMs(&audioEngine->Decks[1], app->deckB.SeekMs);
       app->deckB.HasSeekRequest = false;
+      app->padState.ActiveLoopIdx[1] = -1;
     }
   }
 

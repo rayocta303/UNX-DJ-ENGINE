@@ -139,6 +139,7 @@ void DeckAudio_JumpToMs(DeckAudioState *deck, int64_t ms);
 void DeckAudio_QueueJumpMs(DeckAudioState *deck, uint32_t targetMs,
                            uint32_t waitMs);
 void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch);
+void DeckAudio_Unload(DeckAudioState *deck);
 
 void DeckAudio_SetSlip(DeckAudioState *deck, bool active);
 void DeckAudio_SetLoop(DeckAudioState *deck, bool active, double startPos,

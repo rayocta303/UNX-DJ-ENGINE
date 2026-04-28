@@ -3,6 +3,7 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
 #include <stdlib.h>
 #include "ui/components/assets_bundle.h"
@@ -11,7 +12,38 @@ static Texture2D crownTex = {0};
 static Texture2D starTex = {0};
 
 static int DeckInfo_Update(Component *base) {
-    (void)base;
+    DeckInfoPanel *d = (DeckInfoPanel *)base;
+    
+    float deckInfoW = SIDE_PANEL_W;
+    float deckInfoH = (SCREEN_HEIGHT - TOP_BAR_H - FX_BAR_H - DECK_STR_H) / 2.0f;
+    float y = TOP_BAR_H + (d->ID * deckInfoH);
+    
+    float ejectX = deckInfoW - S(16);
+    float ejectY = y + S(1.5f);
+    Rectangle ejectRect = { ejectX - S(4), ejectY - S(2), S(20), S(12) };
+    
+    if (d->State->LoadedTrack != NULL && CheckCollisionPointRec(UIGetMousePosition(), ejectRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        // Unload Engine
+        DeckAudio_Unload(&d->Engine->Decks[d->ID]);
+        
+        // Unload UI State
+        if (d->State->LoadedTrack) {
+            TrackState *t = d->State->LoadedTrack;
+            d->State->LoadedTrack = NULL; // Clear pointer FIRST
+            if (t->BeatGrid != NULL) free(t->BeatGrid);
+            free(t);
+        }
+        d->State->TrackTitle[0] = '\0';
+        d->State->ArtistName[0] = '\0';
+        d->State->ArtworkPath[0] = '\0';
+        d->State->TrackLengthMs = 0;
+        d->State->PositionMs = 0;
+        d->State->Position = 0;
+        d->State->CurrentBPM = 0;
+        d->State->OriginalBPM = 0;
+        strcpy(d->State->TrackKey, "");
+    }
+
     return 0;
 }
 
@@ -63,6 +95,17 @@ static void DeckInfo_Draw(Component *base) {
     char deckLabel[32];
     sprintf(deckLabel, "DECK %d", d->ID + 1);
     UIDrawText(deckLabel, faceXXS, S(margin), y + S(1.5f), S(7.5f), ColorWhite);
+
+    // Eject Button (Upper right)
+    Font faceIcon = UIFonts_GetIcon(S(10));
+    float ejectX = deckInfoW - S(16);
+    float ejectY = y + S(1.5f);
+    Rectangle ejectRect = { ejectX - S(4), ejectY - S(2), S(20), S(12) };
+    bool hoverEject = CheckCollisionPointRec(UIGetMousePosition(), ejectRect);
+    
+    if (d->State->LoadedTrack != NULL) {
+        UIDrawText("\uf052", faceIcon, ejectX, ejectY, S(10), hoverEject ? ColorRed : ColorShadow);
+    }
 
     float contentY = y + S(headerH);
     float contentH = deckInfoH - S(headerH);
@@ -203,9 +246,10 @@ static void DeckInfo_Draw(Component *base) {
     UIDrawText(d->State->VinylModeEnabled ? "VINYL" : "CDJ", faceXXS, viRect.x + (d->State->VinylModeEnabled ? S(4.5f) : S(7.5f)), viRect.y + S(2), S(7.5f), ColorWhite);
 }
 
-void DeckInfoPanel_Init(DeckInfoPanel *p, int id, DeckState *state) {
+void DeckInfoPanel_Init(DeckInfoPanel *p, int id, DeckState *state, AudioEngine *engine) {
     p->base.Update = DeckInfo_Update;
     p->base.Draw = DeckInfo_Draw;
     p->ID = id;
     p->State = state;
+    p->Engine = engine;
 }

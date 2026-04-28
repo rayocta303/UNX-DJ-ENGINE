@@ -433,8 +433,12 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
       for (int j = 0; j < 512; j++) {
         AudioEngine_GetSample(deck, deck->MT_ReadPos, &inBuf[j * 2], &inBuf[j * 2 + 1]);
         deck->MT_ReadPos += (targetRate > 0) ? 1.0 : -1.0;
-        if (deck->IsLooping && deck->MT_ReadPos >= deck->LoopEndPos) {
-           deck->MT_ReadPos = deck->LoopStartPos + (deck->MT_ReadPos - deck->LoopEndPos);
+        if (deck->IsLooping) {
+          double loopLen = deck->LoopEndPos - deck->LoopStartPos;
+          if (loopLen > 1.0) {
+            while (deck->MT_ReadPos >= deck->LoopEndPos) deck->MT_ReadPos -= loopLen;
+            while (deck->MT_ReadPos < deck->LoopStartPos) deck->MT_ReadPos += loopLen;
+          }
         }
       }
       st->putSamples(inBuf, 512);
@@ -449,8 +453,12 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
       currentRate += rateDelta;
       AudioEngine_GetSample(deck, deck->Position, &outBuf[i * 2], &outBuf[i * 2 + 1]);
       deck->Position += currentRate * (double)sampleRateRatio;
-      if (deck->IsLooping && deck->Position >= deck->LoopEndPos) {
-        deck->Position = deck->LoopStartPos + (deck->Position - deck->LoopEndPos);
+      if (deck->IsLooping) {
+        double loopLen = deck->LoopEndPos - deck->LoopStartPos;
+        if (loopLen > 1.0) {
+          while (deck->Position >= deck->LoopEndPos) deck->Position -= loopLen;
+          while (deck->Position < deck->LoopStartPos) deck->Position += loopLen;
+        }
       }
     }
     received = frames;
@@ -583,6 +591,25 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
 
 void DeckAudio_Play(DeckAudioState *deck) { deck->IsMotorOn = true; }
 void DeckAudio_Stop(DeckAudioState *deck) { deck->IsMotorOn = false; }
+
+void DeckAudio_Unload(DeckAudioState *deck) {
+  deck->IsLoading = true;
+  // Short sleep to ensure audio thread finishes any active sample processing
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+  deck->IsPlaying = false;
+  deck->IsMotorOn = false;
+  deck->OutlinedRate = 0;
+  if (deck->PCMBuffer) {
+    void *ptr = deck->PCMBuffer;
+    deck->PCMBuffer = NULL;
+    free(ptr);
+  }
+  deck->TotalSamples = 0;
+  deck->Position = 0;
+  deck->FilePath[0] = '\0';
+  deck->IsLoading = false;
+}
 void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch) {
   deck->Pitch = pitch;
 }
@@ -610,6 +637,7 @@ void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching) {
     deck->JogRate = deck->OutlinedRate;
 }
 void DeckAudio_JumpToMs(DeckAudioState *deck, int64_t ms) {
+  deck->IsLooping = false;
   deck->Position = (double)ms * ((double)deck->SampleRate / 1000.0);
   deck->MT_ReadPos = deck->Position;
   if (deck->Position * 2 >= (double)deck->TotalSamples) {

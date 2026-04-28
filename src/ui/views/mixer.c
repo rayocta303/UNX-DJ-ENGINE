@@ -337,6 +337,7 @@ static void Mixer_Draw(Component *base) {
   // =========================================================================
   // COLUMN 3: BEAT FX (RIGHT)
   // =========================================================================
+  BeatFXState *fxs = r->State->FXState;
   DrawRectangle(rightX + S(2), panelY + S(2), colRightW - S(4), panelH - S(4), (Color){20, 20, 20, 255});
   float masterKnobY = panelY + S(25);
   Mixer_DrawKnob(rightX + colRightW / 2.0f, masterKnobY, S(15), eng->MasterVolume, 0.0f, 1.0f, "MASTER", ColorRed, false);
@@ -348,24 +349,25 @@ static void Mixer_Draw(Component *base) {
   const char *bfxNames[] = {"DELAY", "ECHO", "P-PONG", "SPIRAL", "REVERB", "TRANS", "FILTER", "FLANGER", "PHASER", "PITCH", "SLIPROLL", "ROLL", "BRAKE", "HELIX"};
   float bSelectorY = bfxY + S(12);
   DrawRectangle(rightX + S(10), bSelectorY, colRightW - S(20), S(18), ColorBlack);
-  DrawCentredText(bfxNames[eng->BeatFX.activeFX % 14], fSub, rightX, colRightW, bSelectorY + S(4), S(9), ColorWhite);
+  DrawCentredText(bfxNames[fxs->SelectedFX % 14], fSub, rightX, colRightW, bSelectorY + S(4), S(9), ColorWhite);
   if (CheckCollisionPointRec(mousePos, (Rectangle){rightX + S(10), bSelectorY, colRightW - S(20), S(18)}) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-      BeatFXManager_SetFX(&eng->BeatFX, (eng->BeatFX.activeFX + 1) % 14);
+      fxs->SelectedFX = (fxs->SelectedFX + 1) % 14;
+      BeatFXManager_SetFX(&eng->BeatFX, fxs->SelectedFX);
   }
 
   float targetY = bSelectorY + S(24);
   const char *targetNames[] = {"MASTER", "CH 1", "CH 2"};
-  if (DrawFXButton(targetNames[eng->BeatFX.targetChannel], rightX + S(10), targetY, colRightW - S(20), S(18), false)) {
-      eng->BeatFX.targetChannel = (eng->BeatFX.targetChannel + 1) % 3;
+  if (DrawFXButton(targetNames[fxs->SelectedChannel % 3], rightX + S(10), targetY, colRightW - S(20), S(18), false)) {
+      fxs->SelectedChannel = (fxs->SelectedChannel + 1) % 3;
   }
 
   float bDepthY = panelY + panelH - S(100);
-  Mixer_DrawKnob(rightX + colRightW / 2.0f, bDepthY, S(13), eng->BeatFX.levelDepth, 0.0f, 1.0f, "DEPTH", ColorOrange, false);
-  HandleKnob(&eng->BeatFX.levelDepth, rightX + colRightW / 2.0f, bDepthY, S(13), 0.0f, 1.0f, false, mousePos, mDown);
+  Mixer_DrawKnob(rightX + colRightW / 2.0f, bDepthY, S(13), fxs->LevelDepth, 0.0f, 1.0f, "DEPTH", ColorOrange, false);
+  HandleKnob(&fxs->LevelDepth, rightX + colRightW / 2.0f, bDepthY, S(13), 0.0f, 1.0f, false, mousePos, mDown);
 
   float bOnOffY = panelY + panelH - S(45);
-  if (DrawFXButton(eng->BeatFX.isFxOn ? "ON" : "OFF", rightX + S(15), bOnOffY, colRightW - S(30), S(30), eng->BeatFX.isFxOn)) {
-      eng->BeatFX.isFxOn = !eng->BeatFX.isFxOn;
+  if (DrawFXButton(fxs->IsFXOn ? "ON" : "OFF", rightX + S(15), bOnOffY, colRightW - S(30), S(30), fxs->IsFXOn)) {
+      fxs->IsFXOn = !fxs->IsFXOn;
   }
 }
 

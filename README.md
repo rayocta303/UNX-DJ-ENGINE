@@ -115,6 +115,28 @@ Utilize the included `build.sh` script:
 ### Android and iOS
 Mobile builds are managed via GitHub Actions CI/CD pipelines.
 
+## Keyboard Shortcuts
+
+> [!NOTE]
+> Keyboard shortcuts are currently **hardcoded** and cannot be customized in the current version.
+
+| Key | Action |
+|-----|--------|
+| **Z** | Play / Pause (Deck 1) |
+| **A** | Cue (Deck 1) |
+| **1 - 5** | Hot Cues A - E (Deck 1) |
+| **Q** | Sync / Beat Sync (Deck 1) |
+| **F** | Beat FX Toggle (Deck 1) |
+| **N** | Play / Pause (Deck 2) |
+| **H** | Cue (Deck 2) |
+| **6 - 0** | Hot Cues A - E (Deck 2) |
+| **Y** | Sync / Beat Sync (Deck 2) |
+| **J** | Beat FX Toggle (Deck 2) |
+| **SPACE** | Toggle Browser View |
+| **I** | Toggle Track Info View |
+| **TAB** | Toggle Settings View |
+| **M** | Toggle Mixer View |
+| **ESC** | Back / Exit View |
 
 ## Credits and Acknowledgments
 

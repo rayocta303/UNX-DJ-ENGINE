@@ -5,102 +5,189 @@
 #include "core/logic/sync.h"
 
 KeyboardMapping GetDefaultMapping() {
-    KeyboardMapping m = {0};
-    m.playPause1 = KEY_Z;
-    m.cue1 = KEY_X;
-    m.hotCues1[0] = KEY_ONE;
-    m.hotCues1[1] = KEY_TWO;
-    m.hotCues1[2] = KEY_THREE;
-    m.hotCues1[3] = KEY_FOUR;
-    m.hotCues1[4] = KEY_FIVE;
+  KeyboardMapping m = {0};
+  m.playPause1 = KEY_Z;
+  m.cue1 = KEY_X;
+  m.hotCues1[0] = KEY_ONE;
+  m.hotCues1[1] = KEY_TWO;
+  m.hotCues1[2] = KEY_THREE;
+  m.hotCues1[3] = KEY_FOUR;
+  m.hotCues1[4] = KEY_FIVE;
 
-    m.playPause2 = KEY_N;
-    m.cue2 = KEY_M;
-    m.hotCues2[0] = KEY_SIX;
-    m.hotCues2[1] = KEY_SEVEN;
-    m.hotCues2[2] = KEY_EIGHT;
-    m.hotCues2[3] = KEY_NINE;
-    m.hotCues2[4] = KEY_ZERO;
+  m.playPause2 = KEY_N;
+  m.cue2 = KEY_M;
+  m.hotCues2[0] = KEY_SIX;
+  m.hotCues2[1] = KEY_SEVEN;
+  m.hotCues2[2] = KEY_EIGHT;
+  m.hotCues2[3] = KEY_NINE;
+  m.hotCues2[4] = KEY_ZERO;
 
-    m.toggleBrowser = KEY_SPACE;
-    m.toggleInfo = KEY_I;
-    m.toggleSettings = KEY_TAB;
-    m.toggleMixer = KEY_M;
-    m.back = KEY_ESCAPE;
-    
-    return m;
+  m.toggleBrowser = KEY_SPACE;
+  m.toggleInfo = KEY_I;
+  m.toggleSettings = KEY_TAB;
+  m.toggleMixer = KEY_M;
+  m.fx1 = KEY_F;
+  m.fx2 = KEY_J;
+  m.sync1 = KEY_Q;
+  m.sync2 = KEY_Y;
+  m.back = KEY_ESCAPE;
+
+  return m;
 }
 
-void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2, AudioEngine *engine) {
-    // Deck 1
-    if (IsKeyPressed(m->playPause1)) {
-        if (engine) {
-            bool starting = !engine->Decks[0].IsMotorOn;
-            DeckAudio_SetPlaying(&engine->Decks[0], starting);
-            if (starting) {
-                if (d1->SyncMode == 2 && !d1->IsMaster) {
-                    Sync_RequestPhaseSnap(d1, d2, engine);
-                }
+void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2,
+                          AudioEngine *engine, BeatFXState *fx) {
+  // Deck 1
+  if (IsKeyPressed(m->playPause1)) {
+    if (engine) {
+      bool starting = !engine->Decks[0].IsMotorOn;
+      DeckAudio_SetPlaying(&engine->Decks[0], starting);
+      if (starting) {
+        if (d1->SyncMode == 2 && !d1->IsMaster) {
+          Sync_RequestPhaseSnap(d1, d2, engine);
+        }
+      } else {
+        // Revert to BPM sync on stop to avoid snapping during motor brake
+        if (d1->SyncMode == 2)
+          d1->SyncMode = 1;
+      }
+    }
+  }
+  for (int i = 0; i < 5; i++) {
+    if (IsKeyPressed(m->hotCues1[i])) {
+      int targetID = i + 1; // 1, 2, 3, 4, 5
+      if (d1->LoadedTrack) {
+        for (int j = 0; j < d1->LoadedTrack->HotCuesCount; j++) {
+          if (d1->LoadedTrack->HotCues[j].ID == (unsigned int)targetID) {
+            uint32_t targetMs = d1->LoadedTrack->HotCues[j].Start;
+            if (d1->QuantizeEnabled) {
+              int32_t waitMs =
+                  Quantize_GetWaitMs(d1->LoadedTrack, d1->PositionMs);
+              DeckAudio_QueueJumpMs(&engine->Decks[0], targetMs,
+                                    (uint32_t)waitMs);
             } else {
-                // Revert to BPM sync on stop to avoid snapping during motor brake
-                if (d1->SyncMode == 2) d1->SyncMode = 1;
+              DeckAudio_JumpToMs(&engine->Decks[0], targetMs);
+              DeckAudio_InstantPlay(&engine->Decks[0]);
             }
+            break;
+          }
         }
+      }
     }
-    for (int i = 0; i < 5; i++) {
-        if (IsKeyPressed(m->hotCues1[i])) {
-            int targetID = i + 1; // 1, 2, 3, 4, 5
-            if (d1->LoadedTrack) {
-                for (int j = 0; j < d1->LoadedTrack->HotCuesCount; j++) {
-                    if (d1->LoadedTrack->HotCues[j].ID == (unsigned int)targetID) {
-                        uint32_t targetMs = d1->LoadedTrack->HotCues[j].Start;
-                        if (d1->QuantizeEnabled) {
-                            int32_t waitMs = Quantize_GetWaitMs(d1->LoadedTrack, d1->PositionMs);
-                            DeckAudio_QueueJumpMs(&engine->Decks[0], targetMs, (uint32_t)waitMs);
-                        } else {
-                            DeckAudio_JumpToMs(&engine->Decks[0], targetMs);
-                            DeckAudio_InstantPlay(&engine->Decks[0]);
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-    }
+  }
 
-    // Deck 2
-    if (IsKeyPressed(m->playPause2)) {
-        if (engine) {
-            bool starting = !engine->Decks[1].IsMotorOn;
-            DeckAudio_SetPlaying(&engine->Decks[1], starting);
-            if (starting) {
-                if (d2->SyncMode == 2 && !d2->IsMaster) {
-                    Sync_RequestPhaseSnap(d2, d1, engine);
-                }
+  // Deck 2
+  if (IsKeyPressed(m->playPause2)) {
+    if (engine) {
+      bool starting = !engine->Decks[1].IsMotorOn;
+      DeckAudio_SetPlaying(&engine->Decks[1], starting);
+      if (starting) {
+        if (d2->SyncMode == 2 && !d2->IsMaster) {
+          Sync_RequestPhaseSnap(d2, d1, engine);
+        }
+      } else {
+        // Revert to BPM sync on stop to avoid snapping during motor brake
+        if (d2->SyncMode == 2)
+          d2->SyncMode = 1;
+      }
+    }
+  }
+  for (int i = 0; i < 5; i++) {
+    if (IsKeyPressed(m->hotCues2[i])) {
+      int targetID = i + 1; // Mapping 6,7,8,9,0 keys to HotCues 1,2,3,4,5
+      if (d2->LoadedTrack) {
+        for (int j = 0; j < d2->LoadedTrack->HotCuesCount; j++) {
+          if (d2->LoadedTrack->HotCues[j].ID == (unsigned int)targetID) {
+            uint32_t targetMs = d2->LoadedTrack->HotCues[j].Start;
+            if (d2->QuantizeEnabled) {
+              int32_t waitMs =
+                  Quantize_GetWaitMs(d2->LoadedTrack, d2->PositionMs);
+              DeckAudio_QueueJumpMs(&engine->Decks[1], targetMs,
+                                    (uint32_t)waitMs);
             } else {
-                // Revert to BPM sync on stop to avoid snapping during motor brake
-                if (d2->SyncMode == 2) d2->SyncMode = 1;
+              DeckAudio_JumpToMs(&engine->Decks[1], targetMs);
+              DeckAudio_InstantPlay(&engine->Decks[1]);
             }
+            break;
+          }
         }
+      }
     }
-    for (int i = 0; i < 5; i++) {
-        if (IsKeyPressed(m->hotCues2[i])) {
-            int targetID = i + 1; // Mapping 6,7,8,9,0 keys to HotCues 1,2,3,4,5
-            if (d2->LoadedTrack) {
-                for (int j = 0; j < d2->LoadedTrack->HotCuesCount; j++) {
-                    if (d2->LoadedTrack->HotCues[j].ID == (unsigned int)targetID) {
-                        uint32_t targetMs = d2->LoadedTrack->HotCues[j].Start;
-                        if (d2->QuantizeEnabled) {
-                            int32_t waitMs = Quantize_GetWaitMs(d2->LoadedTrack, d2->PositionMs);
-                            DeckAudio_QueueJumpMs(&engine->Decks[1], targetMs, (uint32_t)waitMs);
-                        } else {
-                            DeckAudio_JumpToMs(&engine->Decks[1], targetMs);
-                            DeckAudio_InstantPlay(&engine->Decks[1]);
-                        }
-                        break;
-                    }
-                }
-            }
-        }
+  }
+
+  // Beat FX Shortcuts
+  if (IsKeyPressed(m->fx1)) {
+    if (fx->SelectedChannel == 1) {
+      fx->IsFXOn = !fx->IsFXOn;
+    } else {
+      fx->SelectedChannel = 1;
+      fx->IsFXOn = true;
     }
+  }
+  if (IsKeyPressed(m->fx2)) {
+    if (fx->SelectedChannel == 2) {
+      fx->IsFXOn = !fx->IsFXOn;
+    } else {
+      fx->SelectedChannel = 2;
+      fx->IsFXOn = true;
+    }
+  }
+
+  // Sync Shortcuts
+  if (IsKeyPressed(m->sync1)) {
+    d1->SyncMode = (d1->SyncMode + 1) % 3;
+  }
+  if (IsKeyPressed(m->sync2)) {
+    d2->SyncMode = (d2->SyncMode + 1) % 3;
+  }
+
+  // Deck 1 Cue Handling
+  if (IsKeyPressed(m->cue1)) {
+    if (engine->Decks[0].IsMotorOn) {
+      // If playing: Stop and jump to Cue
+      DeckAudio_SetPlaying(&engine->Decks[0], false);
+      d1->SeekMs = d1->MainCueMs;
+      d1->HasSeekRequest = true;
+      d1->IsPlaying = false;
+    } else {
+      // If stopped: Set new cue if moved, and start preview
+      if (d1->PositionMs != d1->MainCueMs) {
+        d1->MainCueMs = d1->PositionMs;
+      }
+      DeckAudio_SetPlaying(&engine->Decks[0], true);
+      d1->IsPlaying = true;
+      d1->IsCueHeld = true;
+    }
+  }
+  if (d1->IsCueHeld && IsKeyReleased(m->cue1)) {
+    DeckAudio_SetPlaying(&engine->Decks[0], false);
+    d1->SeekMs = d1->MainCueMs;
+    d1->HasSeekRequest = true;
+    d1->IsPlaying = false;
+    d1->IsCueHeld = false;
+  }
+
+  // Deck 2 Cue Handling
+  if (IsKeyPressed(m->cue2)) {
+    if (engine->Decks[1].IsMotorOn) {
+      DeckAudio_SetPlaying(&engine->Decks[1], false);
+      d2->SeekMs = d2->MainCueMs;
+      d2->HasSeekRequest = true;
+      d2->IsPlaying = false;
+    } else {
+      if (d2->PositionMs != d2->MainCueMs) {
+        d2->MainCueMs = d2->PositionMs;
+      }
+      DeckAudio_SetPlaying(&engine->Decks[1], true);
+      d2->IsPlaying = true;
+      d2->IsCueHeld = true;
+    }
+  }
+  if (d2->IsCueHeld && IsKeyReleased(m->cue2)) {
+    DeckAudio_SetPlaying(&engine->Decks[1], false);
+    d2->SeekMs = d2->MainCueMs;
+    d2->HasSeekRequest = true;
+    d2->IsPlaying = false;
+    d2->IsCueHeld = false;
+  }
 }

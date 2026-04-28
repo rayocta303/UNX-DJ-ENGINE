@@ -15,10 +15,14 @@ typedef struct {
     KeyboardKey toggleInfo;
     KeyboardKey toggleSettings;
     KeyboardKey toggleMixer;
+    KeyboardKey fx1;
+    KeyboardKey fx2;
+    KeyboardKey sync1;
+    KeyboardKey sync2;
     KeyboardKey back;
 } KeyboardMapping;
 
 #include "audio/engine.h"
 
 KeyboardMapping GetDefaultMapping();
-void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2, AudioEngine *engine);
+void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2, AudioEngine *engine, BeatFXState *fx);

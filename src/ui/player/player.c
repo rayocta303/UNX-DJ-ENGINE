@@ -19,36 +19,6 @@ static int Player_Update(Component *base) {
   p->DeckA->IsLoading = p->AudioPlugin->Decks[0].IsLoading;
   p->DeckB->IsLoading = p->AudioPlugin->Decks[1].IsLoading;
 
-  // Sync BeatFX state to AudioEngine
-  float masterBpm = 120.0f;
-  if (p->DeckA->IsMaster)
-    masterBpm = p->DeckA->CurrentBPM;
-  else if (p->DeckB->IsMaster)
-    masterBpm = p->DeckB->CurrentBPM;
-  else
-    masterBpm = p->DeckA->CurrentBPM;
-
-  if (masterBpm < 1.0f)
-    masterBpm = 120.0f;
-
-  static const float XPadRatios[] = {0.125f, 0.25f, 0.5f, 0.75f, 1.0f, 2.0f};
-  int padIdx = p->FXState->SelectedPad;
-  if (padIdx < 0)
-    padIdx = 4;
-  if (padIdx >= 6)
-    padIdx = 5;
-
-  float ratio = XPadRatios[padIdx];
-  float fxMs = (60000.0f / masterBpm) * ratio;
-
-  p->AudioPlugin->BeatFX.activeFX = p->FXState->SelectedFX;
-  p->AudioPlugin->BeatFX.targetChannel = p->FXState->SelectedChannel;
-  p->AudioPlugin->BeatFX.isFxOn = p->FXState->IsFXOn;
-  p->AudioPlugin->BeatFX.beatMs = fxMs;
-  p->AudioPlugin->BeatFX.levelDepth = p->FXState->LevelDepth;
-  p->AudioPlugin->BeatFX.scrubVal = p->FXState->XPadScrubValue;
-  p->AudioPlugin->BeatFX.isScrubbing = p->FXState->IsXPadScrubbing;
-
   return 0;
 }
 
@@ -104,8 +74,8 @@ void PlayerRenderer_Init(PlayerRenderer *r, DeckState *a, DeckState *b,
   r->FXState = fx;
   r->AudioPlugin = audioPlugin;
 
-  DeckInfoPanel_Init(&r->InfoA, 0, a);
-  DeckInfoPanel_Init(&r->InfoB, 1, b);
+  DeckInfoPanel_Init(&r->InfoA, 0, a, r->AudioPlugin);
+  DeckInfoPanel_Init(&r->InfoB, 1, b, r->AudioPlugin);
 
   WaveformRenderer_Init(&r->WaveA, 0, a, b);
   WaveformRenderer_Init(&r->WaveB, 1, b, a);
