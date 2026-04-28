@@ -6,6 +6,8 @@
 typedef struct {
     DelayLine delayL;
     DelayLine delayR;
+    float lastOutL;
+    float lastOutR;
 } BeatFX_Echo;
 
 void Echo_Init(BeatFX_Echo* fx);

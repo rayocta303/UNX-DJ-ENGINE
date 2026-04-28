@@ -25,6 +25,7 @@ void EngineLR4_Init(EngineLR4* filter);
 void EngineLR4_SetLowpass(EngineLR4* filter, float freq, float sampleRate);
 void EngineLR4_SetHighpass(EngineLR4* filter, float freq, float sampleRate);
 float EngineLR4_Process(EngineLR4* filter, float in);
+float Engine_GetCrossfaderGain(float crossfader, int deckIdx);
 
 #ifdef __cplusplus
 }

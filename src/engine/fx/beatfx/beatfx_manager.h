@@ -62,5 +62,7 @@ void BeatFXManager_Init(BeatFXManager* mgr);
 void BeatFXManager_Free(BeatFXManager* mgr);
 void BeatFXManager_SetFX(BeatFXManager* mgr, BeatFXType type);
 void BeatFXManager_Process(BeatFXManager* mgr, float* outL, float* outR, float inL, float inR, float sampleRate);
+void BeatFXManager_ProcessWetOnly(BeatFXManager* mgr, float* wetL, float* wetR, float inL, float inR, float sampleRate);
+bool BeatFXManager_HasTails(BeatFXManager* mgr, int channelIdx);
 
 #endif

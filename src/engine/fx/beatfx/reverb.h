@@ -4,8 +4,8 @@
 #include "../dsp_utils.h"
 
 typedef struct {
-    DelayLine delayL[4];
-    DelayLine delayR[4];
+    DelayLine delayL[8];
+    DelayLine delayR[8];
     BiquadFilter lpfL, lpfR, hpfL, hpfR;
 } BeatFX_Reverb;
 

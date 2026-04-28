@@ -68,3 +68,19 @@ float EngineLR4_Process(EngineLR4* filter, float in) {
     }
     return out;
 }
+
+float Engine_GetCrossfaderGain(float crossfader, int deckIdx) {
+    // Constant power curve: gain = cos(x * PI/2)
+    // crossfader is -1.0 (Left/DeckA) to 1.0 (Right/DeckB)
+    if (deckIdx == 0) { // Deck A
+        float x = (crossfader + 1.0f) * 0.5f; // -1->0, 1->1
+        if (x < 0.0f) x = 0.0f;
+        if (x > 1.0f) x = 1.0f;
+        return cosf(x * (float)M_PI * 0.5f);
+    } else { // Deck B
+        float x = (1.0f - crossfader) * 0.5f; // 1->0, -1->1
+        if (x < 0.0f) x = 0.0f;
+        if (x > 1.0f) x = 1.0f;
+        return cosf(x * (float)M_PI * 0.5f);
+    }
+}
