@@ -451,7 +451,13 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
   float outBuf[4096 * 2]; // Large enough for any process block
   uint32_t received = 0;
 
-  if (deck->MasterTempoActive && !deck->IsTouching && st &&
+  // Bypass MT during motor start/stop or scratching/spinning inertia
+  bool motorSteady = (fabs(deck->OutlinedRate - deck->BaseRate) < 0.05f);
+  // In Vinyl mode, we want pitch to shift during any scratch/spin (not steady).
+  // In CDJ mode, we only bypass during motor start/stop ramps (at least 95% speed).
+  bool motorReady = deck->IsMotorOn && (deck->VinylModeEnabled ? motorSteady : (fabs(deck->OutlinedRate) >= fabs(deck->BaseRate) * 0.95f));
+
+  if (deck->MasterTempoActive && !deck->IsTouching && motorReady && st &&
       fabs(targetRate) > 0.01) {
     if (!wasMTActive[deckIndex]) {
       deck->MT_ReadPos = deck->Position;
