@@ -590,6 +590,13 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
     DeckAudio_JumpToMs(audio, (int64_t)(currentMs + (beats * beatDurationMs)));
     
     a->padState.ActiveLoopIdx[deckIdx] = -1;
+  } else if (mode == PAD_MODE_GATE_CUE) {
+    if (padIdx < ds->LoadedTrack->HotCuesCount) {
+      HotCue hc = ds->LoadedTrack->HotCues[padIdx];
+      ds->SeekMs = hc.Start;
+      ds->HasSeekRequest = true;
+      DeckAudio_InstantPlay(audio);
+    }
   }
 }
 
@@ -604,6 +611,8 @@ void OnPadRelease(void *ctx, int deckIdx, int padIdx) {
     DeckAudio_ExitLoop(audio);
     DeckAudio_SetSlip(audio, false);
     a->padState.ActiveLoopIdx[deckIdx] = -1;
+  } else if (mode == PAD_MODE_GATE_CUE) {
+    DeckAudio_Stop(audio);
   }
 }
 

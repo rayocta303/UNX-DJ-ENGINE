@@ -208,7 +208,13 @@ static void Pad_Draw(Component *base) {
             } else if (mode == PAD_MODE_BEAT_JUMP) {
                 padColor = ColorOrange; hasData = true;
             } else if (mode == PAD_MODE_GATE_CUE) {
-                padColor = ColorBlue; hasData = true;
+                if (deck && deck->LoadedTrack && i < deck->LoadedTrack->HotCuesCount) {
+                    padColor = ColorBlue;
+                    hasData = true;
+                } else {
+                    padColor = ColorDark3;
+                    hasData = false;
+                }
             } else if (mode == PAD_MODE_RELEASE_FX) {
                 padColor = ColorPink; hasData = true;
             }
@@ -225,6 +231,12 @@ static void Pad_Draw(Component *base) {
             } else if (mode == PAD_MODE_BEAT_JUMP) {
                 static const char* jumps[] = {"<< 4", "<< 8", "<< 16", "<< 32", "4 >>", "8 >>", "16 >>", "32 >>"};
                 strcpy(lbl, jumps[i]);
+            } else if (mode == PAD_MODE_HOT_CUE || mode == PAD_MODE_GATE_CUE) {
+                if (hasData) {
+                    lbl[0] = (char)('A' + i); lbl[1] = 0;
+                } else {
+                    strcpy(lbl, "-");
+                }
             } else {
                 lbl[0] = (char)('A' + i); lbl[1] = 0;
             }
