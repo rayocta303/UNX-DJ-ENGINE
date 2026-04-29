@@ -706,7 +706,7 @@ void App_Init(App *a) {
   a->deckA.IsMaster = true;
   a->deckA.VinylModeEnabled = true;
   a->deckA.MasterTempo = false;
-  a->deckA.ZoomScale = 8.0f;
+  a->deckA.ZoomScale = 2.0f;
 
   memset(&a->deckB, 0, sizeof(DeckState));
   a->deckB.ID = 1;
@@ -715,7 +715,7 @@ void App_Init(App *a) {
   a->deckB.TrackLengthMs = 0;
   a->deckB.VinylModeEnabled = true;
   a->deckB.MasterTempo = false;
-  a->deckB.ZoomScale = 8.0f;
+  a->deckB.ZoomScale = 2.0f;
 
   // Init Browser State
   UNX_LOG_INFO("[APP] Initializing Browser...");

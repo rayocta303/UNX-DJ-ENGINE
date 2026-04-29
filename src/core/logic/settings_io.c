@@ -62,8 +62,8 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
 void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, char *controllerPath) {
     // Defaults
     controllerPath[0] = '\0';
-    wfmA->Style = WAVEFORM_STYLE_3BAND;
-    wfmA->GainLow = 1.0f; wfmA->GainMid = 1.0f; wfmA->GainHigh = 1.0f;
+    wfmA->Style = WAVEFORM_STYLE_RGB;
+    wfmA->GainLow = 0.4f; wfmA->GainMid = 0.4f; wfmA->GainHigh = 0.4f;
     wfmA->VinylStartMs = 500.0f; wfmA->VinylStopMs = 1200.0f; wfmA->LoadLock = true;
     *wfmB = *wfmA;
     
