@@ -97,9 +97,12 @@ static void Credits_Draw(Component *base) {
   UIDrawText("INSPIRATION & SUPPORT", faceXS, contentX, ly, S(8), ColorOrange);
   ly += S(14);
   const char *supporters[] = {
-      "@takeoutbox.dj",          "@alyxxcould", "@_tepann",   "@stephanievlna",
-      "@djnozalavenza_official", "@diydjtech",  "@djbossbomb"};
-  int supCount = 7;
+      "@takeoutbox.dj",          "@alyxxcould",
+      "@_tepann",                "@stephanievlna",
+      "@djnozalavenza_official", "@diydjtech",
+      "@djbossbomb",             "@evanjoris.music",
+      "@dj_equipment_development"};
+  int supCount = 9;
   for (int i = 0; i < supCount; i++) {
     UIDrawText(supporters[i], faceSm, contentX + S(10), ly, S(10), ColorWhite);
     ly += rowH;
@@ -110,7 +113,7 @@ static void Credits_Draw(Component *base) {
   UIDrawText("SPECIAL THANKS", faceXS, contentX, ly, S(8), ColorBlue);
   ly += S(14);
   const char *thanks[] = {
-      "Deepsymmetry Community", "Mixxx Community",
+      "Deep Symmetry", "Mixxx Community",
       "Rekordcrate Team",       "Raylib Open Source Community",
       "Miniaudio Backend Team", "SoundTouch Library Devs",
       "All beta testers"};
