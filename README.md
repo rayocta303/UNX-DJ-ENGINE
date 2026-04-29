@@ -71,6 +71,20 @@ UNX DJ Engine is a specialized, high-performance DJ media player firmware subset
 - **Android (ARM64)**: Mobile-optimized builds with NDK integration.
 - **iOS (ARM64)**: Native UIKit/CAEAGLLayer integration for high-performance mobile execution.
 
+## Tested Devices
+
+| Device | Status | Note |
+|--------|--------|------|
+| Armbian S905X Board | ✅ Working | |
+| Windows 10 (HP Probook X360) | ✅ Working | Primary Dev Environment |
+| Xiaomi Redmi Note 3 Kenzo (Snapdragon) | ✅ Working | |
+| Xiaomi Redmi Note 13 | ✅ Working | |
+| Xiaomi Redmi Note 3 Hennessy (Mediatek) | ❌ Not Working | Stuck / Blank Screen |
+
+> [!IMPORTANT]
+> If you encounter bugs or issues on a specific device, please let us know the device model and the nature of the bug by opening an issue. Your feedback helps us improve compatibility across more hardware.
+
+
 
 ## Project Roadmap
 
