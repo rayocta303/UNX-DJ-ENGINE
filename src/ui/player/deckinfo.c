@@ -27,7 +27,7 @@ static int DeckInfo_Update(Component *base) {
     float utilW = (deckInfoW - margin * 2 - S(8)) / 3.0f;
     float utilH = S(14);
     float btnH = S(26);
-    float btnY = y + deckInfoH - btnH - S(2); // Flush to bottom with 2px gap
+    float btnY = y + deckInfoH - btnH - S(6); // More breathing room from bottom
     float btnW = (deckInfoW - margin * 2 - S(6)) / 2.0f;
 
     // 1. Eject
@@ -192,38 +192,44 @@ static void DeckInfo_Draw(Component *base) {
 
     // Master
     Rectangle msRect = { margin, utilY, utilW, utilH };
-    DrawRectangleRounded(msRect, 0.2f, 4, d->State->IsMaster ? ColorOrange : ColorShadow);
-    DrawTextureEx(crownTex, (Vector2){msRect.x + (utilW - S(9))/2.0f, msRect.y + S(2.5f)}, 0.0f, 1.0f, d->State->IsMaster ? ColorBlack : ColorWhite);
+    DrawRectangleRec(msRect, d->State->IsMaster ? Fade(ColorOrange, 0.3f) : ColorDark1);
+    DrawRectangleLinesEx(msRect, S(1), d->State->IsMaster ? ColorOrange : ColorShadow);
+    DrawTextureEx(crownTex, (Vector2){msRect.x + (utilW - S(9))/2.0f, msRect.y + S(2.5f)}, 0.0f, 1.0f, d->State->IsMaster ? ColorOrange : ColorShadow);
 
     // MT
     Rectangle mtRect = { margin + utilW + S(4), utilY, utilW, utilH };
-    DrawRectangleRounded(mtRect, 0.2f, 4, d->State->MasterTempo ? ColorBlue : ColorShadow);
-    UIDrawText("MT", faceXXS, mtRect.x + (utilW - S(10))/2.0f, mtRect.y + S(4), S(7), ColorWhite);
+    DrawRectangleRec(mtRect, d->State->MasterTempo ? Fade(ColorBlue, 0.3f) : ColorDark1);
+    DrawRectangleLinesEx(mtRect, S(1), d->State->MasterTempo ? ColorBlue : ColorShadow);
+    UIDrawText("MT", faceXXS, mtRect.x + (utilW - S(10))/2.0f, mtRect.y + S(4), S(7), d->State->MasterTempo ? ColorWhite : ColorShadow);
 
     // Vinyl
     Rectangle viRect = { margin + (utilW + S(4)) * 2, utilY, utilW, utilH };
-    DrawRectangleRounded(viRect, 0.2f, 4, d->State->VinylModeEnabled ? ColorBlue : ColorShadow);
-    UIDrawText(d->State->VinylModeEnabled ? "VINYL" : "CDJ", faceXXS, viRect.x + (utilW - (d->State->VinylModeEnabled?S(20):S(14)))/2.0f, viRect.y + S(4), S(7), ColorWhite);
+    DrawRectangleRec(viRect, d->State->VinylModeEnabled ? Fade(ColorBlue, 0.3f) : ColorDark1);
+    DrawRectangleLinesEx(viRect, S(1), d->State->VinylModeEnabled ? ColorBlue : ColorShadow);
+    UIDrawText(d->State->VinylModeEnabled ? "VINYL" : "CDJ", faceXXS, viRect.x + (utilW - (d->State->VinylModeEnabled?S(20):S(14)))/2.0f, viRect.y + S(4), S(7), d->State->VinylModeEnabled ? ColorWhite : ColorShadow);
 
     // --- Row 3: Main Controls (Cue, Play) ---
     float btnH = S(26);
-    float btnY = y + deckInfoH - btnH - S(2);
+    float btnY = y + deckInfoH - btnH - S(6);
     float btnW = (deckInfoW - margin * 2 - S(6)) / 2.0f;
 
     // Cue
     Rectangle cueRect = { margin, btnY, btnW, btnH };
     bool hoverCue = CheckCollisionPointRec(UIGetMousePosition(), cueRect);
-    DrawRectangleRounded(cueRect, 0.15f, 4, ColorCue);
-    if (hoverCue) DrawRectangleRoundedLines(cueRect, 0.15f, 4, S(1), ColorWhite);
-    UIDrawText("CUE", faceXS, cueRect.x + (btnW - S(18))/2.0f, cueRect.y + S(9), S(8.5f), ColorBlack);
+    bool isCueing = d->State->IsCueActive;
+    DrawRectangleRec(cueRect, isCueing ? Fade(ColorCue, 0.4f) : ColorDark1);
+    DrawRectangleLinesEx(cueRect, S(1), isCueing ? ColorCue : ColorShadow);
+    if (hoverCue) DrawRectangleLinesEx(cueRect, S(1.5f), ColorWhite);
+    UIDrawText("CUE", faceXS, cueRect.x + (btnW - S(18))/2.0f, cueRect.y + S(9), S(8.5f), isCueing ? ColorWhite : ColorShadow);
 
     // Play/Pause
     Rectangle playRect = { margin + btnW + S(6), btnY, btnW, btnH };
     bool hoverPlay = CheckCollisionPointRec(UIGetMousePosition(), playRect);
     bool isPlaying = d->State->IsPlaying;
-    DrawRectangleRounded(playRect, 0.15f, 4, isPlaying ? ColorGreen : ColorShadow);
-    if (hoverPlay) DrawRectangleRoundedLines(playRect, 0.15f, 4, S(1), ColorWhite);
-    UIDrawText(isPlaying ? "\uf04c" : "\uf04b", faceIcon, playRect.x + (btnW - S(10))/2.0f, playRect.y + S(8), S(11), isPlaying ? ColorBlack : ColorWhite);
+    DrawRectangleRec(playRect, isPlaying ? Fade(ColorGreen, 0.4f) : ColorDark1);
+    DrawRectangleLinesEx(playRect, S(1), isPlaying ? ColorGreen : ColorShadow);
+    if (hoverPlay) DrawRectangleLinesEx(playRect, S(1.5f), ColorWhite);
+    UIDrawText(isPlaying ? "\uf04c" : "\uf04b", faceIcon, playRect.x + (btnW - S(10))/2.0f, playRect.y + S(8), S(11), isPlaying ? ColorWhite : ColorShadow);
 }
 
 void DeckInfoPanel_Init(DeckInfoPanel *p, int id, DeckState *state, AudioEngine *engine) {
