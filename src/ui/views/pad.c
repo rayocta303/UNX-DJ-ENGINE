@@ -16,18 +16,22 @@ static int Pad_Update(Component *base) {
     static int pressedPad = -1;
     static int pressedDeck = -1;
 
-    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        Vector2 mouse = UIGetMousePosition();
-        float availableH = SCREEN_HEIGHT - TOP_BAR_H - DECK_STR_H;
-        float panelW = (SCREEN_WIDTH - S(24)) / 2.0f;
-        float panelH = availableH - S(16);
-        
-        float modeBarH = S(20);
-        float padAreaW = panelW - S(20);
-        float padAreaH = panelH - S(40) - modeBarH;
-        float padW = (padAreaW - S(12)) / 4.0f;
-        float padH = (padAreaH - S(4)) / 2.0f;
+    Vector2 mouse = UIGetMousePosition();
+    bool isDown = IsMouseButtonDown(MOUSE_LEFT_BUTTON);
+    bool isPressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
+    bool isReleased = IsMouseButtonReleased(MOUSE_LEFT_BUTTON);
 
+    float availableH = SCREEN_HEIGHT - TOP_BAR_H - DECK_STR_H;
+    float panelW = (SCREEN_WIDTH - S(24)) / 2.0f;
+    float panelH = availableH - S(16);
+    
+    float modeBarH = S(20);
+    float padAreaW = panelW - S(20);
+    float padAreaH = panelH - S(40) - modeBarH;
+    float padW = (padAreaW - S(12)) / 4.0f;
+    float padH = (padAreaH - S(4)) / 2.0f;
+
+    if (isPressed) {
         for (int d = 0; d < 2; d++) {
             float panelX = S(8) + d * (panelW + S(8));
             float panelY = TOP_BAR_H + S(8);
@@ -45,8 +49,13 @@ static int Pad_Update(Component *base) {
                     return 1;
                 }
             }
+        }
+    }
 
-            // Pad hits
+    if (isDown) {
+        for (int d = 0; d < 2; d++) {
+            float panelX = S(8) + d * (panelW + S(8));
+            float panelY = TOP_BAR_H + S(8);
             float startX = panelX + S(10);
             float startY = panelY + S(30) + modeBarH + S(5);
 
@@ -58,14 +67,33 @@ static int Pad_Update(Component *base) {
                 Rectangle rect = { px, py, padW, padH };
 
                 if (CheckCollisionPointRec(mouse, rect)) {
-                    pressedPad = i;
-                    pressedDeck = d;
-                    if (r->OnPadPress) r->OnPadPress(r->callbackCtx, d, i);
-                    return 1;
+                    if (pressedPad != i || pressedDeck != d) {
+                        PadMode mode = r->State->Mode[d];
+                        
+                        // Dragging only for Loop modes
+                        if (isPressed || mode == PAD_MODE_BEAT_LOOP || mode == PAD_MODE_SLIP_LOOP) {
+                            if (pressedPad != -1 && r->OnPadRelease) {
+                                r->OnPadRelease(r->callbackCtx, pressedDeck, pressedPad);
+                            }
+                            
+                            pressedPad = i;
+                            pressedDeck = d;
+                            if (r->OnPadPress) r->OnPadPress(r->callbackCtx, d, i);
+                            return 1;
+                        }
+                    }
+                    goto handled; // Found pad, stop looking
                 }
             }
         }
-    } else if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+        
+        // If mouse is down but not over any pad, and we HAD a pad pressed
+        // we might want to release it if we moved outside the grid? 
+        // For loops, we usually keep them until release.
+    }
+
+handled:
+    if (isReleased) {
         if (pressedPad != -1) {
             if (r->OnPadRelease) r->OnPadRelease(r->callbackCtx, pressedDeck, pressedPad);
             pressedPad = -1;

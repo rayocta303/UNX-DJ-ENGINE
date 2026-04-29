@@ -563,9 +563,8 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
     
     DeckAudio_SetLoop(audio, true, startPos, startPos + loopLengthSamples);
     
-    // For Roll (Slip Loop), or if it's a NEW loop, jump to start.
-    // If we are resizing, we don't necessarily want to jump unless the playhead is now outside the loop.
-    if (mode == PAD_MODE_SLIP_LOOP || !isResizing) {
+    // For NEW loops, jump to start. For resizing, we don't jump so the playback phase is preserved.
+    if (!isResizing) {
         audio->Position = startPos;
         audio->MT_ReadPos = startPos;
         DeckAudio_ClearMT(audio);
