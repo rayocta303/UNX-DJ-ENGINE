@@ -56,6 +56,17 @@ double Quantize_GetBeatDistance(TrackState *track, int64_t currentMs) {
     return 0.0;
 }
 
+int Quantize_GetCurrentBeat(TrackState *track, int64_t currentMs) {
+    if (!track || track->BeatGridCount == 0) return 1;
+    for (int i = 0; i < track->BeatGridCount; i++) {
+        if ((int64_t)track->BeatGrid[i].Time > currentMs) {
+            if (i == 0) return track->BeatGrid[0].BeatNumber;
+            return track->BeatGrid[i - 1].BeatNumber;
+        }
+    }
+    return track->BeatGrid[track->BeatGridCount - 1].BeatNumber;
+}
+
 float Quantize_GetBeatFXLengthMs(TrackState *track, float targetRatio) {
     if (!track || track->BeatGridCount < 2) return 0.0f;
     

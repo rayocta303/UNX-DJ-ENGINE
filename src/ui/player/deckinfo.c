@@ -7,6 +7,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "ui/components/assets_bundle.h"
+#include "core/logic/quantize.h"
 
 static Texture2D crownTex = {0};
 static Texture2D starTex = {0};
@@ -73,9 +74,30 @@ static int DeckInfo_Update(Component *base) {
                 DeckAudio_SetPlaying(&d->Engine->Decks[d->ID], false);
                 DeckAudio_JumpToMs(&d->Engine->Decks[d->ID], d->State->MainCueMs);
                 d->State->IsPlaying = false;
+                // Force UI position to match cue point immediately to prevent drift if pressed again quickly
+                d->State->PositionMs = d->State->MainCueMs;
             } else {
-                d->State->MainCueMs = d->State->PositionMs;
-                DeckAudio_SetPlaying(&d->Engine->Decks[d->ID], true);
+                // If paused, set new cue point (quantized if enabled) and play while held
+                if (d->State->QuantizeEnabled && d->State->LoadedTrack) {
+                    d->State->MainCueMs = Quantize_GetNearestBeatMs(d->State->LoadedTrack, d->State->PositionMs);
+                    d->State->PositionMs = d->State->MainCueMs; // Snap UI position too
+                } else {
+                    d->State->MainCueMs = d->State->PositionMs;
+                }
+                
+                if (d->State->QuantizeEnabled && d->State->LoadedTrack) {
+                    int32_t waitMs = Quantize_GetWaitMs(d->State->LoadedTrack, d->State->PositionMs);
+                    if (waitMs > 5) {
+                        DeckAudio_QueueJumpMs(&d->Engine->Decks[d->ID], d->State->MainCueMs, (uint32_t)waitMs);
+                    } else {
+                        DeckAudio_JumpToMs(&d->Engine->Decks[d->ID], d->State->MainCueMs);
+                        DeckAudio_InstantPlay(&d->Engine->Decks[d->ID]);
+                    }
+                } else {
+                    DeckAudio_JumpToMs(&d->Engine->Decks[d->ID], d->State->MainCueMs);
+                    DeckAudio_InstantPlay(&d->Engine->Decks[d->ID]);
+                }
+                
                 d->State->IsPlaying = true;
                 d->State->IsCueHeld = true;
             }
@@ -87,6 +109,7 @@ static int DeckInfo_Update(Component *base) {
         DeckAudio_JumpToMs(&d->Engine->Decks[d->ID], d->State->MainCueMs);
         d->State->IsPlaying = false;
         d->State->IsCueHeld = false;
+        d->State->PositionMs = d->State->MainCueMs;
     }
 
     Rectangle playRect = { margin + btnW + S(6), btnY, btnW, btnH };

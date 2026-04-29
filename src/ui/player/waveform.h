@@ -11,6 +11,7 @@ struct WaveformRenderer {
   DeckState *State;
   DeckState *OtherDeck;
   TrackState *cachedTrack;
+  unsigned int cachedTrackLength;
   int dynWfmFrames;
   float dataDensity;
   float lastMouseX;

@@ -22,6 +22,7 @@
 #include "ui/views/settings.h"
 #include "ui/views/splash.h"
 #include "ui/views/topbar.h"
+#include "core/logic/quantize.h"
 #include "version.h"
 #include <math.h>
 #include <stdio.h>
@@ -1722,8 +1723,29 @@ void UpdateDrawFrame(App *app) {
     for (int j = 0; j < 8; j++) {
       if (ds->MidiRequestHotCue[j]) {
         if (ds->LoadedTrack && j < ds->LoadedTrack->HotCuesCount) {
-          ds->SeekMs = ds->LoadedTrack->HotCues[j].Start;
-          ds->HasSeekRequest = true;
+          uint32_t targetMs = ds->LoadedTrack->HotCues[j].Start;
+          
+          if (ds->QuantizeEnabled && ds->IsPlaying) {
+             int32_t waitMs = Quantize_GetWaitMs(ds->LoadedTrack, ds->PositionMs);
+             if (waitMs > 5) { // Only queue if more than 5ms wait (avoid jitter)
+                 DeckAudio_QueueJumpMs(audio, targetMs, (uint32_t)waitMs);
+                 ds->IsPlaying = true;
+                 audio->IsPlaying = true;
+                 audio->IsMotorOn = true;
+             } else {
+                 ds->SeekMs = targetMs;
+                 ds->HasSeekRequest = true;
+                 ds->IsPlaying = true;
+                 audio->IsPlaying = true;
+                 audio->IsMotorOn = true;
+             }
+          } else {
+             ds->SeekMs = targetMs;
+             ds->HasSeekRequest = true;
+             ds->IsPlaying = true;
+             audio->IsPlaying = true;
+             audio->IsMotorOn = true;
+          }
         }
         ds->MidiRequestHotCue[j] = false;
       }
@@ -2007,14 +2029,16 @@ void UpdateDrawFrame(App *app) {
       statsTimer = 0;
     }
 
-    // --- Handle Seek Requests from UI ---
+    // --- Handle Seek Requests from UI (Hot Cues / Scrubbing) ---
     if (app->deckA.HasSeekRequest) {
       DeckAudio_JumpToMs(&audioEngine->Decks[0], app->deckA.SeekMs);
+      if (app->deckA.IsPlaying) DeckAudio_InstantPlay(&audioEngine->Decks[0]);
       app->deckA.HasSeekRequest = false;
       app->padState.ActiveLoopIdx[0] = -1;
     }
     if (app->deckB.HasSeekRequest) {
       DeckAudio_JumpToMs(&audioEngine->Decks[1], app->deckB.SeekMs);
+      if (app->deckB.IsPlaying) DeckAudio_InstantPlay(&audioEngine->Decks[1]);
       app->deckB.HasSeekRequest = false;
       app->padState.ActiveLoopIdx[1] = -1;
     }

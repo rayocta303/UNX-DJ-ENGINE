@@ -21,6 +21,7 @@ int32_t Quantize_GetWaitMs(TrackState *track, int64_t currentMs);
 
 // Returns the fractional distance between the current beat and the next (0.0 to 1.0)
 double Quantize_GetBeatDistance(TrackState *track, int64_t currentMs);
+int Quantize_GetCurrentBeat(TrackState *track, int64_t currentMs);
 
 // Calculate the nearest exact fraction of a beat (1/8, 1/4, 1/2, 1, 2)
 // This is useful for Beat FX (Delay/Echo) length calculations.

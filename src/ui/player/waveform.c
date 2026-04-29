@@ -9,48 +9,31 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-// Helper to find the current beat number (1, 2, 3, or 4) based on playhead position
-static int GetCurrentBeat(TrackState *track, double positionMs) {
-  if (!track || !track->BeatGrid) return 1;
-  int currentBeat = 1;
-
-  for (int i = 0; i < track->BeatGridCount; i++) {
-    unsigned int ms = track->BeatGrid[i].Time;
-    if (ms == 0xFFFFFFFF || ms == 0) break; 
-    
-    if ((double)ms <= positionMs) {
-      currentBeat = track->BeatGrid[i].BeatNumber;
-    } else {
-      break;
-    }
-  }
-  return currentBeat;
-}
+// (Local GetCurrentBeat removed, now using Quantize_GetCurrentBeat from quantize.h)
 static int Waveform_Update(Component *base) {
   WaveformRenderer *r = (WaveformRenderer *)base;
 
   // Refresh dynamic frame count when track changes
-  if (r->State->LoadedTrack != r->cachedTrack) {
+  // Recalculate data density if track length or waveform data changes
+  if (r->State->LoadedTrack != r->cachedTrack || r->dataDensity <= 0.001f || (r->State->TrackLengthMs > 0 && r->State->TrackLengthMs != r->cachedTrackLength)) {
     r->cachedTrack = r->State->LoadedTrack;
-    if (r->cachedTrack) {
-      // Frame count depends on bytes-per-frame for each waveform type:
-      //   Type 1 (PWV2 Blue):          1 byte  per frame
-      //   Type 2 (PWV4 RGB Color):     2 bytes per frame (16-bit big-endian
-      //   word) Type 3 (PWV7 3-Band):        3 bytes per frame
+    r->cachedTrackLength = r->State->TrackLengthMs;
+
+    if (r->cachedTrack != NULL) {
       int bpf = (r->cachedTrack->WaveformType == 3)   ? 3
                 : (r->cachedTrack->WaveformType == 2) ? 2
                                                       : 1;
       r->dynWfmFrames = r->cachedTrack->DynamicWaveformLen / bpf;
 
-      // Calculate data density: how many data frames exist per UI frame (150Hz)
-      float totalUIFrames = (float)r->State->TrackLengthMs * 0.15f;
-      if (totalUIFrames > 0) {
-        r->dataDensity = (float)r->dynWfmFrames / totalUIFrames;
+      if (r->State->TrackLengthMs > 0 && r->dynWfmFrames > 0) {
+        // Recordbox waveforms are typically 150 Hz (0.15 frames per ms)
+        double totalUIFrames = (double)r->State->TrackLengthMs * 0.15;
+        r->dataDensity = (float)((double)r->dynWfmFrames / totalUIFrames);
       } else {
         r->dataDensity = 1.0f;
       }
     } else {
-      r->dynWfmFrames = 480;
+      r->dynWfmFrames = 0;
       r->dataDensity = 1.0f;
     }
   }
@@ -705,7 +688,7 @@ static void Waveform_Draw(Component *base) {
     float pmY = wfY + S(4);
 
     // Get current beat (1-4) and map it to a 0-3 index for the blocks
-    int myBeat = GetCurrentBeat(r->State->LoadedTrack, r->State->PositionMs);
+    int myBeat = Quantize_GetCurrentBeat(r->State->LoadedTrack, r->State->PositionMs);
     int myDisplayBeat = ((myBeat - 1) % 4);
 
     float blockSpacing = S(4);
@@ -727,7 +710,7 @@ static void Waveform_Draw(Component *base) {
 
     // Draw Other Deck - Small blocks underneath (for visual beat matching)
     if (r->OtherDeck && r->OtherDeck->LoadedTrack) {
-      int otherBeat = GetCurrentBeat(r->OtherDeck->LoadedTrack, r->OtherDeck->PositionMs);
+      int otherBeat = Quantize_GetCurrentBeat(r->OtherDeck->LoadedTrack, r->OtherDeck->PositionMs);
       int otherDisplayBeat = ((otherBeat - 1) % 4);
       
       float otherY = pmY + pmH + S(2);

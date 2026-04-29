@@ -757,7 +757,7 @@ void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch) {
 void DeckAudio_QueueJumpMs(DeckAudioState *deck, uint32_t targetMs,
                            uint32_t waitMs) {
   deck->QueuedJumpMs = targetMs;
-  deck->QueuedWaitSamples = (uint32_t)((float)waitMs * 44.1f);
+  deck->QueuedWaitSamples = (uint32_t)((float)waitMs * ((float)deck->SampleRate / 1000.0f));
   deck->HasQueuedJump = true;
 }
 void DeckAudio_SetPlaying(DeckAudioState *deck, bool playing) {
