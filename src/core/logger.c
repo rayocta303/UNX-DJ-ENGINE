@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include "raylib.h"
 
 
 #if defined(_WIN32)
@@ -37,8 +38,13 @@ void Log_Init(void) {
 #endif
 
     const char* logPath = "xdjunx.log";
-    
-#if defined(PLATFORM_IOS)
+    char androidPath[512];
+
+#if defined(__ANDROID__)
+    // Use internal app storage on Android
+    snprintf(androidPath, sizeof(androidPath), "%s/xdjunx.log", GetApplicationDirectory());
+    logPath = androidPath;
+#elif defined(PLATFORM_IOS)
     // On iOS, we write to the Documents folder so we can retrieve it via iTunes/Files app
     extern const char* ios_get_documents_path(const char* filename);
     logPath = ios_get_documents_path("xdjunx.log");
