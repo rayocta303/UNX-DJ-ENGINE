@@ -108,7 +108,7 @@ static void TopBar_Draw(Component *base) {
   // 3. Right Status & Battery
   float batW = S(20);
   float batH = S(9);
-  float batX = SCREEN_WIDTH - t->MarginX - batW - S(4);
+  float batX = SCREEN_WIDTH - t->MarginX - batW - S(15);
   float batY = (TOP_BAR_H - batH) / 2;
 
   char batPctStr[16];
