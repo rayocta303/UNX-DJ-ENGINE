@@ -204,6 +204,8 @@ jobs:
         cp platform/ios/Info.plist Payload/xdjunx.app/
         mkdir -p Payload/xdjunx.app/assets
         cp -r assets/* Payload/xdjunx.app/assets/
+        mkdir -p Payload/xdjunx.app/assets/controllers
+        cp -r controllers/* Payload/xdjunx.app/assets/controllers/
 
         # Copy App Icons
         cp platform/ios/Assets.xcassets/AppIcon.appiconset/*.png Payload/xdjunx.app/

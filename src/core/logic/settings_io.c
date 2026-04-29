@@ -3,6 +3,33 @@
 #include <stdlib.h>
 #include <string.h>
 #include "raylib.h"
+#include "defaults.h"
+
+#if defined(_WIN32)
+#include <direct.h>
+#define MKDIR(path) _mkdir(path)
+#else
+#include <sys/stat.h>
+#define MKDIR(path) mkdir(path, 0777)
+#endif
+
+static void EnsureControllersExist(const char* baseDir) {
+    if (!baseDir || baseDir[0] == '\0') return;
+    
+    char controllersDir[512];
+    snprintf(controllersDir, sizeof(controllersDir), "%s/controllers", baseDir);
+    MKDIR(controllersDir);
+
+    char path[512];
+    snprintf(path, sizeof(path), "%s/LoopMIDI.midi.xml", controllersDir);
+    if (!FileExists(path)) {
+        SaveFileText(path, (char*)DEFAULT_MIDI_LOOPMIDI);
+    }
+    snprintf(path, sizeof(path), "%s/Template.midi.xml", controllersDir);
+    if (!FileExists(path)) {
+        SaveFileText(path, (char*)DEFAULT_MIDI_TEMPLATE);
+    }
+}
 
 static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio) {
     if (!json) return;
@@ -91,12 +118,23 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     strncpy(path, "settings.json", sizeof(path)-1);
 #endif
 
+    // Ensure controllers directory exists based on detected platform path
+    char baseDir[512] = ".";
+#if defined(__ANDROID__)
+    strncpy(baseDir, "/sdcard", sizeof(baseDir)-1);
+#elif defined(PLATFORM_IOS)
+    extern const char* ios_get_documents_path(const char* filename);
+    strncpy(baseDir, ios_get_documents_path(""), sizeof(baseDir)-1);
+#endif
+    EnsureControllersExist(baseDir);
+
     FILE *f = fopen(path, "r");
     if (!f && strcmp(path, "settings.json") != 0) {
         f = fopen("settings.json", "r");
     }
 
     if (!f) {
+        EnsureControllersExist("."); // Fallback to current dir if nothing else
         Settings_Save(*wfmA, *wfmB, *audio, controllerPath);
         return;
     }

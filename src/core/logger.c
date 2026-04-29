@@ -51,17 +51,30 @@ void Log_Init(void) {
     const char* logPath = "unx.log";
 
 #if defined(__ANDROID__)
-    // Use external storage for user accessibility if possible, fallback to internal
     static char androidPath[512];
+    // Attempt 1: Accessible SD Card path
     strncpy(androidPath, "/sdcard/unx.log", sizeof(androidPath)-1);
     FILE *testFile = fopen(androidPath, "a");
     if (testFile) {
         fclose(testFile);
     } else {
-        snprintf(androidPath, sizeof(androidPath), "%s/unx.log", GetApplicationDirectory());
+        // Attempt 2: Try creating via "w" in case "a" is restricted on new file
+        testFile = fopen(androidPath, "w");
+        if (testFile) {
+            fclose(testFile);
+        } else {
+            // Attempt 3: Fallback to internal private storage (Always works)
+            const char* appDir = GetApplicationDirectory();
+            if (appDir && appDir[0] != '\0') {
+                snprintf(androidPath, sizeof(androidPath), "%s/unx.log", appDir);
+            } else {
+                // Last resort fallback
+                strncpy(androidPath, "unx.log", sizeof(androidPath)-1);
+            }
+        }
     }
     logPath = androidPath;
-    __android_log_print(ANDROID_LOG_INFO, "XDJ-UNX", "Log file path: %s", logPath);
+    __android_log_print(ANDROID_LOG_INFO, "XDJ-UNX", "[LOGGER] Final Path: %s", logPath);
 #elif defined(PLATFORM_IOS)
     // On iOS, we write to the Documents folder so we can retrieve it via iTunes/Files app
     extern const char* ios_get_documents_path(const char* filename);

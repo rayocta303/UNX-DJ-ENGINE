@@ -123,6 +123,9 @@ if "%PLATFORM%"=="windows" (
 )
 
 :end
+    if exist controllers (
+        xcopy controllers %OUT_DIR%\controllers /s /e /y /i
+    )
     if "%BACKEND%"=="desktop" (
         if exist assets (
             xcopy assets %OUT_DIR%\assets /s /e /y /i

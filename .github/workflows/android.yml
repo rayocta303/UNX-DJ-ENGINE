@@ -92,8 +92,9 @@ jobs:
 
     - name: Prepare Android Assets
       run: |
-        mkdir -p platform/android/app/src/main/assets
+        mkdir -p platform/android/app/src/main/assets/controllers
         cp -r assets/* platform/android/app/src/main/assets/
+        cp -r controllers/* platform/android/app/src/main/assets/controllers/
         rm -rf platform/android/app/src/main/assets/app_icons
 
     - name: Create CMakeLists.txt for App

@@ -961,7 +961,7 @@ int raylib_main(int argc, char *argv[]) {
 int main(void) {
 #endif
   SetTraceLogLevel(LOG_ALL);
-  Log_Init();
+  // Log_Init moved after InitWindow for Android path stability
   UNX_LOG_INFO("!!! [DEBUG] ENTRY POINT main() !!!");
 
 #if defined(_WIN32)
@@ -1002,6 +1002,7 @@ int main(void) {
   UNX_LOG_INFO("[MAIN] InitWindow finished. Result: %s",
                IsWindowReady() ? "SUCCESS" : "FAILED");
   SetTargetFPS(60);
+  Log_Init(); // Initialize logger after Raylib is ready (required for Android paths)
 #else
 // Desktop (X11, Wayland, Windows)
 printf("[MAIN] Platform: DESKTOP (X11/Wayland/Windows)\n");

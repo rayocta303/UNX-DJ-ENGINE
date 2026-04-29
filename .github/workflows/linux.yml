@@ -39,10 +39,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: xdjunx-linux-arm64-drm
-          path: build/linux_drm/xdjunx
+          path: build/linux_drm/
 
       - name: Upload Desktop Artifact
         uses: actions/upload-artifact@v4
         with:
           name: xdjunx-linux-arm64-desktop
-          path: build/linux_desktop/xdjunx
+          path: build/linux_desktop/

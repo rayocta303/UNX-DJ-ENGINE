@@ -108,4 +108,8 @@ echo "Linking..."
 OBJ_FILES=$(find src lib -name "*.o" ! -name "bin2c.o" ! -name "gen_splash_bundle.o" ! -path "*/soundtouch_temp/*")
 $CXX $CXXFLAGS $OBJ_FILES $LDFLAGS -o "$OUT_DIR/$TARGET" || exit 1
 
+if [ -d "controllers" ]; then
+    cp -r controllers "$OUT_DIR/"
+fi
+
 echo "Done."

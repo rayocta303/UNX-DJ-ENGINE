@@ -10,7 +10,7 @@ ifeq ($(PLATFORM),WINDOWS_X64)
     TARGET = xdjunx.exe
     CFLAGS = -O2 -target x86_64-windows -D_WIN32 -DKS_STR_ENCODING_WIN32API
     CXXFLAGS = -O2 -target x86_64-windows -std=c++17 -D_WIN32 -DKS_STR_ENCODING_WIN32API
-    LDFLAGS = -Llib -lraylib -lgdi32 -lwinmm -lopengl32
+    LDFLAGS = -Llib -lraylib -lgdi32 -lwinmm -lopengl32 -lpsapi -lsetupapi -lhid
 else ifeq ($(PLATFORM),LINUX_ARM64)
     LINUX_BACKEND ?= DRM
     CC ?= t:\zig\zig.exe cc
