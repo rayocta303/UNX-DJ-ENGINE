@@ -4,7 +4,9 @@
 #include "ui/components/helpers.h"
 #include "core/logic/quantize.h"
 #include "audio/engine.h"
+#include "ui/player/waveform.h"
 #include <stdio.h>
+#include <math.h>
 
 static const char* AllFXNames[] = {
     "DELAY", "ECHO", "PING PONG", "SPIRAL", "REVERB", "TRANS", 
@@ -116,6 +118,38 @@ static int BeatFX_Update(Component *base) {
             b->State->ShowBeatFXTab = false;
         } else if (CheckCollisionPointRec(mouse, beatFxTab)) {
             b->State->ShowBeatFXTab = true;
+        }
+    }
+
+    // Zoom buttons interaction
+    float plusMinusY = b->FXButton.y + b->FXButton.height + S(12) + S(18);
+    float halfB = (w - S(12)) / 2;
+    Rectangle minusRect = { x + S(4), plusMinusY, halfB, S(14) };
+    Rectangle plusRect = { x + S(8) + halfB, plusMinusY, halfB, S(14) };
+
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        int zoomDelta = 0;
+        if (CheckCollisionPointRec(mouse, minusRect)) zoomDelta = 1;  // Zoom OUT (Show more track)
+        if (CheckCollisionPointRec(mouse, plusRect)) zoomDelta = -1; // Zoom IN (Show more detail)
+
+        if (zoomDelta != 0) {
+            DeckState* decks[2] = { b->DeckA, b->DeckB };
+            for (int d = 0; d < 2; d++) {
+                DeckState* ds = decks[d];
+                int currentIndex = 0;
+                float minDiff = 9999.0f;
+                for (int i = 0; i < NUM_ZOOM_LEVELS; i++) {
+                    float diff = fabsf(ds->ZoomScale - ZOOM_LEVELS[i]);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        currentIndex = i;
+                    }
+                }
+                currentIndex += zoomDelta;
+                if (currentIndex < 0) currentIndex = 0;
+                if (currentIndex >= NUM_ZOOM_LEVELS) currentIndex = NUM_ZOOM_LEVELS - 1;
+                ds->ZoomScale = ZOOM_LEVELS[currentIndex];
+            }
         }
     }
 
@@ -286,6 +320,16 @@ static void BeatFX_Draw(Component *base) {
     DrawRectangle(x + S(8) + halfB, cy, halfB, S(14), ColorDark1);
     DrawRectangleLines(x + S(8) + halfB, cy, halfB, S(14), ColorShadow);
     DrawCentredText("GRID", faceXXS, x + S(8) + halfB, halfB, cy + S(3.5f), S(7), ColorShadow);
+
+    // 4b. +/- BUTTONS (Below Zoom/Grid)
+    cy += S(18); // Row height + spacing
+    DrawRectangle(x + S(4), cy, halfB, S(14), ColorDark2);
+    DrawRectangleLines(x + S(4), cy, halfB, S(14), ColorShadow);
+    DrawCentredText("-", faceSm, x + S(4), halfB, cy + S(2.5f), S(9), ColorWhite);
+
+    DrawRectangle(x + S(8) + halfB, cy, halfB, S(14), ColorDark2);
+    DrawRectangleLines(x + S(8) + halfB, cy, halfB, S(14), ColorShadow);
+    DrawCentredText("+", faceSm, x + S(8) + halfB, halfB, cy + S(2.5f), S(9), ColorWhite);
 
     cy = y + h - S(18); // Bottom alignment
 
