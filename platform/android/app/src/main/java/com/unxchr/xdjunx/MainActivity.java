@@ -10,6 +10,7 @@ import android.provider.Settings;
 import android.content.pm.PackageManager;
 import android.util.Log;
 import android.Manifest;
+import android.view.WindowManager;
 
 public class MainActivity extends NativeActivity {
     private static final String TAG = "UNX_MainActivity";
@@ -19,6 +20,7 @@ public class MainActivity extends NativeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         Log.i(TAG, "onCreate: Requesting permissions for Android " + Build.VERSION.SDK_INT);
         requestRuntimePermissions();
         checkManageStoragePermission();
