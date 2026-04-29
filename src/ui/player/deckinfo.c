@@ -17,19 +17,29 @@ static int DeckInfo_Update(Component *base) {
     float deckInfoW = SIDE_PANEL_W;
     float deckInfoH = (SCREEN_HEIGHT - TOP_BAR_H - FX_BAR_H - DECK_STR_H) / 2.0f;
     float y = TOP_BAR_H + (d->ID * deckInfoH);
-    
+    float margin = S(4.0f);
+
+    // Layout Constants (Must match Draw function)
+    float headerH = S(14.0f);
+    float contentY = y + headerH + S(6);
+    float statusH = S(22);
+    float utilY = contentY + statusH + S(6);
+    float utilW = (deckInfoW - margin * 2 - S(8)) / 3.0f;
+    float utilH = S(14);
+    float btnH = S(26);
+    float btnY = y + deckInfoH - btnH - S(2); // Flush to bottom with 2px gap
+    float btnW = (deckInfoW - margin * 2 - S(6)) / 2.0f;
+
+    // 1. Eject
     float ejectX = deckInfoW - S(16);
-    float ejectY = y + S(1.5f);
+    float ejectY = y + S(3.5f);
     Rectangle ejectRect = { ejectX - S(4), ejectY - S(2), S(20), S(12) };
     
     if (d->State->LoadedTrack != NULL && CheckCollisionPointRec(UIGetMousePosition(), ejectRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        // Unload Engine
         DeckAudio_Unload(&d->Engine->Decks[d->ID]);
-        
-        // Unload UI State
         if (d->State->LoadedTrack) {
             TrackState *t = d->State->LoadedTrack;
-            d->State->LoadedTrack = NULL; // Clear pointer FIRST
+            d->State->LoadedTrack = NULL;
             if (t->BeatGrid != NULL) free(t->BeatGrid);
             free(t);
         }
@@ -44,6 +54,48 @@ static int DeckInfo_Update(Component *base) {
         strcpy(d->State->TrackKey, "");
     }
 
+    // 2. Utility Buttons
+    Rectangle msRect = { margin, utilY, utilW, utilH };
+    if (CheckCollisionPointRec(UIGetMousePosition(), msRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) d->State->IsMaster = !d->State->IsMaster;
+
+    Rectangle mtRect = { margin + utilW + S(4), utilY, utilW, utilH };
+    if (CheckCollisionPointRec(UIGetMousePosition(), mtRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) d->State->MasterTempo = !d->State->MasterTempo;
+
+    Rectangle viRect = { margin + (utilW + S(4)) * 2, utilY, utilW, utilH };
+    if (CheckCollisionPointRec(UIGetMousePosition(), viRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) d->State->VinylModeEnabled = !d->State->VinylModeEnabled;
+
+    // 3. Main Controls
+    Rectangle cueRect = { margin, btnY, btnW, btnH };
+    
+    if (CheckCollisionPointRec(UIGetMousePosition(), cueRect)) {
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            if (d->State->IsPlaying) {
+                DeckAudio_SetPlaying(&d->Engine->Decks[d->ID], false);
+                DeckAudio_JumpToMs(&d->Engine->Decks[d->ID], d->State->MainCueMs);
+                d->State->IsPlaying = false;
+            } else {
+                d->State->MainCueMs = d->State->PositionMs;
+                DeckAudio_SetPlaying(&d->Engine->Decks[d->ID], true);
+                d->State->IsPlaying = true;
+                d->State->IsCueHeld = true;
+            }
+        }
+    }
+    
+    if (d->State->IsCueHeld && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+        DeckAudio_SetPlaying(&d->Engine->Decks[d->ID], false);
+        DeckAudio_JumpToMs(&d->Engine->Decks[d->ID], d->State->MainCueMs);
+        d->State->IsPlaying = false;
+        d->State->IsCueHeld = false;
+    }
+
+    Rectangle playRect = { margin + btnW + S(6), btnY, btnW, btnH };
+    if (CheckCollisionPointRec(UIGetMousePosition(), playRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        bool starting = !d->Engine->Decks[d->ID].IsMotorOn;
+        DeckAudio_SetPlaying(&d->Engine->Decks[d->ID], starting);
+        d->State->IsPlaying = starting;
+    }
+
     return 0;
 }
 
@@ -53,7 +105,6 @@ static void DeckInfo_Draw(Component *base) {
     if (crownTex.id == 0) {
         Image img = LoadImageFromMemory(".png", icon_crown, icon_crown_size);
         if (img.data == NULL) img = LoadImage("assets/icons/crown.png");
-        
         if (img.data != NULL) {
             ImageResize(&img, (int)S(9), (int)S(9));
             crownTex = LoadTextureFromImage(img);
@@ -64,7 +115,6 @@ static void DeckInfo_Draw(Component *base) {
     if (starTex.id == 0) {
         Image img = LoadImageFromMemory(".png", icon_star, icon_star_size);
         if (img.data == NULL) img = LoadImage("assets/icons/star.png");
-        
         if (img.data != NULL) {
             ImageResize(&img, (int)S(7), (int)S(7));
             starTex = LoadTextureFromImage(img);
@@ -76,174 +126,104 @@ static void DeckInfo_Draw(Component *base) {
     float deckInfoW = SIDE_PANEL_W;
     float deckInfoH = (SCREEN_HEIGHT - TOP_BAR_H - FX_BAR_H - DECK_STR_H) / 2.0f;
     float y = TOP_BAR_H + (d->ID * deckInfoH);
-    float margin = 10.0f;
+    float margin = S(4.0f);
 
     DrawRectangle(0, y, deckInfoW, deckInfoH, ColorDark2);
     
-    float headerH = 12.0f;
-    DrawRectangle(0, y, deckInfoW, S(headerH), ColorShadow);
-    DrawRectangle(0, y + S(headerH) - S(0.5f), deckInfoW, S(1.0f), ColorBlue);
+    float headerH = S(14.0f);
+    DrawRectangle(0, y, deckInfoW, headerH, ColorShadow);
+    DrawRectangle(0, y + headerH - S(1.0f), deckInfoW, S(1.0f), d->ID == 0 ? ColorBlue : ColorOrange);
 
-    DrawLine(deckInfoW - 1, y, deckInfoW - 1, y + deckInfoH, ColorDark1);
-    DrawLine(0, y + deckInfoH - 1, deckInfoW, y + deckInfoH - 1, ColorDark1);
-
-    Font faceXXS = UIFonts_GetFace(S(7.5f));
+    Font faceXXS = UIFonts_GetFace(S(7));
     Font faceXS = UIFonts_GetFace(S(8.5f));
     Font faceSm = UIFonts_GetFace(S(10));
-    Font iconBrand = UIFonts_GetIconBrand(S(10));
+    Font faceIcon = UIFonts_GetIcon(S(11));
 
     char deckLabel[32];
     sprintf(deckLabel, "DECK %d", d->ID + 1);
-    UIDrawText(deckLabel, faceXXS, S(margin), y + S(1.5f), S(7.5f), ColorWhite);
+    UIDrawText(deckLabel, faceXXS, margin, y + S(3.5f), S(7), ColorWhite);
 
-    // Eject Button (Upper right)
-    Font faceIcon = UIFonts_GetIcon(S(10));
+    // Eject
     float ejectX = deckInfoW - S(16);
-    float ejectY = y + S(1.5f);
+    float ejectY = y + S(3.5f);
     Rectangle ejectRect = { ejectX - S(4), ejectY - S(2), S(20), S(12) };
-    bool hoverEject = CheckCollisionPointRec(UIGetMousePosition(), ejectRect);
-    
     if (d->State->LoadedTrack != NULL) {
+        bool hoverEject = CheckCollisionPointRec(UIGetMousePosition(), ejectRect);
         UIDrawText("\uf052", faceIcon, ejectX, ejectY, S(10), hoverEject ? ColorRed : ColorShadow);
     }
 
-    float contentY = y + S(headerH);
-    float contentH = deckInfoH - S(headerH);
-    float rowH = contentH / 4.0f;
-
-    for (int i = 1; i < 4; i++) {
-        float dividerY = contentY + i * rowH;
-        DrawLine(0, dividerY, deckInfoW, dividerY, (Color){0x22, 0x22, 0x22, 0xFF});
-    }
-
-    // 1. Source Row
-    float sourceY = contentY + (rowH - S(10)) / 2.0f;
-    UIDrawText("\uf287", iconBrand, S(margin), sourceY, S(10), ColorWhite); // uf287 usb
-    UIDrawText(d->State->SourceName, faceXS, S(margin + 16), sourceY - S(1), S(8.5f), ColorWhite);
-
-    // 2. Key Row
-    float keyY = contentY + rowH + (rowH - S(10)) / 2.0f;
-    DrawRectangleLines(S(margin), keyY, S(14), S(10), ColorShadow);
-    UIDrawText("\uf7c2", faceXXS, S(margin + 2), keyY + S(1), S(7.5f), ColorShadow); // flat sharp
+    float contentY = y + headerH + S(6);
+    float col1X = margin;
+    float col2X = deckInfoW / 2.0f + S(2);
     
-    const char* keyStr = "---";
-    if (d->State->LoadedTrack != NULL) {
-        keyStr = d->State->TrackKey;
-    }
-    UIDrawText(keyStr, faceXS, S(margin + 20), keyY, S(8.5f), ColorWhite);
+    // --- Row 1: Status Grid (Key & Bars) ---
+    float statusH = S(22);
+    DrawRectangle(margin, contentY, deckInfoW - margin * 2, statusH, (Color){0,0,0,60});
+    
+    // Column 1: KEY
+    UIDrawText("KEY", faceXXS, col1X + S(6), contentY + S(4), S(7), ColorShadow);
+    char keyStr[16] = "---";
+    if (d->State->LoadedTrack) strcpy(keyStr, d->State->TrackKey);
+    UIDrawText(keyStr, faceSm, col1X + S(6), contentY + S(11), S(10), ColorBlue);
 
-    // Track Rating (Placeholder stars if loaded)
-    if (d->State->LoadedTrack != NULL) {
-        float starX = S(margin + 60);
-        for (int i = 0; i < 5; i++) {
-            DrawTextureEx(starTex, (Vector2){starX + i * S(8), keyY + S(1)}, 0.0f, 1.0f, (i < 3) ? ColorOrange : ColorShadow);
-        }
-    }
-
-    // 3. Bars Row
-    float barsY = contentY + rowH * 2.0f + (rowH - S(11)) / 2.0f;
-    Color barsColor = ColorWhite;
-    char barsVal[32] = "---.-";
-
-    if (d->State->LoadedTrack != NULL) {
+    // Column 2: BAR
+    UIDrawText("BAR", faceXXS, col2X + S(2), contentY + S(4), S(7), ColorShadow);
+    char barsVal[32] = "01.1";
+    if (d->State->LoadedTrack) {
         long long posMs = d->State->PositionMs;
         int beatIdx = -1;
-
-        for (int i = 0; i < 1024; i++) {
-            long long bMs = (long long)d->State->LoadedTrack->BeatGrid[i].Time;
-            if (bMs == 0xFFFFFFFF) break;
-            if (bMs <= posMs) beatIdx = i;
+        for (int i = 0; i < 1024 && d->State->LoadedTrack->BeatGrid[i].Time != 0xFFFFFFFF; i++) {
+            if (d->State->LoadedTrack->BeatGrid[i].Time <= posMs) beatIdx = i;
             else break;
         }
-
         if (beatIdx >= 0) {
             int currentBeat = d->State->LoadedTrack->BeatGrid[beatIdx].BeatNumber;
-            
-            // To figure out currentBar efficiently: Count how many "Beat 1"s we've encountered
-            int currentBar = 0;
-            for (int i = 0; i <= beatIdx; i++) {
-                if (d->State->LoadedTrack->BeatGrid[i].BeatNumber == 1) {
-                    currentBar++;
-                }
-            }
-            // If we somehow didn't hit a 1 yet, fallback to 1 
-            if (currentBar == 0) currentBar = 1;
-            
+            int currentBar = 1;
+            for (int i = 0; i <= beatIdx; i++) if (d->State->LoadedTrack->BeatGrid[i].BeatNumber == 1) currentBar++;
             sprintf(barsVal, "%02d.%d", currentBar, currentBeat);
-        } else {
-            // Negative position or before first beat
-            if (posMs < 0) {
-                // Determine BPM from first two beats to extrapolate lead-in bars
-                double firstBeatMs = (double)d->State->LoadedTrack->BeatGrid[0].Time;
-                double secondBeatMs = (double)d->State->LoadedTrack->BeatGrid[1].Time;
-                double beatLen = secondBeatMs - firstBeatMs;
-                if (beatLen <= 0) beatLen = 500.0; // 120 BPM fallback
-
-                double msFromFirst = (double)posMs - firstBeatMs;
-                int totalBeatsBefore = (int)floor(msFromFirst / beatLen); 
-                // e.g. -500ms from start = -1 beat.
-                // -1 beat relative to 1.1 -> 0.4? No, usually it counts as -01.1
-                
-                int absBeats = abs(totalBeatsBefore);
-                int bars = (absBeats / 4) + 1;
-                int beats = (absBeats % 4) + 1;
-                sprintf(barsVal, "-%02d.%d", bars, beats);
-            } else {
-                sprintf(barsVal, "01.1");
-            }
         }
     }
+    UIDrawText(barsVal, faceSm, col2X + S(2), contentY + S(11), S(10), d->ID == 0 ? ColorOrange : ColorWhite);
 
-    if (d->ID == 0) barsColor = ColorOrange;
+    // --- Row 2: Utility Buttons (Master, MT, Vinyl) ---
+    float utilY = contentY + statusH + S(6);
+    float utilW = (deckInfoW - margin * 2 - S(8)) / 3.0f;
+    float utilH = S(14);
 
-    UIDrawText(barsVal, faceSm, S(margin), barsY, S(10), barsColor);
-    UIDrawText("Bars", faceXXS, S(margin + 32), barsY + S(2.5f), S(7.5f), barsColor);
+    // Master
+    Rectangle msRect = { margin, utilY, utilW, utilH };
+    DrawRectangleRounded(msRect, 0.2f, 4, d->State->IsMaster ? ColorOrange : ColorShadow);
+    DrawTextureEx(crownTex, (Vector2){msRect.x + (utilW - S(9))/2.0f, msRect.y + S(2.5f)}, 0.0f, 1.0f, d->State->IsMaster ? ColorBlack : ColorWhite);
 
-    // 4. Buttons Row (MT, Vinyl, etc)
-    float btnY = contentY + rowH * 3.0f + (rowH - S(10)) / 2.0f;
-    float btnH = S(11);
-    float btnS = S(3); // Spacing
-    float x = S(margin);
-    
-    // MASTER Button (Crown Icon Only)
-    float msW = S(20);
-    Rectangle msRect = { x, btnY, msW, btnH };
-    bool msClicked = CheckCollisionPointRec(UIGetMousePosition(), msRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-    if (msClicked) d->State->IsMaster = !d->State->IsMaster;
+    // MT
+    Rectangle mtRect = { margin + utilW + S(4), utilY, utilW, utilH };
+    DrawRectangleRounded(mtRect, 0.2f, 4, d->State->MasterTempo ? ColorBlue : ColorShadow);
+    UIDrawText("MT", faceXXS, mtRect.x + (utilW - S(10))/2.0f, mtRect.y + S(4), S(7), ColorWhite);
 
-    Color msColor = d->State->IsMaster ? ColorOrange : ColorShadow;
-    DrawRectangleRounded(msRect, 0.2f, 4, msColor);
-    
-    Color iconColor = d->State->IsMaster ? ColorBlack : ColorWhite;
-    Vector2 iconPos = {
-        msRect.x + (msRect.width - crownTex.width) / 2.0f,
-        msRect.y + (msRect.height - crownTex.height) / 2.0f
-    };
-    DrawTextureEx(crownTex, iconPos, 0.0f, 1.0f, iconColor);
+    // Vinyl
+    Rectangle viRect = { margin + (utilW + S(4)) * 2, utilY, utilW, utilH };
+    DrawRectangleRounded(viRect, 0.2f, 4, d->State->VinylModeEnabled ? ColorBlue : ColorShadow);
+    UIDrawText(d->State->VinylModeEnabled ? "VINYL" : "CDJ", faceXXS, viRect.x + (utilW - (d->State->VinylModeEnabled?S(20):S(14)))/2.0f, viRect.y + S(4), S(7), ColorWhite);
 
-    x += msW + btnS;
+    // --- Row 3: Main Controls (Cue, Play) ---
+    float btnH = S(26);
+    float btnY = y + deckInfoH - btnH - S(2);
+    float btnW = (deckInfoW - margin * 2 - S(6)) / 2.0f;
 
-    // MT Button
-    float mtW = S(18);
-    Rectangle mtRect = { x, btnY, mtW, btnH };
-    bool mtClicked = CheckCollisionPointRec(UIGetMousePosition(), mtRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-    if (mtClicked) d->State->MasterTempo = !d->State->MasterTempo;
-    
-    Color mtColor = d->State->MasterTempo ? ColorBlue : ColorShadow;
-    DrawRectangleRounded(mtRect, 0.2f, 4, mtColor);
-    UIDrawText("MT", faceXXS, mtRect.x + (mtRect.width - S(10)) / 2.0f, mtRect.y + S(2), S(7.5f), ColorWhite);
+    // Cue
+    Rectangle cueRect = { margin, btnY, btnW, btnH };
+    bool hoverCue = CheckCollisionPointRec(UIGetMousePosition(), cueRect);
+    DrawRectangleRounded(cueRect, 0.15f, 4, ColorCue);
+    if (hoverCue) DrawRectangleRoundedLines(cueRect, 0.15f, 4, S(1), ColorWhite);
+    UIDrawText("CUE", faceXS, cueRect.x + (btnW - S(18))/2.0f, cueRect.y + S(9), S(8.5f), ColorBlack);
 
-    x += mtW + btnS;
-
-    // Vinyl Button
-    float viW = S(32);
-    Rectangle viRect = { x, btnY, viW, btnH };
-    bool viClicked = CheckCollisionPointRec(UIGetMousePosition(), viRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-    if (viClicked) d->State->VinylModeEnabled = !d->State->VinylModeEnabled;
-
-    Color viColor = d->State->VinylModeEnabled ? ColorBlue : ColorShadow;
-    DrawRectangleRounded(viRect, 0.2f, 4, viColor);
-    UIDrawText(d->State->VinylModeEnabled ? "VINYL" : "CDJ", faceXXS, viRect.x + (d->State->VinylModeEnabled ? S(4.5f) : S(7.5f)), viRect.y + S(2), S(7.5f), ColorWhite);
+    // Play/Pause
+    Rectangle playRect = { margin + btnW + S(6), btnY, btnW, btnH };
+    bool hoverPlay = CheckCollisionPointRec(UIGetMousePosition(), playRect);
+    bool isPlaying = d->State->IsPlaying;
+    DrawRectangleRounded(playRect, 0.15f, 4, isPlaying ? ColorGreen : ColorShadow);
+    if (hoverPlay) DrawRectangleRoundedLines(playRect, 0.15f, 4, S(1), ColorWhite);
+    UIDrawText(isPlaying ? "\uf04c" : "\uf04b", faceIcon, playRect.x + (btnW - S(10))/2.0f, playRect.y + S(8), S(11), isPlaying ? ColorBlack : ColorWhite);
 }
 
 void DeckInfoPanel_Init(DeckInfoPanel *p, int id, DeckState *state, AudioEngine *engine) {
