@@ -14,6 +14,7 @@
 #include "ui/components/theme.h"
 #include "ui/player/player.h"
 #include "ui/views/about.h"
+#include "ui/views/credits.h"
 #include "ui/views/debug_ios.h"
 #include "ui/views/info.h"
 #include "ui/views/mixer.h"
@@ -90,6 +91,7 @@ typedef struct {
   InfoState infoState;
   SettingsState settingsState;
   AboutState aboutState;
+  CreditsState creditsState;
   MixerState mixerState;
   PadState padState;
 
@@ -101,6 +103,7 @@ typedef struct {
   InfoRenderer info;
   SettingsRenderer settings;
   AboutRenderer about;
+  CreditsRenderer credits;
   MixerRenderer mixer;
   PadRenderer pad;
   SplashRenderer splash;
@@ -348,15 +351,18 @@ void OnSettingsValueChanged(void *ctx, int idx) {
 
 void OnSettingsAction(void *ctx, int idx) {
   App *a = (App *)ctx;
-  if (idx == 15) { // ABOUT
+  if (idx == 16) { // ABOUT
     a->screen = ScreenAbout;
     a->aboutState.IsActive = true;
-  } else if (idx == 16) { // EXIT APPLICATION
+  } else if (idx == 17) { // CREDITS
+    a->screen = ScreenCredits;
+    a->creditsState.IsActive = true;
+  } else if (idx == 18) { // EXIT APPLICATION
     a->showExitConfirm = true;
-  } else if (idx == 18) { // CREATE NEW MAPPING
+  } else if (idx == 20) { // CREATE NEW MAPPING
     MIDI_CreateTemplate(MIDI_GetGlobalMapping());
     PopulateMidiSettings(a);
-  } else if (idx == 19) { // SAVE CURRENT AS
+  } else if (idx == 21) { // SAVE CURRENT AS
     // For simplicity, we use the current map name or a default
     MIDI_GetGlobalMapping(); // Refresh without assigning if unused
     char nameBuf[128];
@@ -370,41 +376,41 @@ void OnSettingsAction(void *ctx, int idx) {
 }
 
 void PopulateMidiSettings(App *a) {
-  // --- PRESET SELECTION ITEM (Index 17) ---
+  // --- PRESET SELECTION ITEM (Index 19) ---
   char names[32][64];
   a->midiPresetCount =
       MIDI_ListControllers("controllers", names, a->midiPresetPaths);
 
-  strcpy(a->settingsState.Items[17].Label, "MAPPING PRESET");
-  a->settingsState.Items[17].Type = SETTING_TYPE_LIST;
-  a->settingsState.Items[17].Category = SETTING_CAT_CONTROLLERS;
-  a->settingsState.Items[17].OptionsCount = a->midiPresetCount;
-  a->settingsState.Items[17].Current = 0;
+  strcpy(a->settingsState.Items[19].Label, "MAPPING PRESET");
+  a->settingsState.Items[19].Type = SETTING_TYPE_LIST;
+  a->settingsState.Items[19].Category = SETTING_CAT_CONTROLLERS;
+  a->settingsState.Items[19].OptionsCount = a->midiPresetCount;
+  a->settingsState.Items[19].Current = 0;
 
   for (int i = 0; i < a->midiPresetCount; i++) {
-    strncpy(a->settingsState.Items[17].Options[i], names[i], 31);
+    strncpy(a->settingsState.Items[19].Options[i], names[i], 31);
     if (strcmp(a->activeControllerPath, a->midiPresetPaths[i]) == 0) {
-      a->settingsState.Items[17].Current = i;
+      a->settingsState.Items[19].Current = i;
     }
   }
 
-  // --- ACTIONS (18, 19) ---
-  strcpy(a->settingsState.Items[18].Label, "CREATE NEW MAPPING");
-  a->settingsState.Items[18].Type = SETTING_TYPE_ACTION;
-  a->settingsState.Items[18].Category = SETTING_CAT_CONTROLLERS;
-  strcpy(a->settingsState.Items[18].Unit, "RESET");
+  // --- ACTIONS (20, 21) ---
+  strcpy(a->settingsState.Items[20].Label, "CREATE NEW MAPPING");
+  a->settingsState.Items[20].Type = SETTING_TYPE_ACTION;
+  a->settingsState.Items[20].Category = SETTING_CAT_CONTROLLERS;
+  strcpy(a->settingsState.Items[20].Unit, "RESET");
 
-  strcpy(a->settingsState.Items[19].Label, "SAVE CURRENT MAPPING");
-  a->settingsState.Items[19].Type = SETTING_TYPE_ACTION;
-  a->settingsState.Items[19].Category = SETTING_CAT_CONTROLLERS;
-  strcpy(a->settingsState.Items[19].Unit, "SAVE");
+  strcpy(a->settingsState.Items[21].Label, "SAVE CURRENT MAPPING");
+  a->settingsState.Items[21].Type = SETTING_TYPE_ACTION;
+  a->settingsState.Items[21].Category = SETTING_CAT_CONTROLLERS;
+  strcpy(a->settingsState.Items[21].Unit, "SAVE");
 
-  // --- MAPPING ENTRIES (Starting from Index 20) ---
+  // --- MAPPING ENTRIES (Starting from Index 22) ---
   MidiMapping *map = MIDI_GetGlobalMapping();
   if (!map)
     return;
 
-  int baseIdx = 20;
+  int baseIdx = 22;
   for (int i = 0; i < map->count && (baseIdx + i) < MAX_SETTINGS_ITEMS; i++) {
     MappingEntry *e = &map->entries[i];
     snprintf(a->settingsState.Items[baseIdx + i].Label, 64, "%s %s", e->group,
@@ -875,10 +881,14 @@ void App_Init(App *a) {
   a->settingsState.Items[16].Type = SETTING_TYPE_ACTION;
   a->settingsState.Items[16].Category = SETTING_CAT_SYSTEM;
 
-  strcpy(a->settingsState.Items[17].Label, "EXIT APPLICATION");
+  strcpy(a->settingsState.Items[17].Label, "CREDITS");
   a->settingsState.Items[17].Type = SETTING_TYPE_ACTION;
   a->settingsState.Items[17].Category = SETTING_CAT_SYSTEM;
-  a->settingsState.ItemsCount = 18;
+
+  strcpy(a->settingsState.Items[18].Label, "EXIT APPLICATION");
+  a->settingsState.Items[18].Type = SETTING_TYPE_ACTION;
+  a->settingsState.Items[18].Category = SETTING_CAT_SYSTEM;
+  a->settingsState.ItemsCount = 19;
 
   // Set Load Lock current opt
   a->settingsState.Items[1].Current = a->deckA.Waveform.LoadLock ? 1 : 0;
@@ -923,6 +933,7 @@ void App_Init(App *a) {
   // We only set hardcoded defaults if you want a fallback before loading.
 
   AboutRenderer_Init(&a->about, &a->aboutState);
+  CreditsRenderer_Init(&a->credits, &a->creditsState);
   a->mixerState.FXState = &a->fxState;
   MixerRenderer_Init(&a->mixer, &a->mixerState);
 
@@ -1107,6 +1118,10 @@ SetTargetFPS(60);
   app->browserState.DeckA = (struct DeckState *)&app->deckA;
   app->browserState.DeckB = (struct DeckState *)&app->deckB;
   app->player.AudioPlugin = audioEngine;
+  app->player.InfoA.Engine = audioEngine;
+  app->player.InfoB.Engine = audioEngine;
+  app->player.BeatFX.AudioPlugin = audioEngine;
+  app->player.FXBar.AudioPlugin = audioEngine;
 
   UNX_LOG_INFO("[MAIN] Audio Engine initialized. Total RAM: %.2f MB",
                Log_GetRAMUsage());
@@ -1911,7 +1926,6 @@ void UpdateDrawFrame(App *app) {
   if (IsKeyPressed(app->keyMap.toggleSettings)) {
     if (app->screen == ScreenSettings) {
       app->screen = ScreenPlayer;
-      app->infoState.IsActive = false; // Typo fix
       app->settingsState.IsActive = false;
     } else {
       app->screen = ScreenSettings;
@@ -1946,6 +1960,7 @@ void UpdateDrawFrame(App *app) {
       app->infoState.IsActive = false;
       app->settingsState.IsActive = false;
       app->aboutState.IsActive = false;
+      app->creditsState.IsActive = false;
       app->mixerState.IsActive = false;
     }
   }
@@ -1969,6 +1984,8 @@ void UpdateDrawFrame(App *app) {
     app->pad.base.Update((Component *)&app->pad);
   if (app->screen == ScreenDebug)
     app->debugView.base.Update((Component *)&app->debugView);
+  if (app->screen == ScreenCredits)
+    app->credits.base.Update((Component *)&app->credits);
   if (app->screen == ScreenSplash) {
     app->splash.base.Update((Component *)&app->splash);
     if (app->splashCounter > 0)
@@ -2041,6 +2058,9 @@ void UpdateDrawFrame(App *app) {
     break;
   case ScreenPad:
     app->pad.base.Draw((Component *)&app->pad);
+    break;
+  case ScreenCredits:
+    app->credits.base.Draw((Component *)&app->credits);
     break;
   default:
     ClearBackground(MAGENTA); // Fail-safe color

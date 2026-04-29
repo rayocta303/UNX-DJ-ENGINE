@@ -11,7 +11,8 @@ typedef enum {
     ScreenMixer,
     ScreenSplash,
     ScreenDebug,
-    ScreenPad
+    ScreenPad,
+    ScreenCredits
 } CurrentScreen;
 
 typedef struct TopBar TopBar;

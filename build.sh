@@ -58,7 +58,7 @@ echo "Building C files..."
 C_FILES=(
     src/main.c src/ui/components/theme.c src/ui/components/fonts.c src/ui/components/helpers.c
     src/ui/views/topbar.c src/ui/views/info.c src/ui/views/splash.c src/ui/views/settings.c
-    src/ui/views/about.c src/ui/views/mixer.c src/ui/player/bottomstrip.c src/ui/player/beatfx.c
+    src/ui/views/about.c src/ui/views/credits.c src/ui/views/mixer.c src/ui/player/bottomstrip.c src/ui/player/beatfx.c
     src/ui/player/deckinfo.c src/ui/player/deckstrip.c src/ui/player/waveform.c src/ui/player/player.c
     src/audio/scalers.c src/input/keyboard.c src/ui/browser/browser.c src/core/audio_backend.c
     src/core/logger.c src/core/system_info.c src/core/logic/quantize.c src/core/logic/sync.c src/core/logic/settings_io.c

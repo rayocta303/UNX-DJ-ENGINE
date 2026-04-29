@@ -518,7 +518,9 @@ static void Settings_Draw(Component *base) {
                UIDrawText(item->Unit, faceMd, valueX + valueWidth - S(90), ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
                UIDrawText("\uf35a", faceIcon, valueX + valueWidth - S(25), ry + (rowH / 2.0f) - S(6), S(12), ColorGray);
            }
-      } else if (strcmp(item->Label, "ABOUT") != 0 && strcmp(item->Label, "EXIT APPLICATION") != 0) {
+      } else if (strcmp(item->Label, "ABOUT") != 0 && 
+                 strcmp(item->Label, "CREDITS") != 0 &&
+                 strcmp(item->Label, "EXIT APPLICATION") != 0) {
         UIDrawText("\uf2f5", faceIcon, valueX + valueWidth - S(35), ry + (rowH / 2.0f) - S(6), S(12), ColorOrange);
       }
     }

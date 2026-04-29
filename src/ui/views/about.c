@@ -5,7 +5,6 @@
 #include "version.h"
 #include <stdio.h>
 
-
 static int About_Update(Component *base) {
   AboutRenderer *r = (AboutRenderer *)base;
   if (!r->State->IsActive)
@@ -67,7 +66,7 @@ static void About_Draw(Component *base) {
   // Large Device Icon in Sidebar
   UIDrawText("\xef\x8a\x92", UIFonts_GetIcon(S(48)), cardX + sideW / 2 - S(24),
              cardY + S(40), S(48), ColorShadow);
-  DrawCentredText("XDJ-UNX", faceXS, cardX, sideW, cardY + S(95), S(8),
+  DrawCentredText("UNX DECK", faceXS, cardX, sideW, cardY + S(95), S(8),
                   ColorGray);
   DrawCentredText("SYSTEM", faceXS, cardX, sideW, cardY + S(105), S(8),
                   ColorGray);
@@ -109,15 +108,22 @@ static void About_Draw(Component *base) {
              S(11), ColorWhite);
 
   // --- Row 4: Audio ---
-  UIDrawText("\xef\x80\x81", iconMain, contentX, detailsY + rowH * 3 + S(2), S(12), ColorShadow); // Changed to music icon for better compatibility
-  UIDrawText("AUDIO ENGINE", faceXS, contentX + S(18), detailsY + rowH * 3 - S(4), S(7), ColorShadow);
+  UIDrawText("\xef\x80\x81", iconMain, contentX, detailsY + rowH * 3 + S(2),
+             S(12),
+             ColorShadow); // Changed to music icon for better compatibility
+  UIDrawText("AUDIO INTERFACE", faceXS, contentX + S(18),
+             detailsY + rowH * 3 - S(4), S(7), ColorShadow);
   char audioBuf[128];
-  snprintf(audioBuf, 128, "%s (%s)", r->State->AudioDevice, r->State->AudioDriver);
-  UIDrawText(audioBuf, faceSm, contentX + S(18), detailsY + rowH * 3 + S(6), S(9), ColorGray);
+  snprintf(audioBuf, 128, "%s (%s)", r->State->AudioDevice,
+           r->State->AudioDriver);
+  UIDrawText(audioBuf, faceSm, contentX + S(18), detailsY + rowH * 3 + S(6),
+             S(9), ColorGray);
 
   // Footer Hints (Inside the card now)
-  UIDrawText("Engineered for precision performance.", faceXS, contentX, cardY + cardH - S(15), S(7), ColorDark3);
-  UIDrawText("BACK to exit", faceXS, cardX + cardW - S(60), cardY + cardH - S(15), S(7), ColorShadow);
+  UIDrawText("The Sound of Nusantara, For Everyone.", faceXS, contentX,
+             cardY + cardH - S(15), S(7), ColorShadow);
+  // UIDrawText("BACK to exit", faceXS, cardX + cardW - S(60),
+  //            cardY + cardH - S(15), S(7), ColorShadow);
 }
 
 void AboutRenderer_Init(AboutRenderer *r, AboutState *state) {
