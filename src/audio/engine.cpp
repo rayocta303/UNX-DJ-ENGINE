@@ -692,13 +692,19 @@ void DeckAudio_SetLoop(DeckAudioState *deck, bool active, double startPos,
   deck->LoopEndPos = endPos;
   deck->IsLooping = active;
 
-  if (active && deck->Position >= endPos) {
-    deck->Position = startPos;
-    deck->MT_ReadPos = startPos;
-    if (deck->SoundTouchHandle) {
-      ((soundtouch::SoundTouch *)deck->SoundTouchHandle)->clear();
+  double loopLen = endPos - startPos;
+  if (active && loopLen > 1.0) {
+    if (deck->Position >= endPos || deck->Position < startPos) {
+      double offset = deck->Position - startPos;
+      deck->Position = startPos + fmod(offset, loopLen);
+      if (deck->Position < startPos) deck->Position += loopLen; // handle negative offset if any
+      deck->MT_ReadPos = deck->Position;
+      if (deck->SoundTouchHandle) {
+        ((soundtouch::SoundTouch *)deck->SoundTouchHandle)->clear();
+      }
     }
   }
+
 }
 
 void DeckAudio_ExitLoop(DeckAudioState *deck) { deck->IsLooping = false; }

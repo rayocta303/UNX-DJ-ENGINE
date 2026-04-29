@@ -72,7 +72,8 @@ static int Pad_Update(Component *base) {
                         
                         // Dragging only for Loop modes
                         if (isPressed || mode == PAD_MODE_BEAT_LOOP || mode == PAD_MODE_SLIP_LOOP) {
-                            if (pressedPad != -1 && r->OnPadRelease) {
+                            // Avoid releasing if we are dragging in Slip Loop mode to prevent resets
+                            if (pressedPad != -1 && r->OnPadRelease && mode != PAD_MODE_SLIP_LOOP) {
                                 r->OnPadRelease(r->callbackCtx, pressedDeck, pressedPad);
                             }
                             
