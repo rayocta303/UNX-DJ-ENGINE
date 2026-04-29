@@ -186,8 +186,8 @@ int PWV2_Decode(unsigned char v, Color *outColor) {
 //   Red    = (v >> 13) & 0x07  → bits 15-13
 //   Color intensities are scaled: component = (intensity / 7.0) * 255
 // ─────────────────────────────────────────────────────────────────────────────
-int PWV4_Decode(unsigned char *data, int64_t frame, Color *outColor) {
-  if (frame < 0) {
+int PWV4_Decode(unsigned char *data, int64_t frame, int64_t maxFrames, Color *outColor) {
+  if (frame < 0 || frame >= maxFrames) {
     *outColor = (Color){0, 0, 0, 0};
     return 0;
   }
@@ -353,6 +353,10 @@ static void Waveform_Draw(Component *base) {
       r->State->LoadedTrack->WaveformType; // track data format (1, 2, or 3)
 
   unsigned char *wfData = r->State->LoadedTrack->DynamicWaveform;
+  if (wfData == NULL) {
+      EndScissorMode();
+      return;
+  }
   int64_t wfFrames = r->dynWfmFrames;
 
   float smLo = 0, smMi = 0, smHi = 0;
@@ -382,12 +386,16 @@ static void Waveform_Draw(Component *base) {
         smMi += (rM - smMi) * ((rM > smMi) ? ATK : REL);
         smHi += (rH - smHi) * ((rH > smHi) ? ATK : REL);
       } else {
-        Color col;
-        int h;
-        if (wfType == 2)
-          h = PWV4_Decode(wfData, (int64_t)floor(pA + 0.5), &col);
-        else
-          h = PWV2_Decode(wfData[(int64_t)floor(pA + 0.5)], &col);
+        Color col = {0, 0, 0, 0};
+        int h = 0;
+        int64_t frameIdx = (int64_t)floor(pA + 0.5);
+
+        if (frameIdx >= 0 && frameIdx < wfFrames) {
+          if (wfType == 2)
+            h = PWV4_Decode(wfData, frameIdx, wfFrames, &col);
+          else
+            h = PWV2_Decode(wfData[frameIdx], &col);
+        }
 
         float rL, rM, rH;
         if (userStyle == WAVEFORM_STYLE_3BAND) {
@@ -488,7 +496,7 @@ static void Waveform_Draw(Component *base) {
     } else {
       int h;
       if (wfType == 2)
-        h = PWV4_Decode(wfData, i, &colRaw);
+        h = PWV4_Decode(wfData, i, wfFrames, &colRaw);
       else
         h = PWV2_Decode(wfData[i], &colRaw);
 

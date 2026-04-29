@@ -426,7 +426,7 @@ static void DeckStrip_Draw(Component *base) {
            Get3BandPeak(renderData, totalFrames, p0, p1, &rL, &rM, &rH);
         } else if (renderType == 2) {
            // PWV4: RGB data (2 bytes)
-           int h = PWV4_Decode(renderData, (int64_t)floor(p0 + 0.5), &col);
+           int h = PWV4_Decode(renderData, (int64_t)floor(p0 + 0.5), totalFrames, &col);
            float baseH = (h / 31.0f) * 255.0f;
            // Derive pseudo 3-band for style 3BAND
            if (col.r > col.b && col.r > col.g) { rL = baseH * 0.4f; rM = baseH * 0.9f; rH = baseH * 0.2f; }

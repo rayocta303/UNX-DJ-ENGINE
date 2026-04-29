@@ -318,19 +318,21 @@ static inline float SampleToFloat(void *buffer, int index, int bitDepth) {
   }
 }
 
-static inline void AudioEngine_GetSampleDirect(DeckAudioState *deck, int i,
+static inline void AudioEngine_GetSampleDirect(void *buffer, int i, int bitDepth,
+                                               uint32_t totalSamples,
                                                float *l, float *r) {
-  if (i < 0 || i >= (int)(deck->TotalSamples / 2)) {
+  if (i < 0 || i >= (int)(totalSamples / 2)) {
     *l = 0;
     *r = 0;
     return;
   }
-  *l = SampleToFloat(deck->PCMBuffer, i * 2, deck->BitDepth);
-  *r = SampleToFloat(deck->PCMBuffer, i * 2 + 1, deck->BitDepth);
+  *l = SampleToFloat(buffer, i * 2, bitDepth);
+  *r = SampleToFloat(buffer, i * 2 + 1, bitDepth);
 }
 
-static inline void AudioEngine_GetSample(DeckAudioState *deck, double pos,
-                                         float *l, float *r) {
+static inline void AudioEngine_GetSample(void *buffer, double pos, int bitDepth,
+                                         uint32_t totalSamples, float *l,
+                                         float *r) {
   if (pos < 2.0) {
     *l = 0;
     *r = 0;
@@ -338,21 +340,21 @@ static inline void AudioEngine_GetSample(DeckAudioState *deck, double pos,
   }
   int i = (int)pos;
   float f = (float)(pos - i);
-  if (i >= (int)((deck->TotalSamples / 2) - 3)) {
+  if (i >= (int)((totalSamples / 2) - 3)) {
     *l = 0;
     *r = 0;
     return;
   }
 
-  float y0_l = SampleToFloat(deck->PCMBuffer, (i - 1) * 2, deck->BitDepth);
-  float y1_l = SampleToFloat(deck->PCMBuffer, i * 2, deck->BitDepth);
-  float y2_l = SampleToFloat(deck->PCMBuffer, (i + 1) * 2, deck->BitDepth);
-  float y3_l = SampleToFloat(deck->PCMBuffer, (i + 2) * 2, deck->BitDepth);
+  float y0_l = SampleToFloat(buffer, (i - 1) * 2, bitDepth);
+  float y1_l = SampleToFloat(buffer, i * 2, bitDepth);
+  float y2_l = SampleToFloat(buffer, (i + 1) * 2, bitDepth);
+  float y3_l = SampleToFloat(buffer, (i + 2) * 2, bitDepth);
 
-  float y0_r = SampleToFloat(deck->PCMBuffer, (i - 1) * 2 + 1, deck->BitDepth);
-  float y1_r = SampleToFloat(deck->PCMBuffer, i * 2 + 1, deck->BitDepth);
-  float y2_r = SampleToFloat(deck->PCMBuffer, (i + 1) * 2 + 1, deck->BitDepth);
-  float y3_r = SampleToFloat(deck->PCMBuffer, (i + 2) * 2 + 1, deck->BitDepth);
+  float y0_r = SampleToFloat(buffer, (i - 1) * 2 + 1, bitDepth);
+  float y1_r = SampleToFloat(buffer, i * 2 + 1, bitDepth);
+  float y2_r = SampleToFloat(buffer, (i + 1) * 2 + 1, bitDepth);
+  float y3_r = SampleToFloat(buffer, (i + 2) * 2 + 1, bitDepth);
 
   if (f < 0.0001f) {
     *l = y1_l;
@@ -366,9 +368,10 @@ static inline void AudioEngine_GetSample(DeckAudioState *deck, double pos,
 static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
                              float *outCue, int frames, AudioEngine *engine,
                              int deckIndex, float *outCleanMaster) {
+  void *pcm = deck->PCMBuffer;
   bool noiseActive = (deck->ColorFX.activeFX == COLORFX_NOISE &&
                       deck->ColorFX.colorValue != 0.0f);
-  if ((!deck->PCMBuffer || deck->IsLoading) && !noiseActive)
+  if ((!pcm || deck->IsLoading) && !noiseActive)
     return;
 
   if (deck->HasQueuedJump) {
@@ -461,7 +464,8 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     while (st->numSamples() < (uint32_t)frames && maxIterations-- > 0) {
       float inBuf[512 * 2];
       for (int j = 0; j < 512; j++) {
-        AudioEngine_GetSample(deck, deck->MT_ReadPos, &inBuf[j * 2],
+        AudioEngine_GetSample(pcm, deck->MT_ReadPos, deck->BitDepth,
+                              deck->TotalSamples, &inBuf[j * 2],
                               &inBuf[j * 2 + 1]);
         deck->MT_ReadPos += (targetRate > 0) ? 1.0 : -1.0;
         if (deck->IsLooping) {
@@ -492,7 +496,8 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     double rateDelta = (targetRate - currentRate) / (double)frames;
     for (int i = 0; i < frames; i++) {
       currentRate += rateDelta;
-      AudioEngine_GetSample(deck, deck->Position, &outBuf[i * 2],
+      AudioEngine_GetSample(pcm, deck->Position, deck->BitDepth,
+                            deck->TotalSamples, &outBuf[i * 2],
                             &outBuf[i * 2 + 1]);
       deck->Position += currentRate * (double)sampleRateRatio;
 

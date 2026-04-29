@@ -3,6 +3,10 @@
 
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum {
     UNX_LEVEL_INFO,
     UNX_LEVEL_WARNING,
@@ -30,5 +34,9 @@ float Log_GetRAMUsage(void);
 #define UNX_LOG_WARN(...)  Log_Write(UNX_LEVEL_WARNING, __VA_ARGS__)
 #define UNX_LOG_ERR(...)   Log_Write(UNX_LEVEL_ERROR, __VA_ARGS__)
 #define UNX_LOG_DEBUG(...) Log_Write(UNX_LEVEL_DEBUG, __VA_ARGS__)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // LOGGER_H

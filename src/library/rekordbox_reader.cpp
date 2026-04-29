@@ -14,6 +14,7 @@
 #include <map>
 #include <cstring>
 #include <iostream>
+#include "core/logger.h"
 
 // Helper to safely get string from RB device string
 static std::string RB_GetString(rekordbox_pdb_t::device_sql_string_t* rbs) {
@@ -48,7 +49,7 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
     std::string pdbPath = std::string(rootPath) + "/PIONEER/rekordbox/export.pdb";
     std::ifstream is(pdbPath, std::ios::binary);
     if (!is.is_open()) {
-        std::cerr << "[RB] Failed to open " << pdbPath << std::endl;
+        UNX_LOG_ERR("[RB] Failed to open %s", pdbPath.c_str());
         return nullptr;
     }
 
@@ -82,42 +83,42 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
                                     auto r = static_cast<rekordbox_pdb_t::artist_row_t*>(body);
                                     std::string val = RB_GetString(r->name());
                                     artists[r->id()] = val;
-                                    printf("[RB-PASS1] Artist ID %u = '%s'\n", r->id(), val.c_str());
+                                    UNX_LOG_INFO("[RB-PASS1] Artist ID %u = '%s'", r->id(), val.c_str());
                                     break;
                                 }
                                 case rekordbox_pdb_t::PAGE_TYPE_ALBUMS: {
                                     auto r = static_cast<rekordbox_pdb_t::album_row_t*>(body);
                                     std::string val = RB_GetString(r->name());
                                     albums[r->id()] = val;
-                                    printf("[RB-PASS1] Album ID %u = '%s'\n", r->id(), val.c_str());
+                                    UNX_LOG_INFO("[RB-PASS1] Album ID %u = '%s'", r->id(), val.c_str());
                                     break;
                                 }
                                 case rekordbox_pdb_t::PAGE_TYPE_GENRES: {
                                     auto r = static_cast<rekordbox_pdb_t::genre_row_t*>(body);
                                     std::string val = RB_GetString(r->name());
                                     genres[r->id()] = val;
-                                    printf("[RB-PASS1] Genre ID %u = '%s'\n", r->id(), val.c_str());
+                                    UNX_LOG_INFO("[RB-PASS1] Genre ID %u = '%s'", r->id(), val.c_str());
                                     break;
                                 }
                                 case rekordbox_pdb_t::PAGE_TYPE_KEYS: {
                                     auto r = static_cast<rekordbox_pdb_t::key_row_t*>(body);
                                     std::string val = RB_GetString(r->name());
                                     keys[r->id()] = val;
-                                    printf("[RB-PASS1] Key ID %u = '%s'\n", r->id(), val.c_str());
+                                    UNX_LOG_INFO("[RB-PASS1] Key ID %u = '%s'", r->id(), val.c_str());
                                     break;
                                 }
                                 case rekordbox_pdb_t::PAGE_TYPE_ARTWORK: {
                                     auto r = static_cast<rekordbox_pdb_t::artwork_row_t*>(body);
                                     std::string val = RB_GetString(r->path());
                                     artworks[r->id()] = val;
-                                    printf("[RB-PASS1] Artwork ID %u = '%s'\n", r->id(), val.c_str());
+                                    UNX_LOG_INFO("[RB-PASS1] Artwork ID %u = '%s'", r->id(), val.c_str());
                                     break;
                                 }
                                 case rekordbox_pdb_t::PAGE_TYPE_LABELS: {
                                     auto r = static_cast<rekordbox_pdb_t::label_row_t*>(body);
                                     std::string val = RB_GetString(r->name());
                                     labels[r->id()] = val;
-                                    printf("[RB-PASS1] Label ID %u = '%s'\n", r->id(), val.c_str());
+                                    UNX_LOG_INFO("[RB-PASS1] Label ID %u = '%s'", r->id(), val.c_str());
                                     break;
                                 }
                                 default: break;
@@ -130,7 +131,7 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
             }
         }
         
-        printf("[RB] Metadata Loaded: Artists:%zu, Albums:%zu, Genres:%zu, Keys:%zu, Artworks:%zu, Labels:%zu\n",
+        UNX_LOG_INFO("[RB) Metadata Loaded: Artists:%zu, Albums:%zu, Genres:%zu, Keys:%zu, Artworks:%zu, Labels:%zu",
                artists.size(), albums.size(), genres.size(), keys.size(), artworks.size(), labels.size());
 
         // PASS 2: Tracks and Playlists
@@ -237,7 +238,7 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
         return db;
 
     } catch (const std::exception& e) {
-        std::cerr << "[RB] Error parsing database: " << e.what() << std::endl;
+        UNX_LOG_ERR("[RB] Error parsing database: %s", e.what());
         return nullptr;
     }
 }
