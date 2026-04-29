@@ -9,7 +9,18 @@
 
 
 #if defined(_WIN32)
+    #define WIN32_LEAN_AND_MEAN
+    #define NOGDI
+    #define NOUSER
+    #define Rectangle WinRectangle
+    #define CloseWindow WinCloseWindow
+    #define ShowCursor WinShowCursor
+    #define DrawText WinDrawText
     #include <windows.h>
+    #undef Rectangle
+    #undef CloseWindow
+    #undef ShowCursor
+    #undef DrawText
     #include <psapi.h>
     static CRITICAL_SECTION g_logLock;
     static bool g_lockInitialized = false;
@@ -38,10 +49,10 @@ void Log_Init(void) {
 #endif
 
     const char* logPath = "xdjunx.log";
-    char androidPath[512];
 
 #if defined(__ANDROID__)
     // Use internal app storage on Android
+    static char androidPath[512];
     snprintf(androidPath, sizeof(androidPath), "%s/xdjunx.log", GetApplicationDirectory());
     logPath = androidPath;
 #elif defined(PLATFORM_IOS)
