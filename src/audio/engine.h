@@ -38,6 +38,7 @@ typedef struct DeckAudioState {
   void *PCMBuffer;       // Full track audio decoded (interleaved L/R)
   uint32_t TotalSamples; // Total samples in buffer
   uint32_t SampleRate;   // Original sample rate (e.g. 44100, 48000)
+  uint32_t OutputSampleRate; // Engine output sample rate
   int BitDepth;          // 16 or 24
   char FilePath[512];    // Path to the loaded track for auto-reinit
 

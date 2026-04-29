@@ -72,6 +72,7 @@ void AudioEngine_Init(AudioEngine *engine, uint32_t outputSampleRate) {
     st->setSetting(SETTING_SEEKWINDOW_MS, 15); // Reduced CPU load for mobile
     st->setSetting(SETTING_OVERLAP_MS, 8); // Standard overlap for smoothness
     deck->SoundTouchHandle = (void *)st;
+    deck->OutputSampleRate = engine->OutputSampleRate;
   }
 
   BeatFXManager_Init(&engine->BeatFX);
@@ -88,6 +89,7 @@ void AudioEngine_SetOutputSampleRate(AudioEngine *engine, uint32_t sampleRate) {
       ((SoundTouch *)engine->Decks[i].SoundTouchHandle)
           ->setSampleRate(sampleRate);
     }
+    engine->Decks[i].OutputSampleRate = sampleRate;
   }
 }
 
@@ -458,7 +460,7 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     }
     double effectiveTempo = fabs(targetRate) * (double)sampleRateRatio;
     st->setTempo(effectiveTempo);
-    st->setPitch(1.0);
+    st->setPitch((double)sampleRateRatio);
 
     int maxIterations = 15;
     while (st->numSamples() < (uint32_t)frames && maxIterations-- > 0) {
@@ -481,7 +483,7 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
       st->putSamples(inBuf, 512);
     }
     received = st->receiveSamples(outBuf, frames);
-    deck->Position += (double)received * targetRate;
+    deck->Position += (double)received * targetRate * (double)sampleRateRatio;
 
     if (deck->SlipActive) {
       deck->SlipPosition +=
@@ -757,7 +759,8 @@ void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch) {
 void DeckAudio_QueueJumpMs(DeckAudioState *deck, uint32_t targetMs,
                            uint32_t waitMs) {
   deck->QueuedJumpMs = targetMs;
-  deck->QueuedWaitSamples = (uint32_t)((float)waitMs * ((float)deck->SampleRate / 1000.0f));
+  uint32_t sr = (deck->OutputSampleRate > 0) ? deck->OutputSampleRate : 48000;
+  deck->QueuedWaitSamples = (uint32_t)((float)waitMs * ((float)sr / 1000.0f));
   deck->HasQueuedJump = true;
 }
 void DeckAudio_SetPlaying(DeckAudioState *deck, bool playing) {
