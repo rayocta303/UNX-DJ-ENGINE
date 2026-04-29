@@ -229,3 +229,17 @@ void emscripten_set_main_loop_arg(void (*func)(void *), void *arg,
     [_displayLink addToRunLoop:[NSRunLoop mainRunLoop]
                        forMode:NSDefaultRunLoopMode];
 }
+
+/* Battery helpers for system_info */
+float ios_get_battery_level(void) {
+    UIDevice *device = [UIDevice currentDevice];
+    [device setBatteryMonitoringEnabled:YES];
+    return [device batteryLevel];
+}
+
+bool ios_is_battery_charging(void) {
+    UIDevice *device = [UIDevice currentDevice];
+    [device setBatteryMonitoringEnabled:YES];
+    UIDeviceBatteryState state = [device batteryState];
+    return (state == UIDeviceBatteryStateCharging || state == UIDeviceBatteryStateFull);
+}

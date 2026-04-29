@@ -90,4 +90,22 @@ public class MainActivity extends NativeActivity {
             }
         }
     }
+
+    // Battery helpers for JNI
+    public float getBatteryLevel() {
+        Intent batteryIntent = registerReceiver(null, new android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        if (batteryIntent == null) return -1.0f;
+        int level = batteryIntent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1);
+        int scale = batteryIntent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1);
+        if (level == -1 || scale == -1) return -1.0f;
+        return ((float) level / (float) scale);
+    }
+
+    public boolean isBatteryCharging() {
+        Intent batteryIntent = registerReceiver(null, new android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        if (batteryIntent == null) return false;
+        int status = batteryIntent.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1);
+        return status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
+               status == android.os.BatteryManager.BATTERY_STATUS_FULL;
+    }
 }

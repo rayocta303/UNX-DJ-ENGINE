@@ -1,6 +1,21 @@
 #include "core/system_info.h"
 #include <stdbool.h>
 #include <string.h>
+#include <stdio.h>
+
+#ifdef __ANDROID__
+#include <jni.h>
+// Note: android_app must be accessible or GetAndroidApp() must be available
+// For this implementation, we assume we can link against Raylib's internal state or use a setter
+#endif
+
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#if TARGET_OS_IPHONE
+extern float ios_get_battery_level(void);
+extern bool ios_is_battery_charging(void);
+#endif
+#endif
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -74,6 +89,17 @@ SystemStats GetSystemStats() {
     if (GlobalMemoryStatusEx(&memInfo)) {
         stats.ramTotalMB = (float)memInfo.ullTotalPhys / (1024.0f * 1024.0f);
     }
+    
+    // Battery Info
+    SYSTEM_POWER_STATUS sps;
+    if (GetSystemPowerStatus(&sps)) {
+        if (sps.BatteryLifePercent != 255) {
+            stats.batteryLevel = (float)sps.BatteryLifePercent / 100.0f;
+        } else {
+            stats.batteryLevel = -1.0f; // No battery
+        }
+        stats.isCharging = (sps.ACLineStatus == 1);
+    }
 
     return stats;
 }
@@ -114,11 +140,71 @@ SystemStats GetSystemStats() {
         fclose(file);
     }
 
+    // Battery Info
+    FILE* bfile = fopen("/sys/class/power_supply/BAT0/capacity", "r");
+    if (!bfile) bfile = fopen("/sys/class/power_supply/battery/capacity", "r");
+    if (bfile) {
+        int cap;
+        if (fscanf(bfile, "%d", &cap) > 0) {
+            stats.batteryLevel = (float)cap / 100.0f;
+        }
+        fclose(bfile);
+        
+        bfile = fopen("/sys/class/power_supply/BAT0/status", "r");
+        if (!bfile) bfile = fopen("/sys/class/power_supply/battery/status", "r");
+        if (bfile) {
+            char status[32];
+            if (fscanf(bfile, "%31s", status) > 0) {
+                stats.isCharging = (strcmp(status, "Charging") == 0 || strcmp(status, "Full") == 0);
+            }
+            fclose(bfile);
+        }
+    } else {
+        stats.batteryLevel = -1.0f;
+    }
+
+    return stats;
+}
+#elif defined(__ANDROID__)
+#include <android/native_app_glue.h>
+
+// Forward declaration if not using a global header
+extern struct android_app *GetAndroidApp(void);
+
+SystemStats GetSystemStats() {
+    SystemStats stats = {0.05f, 150.0f, 8192.0f, -1.0f, false};
+    struct android_app *app = GetAndroidApp();
+
+    if (app && app->activity) {
+        JavaVM *vm = app->activity->vm;
+        JNIEnv *env = NULL;
+        (*vm)->AttachCurrentThread(vm, &env, NULL);
+
+        jobject activity = app->activity->clazz;
+        jclass cls = (*env)->GetObjectClass(env, activity);
+
+        jmethodID midLvl = (*env)->GetMethodID(env, cls, "getBatteryLevel", "()F");
+        if (midLvl)
+            stats.batteryLevel = (*env)->CallFloatMethod(env, activity, midLvl);
+
+        jmethodID midChg = (*env)->GetMethodID(env, cls, "isBatteryCharging", "()Z");
+        if (midChg)
+            stats.isCharging = (*env)->CallBooleanMethod(env, activity, midChg);
+
+        (*vm)->DetachCurrentThread(vm);
+    }
+    return stats;
+}
+#elif defined(__APPLE__) && TARGET_OS_IPHONE
+SystemStats GetSystemStats() {
+    SystemStats stats = {0.05f, 150.0f, 8192.0f, -1.0f, false};
+    stats.batteryLevel = ios_get_battery_level();
+    stats.isCharging = ios_is_battery_charging();
     return stats;
 }
 #else
 SystemStats GetSystemStats() {
-    SystemStats stats = {0.05f, 150.0f, 8192.0f};
+    SystemStats stats = {0.05f, 150.0f, 8192.0f, -1.0f, false};
     return stats;
 }
 #endif

@@ -140,6 +140,11 @@ static void TopBar_Draw(Component *base) {
                       batH - (gap * 2), fillColor);
       }
     }
+
+    // Charging indicator (Bolt icon or "+" sign)
+    if (t->IsCharging) {
+        UIDrawText("+", faceXS, batX + batW + S(4), batY, S(8), ColorYellow);
+    }
   }
 
   UIDrawText("LINK   MIDI", faceSm, pctX - S(68), S(5), S(9), ColorWhite);

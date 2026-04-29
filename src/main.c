@@ -2026,6 +2026,8 @@ void UpdateDrawFrame(App *app) {
       SystemStats stats = GetSystemStats();
       app->topbar.CPUUsage = stats.cpuUsage;
       app->topbar.RAMUsage = stats.ramUsageMB;
+      app->topbar.BatteryLevel = stats.batteryLevel;
+      app->topbar.IsCharging = stats.isCharging;
       statsTimer = 0;
     }
 
