@@ -52,15 +52,15 @@ void Log_Init(void) {
 
 #if defined(__ANDROID__)
     // Use external storage for user accessibility if possible, fallback to internal
-    logPath = "/sdcard/unx.log";
-    FILE* testFile = fopen(logPath, "a");
+    static char androidPath[512];
+    strncpy(androidPath, "/sdcard/unx.log", sizeof(androidPath)-1);
+    FILE *testFile = fopen(androidPath, "a");
     if (testFile) {
         fclose(testFile);
     } else {
-        static char androidPath[512];
         snprintf(androidPath, sizeof(androidPath), "%s/unx.log", GetApplicationDirectory());
-        logPath = androidPath;
     }
+    logPath = androidPath;
     __android_log_print(ANDROID_LOG_INFO, "XDJ-UNX", "Log file path: %s", logPath);
 #elif defined(PLATFORM_IOS)
     // On iOS, we write to the Documents folder so we can retrieve it via iTunes/Files app
