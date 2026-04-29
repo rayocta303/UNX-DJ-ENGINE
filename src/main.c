@@ -198,10 +198,9 @@ void OnSettingsApply(void *ctx) {
   a->deckA.Waveform.Style = (WaveformStyle)styleIdx;
   a->deckB.Waveform.Style = (WaveformStyle)styleIdx;
 
-  a->deckA.Waveform.GainLow = 0.5f + (a->settingsState.Items[3].Current * 0.1f);
-  a->deckA.Waveform.GainMid = 0.5f + (a->settingsState.Items[4].Current * 0.1f);
-  a->deckA.Waveform.GainHigh =
-      0.5f + (a->settingsState.Items[5].Current * 0.1f);
+  a->deckA.Waveform.GainLow = 0.1f + (a->settingsState.Items[3].Current * 0.1f);
+  a->deckA.Waveform.GainMid = 0.1f + (a->settingsState.Items[4].Current * 0.1f);
+  a->deckA.Waveform.GainHigh = 0.1f + (a->settingsState.Items[5].Current * 0.1f);
 
   a->deckB.Waveform = a->deckA.Waveform;
 

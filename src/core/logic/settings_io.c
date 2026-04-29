@@ -51,9 +51,6 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
             start += 9;
             char *end = strchr(start, '\"');
             if (end) {
-                int len = end - start;
-                // We'd need to pass controllerPath to LoadFromJSON, 
-                // but let's just do it directly in Settings_Load for now or change signature.
             }
         }
     }
@@ -73,11 +70,20 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     audio->SampleRate = 48000; audio->BufferSizeFrames = 256; audio->PCMBitDepth = 16;
 
     char path[512];
-    const char *basePath = "";
 
 #if defined(__ANDROID__)
-    basePath = GetApplicationDirectory();
-    snprintf(path, sizeof(path), "%s/settings.json", basePath);
+    // Try SD Card first for easier user access, fallback to internal
+    strncpy(path, "/sdcard/unx_settings.json", sizeof(path)-1);
+    FILE *test = fopen(path, "r");
+    if (test) fclose(test);
+    else {
+        FILE *testW = fopen(path, "w");
+        if (testW) fclose(testW);
+        else {
+            // Fallback to internal
+            snprintf(path, sizeof(path), "%s/settings.json", GetApplicationDirectory());
+        }
+    }
 #elif defined(PLATFORM_IOS)
     extern const char* ios_get_documents_path(const char* filename);
     strncpy(path, ios_get_documents_path("settings.json"), sizeof(path)-1);
@@ -127,11 +133,20 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
 
 void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendConfig audio, const char *controllerPath) {
     char path[512];
-    const char *basePath = "";
 
 #if defined(__ANDROID__)
-    basePath = GetApplicationDirectory();
-    snprintf(path, sizeof(path), "%s/settings.json", basePath);
+    // Try SD Card first for easier user access, fallback to internal
+    strncpy(path, "/sdcard/unx_settings.json", sizeof(path)-1);
+    FILE *test = fopen(path, "r");
+    if (test) fclose(test);
+    else {
+        FILE *testW = fopen(path, "w");
+        if (testW) fclose(testW);
+        else {
+            // Fallback to internal
+            snprintf(path, sizeof(path), "%s/settings.json", GetApplicationDirectory());
+        }
+    }
 #elif defined(PLATFORM_IOS)
     extern const char* ios_get_documents_path(const char* filename);
     strncpy(path, ios_get_documents_path("settings.json"), sizeof(path)-1);

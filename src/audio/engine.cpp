@@ -776,6 +776,12 @@ void DeckAudio_InstantPlay(DeckAudioState *deck) {
   deck->IsMotorOn = true;
   deck->BaseRate = (float)deck->Pitch / 10000.0f;
   deck->OutlinedRate = deck->BaseRate;
+  deck->LastRate = deck->BaseRate;
+}
+void DeckAudio_InstantStop(DeckAudioState *deck) {
+  deck->IsMotorOn = false;
+  deck->OutlinedRate = 0;
+  deck->LastRate = 0;
 }
 void DeckAudio_SetJogRate(DeckAudioState *deck, double rate) {
   if (deck->IsTouching)

@@ -71,33 +71,25 @@ static int DeckInfo_Update(Component *base) {
     if (CheckCollisionPointRec(UIGetMousePosition(), cueRect)) {
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
             if (d->State->IsPlaying) {
-                DeckAudio_SetPlaying(&d->Engine->Decks[d->ID], false);
+                // While playing: Instant stop and jump back to cue
+                DeckAudio_InstantStop(&d->Engine->Decks[d->ID]);
                 DeckAudio_JumpToMs(&d->Engine->Decks[d->ID], d->State->MainCueMs);
                 d->State->IsPlaying = false;
-                // Force UI position to match cue point immediately to prevent drift if pressed again quickly
                 d->State->PositionMs = d->State->MainCueMs;
             } else {
-                // If paused, set new cue point (quantized if enabled) and play while held
+                // While paused: Set new cue point (quantized if enabled)
                 if (d->State->QuantizeEnabled && d->State->LoadedTrack) {
                     d->State->MainCueMs = Quantize_GetNearestBeatMs(d->State->LoadedTrack, d->State->PositionMs);
-                    d->State->PositionMs = d->State->MainCueMs; // Snap UI position too
                 } else {
                     d->State->MainCueMs = d->State->PositionMs;
                 }
                 
-                if (d->State->QuantizeEnabled && d->State->LoadedTrack) {
-                    int32_t waitMs = Quantize_GetWaitMs(d->State->LoadedTrack, d->State->PositionMs);
-                    if (waitMs > 5) {
-                        DeckAudio_QueueJumpMs(&d->Engine->Decks[d->ID], d->State->MainCueMs, (uint32_t)waitMs);
-                    } else {
-                        DeckAudio_JumpToMs(&d->Engine->Decks[d->ID], d->State->MainCueMs);
-                        DeckAudio_InstantPlay(&d->Engine->Decks[d->ID]);
-                    }
-                } else {
-                    DeckAudio_JumpToMs(&d->Engine->Decks[d->ID], d->State->MainCueMs);
-                    DeckAudio_InstantPlay(&d->Engine->Decks[d->ID]);
-                }
-                
+                // Immediately jump to and sync the newly set cue point
+                DeckAudio_JumpToMs(&d->Engine->Decks[d->ID], d->State->MainCueMs);
+                d->State->PositionMs = d->State->MainCueMs;
+
+                // Hold behavior: Start playing from cue point instantly
+                DeckAudio_InstantPlay(&d->Engine->Decks[d->ID]);
                 d->State->IsPlaying = true;
                 d->State->IsCueHeld = true;
             }
@@ -105,7 +97,8 @@ static int DeckInfo_Update(Component *base) {
     }
     
     if (d->State->IsCueHeld && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
-        DeckAudio_SetPlaying(&d->Engine->Decks[d->ID], false);
+        // When releasing a held CUE: Instant stop and return to cue point
+        DeckAudio_InstantStop(&d->Engine->Decks[d->ID]);
         DeckAudio_JumpToMs(&d->Engine->Decks[d->ID], d->State->MainCueMs);
         d->State->IsPlaying = false;
         d->State->IsCueHeld = false;
@@ -114,9 +107,16 @@ static int DeckInfo_Update(Component *base) {
 
     Rectangle playRect = { margin + btnW + S(6), btnY, btnW, btnH };
     if (CheckCollisionPointRec(UIGetMousePosition(), playRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        bool starting = !d->Engine->Decks[d->ID].IsMotorOn;
-        DeckAudio_SetPlaying(&d->Engine->Decks[d->ID], starting);
-        d->State->IsPlaying = starting;
+        if (d->State->IsCueHeld) {
+            // CUE + PLAY interlock: keep playing after CUE is released
+            d->State->IsCueHeld = false;
+            d->State->IsPlaying = true;
+            // Physical motor is already on from CUE hold
+        } else {
+            bool targetPlaying = !d->State->IsPlaying;
+            DeckAudio_SetPlaying(&d->Engine->Decks[d->ID], targetPlaying);
+            d->State->IsPlaying = targetPlaying;
+        }
     }
 
     return 0;

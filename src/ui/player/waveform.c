@@ -591,6 +591,21 @@ static void Waveform_Draw(Component *base) {
     }
   }
 
+  // Main Cue Marker
+  if (r->State->LoadedTrack != NULL) {
+      double cuePosHF = (double)r->State->MainCueMs * 0.15;
+      float px = (float)((cuePosHF - elapsedHalfFrames) / (double)effectiveZoom);
+      float bx = playheadX + px;
+      
+      if (bx >= wfLeft && bx <= wfRight) {
+          // Orange triangle at the bottom pointing up
+          DrawTriangle((Vector2){bx - S(6), wfY + waveH}, (Vector2){bx + S(6), wfY + waveH},
+                       (Vector2){bx, wfY + waveH - S(8)}, ColorOrange);
+          // Vertical white line
+          DrawLineEx((Vector2){bx, wfY}, (Vector2){bx, wfY + waveH}, 1.5f, ColorWhite);
+      }
+  }
+
   // Hot Cues — scrolling colored triangles with letter labels
   if (r->State->LoadedTrack != NULL) {
     for (int i = 0; i < r->State->LoadedTrack->HotCuesCount; i++) {
