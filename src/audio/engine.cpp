@@ -445,6 +445,10 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     }
     received = st->receiveSamples(outBuf, frames);
     deck->Position += (double)received * targetRate;
+    
+    if (deck->SlipActive) {
+      deck->SlipPosition += (double)received * deck->BaseRate * (double)sampleRateRatio;
+    }
   } else if (deck->IsPlaying || noiseActive) {
     if (wasMTActive[deckIndex]) { st->clear(); wasMTActive[deckIndex] = false; }
     double currentRate = deck->LastRate;
@@ -453,6 +457,19 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
       currentRate += rateDelta;
       AudioEngine_GetSample(deck, deck->Position, &outBuf[i * 2], &outBuf[i * 2 + 1]);
       deck->Position += currentRate * (double)sampleRateRatio;
+
+      if (deck->SlipActive) {
+        deck->SlipPosition += deck->BaseRate * (double)sampleRateRatio;
+      }
+
+      // Enforce -4 bar limit (16 beats)
+      if (deck->BPM > 10.0) {
+        double limitSamples = -(16.0 * (60.0 / deck->BPM) * (double)deck->SampleRate);
+        if (deck->Position < limitSamples) deck->Position = limitSamples;
+      } else if (deck->Position < 0) {
+        deck->Position = 0;
+      }
+
       if (deck->IsLooping) {
         double loopLen = deck->LoopEndPos - deck->LoopStartPos;
         if (loopLen > 1.0) {
@@ -638,6 +655,14 @@ void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching) {
 }
 void DeckAudio_JumpToMs(DeckAudioState *deck, int64_t ms) {
   deck->IsLooping = false;
+  
+  // Enforce -4 bar limit
+  int64_t limitMs = 0;
+  if (deck->BPM > 10.0) {
+      limitMs = (int64_t)-(16.0 * (60000.0 / deck->BPM));
+  }
+  if (ms < limitMs) ms = limitMs;
+
   deck->Position = (double)ms * ((double)deck->SampleRate / 1000.0);
   deck->MT_ReadPos = deck->Position;
   if (deck->Position * 2 >= (double)deck->TotalSamples) {

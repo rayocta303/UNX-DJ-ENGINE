@@ -193,6 +193,9 @@ static void Pad_Draw(Component *base) {
             if (mode == PAD_MODE_BEAT_LOOP || mode == PAD_MODE_SLIP_LOOP) {
                 static const char* loops[] = {"1/4", "1/2", "1", "2", "4", "8", "16", "32"};
                 strcpy(lbl, loops[i]);
+            } else if (mode == PAD_MODE_BEAT_JUMP) {
+                static const char* jumps[] = {"<< 4", "<< 8", "<< 16", "<< 32", "4 >>", "8 >>", "16 >>", "32 >>"};
+                strcpy(lbl, jumps[i]);
             } else {
                 lbl[0] = (char)('A' + i); lbl[1] = 0;
             }

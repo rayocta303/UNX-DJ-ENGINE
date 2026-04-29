@@ -573,6 +573,20 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
             DeckAudio_ClearMT(audio);
         }
     }
+  } else if (mode == PAD_MODE_BEAT_JUMP) {
+    // Left 4 pads: Jump Back, Right 4 pads: Jump Forward (4, 8, 16, 32)
+    static float jumpBeats[] = {-4.0f, -8.0f, -16.0f, -32.0f, 4.0f, 8.0f, 16.0f, 32.0f};
+    float beats = jumpBeats[padIdx];
+    float beatDurationMs = 60000.0f / (ds->CurrentBPM > 0 ? ds->CurrentBPM : 120.0f);
+
+    double trackSR = (double)audio->SampleRate;
+    if (trackSR < 100) trackSR = 44100.0;
+
+    // Perform jump IMMEDIATELY on engine for maximum responsiveness
+    double currentMs = (audio->Position / trackSR) * 1000.0;
+    DeckAudio_JumpToMs(audio, (int64_t)(currentMs + (beats * beatDurationMs)));
+    
+    a->padState.ActiveLoopIdx[deckIdx] = -1;
   }
 }
 
@@ -1632,6 +1646,7 @@ void UpdateDrawFrame(App *app) {
   }
   audioEngine->Decks[0].VinylModeEnabled = app->deckA.VinylModeEnabled;
   audioEngine->Decks[0].MasterTempoActive = app->deckA.MasterTempo;
+  audioEngine->Decks[0].BPM = app->deckA.CurrentBPM;
 
   // Deck B
   if (app->deckB.IsTouching != audioEngine->Decks[1].IsTouching) {
@@ -1665,6 +1680,7 @@ void UpdateDrawFrame(App *app) {
   }
   audioEngine->Decks[1].VinylModeEnabled = app->deckB.VinylModeEnabled;
   audioEngine->Decks[1].MasterTempoActive = app->deckB.MasterTempo;
+  audioEngine->Decks[1].BPM = app->deckB.CurrentBPM;
 
   // Apply Vinyl Start/Stop Physics
   for (int i = 0; i < 2; i++) {

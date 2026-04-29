@@ -106,6 +106,8 @@ typedef struct DeckAudioState {
   // VU Meter (Real-time tracking of DSP output peak for UI)
   float VuMeterL;
   float VuMeterR;
+
+  double BPM; // Current BPM for beat-based limits
 } DeckAudioState;
 
 typedef struct AudioEngine {
