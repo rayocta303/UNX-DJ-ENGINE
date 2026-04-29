@@ -80,6 +80,7 @@ UNX DJ Engine is a specialized, high-performance DJ media player firmware subset
 | Xiaomi Redmi Note 3 Kenzo (Snapdragon) | ✅ Working | |
 | Xiaomi Redmi Note 13 | ✅ Working | |
 | Xiaomi Redmi Note 3 Hennessy (Mediatek) | ❌ Not Working | Stuck / Blank Screen |
+| iPhone 8 Plus | ❌ Not Working | Stuck / Blank Screen & Force Close |
 
 > [!IMPORTANT]
 > If you encounter bugs or issues on a specific device, please let us know the device model and the nature of the bug by opening an issue. Your feedback helps us improve compatibility across more hardware.
