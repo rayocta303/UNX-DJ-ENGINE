@@ -492,8 +492,8 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
       ds->SeekMs = hc.Start;
       ds->HasSeekRequest = true;
       
-      // Start playback immediately
-      DeckAudio_Play(audio);
+      // Start playback immediately without motor ramp
+      DeckAudio_InstantPlay(audio);
       (void)ds; // Mark as used
     }
   } else if (mode == PAD_MODE_BEAT_LOOP || mode == PAD_MODE_SLIP_LOOP) {
