@@ -160,6 +160,7 @@ void Browser_RefreshStorages(BrowserState *s) {
   // On Android, check the root of internal storage for usb_test folder
   if (stat("/storage/emulated/0/usb_test", &st) == 0) {
     testPath = "/storage/emulated/0/usb_test";
+    printf("[BROWSER] Found Android usb_test at %s\n", testPath);
   }
 #endif
 
@@ -235,13 +236,27 @@ void Browser_RefreshStorages(BrowserState *s) {
     }
   }
 #else
+#ifdef __ANDROID__
   // 2. Scan Android / Linux /storage directory for OTG / SD Cards
+  if (s->StorageCount < 16) {
+    if (stat("/storage/emulated/0", &st) == 0) {
+      strcpy(s->AvailableStorages[s->StorageCount].Name, "Internal Storage");
+      strcpy(s->AvailableStorages[s->StorageCount].Path, "/storage/emulated/0");
+      strcpy(s->AvailableStorages[s->StorageCount].Type, "Internal");
+      s->StorageCount++;
+      printf("[BROWSER] Added Internal Storage: /storage/emulated/0\n");
+    } else {
+      printf("[BROWSER] Internal Storage /storage/emulated/0 NOT FOUND\n");
+    }
+  }
+#else
   if (s->StorageCount < 8) {
     strcpy(s->AvailableStorages[s->StorageCount].Name, "Internal Storage");
     strcpy(s->AvailableStorages[s->StorageCount].Path, "/storage/emulated/0");
     strcpy(s->AvailableStorages[s->StorageCount].Type, "Internal");
     s->StorageCount++;
   }
+#endif
 
 #ifdef PLATFORM_IOS
   extern const char *ios_get_documents_path(const char *filename);
@@ -277,28 +292,19 @@ void Browser_RefreshStorages(BrowserState *s) {
           continue;
 
         // Skip system folders and internal mount points
-        if (strcmp(dir->d_name, "self") == 0 ||
-            strcmp(dir->d_name, "emulated") == 0 ||
-            strcmp(dir->d_name, "knox-emulated") == 0 ||
-            strcmp(dir->d_name, "container") == 0 ||
-            strcmp(dir->d_name, "secure") == 0 ||
-            strcmp(dir->d_name, "asec") == 0 ||
-            strcmp(dir->d_name, "obb") == 0 ||
-            strcmp(dir->d_name, "runtime") == 0 ||
-            strcmp(dir->d_name, "appfuse") == 0 ||
-            strcmp(dir->d_name, "shared") == 0 ||
-            strcmp(dir->d_name, "user") == 0 ||
-            strcmp(dir->d_name, "media_rw") == 0 ||
-            strcmp(dir->d_name, "temp") == 0 ||
-            strcmp(dir->d_name, "expand") == 0 ||
-            strcmp(dir->d_name, "legacy") == 0 ||
-            strcmp(dir->d_name, "usb") == 0 ||
-            strcmp(dir->d_name, "sdcard") ==
-                0) // Already covered by "Internal Storage"
-          continue;
+        bool skip = false;
+        const char* toSkip[] = {"self", "emulated", "knox-emulated", "container", "secure", "asec", "obb", "runtime", "appfuse", "shared", "user", "media_rw", "temp", "expand", "legacy"};
+        for(int k=0; k<15; k++) {
+            if(strcmp(dir->d_name, toSkip[k]) == 0) { skip = true; break; }
+        }
+        if (skip) continue;
+
 
         char fullPath[512];
-        snprintf(fullPath, sizeof(fullPath), "%s/%s", scanDirs[i], dir->d_name);
+        snprintf(fullPath, sizeof(fullPath), "%s/%s", dirToScan, dir->d_name);
+
+        printf("[BROWSER] Scanning potential storage: %s\n", fullPath);
+
 
         struct stat st_dir;
         if (stat(fullPath, &st_dir) == 0 && S_ISDIR(st_dir.st_mode) &&
@@ -688,33 +694,30 @@ static int Browser_Update(Component *base) {
         s->SeratoDB = Serato_LoadDatabase(s->SelectedStorage->Path);
         s->HasBothDatabases = (s->DB != NULL && s->SeratoDB != NULL);
 
-        if (s->DB || s->SeratoDB) {
-          if (s->DB) {
-            s->DatabaseType = 0; // Default to Rekordbox if present
-            if (s->TrackPointers)
-              free(s->TrackPointers);
-            s->TrackPointers =
-                (RBTrack **)malloc(s->DB->TrackCount * sizeof(RBTrack *));
-          } else {
-            s->DatabaseType = 1; // Fallback to Serato
-          }
-
-          if (s->SeratoDB) {
-            if (s->SeratoTrackPointers)
-              free(s->SeratoTrackPointers);
-            s->SeratoTrackPointers = (SeratoTrack **)malloc(
-                s->SeratoDB->TrackCount * sizeof(SeratoTrack *));
-            // If ONLY Serato was found, ensure DatabaseType is Serato
-            if (!s->DB)
-              s->DatabaseType = 1;
-          }
-
-          s->BrowseLevel = 2; // Categories level
-          s->CursorPos = s->ScrollOffset = 0;
+        if (s->DB) {
+          s->DatabaseType = 0; // Default to Rekordbox if present
+          if (s->TrackPointers)
+            free(s->TrackPointers);
+          s->TrackPointers =
+              (RBTrack **)malloc(s->DB->TrackCount * sizeof(RBTrack *));
+        } else if (s->SeratoDB) {
+          s->DatabaseType = 1; // Fallback to Serato
         } else {
-          printf("[BROWSER] Failed to load any database from %s\n",
-                 s->SelectedStorage->Path);
+          s->DatabaseType = 0; // Default
         }
+
+        if (s->SeratoDB) {
+          if (s->SeratoTrackPointers)
+            free(s->SeratoTrackPointers);
+          s->SeratoTrackPointers = (SeratoTrack **)malloc(
+              s->SeratoDB->TrackCount * sizeof(SeratoTrack *));
+        }
+
+        s->BrowseLevel = 2; // Categories level
+        s->CursorPos = s->ScrollOffset = 0;
+        printf("[BROWSER] Selected storage: %s (DB Found: %s)\n", 
+               s->SelectedStorage->Path, (s->DB || s->SeratoDB) ? "YES" : "NO");
+
       }
     } else if (s->BrowseLevel == 2) {
       if (s->CursorPos == 5 && s->HasBothDatabases) {
@@ -727,9 +730,10 @@ static int Browser_Update(Component *base) {
         Browser_UpdateActiveTracks(s);
       } else if (s->CursorPos == 2) {
         s->BrowseLevel = 1; // Categories to Playlists
-      } else if (s->CursorPos == 3 || s->CursorPos == 0) {
-        s->BrowseLevel = 0; // Categories to Tracks
+      } else if (s->CursorPos == 0 || s->CursorPos == 1 || s->CursorPos == 3 || s->CursorPos == 4) {
+        s->BrowseLevel = 0; // Categories to Tracks/Folders/Search
         s->CurrentPlaylistIdx = -1;
+
         Browser_UpdateActiveTracks(s);
       }
       s->CursorPos = s->ScrollOffset = 0;

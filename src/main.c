@@ -647,12 +647,7 @@ void App_Init(App *a) {
   for (int i = 0; i < 3; i++)
     a->browserState.PlaylistBank[i].PlaylistIdx = -1;
 
-#if defined(__ANDROID__)
-  UNX_LOG_INFO(
-      "[APP] Skipping Browser_RefreshStorages on Android to prevent hang...");
-#else
   Browser_RefreshStorages(&a->browserState);
-#endif
   UNX_LOG_INFO("[APP] App_Init completed.");
 
   // Init Settings State
