@@ -356,7 +356,7 @@ void OnSettingsAction(void *ctx, int idx) {
     PopulateMidiSettings(a);
   } else if (idx == 19) { // SAVE CURRENT AS
     // For simplicity, we use the current map name or a default
-    MidiMapping *map = MIDI_GetGlobalMapping();
+    MIDI_GetGlobalMapping(); // Refresh without assigning if unused
     char nameBuf[128];
     static int saveCounter = 0;
     snprintf(nameBuf, 128, "Custom_%d", ++saveCounter);
@@ -491,6 +491,10 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
       HotCue hc = ds->LoadedTrack->HotCues[padIdx];
       ds->SeekMs = hc.Start;
       ds->HasSeekRequest = true;
+      
+      // Start playback immediately
+      DeckAudio_Play(audio);
+      (void)ds; // Mark as used
     }
   } else if (mode == PAD_MODE_BEAT_LOOP || mode == PAD_MODE_SLIP_LOOP) {
     if (mode == PAD_MODE_BEAT_LOOP && a->padState.ActiveLoopIdx[deckIdx] == padIdx) {
@@ -591,6 +595,8 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
 }
 
 void OnPadRelease(void *ctx, int deckIdx, int padIdx) {
+  (void)padIdx;
+
   App *a = (App *)ctx;
   DeckAudioState *audio = &globalAudioEngine->Decks[deckIdx];
   PadMode mode = a->padState.Mode[deckIdx];
@@ -615,6 +621,9 @@ void TopBar_OnSettings(void *ctx) {
 
 void App_Init(App *a) {
   UNX_LOG_INFO("[APP] App_Init starting...");
+#if defined(__ANDROID__) || defined(PLATFORM_IOS)
+  SetGesturesEnabled(GESTURE_PINCH_IN | GESTURE_PINCH_OUT);
+#endif
   a->screen = ScreenSplash;
   a->splashCounter = 120; // 2 seconds at 60 FPS
 
@@ -891,11 +900,11 @@ int main(void) {
 
   // Standard 1080p 16:9 Resolution (iPhone 8 Plus Native)
 #if defined(_WIN32)
-  int startWidth = 1280;
-  int startHeight = 720;
+  // int startWidth = 1280;
+  // int startHeight = 720;
 #else
-  int startWidth = 1920;
-  int startHeight = 1080;
+  // int startWidth = 1920;
+  // int startHeight = 1080;
 #endif
 
 #if !defined(PLATFORM_IOS)

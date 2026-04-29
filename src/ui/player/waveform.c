@@ -65,9 +65,14 @@ static int Waveform_Update(Component *base) {
                      mouse.y >= wfY && mouse.y <= wfY + waveH);
 
   // Zoom & Jog Interaction Logic
+  int gesture = GetGestureDetected();
   if (inWaveform) {
     float wheel = GetMouseWheelMove();
-    if (wheel != 0.0f) {
+    
+    // Support for Pinch Gesture (Touch)
+    bool isPinch = (gesture == GESTURE_PINCH_IN || gesture == GESTURE_PINCH_OUT);
+    
+    if (wheel != 0.0f || isPinch) {
       int currentIndex = 0;
       float minDiff = 99999.0f;
       for (int i = 0; i < NUM_ZOOM_LEVELS; i++) {
@@ -78,12 +83,21 @@ static int Waveform_Update(Component *base) {
         }
       }
 
-      float deadZone = 0.05f;
-      // Use a small deadzone to ignore microscopic trackpad jitters
-      if (wheel > deadZone) {
-        currentIndex--; // Positive wheel decreases zoom
-      } else if (wheel < -deadZone) {
-        currentIndex++; // Negative wheel increases zoom
+      if (isPinch) {
+          static float pinchTimer = 0;
+          pinchTimer += GetFrameTime();
+          if (pinchTimer > 0.1f) { // Rate limit pinch zoom
+              if (gesture == GESTURE_PINCH_OUT) currentIndex++;
+              else currentIndex--;
+              pinchTimer = 0;
+          }
+      } else {
+          float deadZone = 0.05f;
+          if (wheel > deadZone) {
+            currentIndex--; // Positive wheel decreases zoom (Zoom Out)
+          } else if (wheel < -deadZone) {
+            currentIndex++; // Negative wheel increases zoom (Zoom In)
+          }
       }
 
       // Clamp the index
@@ -91,8 +105,11 @@ static int Waveform_Update(Component *base) {
       if (currentIndex >= NUM_ZOOM_LEVELS) currentIndex = NUM_ZOOM_LEVELS - 1;
 
       r->State->ZoomScale = ZOOM_LEVELS[currentIndex];
+      
+      if (isPinch) r->State->IsTouching = false; // Avoid scratching while pinching
     }
   }
+
 
   if (inWaveform && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
     r->State->IsTouching = true;
