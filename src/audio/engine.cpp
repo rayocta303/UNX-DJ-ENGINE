@@ -281,6 +281,25 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
     }
   }
 
+  if (deck->ReleaseFXType == 2) { // Backspin Active
+    deck->JogRate *= 0.95f;       // decay
+    if (fabs(deck->JogRate) < 0.15) {
+      deck->ReleaseFXType = 0;
+      deck->IsTouching = false;
+      deck->JogRate = 0;
+      deck->IsMotorOn = false;
+    }
+    targetRate = deck->JogRate;
+    accel = 1.0f;
+  }
+
+  if (deck->ReleaseFXTimer > 0) {
+    deck->ReleaseFXTimer -= (1.0f / 150.0f); // Assuming 150Hz physics update
+    if (deck->ReleaseFXTimer <= 0) {
+      deck->ReleaseFXType = 0;
+    }
+  }
+
   if (deck->OutlinedRate != targetRate) {
     float diff = targetRate - (float)deck->OutlinedRate;
     if (fabs(diff) < accel)
@@ -377,7 +396,8 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
                   BeatFXManager_HasTails(&engine->BeatFX, deckIndex);
 
   if (!deck->IsPlaying && !noiseActive && !hasActiveFX && !hasTails) {
-    if (deck->MasterTempoActive && deck->SoundTouchHandle && wasMTActive[deckIndex]) {
+    if (deck->MasterTempoActive && deck->SoundTouchHandle &&
+        wasMTActive[deckIndex]) {
       ((SoundTouch *)deck->SoundTouchHandle)->clear();
       wasMTActive[deckIndex] = false;
     }
@@ -385,7 +405,8 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
   }
 
   float fs = (float)engine->OutputSampleRate;
-  if (deck->LastRate == 0) deck->LastRate = deck->OutlinedRate;
+  if (deck->LastRate == 0)
+    deck->LastRate = deck->OutlinedRate;
   double targetRate = deck->OutlinedRate;
 
   // EQ Setup (Standardized frequencies)
@@ -393,31 +414,40 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
   static float lastFreqH[MAX_DECKS] = {0};
   static uint32_t lastSR[MAX_DECKS] = {0};
 
-  if (lastFreqL[deckIndex] != 350.0f || lastSR[deckIndex] != engine->OutputSampleRate) {
+  if (lastFreqL[deckIndex] != 350.0f ||
+      lastSR[deckIndex] != engine->OutputSampleRate) {
     EngineLR4_SetLowpass(&deck->EqLowStateL, 350.0f, engine->OutputSampleRate);
     EngineLR4_SetLowpass(&deck->EqLowStateR, 350.0f, engine->OutputSampleRate);
     lastFreqL[deckIndex] = 350.0f;
   }
-  if (lastFreqH[deckIndex] != 2500.0f || lastSR[deckIndex] != engine->OutputSampleRate) {
-    EngineLR4_SetHighpass(&deck->EqHighStateL, 2500.0f, engine->OutputSampleRate);
-    EngineLR4_SetHighpass(&deck->EqHighStateR, 2500.0f, engine->OutputSampleRate);
+  if (lastFreqH[deckIndex] != 2500.0f ||
+      lastSR[deckIndex] != engine->OutputSampleRate) {
+    EngineLR4_SetHighpass(&deck->EqHighStateL, 2500.0f,
+                          engine->OutputSampleRate);
+    EngineLR4_SetHighpass(&deck->EqHighStateR, 2500.0f,
+                          engine->OutputSampleRate);
     lastFreqH[deckIndex] = 2500.0f;
   }
   lastSR[deckIndex] = engine->OutputSampleRate;
 
-  float gainL = (deck->EqLow < 0.5f) ? (deck->EqLow * 2.0f) : (1.0f + (deck->EqLow - 0.5f) * 4.0f);
-  float gainM = (deck->EqMid < 0.5f) ? (deck->EqMid * 2.0f) : (1.0f + (deck->EqMid - 0.5f) * 4.0f);
-  float gainH = (deck->EqHigh < 0.5f) ? (deck->EqHigh * 2.0f) : (1.0f + (deck->EqHigh - 0.5f) * 4.0f);
+  float gainL = (deck->EqLow < 0.5f) ? (deck->EqLow * 2.0f)
+                                     : (1.0f + (deck->EqLow - 0.5f) * 4.0f);
+  float gainM = (deck->EqMid < 0.5f) ? (deck->EqMid * 2.0f)
+                                     : (1.0f + (deck->EqMid - 0.5f) * 4.0f);
+  float gainH = (deck->EqHigh < 0.5f) ? (deck->EqHigh * 2.0f)
+                                      : (1.0f + (deck->EqHigh - 0.5f) * 4.0f);
 
   SoundTouch *st = (SoundTouch *)deck->SoundTouchHandle;
   float maxL = 0, maxR = 0;
-  float sampleRateRatio = (float)deck->SampleRate / (float)engine->OutputSampleRate;
+  float sampleRateRatio =
+      (float)deck->SampleRate / (float)engine->OutputSampleRate;
 
   // Audio Buffering
   float outBuf[4096 * 2]; // Large enough for any process block
   uint32_t received = 0;
 
-  if (deck->MasterTempoActive && !deck->IsTouching && st && fabs(targetRate) > 0.01) {
+  if (deck->MasterTempoActive && !deck->IsTouching && st &&
+      fabs(targetRate) > 0.01) {
     if (!wasMTActive[deckIndex]) {
       deck->MT_ReadPos = deck->Position;
       st->clear();
@@ -431,13 +461,16 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     while (st->numSamples() < (uint32_t)frames && maxIterations-- > 0) {
       float inBuf[512 * 2];
       for (int j = 0; j < 512; j++) {
-        AudioEngine_GetSample(deck, deck->MT_ReadPos, &inBuf[j * 2], &inBuf[j * 2 + 1]);
+        AudioEngine_GetSample(deck, deck->MT_ReadPos, &inBuf[j * 2],
+                              &inBuf[j * 2 + 1]);
         deck->MT_ReadPos += (targetRate > 0) ? 1.0 : -1.0;
         if (deck->IsLooping) {
           double loopLen = deck->LoopEndPos - deck->LoopStartPos;
           if (loopLen > 1.0) {
-            while (deck->MT_ReadPos >= deck->LoopEndPos) deck->MT_ReadPos -= loopLen;
-            while (deck->MT_ReadPos < deck->LoopStartPos) deck->MT_ReadPos += loopLen;
+            while (deck->MT_ReadPos >= deck->LoopEndPos)
+              deck->MT_ReadPos -= loopLen;
+            while (deck->MT_ReadPos < deck->LoopStartPos)
+              deck->MT_ReadPos += loopLen;
           }
         }
       }
@@ -445,17 +478,22 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     }
     received = st->receiveSamples(outBuf, frames);
     deck->Position += (double)received * targetRate;
-    
+
     if (deck->SlipActive) {
-      deck->SlipPosition += (double)received * deck->BaseRate * (double)sampleRateRatio;
+      deck->SlipPosition +=
+          (double)received * deck->BaseRate * (double)sampleRateRatio;
     }
   } else if (deck->IsPlaying || noiseActive) {
-    if (wasMTActive[deckIndex]) { st->clear(); wasMTActive[deckIndex] = false; }
+    if (wasMTActive[deckIndex]) {
+      st->clear();
+      wasMTActive[deckIndex] = false;
+    }
     double currentRate = deck->LastRate;
     double rateDelta = (targetRate - currentRate) / (double)frames;
     for (int i = 0; i < frames; i++) {
       currentRate += rateDelta;
-      AudioEngine_GetSample(deck, deck->Position, &outBuf[i * 2], &outBuf[i * 2 + 1]);
+      AudioEngine_GetSample(deck, deck->Position, &outBuf[i * 2],
+                            &outBuf[i * 2 + 1]);
       deck->Position += currentRate * (double)sampleRateRatio;
 
       if (deck->SlipActive) {
@@ -463,31 +501,37 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
       }
 
       // Enforce -4 bar limit (16 beats)
-      if (deck->BPM > 10.0) {
-        double limitSamples = -(16.0 * (60.0 / deck->BPM) * (double)deck->SampleRate);
-        if (deck->Position < limitSamples) deck->Position = limitSamples;
-      } else if (deck->Position < 0) {
-        deck->Position = 0;
-      }
+      // Enforce -4 bar limit (16 beats), or fallback to -2s if BPM unknown
+      double limitMs =
+          (deck->BPM > 10.0) ? (16.0 * (60.0 / deck->BPM) * 1000.0) : 2000.0;
+      double limitSamples = -(limitMs * (double)deck->SampleRate / 1000.0);
+      if (deck->Position < limitSamples)
+        deck->Position = limitSamples;
 
       if (deck->IsLooping) {
         double loopLen = deck->LoopEndPos - deck->LoopStartPos;
         if (loopLen > 1.0) {
-          while (deck->Position >= deck->LoopEndPos) deck->Position -= loopLen;
-          while (deck->Position < deck->LoopStartPos) deck->Position += loopLen;
+          while (deck->Position >= deck->LoopEndPos)
+            deck->Position -= loopLen;
+          while (deck->Position < deck->LoopStartPos)
+            deck->Position += loopLen;
         }
       }
     }
     received = frames;
   } else {
     // Deck is paused and no noise: output silence so VU meter can decay
-    if (wasMTActive[deckIndex]) { st->clear(); wasMTActive[deckIndex] = false; }
+    if (wasMTActive[deckIndex]) {
+      st->clear();
+      wasMTActive[deckIndex] = false;
+    }
     memset(outBuf, 0, frames * 2 * sizeof(float));
     received = frames;
   }
 
   // Pre-calculate Ramping Gain (Interpolation) to prevent clicks
-  float startCrossGain = Engine_GetCrossfaderGain(engine->LastCrossfader, deckIndex);
+  float startCrossGain =
+      Engine_GetCrossfaderGain(engine->LastCrossfader, deckIndex);
   float endCrossGain = Engine_GetCrossfaderGain(engine->Crossfader, deckIndex);
   float startTotalGain = deck->LastFader * startCrossGain;
   float endTotalGain = deck->Fader * endCrossGain;
@@ -505,52 +549,73 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     r = (lowR * gainL) + (r - lowR - highR) * gainM + (highR * gainH);
 
     // Trim & Color FX
-    l *= deck->Trim; r *= deck->Trim;
+    l *= deck->Trim;
+    r *= deck->Trim;
     ColorFXManager_Process(&deck->ColorFX, &l, &r, l, r, fs);
 
     // Cue (Pre-Fader)
-    if (deck->IsCueActive) { outCue[i * 2] += l; outCue[i * 2 + 1] += r; }
-    maxL = fmaxf(maxL, fabsf(l)); maxR = fmaxf(maxR, fabsf(r));
+    if (deck->IsCueActive) {
+      outCue[i * 2] += l;
+      outCue[i * 2 + 1] += r;
+    }
+    maxL = fmaxf(maxL, fabsf(l));
+    maxR = fmaxf(maxR, fabsf(r));
 
     // Channel Fader (Post-Cue) with Ramping
     float t = (float)i / (float)received;
-    float currentTotalGain = startTotalGain + (endTotalGain - startTotalGain) * t;
-    float sendL = l * currentTotalGain; 
+    float currentTotalGain =
+        startTotalGain + (endTotalGain - startTotalGain) * t;
+    float sendL = l * currentTotalGain;
     float sendR = r * currentTotalGain;
 
     // Professional Routing Logic
     if (engine->RoutingMode == FX_ROUTING_POST_FADER) {
       // MASTER gets Dry signal (Post-Fader)
-      outMaster[i * 2] += sendL; outMaster[i * 2 + 1] += sendR;
+      outMaster[i * 2] += sendL;
+      outMaster[i * 2 + 1] += sendR;
       // Also add to clean sum for Master FX
-      outCleanMaster[i * 2] += sendL; outCleanMaster[i * 2 + 1] += sendR;
+      outCleanMaster[i * 2] += sendL;
+      outCleanMaster[i * 2 + 1] += sendR;
 
       // BEAT FX gets Send signal (Post-Fader), MASTER gets Wet signal (Return)
       float wetL = 0, wetR = 0;
       if (engine->BeatFX.targetChannel == deckIndex + 1) {
-        BeatFXManager_ProcessWetOnly(&engine->BeatFX, &wetL, &wetR, sendL, sendR, fs);
+        BeatFXManager_ProcessWetOnly(&engine->BeatFX, &wetL, &wetR, sendL,
+                                     sendR, fs);
       }
-      outMaster[i * 2] += wetL; outMaster[i * 2 + 1] += wetR;
-      } else {
+      outMaster[i * 2] += wetL;
+      outMaster[i * 2 + 1] += wetR;
+    } else {
       // INSERT MODE: Beat FX sits between Fader and Master
       float fxOutL = sendL, fxOutR = sendR;
       if (engine->BeatFX.targetChannel == deckIndex + 1) {
-        BeatFXManager_Process(&engine->BeatFX, &fxOutL, &fxOutR, sendL, sendR, fs);
+        BeatFXManager_Process(&engine->BeatFX, &fxOutL, &fxOutR, sendL, sendR,
+                              fs);
       }
-      outMaster[i * 2] += fxOutL; outMaster[i * 2 + 1] += fxOutR;
-      outCleanMaster[i * 2] += fxOutL; outCleanMaster[i * 2 + 1] += fxOutR;
+      outMaster[i * 2] += fxOutL;
+      outMaster[i * 2 + 1] += fxOutR;
+      outCleanMaster[i * 2] += fxOutL;
+      outCleanMaster[i * 2 + 1] += fxOutR;
     }
   }
 
   deck->LastFader = deck->Fader; // Update for next block
   deck->LastRate = targetRate;
   // VU Meter Ballistics
-  float peakL = maxL * 1.6f; float peakR = maxR * 1.6f;
-  if (peakL > 1.0f) peakL = 1.0f; if (peakR > 1.0f) peakR = 1.0f;
-  if (peakL > deck->VuMeterL) deck->VuMeterL = peakL;
-  else deck->VuMeterL = deck->VuMeterL * 0.88f + peakL * 0.12f;
-  if (peakR > deck->VuMeterR) deck->VuMeterR = peakR;
-  else deck->VuMeterR = deck->VuMeterR * 0.88f + peakR * 0.12f;
+  float peakL = maxL * 1.6f;
+  float peakR = maxR * 1.6f;
+  if (peakL > 1.0f)
+    peakL = 1.0f;
+  if (peakR > 1.0f)
+    peakR = 1.0f;
+  if (peakL > deck->VuMeterL)
+    deck->VuMeterL = peakL;
+  else
+    deck->VuMeterL = deck->VuMeterL * 0.88f + peakL * 0.12f;
+  if (peakR > deck->VuMeterR)
+    deck->VuMeterR = peakR;
+  else
+    deck->VuMeterR = deck->VuMeterR * 0.88f + peakR * 0.12f;
 }
 
 void AudioEngine_SetFXRouting(AudioEngine *engine, FXRoutingMode mode) {
@@ -566,17 +631,21 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
   memset(cueMix, 0, frames * 2 * sizeof(float));
 
   for (int i = 0; i < MAX_DECKS; i++) {
-    ProcessDeckAudio(&engine->Decks[i], masterMix, cueMix, frames, engine, i, cleanMasterMix);
+    ProcessDeckAudio(&engine->Decks[i], masterMix, cueMix, frames, engine, i,
+                     cleanMasterMix);
   }
 
   float mPeakL = 0, mPeakR = 0;
   for (int s = 0; s < frames; s++) {
     // Professional Master FX Send/Return (If assigned to Master)
     if (engine->BeatFX.targetChannel == 0) {
-       float wetL = 0, wetR = 0;
-       // Take input from cleanMasterMix to avoid feedback loops with deck tails
-       BeatFXManager_ProcessWetOnly(&engine->BeatFX, &wetL, &wetR, cleanMasterMix[s*2], cleanMasterMix[s*2+1], engine->OutputSampleRate);
-       masterMix[s*2] += wetL; masterMix[s*2+1] += wetR;
+      float wetL = 0, wetR = 0;
+      // Take input from cleanMasterMix to avoid feedback loops with deck tails
+      BeatFXManager_ProcessWetOnly(
+          &engine->BeatFX, &wetL, &wetR, cleanMasterMix[s * 2],
+          cleanMasterMix[s * 2 + 1], engine->OutputSampleRate);
+      masterMix[s * 2] += wetL;
+      masterMix[s * 2 + 1] += wetR;
     }
 
     // --- Master Gain & Soft Limiting ---
@@ -587,8 +656,14 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
     mPeakR = fmaxf(mPeakR, fabsf(r));
 
     // Safety Limiter (Professional Stage)
-    if (l > 1.0f) l = 1.0f; else if (l < -1.0f) l = -1.0f;
-    if (r > 1.0f) r = 1.0f; else if (r < -1.0f) r = -1.0f;
+    if (l > 1.0f)
+      l = 1.0f;
+    else if (l < -1.0f)
+      l = -1.0f;
+    if (r > 1.0f)
+      r = 1.0f;
+    else if (r < -1.0f)
+      r = -1.0f;
 
     outBuffer[s * 4] = l;
     outBuffer[s * 4 + 1] = r;
@@ -597,12 +672,20 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
   }
 
   // Master VU Ballistics
-  float pML = mPeakL * 1.4f; float pMR = mPeakR * 1.4f;
-  if (pML > 1.0f) pML = 1.0f; if (pMR > 1.0f) pMR = 1.0f;
-  if (pML > engine->MasterVuL) engine->MasterVuL = pML;
-  else engine->MasterVuL = engine->MasterVuL * 0.88f + pML * 0.12f;
-  if (pMR > engine->MasterVuR) engine->MasterVuR = pMR;
-  else engine->MasterVuR = engine->MasterVuR * 0.88f + pMR * 0.12f;
+  float pML = mPeakL * 1.4f;
+  float pMR = mPeakR * 1.4f;
+  if (pML > 1.0f)
+    pML = 1.0f;
+  if (pMR > 1.0f)
+    pMR = 1.0f;
+  if (pML > engine->MasterVuL)
+    engine->MasterVuL = pML;
+  else
+    engine->MasterVuL = engine->MasterVuL * 0.88f + pML * 0.12f;
+  if (pMR > engine->MasterVuR)
+    engine->MasterVuR = pMR;
+  else
+    engine->MasterVuR = engine->MasterVuR * 0.88f + pMR * 0.12f;
   engine->LastCrossfader = engine->Crossfader;
 }
 
@@ -627,6 +710,42 @@ void DeckAudio_Unload(DeckAudioState *deck) {
   deck->FilePath[0] = '\0';
   deck->IsLoading = false;
 }
+
+void DeckAudio_TriggerReleaseFX(DeckAudioState *deck, int type) {
+  deck->ReleaseFXType = type;
+  deck->ReleaseFXTimer = 3.0f; // Automatic reset after 3s
+  switch (type) {
+  case 1: // Vinyl Brake Short
+    deck->VinylStopAccel = 0.04f;
+    deck->IsMotorOn = false;
+    break;
+  case 2: // Vinyl Brake Long
+    deck->VinylStopAccel = 0.006f;
+    deck->IsMotorOn = false;
+    break;
+  case 3: // Backspin Short
+    deck->VinylModeEnabled = true;
+    deck->IsTouching = true;
+    deck->JogRate = -5.0f;
+    deck->OutlinedRate = deck->JogRate; // Instant kick
+    deck->ReleaseFXType = 2;
+    deck->IsMotorOn = false;
+    break;
+  case 4: // Backspin Long
+    deck->VinylModeEnabled = true;
+    deck->IsTouching = true;
+    deck->JogRate = -12.0f;
+    deck->OutlinedRate = deck->JogRate; // Instant kick
+    deck->ReleaseFXType = 2;
+    deck->IsMotorOn = false;
+    break;
+  case 5: // Echo Out
+    deck->IsMotorOn = false;
+    deck->VinylStopAccel = 1.0f; // Instant stop
+    deck->ReleaseFXTimer = 4.0f; // Give more time for tail
+    break;
+  }
+}
 void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch) {
   deck->Pitch = pitch;
 }
@@ -649,19 +768,22 @@ void DeckAudio_SetJogRate(DeckAudioState *deck, double rate) {
     deck->JogRate = rate;
 }
 void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching) {
+  if (deck->ReleaseFXType == 2)
+    return; // Protect active backspin
   deck->IsTouching = touching;
   if (!touching)
     deck->JogRate = deck->OutlinedRate;
 }
 void DeckAudio_JumpToMs(DeckAudioState *deck, int64_t ms) {
   deck->IsLooping = false;
-  
+
   // Enforce -4 bar limit
   int64_t limitMs = 0;
   if (deck->BPM > 10.0) {
-      limitMs = (int64_t)-(16.0 * (60000.0 / deck->BPM));
+    limitMs = (int64_t)-(16.0 * (60000.0 / deck->BPM));
   }
-  if (ms < limitMs) ms = limitMs;
+  if (ms < limitMs)
+    ms = limitMs;
 
   deck->Position = (double)ms * ((double)deck->SampleRate / 1000.0);
   deck->MT_ReadPos = deck->Position;
@@ -697,14 +819,14 @@ void DeckAudio_SetLoop(DeckAudioState *deck, bool active, double startPos,
     if (deck->Position >= endPos || deck->Position < startPos) {
       double offset = deck->Position - startPos;
       deck->Position = startPos + fmod(offset, loopLen);
-      if (deck->Position < startPos) deck->Position += loopLen; // handle negative offset if any
+      if (deck->Position < startPos)
+        deck->Position += loopLen; // handle negative offset if any
       deck->MT_ReadPos = deck->Position;
       if (deck->SoundTouchHandle) {
         ((soundtouch::SoundTouch *)deck->SoundTouchHandle)->clear();
       }
     }
   }
-
 }
 
 void DeckAudio_ExitLoop(DeckAudioState *deck) { deck->IsLooping = false; }

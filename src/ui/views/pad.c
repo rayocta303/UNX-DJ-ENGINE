@@ -231,6 +231,9 @@ static void Pad_Draw(Component *base) {
             } else if (mode == PAD_MODE_BEAT_JUMP) {
                 static const char* jumps[] = {"<< 4", "<< 8", "<< 16", "<< 32", "4 >>", "8 >>", "16 >>", "32 >>"};
                 strcpy(lbl, jumps[i]);
+            } else if (mode == PAD_MODE_RELEASE_FX) {
+                static const char* rfx[] = {"BRAKE S", "BRAKE L", "SPIN S", "SPIN L", "ECHO 1/2", "ECHO 1", "ECHO 2", "MUTE"};
+                strcpy(lbl, rfx[i]);
             } else if (mode == PAD_MODE_HOT_CUE || mode == PAD_MODE_GATE_CUE) {
                 if (hasData) {
                     lbl[0] = (char)('A' + i); lbl[1] = 0;

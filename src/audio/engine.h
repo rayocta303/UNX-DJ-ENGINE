@@ -108,6 +108,10 @@ typedef struct DeckAudioState {
   float VuMeterR;
 
   double BPM; // Current BPM for beat-based limits
+  
+  // Release FX State
+  int ReleaseFXType;   // 0=None, 1=Brake, 2=Spin, 3=Echo
+  float ReleaseFXTimer; 
 } DeckAudioState;
 
 typedef struct AudioEngine {
@@ -142,6 +146,7 @@ void DeckAudio_QueueJumpMs(DeckAudioState *deck, uint32_t targetMs,
                            uint32_t waitMs);
 void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch);
 void DeckAudio_Unload(DeckAudioState *deck);
+void DeckAudio_TriggerReleaseFX(DeckAudioState *deck, int type);
 
 void DeckAudio_SetSlip(DeckAudioState *deck, bool active);
 void DeckAudio_SetLoop(DeckAudioState *deck, bool active, double startPos,
