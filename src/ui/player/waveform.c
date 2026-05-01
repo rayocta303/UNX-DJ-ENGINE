@@ -606,8 +606,30 @@ static void Waveform_Draw(Component *base) {
       }
   }
 
+  // Memory Cues
+  if (r->State->LoadedTrack != NULL) {
+    for (int i = 0; i < r->State->LoadedTrack->CuesCount; i++) {
+      HotCue mc = r->State->LoadedTrack->Cues[i];
+      double mcPosHF = (double)mc.Start * 0.15;
+      float px = (float)((mcPosHF - elapsedHalfFrames) / (double)effectiveZoom);
+      float bx = playheadX + px;
+
+      if (bx >= wfLeft - S(2) && bx <= wfRight + S(2)) {
+        // Vertical orange line
+        DrawLineEx((Vector2){bx, wfY}, (Vector2){bx, wfY + waveH}, 1.0f, ColorOrange);
+        // Small marker at bottom
+        DrawRectangleV((Vector2){bx - 1.0f, wfY + waveH - S(5)}, (Vector2){3.0f, S(5)}, ColorOrange);
+      }
+    }
+  }
+
   // Hot Cues — scrolling colored triangles with letter labels
   if (r->State->LoadedTrack != NULL) {
+    static const Color hcPalette[8] = {
+        {0, 255, 0, 255},   {255, 0, 0, 255},   {255, 128, 0, 255},
+        {255, 255, 0, 255}, {0, 0, 255, 255},   {255, 0, 255, 255},
+        {0, 255, 255, 255}, {128, 0, 255, 255}};
+
     for (int i = 0; i < r->State->LoadedTrack->HotCuesCount; i++) {
       HotCue hc = r->State->LoadedTrack->HotCues[i];
       double hcPosHF = (double)hc.Start * 0.15;
@@ -615,7 +637,9 @@ static void Waveform_Draw(Component *base) {
       float bx = playheadX + px;
 
       if (bx >= wfLeft - S(10) && bx <= wfRight + S(10)) {
-        Color hcClr = GetCueColor(hc, ColorOrange);
+        int idx = hc.ID - 1;
+        if (idx < 0) idx = 0; if (idx > 7) idx = 7;
+        Color hcClr = GetCueColor(hc, hcPalette[idx]);
         // Triangle pointing down at top
         DrawTriangle((Vector2){bx - S(5), wfY}, (Vector2){bx + S(5), wfY},
                      (Vector2){bx, wfY + S(8)}, hcClr);

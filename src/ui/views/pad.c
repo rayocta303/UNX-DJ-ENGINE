@@ -189,10 +189,20 @@ static void Pad_Draw(Component *base) {
             bool hasData = false;
 
             if (mode == PAD_MODE_HOT_CUE) {
-                if (deck && deck->LoadedTrack && i < deck->LoadedTrack->HotCuesCount) {
-                    HotCue hc = deck->LoadedTrack->HotCues[i];
-                    padColor = GetCueColor(hc, ColorOrange);
-                    hasData = true;
+                if (deck && deck->LoadedTrack) {
+                    static const Color hcPalette[8] = {
+                        {0, 255, 0, 255},   {255, 0, 0, 255},   {255, 128, 0, 255},
+                        {255, 255, 0, 255}, {0, 0, 255, 255},   {255, 0, 255, 255},
+                        {0, 255, 255, 255}, {128, 0, 255, 255}};
+
+                    for (int h = 0; h < deck->LoadedTrack->HotCuesCount; h++) {
+                        if (deck->LoadedTrack->HotCues[h].ID == (unsigned int)(i + 1)) {
+                            HotCue hc = deck->LoadedTrack->HotCues[h];
+                            padColor = GetCueColor(hc, hcPalette[i % 8]);
+                            hasData = true;
+                            break;
+                        }
+                    }
                 }
             } else if (mode == PAD_MODE_BEAT_LOOP || mode == PAD_MODE_SLIP_LOOP) {
                 bool isActive = (r->State->ActiveLoopIdx[d] == i);
@@ -208,12 +218,14 @@ static void Pad_Draw(Component *base) {
             } else if (mode == PAD_MODE_BEAT_JUMP) {
                 padColor = ColorOrange; hasData = true;
             } else if (mode == PAD_MODE_GATE_CUE) {
-                if (deck && deck->LoadedTrack && i < deck->LoadedTrack->HotCuesCount) {
-                    padColor = ColorBlue;
-                    hasData = true;
-                } else {
-                    padColor = ColorDark3;
-                    hasData = false;
+                if (deck && deck->LoadedTrack) {
+                    for (int h = 0; h < deck->LoadedTrack->HotCuesCount; h++) {
+                        if (deck->LoadedTrack->HotCues[h].ID == (unsigned int)(i + 1)) {
+                            padColor = ColorBlue;
+                            hasData = true;
+                            break;
+                        }
+                    }
                 }
             } else if (mode == PAD_MODE_RELEASE_FX) {
                 padColor = ColorPink; hasData = true;

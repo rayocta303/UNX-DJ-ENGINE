@@ -547,6 +547,17 @@ static void DeckStrip_Draw(Component *base) {
         }
       }
 
+      // Main Cue
+      if (d->State->MainCueMs > 0) {
+        float ratio = (float)d->State->MainCueMs / totalMs;
+        if (ratio >= 0.0f && ratio <= 1.0f) {
+          float rx = wx + ratio * ww;
+          DrawLineEx((Vector2){rx, wy}, (Vector2){rx, wy + wh}, 1.5f, ColorWhite);
+          DrawTriangle((Vector2){rx - S(4), wy + wh}, (Vector2){rx + S(4), wy + wh},
+                       (Vector2){rx, wy + wh - S(6)}, ColorOrange);
+        }
+      }
+
       // Playhead Position
       float ratio = (float)d->State->PositionMs / totalMs;
       if (ratio < 0) ratio = 0; if (ratio > 1) ratio = 1;
