@@ -23,13 +23,19 @@ static int Mixer_Update(Component *base) {
 }
 
 // Helper for vertical fader
-static void HandleVerticalFader(float *val, float fx, float fy, float fw,
+static void HandleVerticalFader(MixerState *state, float *val, float fx, float fy, float fw,
                                 float fh, Vector2 mousePos, bool mDown) {
   float handleH = S(22);
   float travelRange = fh - handleH;
   bool hovered = CheckCollisionPointRec(mousePos, (Rectangle){fx, fy, fw, fh});
 
-  if (mDown && hovered) {
+  // Start drag
+  if (mDown && hovered && state->ActiveHandle == NULL) {
+    state->ActiveHandle = val;
+  }
+
+  // Update if this is the active handle
+  if (mDown && state->ActiveHandle == val) {
     float relY = (mousePos.y - (fy + handleH / 2.0f));
     *val = 1.0f - (relY / travelRange);
     if (*val < 0.0f)
@@ -39,7 +45,7 @@ static void HandleVerticalFader(float *val, float fx, float fy, float fw,
   }
 
   float wheel = GetMouseWheelMove();
-  if (hovered && wheel != 0) {
+  if (hovered && wheel != 0 && (state->ActiveHandle == NULL || state->ActiveHandle == val)) {
     *val += wheel * 0.05f;
     if (*val < 0.0f) *val = 0.0f;
     if (*val > 1.0f) *val = 1.0f;
@@ -103,12 +109,19 @@ static void Mixer_DrawKnob(float x, float y, float radius, float value,
   UIDrawKnob(x, y, radius, value, min, max, label, color, centerZero);
 }
 
-static void HandleKnob(float *val, float cx, float cy, float r, float min,
+static void HandleKnob(MixerState *state, float *val, float cx, float cy, float r, float min,
                        float max, bool centerZero, Vector2 mousePos,
                        bool mDown) {
   bool hovered =
       CheckCollisionPointCircle(mousePos, (Vector2){cx, cy}, r + S(12));
-  if (mDown && hovered) {
+  
+  // Start drag
+  if (mDown && hovered && state->ActiveHandle == NULL) {
+    state->ActiveHandle = val;
+  }
+
+  // Update if this is the active handle
+  if (mDown && state->ActiveHandle == val) {
     Vector2 delta = GetMouseDelta();
     float range = max - min;
     float center = min + range / 2.0f;
@@ -128,8 +141,9 @@ static void HandleKnob(float *val, float cx, float cy, float r, float min,
     if (*val < min) *val = min;
     if (*val > max) *val = max;
   }
+
   float wheel = GetMouseWheelMove();
-  if (wheel != 0.0f && hovered) {
+  if (wheel != 0.0f && hovered && (state->ActiveHandle == NULL || state->ActiveHandle == val)) {
     float range = max - min;
     float center = min + range / 2.0f;
     *val += (wheel * 0.05f) * range;
@@ -143,8 +157,8 @@ static void HandleKnob(float *val, float cx, float cy, float r, float min,
     if (*val < min) *val = min;
     if (*val > max) *val = max;
   }
-  if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
-      CheckCollisionPointCircle(mousePos, (Vector2){cx, cy}, r)) {
+
+  if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && hovered) {
     static float lastClickTime = 0;
     if (GetTime() - lastClickTime < 0.3) {
       *val = centerZero ? (min + (max - min) / 2.0f) : min;
@@ -178,6 +192,9 @@ static void Mixer_Draw(Component *base) {
 
   float viewH = SCREEN_HEIGHT - DECK_STR_H;
   DrawRectangle(0, 0, SCREEN_WIDTH, viewH, ColorBGUtil);
+
+  // Clear handle if mouse released
+  if (!mDown) r->State->ActiveHandle = NULL;
 
   DrawRectangle(0, 0, SCREEN_WIDTH, TOP_BAR_H, ColorDark1);
   DrawLine(0, TOP_BAR_H, SCREEN_WIDTH, TOP_BAR_H, ColorShadow);
@@ -227,7 +244,7 @@ static void Mixer_Draw(Component *base) {
 
   float paramY = panelY + panelH - S(50);
   Mixer_DrawKnob(leftX + colFXW/2, paramY, S(12), eng->Decks[0].ColorFX.parameter, 0.0f, 1.0f, "PARAM", ColorShadow, true);
-  HandleKnob(&eng->Decks[0].ColorFX.parameter, leftX + colFXW/2, paramY, S(12), 0.0f, 1.0f, true, mousePos, mDown);
+  HandleKnob(r->State, &eng->Decks[0].ColorFX.parameter, leftX + colFXW/2, paramY, S(12), 0.0f, 1.0f, true, mousePos, mDown);
   eng->Decks[1].ColorFX.parameter = eng->Decks[0].ColorFX.parameter;
 
   // =========================================================================
@@ -277,22 +294,22 @@ static void Mixer_Draw(Component *base) {
 
     // --- EQ STACK (Inner) ---
     float ky = panelY + S(38); // Lowered slightly
-    Mixer_DrawKnob(ecx, ky, kR, d->Trim, 0.0f, 1.0f, "TRIM", ColorWhite, false);
-    HandleKnob(&d->Trim, ecx, ky, kR, 0.0f, 1.0f, false, mousePos, mDown);
+    Mixer_DrawKnob(ecx, ky, kR, d->Trim, 0.0f, 1.0f, "TRIM", ColorWhite, true);
+    HandleKnob(r->State, &d->Trim, ecx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
     ky += kStep;
     Mixer_DrawKnob(ecx, ky, kR, d->EqHigh, 0.0f, 1.0f, "HI", ColorWhite, true);
-    HandleKnob(&d->EqHigh, ecx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
+    HandleKnob(r->State, &d->EqHigh, ecx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
     ky += kStep;
     Mixer_DrawKnob(ecx, ky, kR, d->EqMid, 0.0f, 1.0f, "MID", ColorWhite, true);
-    HandleKnob(&d->EqMid, ecx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
+    HandleKnob(r->State, &d->EqMid, ecx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
     ky += kStep;
     Mixer_DrawKnob(ecx, ky, kR, d->EqLow, 0.0f, 1.0f, "LOW", ColorWhite, true);
-    HandleKnob(&d->EqLow, ecx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
+    HandleKnob(r->State, &d->EqLow, ecx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
 
     // --- FADER (Outer) ---
     float fy = panelY + S(38); // Align fader start with Trim
     float fW = S(22);
-    HandleVerticalFader(&d->Fader, fcx - fW/2, fy, fW, fH, mousePos, mDown);
+    HandleVerticalFader(r->State, &d->Fader, fcx - fW/2, fy, fW, fH, mousePos, mDown);
     
     // Custom Fader Draw to match image
     Color faderCol = (i == 0) ? (Color){150, 100, 255, 255} : (Color){100, 200, 255, 255};
@@ -311,7 +328,7 @@ static void Mixer_Draw(Component *base) {
     // --- CFX (COLOR) KNOB (Below Fader) ---
     float colorY = fy + fH + S(22);
     Mixer_DrawKnob(fcx, colorY, S(12), d->ColorFX.colorValue, -1.0f, 1.0f, "COLOR", ColorOrange, true);
-    HandleKnob(&d->ColorFX.colorValue, fcx, colorY, S(12), -1.0f, 1.0f, true, mousePos, mDown);
+    HandleKnob(r->State, &d->ColorFX.colorValue, fcx, colorY, S(12), -1.0f, 1.0f, true, mousePos, mDown);
   }
 
   // Master VU (Squeezed in the very middle)
@@ -329,8 +346,14 @@ static void Mixer_Draw(Component *base) {
   float hX = cfX + (eng->Crossfader + 1.0f) * 0.5f * (cfW - S(12));
   DrawRectangleRounded((Rectangle){hX, cfY, S(12), cfH}, 0.2f, 4, (Color){50, 50, 50, 255});
   DrawLine(hX + S(6), cfY + 2, hX + S(6), cfY + cfH - 2, ColorWhite);
-  if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) && CheckCollisionPointRec(mousePos, (Rectangle){cfX, cfY, cfW, cfH})) {
+  
+  if (mDown && CheckCollisionPointRec(mousePos, (Rectangle){cfX, cfY, cfW, cfH}) && r->State->ActiveHandle == NULL) {
+      r->State->ActiveHandle = &eng->Crossfader;
+  }
+  if (mDown && r->State->ActiveHandle == &eng->Crossfader) {
       eng->Crossfader = ((mousePos.x - cfX) / cfW) * 2.0f - 1.0f;
+      if (eng->Crossfader < -1.0f) eng->Crossfader = -1.0f;
+      if (eng->Crossfader > 1.0f) eng->Crossfader = 1.0f;
   }
 
 
@@ -340,8 +363,8 @@ static void Mixer_Draw(Component *base) {
   BeatFXState *fxs = r->State->FXState;
   DrawRectangle(rightX + S(2), panelY + S(2), colRightW - S(4), panelH - S(4), (Color){20, 20, 20, 255});
   float masterKnobY = panelY + S(25);
-  Mixer_DrawKnob(rightX + colRightW / 2.0f, masterKnobY, S(15), eng->MasterVolume, 0.0f, 1.0f, "MASTER", ColorRed, false);
-  HandleKnob(&eng->MasterVolume, rightX + colRightW / 2.0f, masterKnobY, S(15), 0.0f, 1.0f, false, mousePos, mDown);
+  Mixer_DrawKnob(rightX + colRightW / 2.0f, masterKnobY, S(15), eng->MasterVolume, 0.0f, 1.0f, "MASTER", ColorRed, true);
+  HandleKnob(r->State, &eng->MasterVolume, rightX + colRightW / 2.0f, masterKnobY, S(15), 0.0f, 1.0f, true, mousePos, mDown);
 
   float bfxY = masterKnobY + S(40);
   DrawCentredText("BEAT FX", fTiny, rightX, colRightW, bfxY, S(7), ColorShadow);
@@ -363,7 +386,7 @@ static void Mixer_Draw(Component *base) {
 
   float bDepthY = panelY + panelH - S(100);
   Mixer_DrawKnob(rightX + colRightW / 2.0f, bDepthY, S(13), fxs->LevelDepth, 0.0f, 1.0f, "DEPTH", ColorOrange, false);
-  HandleKnob(&fxs->LevelDepth, rightX + colRightW / 2.0f, bDepthY, S(13), 0.0f, 1.0f, false, mousePos, mDown);
+  HandleKnob(r->State, &fxs->LevelDepth, rightX + colRightW / 2.0f, bDepthY, S(13), 0.0f, 1.0f, false, mousePos, mDown);
 
   float bOnOffY = panelY + panelH - S(45);
   if (DrawFXButton(fxs->IsFXOn ? "ON" : "OFF", rightX + S(15), bOnOffY, colRightW - S(30), S(30), fxs->IsFXOn)) {

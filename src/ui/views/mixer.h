@@ -8,6 +8,7 @@ typedef struct {
     bool IsActive;
     AudioEngine *AudioPlugin;
     struct BeatFXState *FXState;
+    void* ActiveHandle;
 } MixerState;
 
 typedef struct {
