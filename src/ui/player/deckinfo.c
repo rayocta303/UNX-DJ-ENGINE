@@ -75,6 +75,7 @@ static int DeckInfo_Update(Component *base) {
             if (d->State->IsPlaying) {
                 // While playing: Instant stop and jump back to cue
                 DeckAudio_InstantStop(&d->Engine->Decks[d->ID]);
+                DeckAudio_ExitLoop(&d->Engine->Decks[d->ID]);
                 DeckAudio_JumpToMs(&d->Engine->Decks[d->ID], d->State->MainCueMs);
                 d->State->IsPlaying = false;
                 d->State->PositionMs = d->State->MainCueMs;
@@ -87,6 +88,7 @@ static int DeckInfo_Update(Component *base) {
                 }
                 
                 // Immediately jump to and sync the newly set cue point
+                DeckAudio_ExitLoop(&d->Engine->Decks[d->ID]);
                 DeckAudio_JumpToMs(&d->Engine->Decks[d->ID], d->State->MainCueMs);
                 d->State->PositionMs = d->State->MainCueMs;
 
@@ -101,6 +103,7 @@ static int DeckInfo_Update(Component *base) {
     if (d->State->IsCueHeld && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
         // When releasing a held CUE: Instant stop and return to cue point
         DeckAudio_InstantStop(&d->Engine->Decks[d->ID]);
+        DeckAudio_ExitLoop(&d->Engine->Decks[d->ID]);
         DeckAudio_JumpToMs(&d->Engine->Decks[d->ID], d->State->MainCueMs);
         d->State->IsPlaying = false;
         d->State->IsCueHeld = false;
@@ -116,7 +119,11 @@ static int DeckInfo_Update(Component *base) {
             // Physical motor is already on from CUE hold
         } else {
             bool targetPlaying = !d->State->IsPlaying;
-            DeckAudio_SetPlaying(&d->Engine->Decks[d->ID], targetPlaying);
+            if (targetPlaying) {
+                DeckAudio_SetPlaying(&d->Engine->Decks[d->ID], true);
+            } else {
+                DeckAudio_InstantStop(&d->Engine->Decks[d->ID]);
+            }
             d->State->IsPlaying = targetPlaying;
         }
     }

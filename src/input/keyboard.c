@@ -7,7 +7,7 @@
 KeyboardMapping GetDefaultMapping() {
   KeyboardMapping m = {0};
   m.playPause1 = KEY_Z;
-  m.cue1 = KEY_X;
+  m.cue1 = KEY_A;
   m.hotCues1[0] = KEY_ONE;
   m.hotCues1[1] = KEY_TWO;
   m.hotCues1[2] = KEY_THREE;
@@ -15,7 +15,7 @@ KeyboardMapping GetDefaultMapping() {
   m.hotCues1[4] = KEY_FIVE;
 
   m.playPause2 = KEY_N;
-  m.cue2 = KEY_M;
+  m.cue2 = KEY_H;
   m.hotCues2[0] = KEY_SIX;
   m.hotCues2[1] = KEY_SEVEN;
   m.hotCues2[2] = KEY_EIGHT;
@@ -39,17 +39,22 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2,
                           AudioEngine *engine, BeatFXState *fx) {
   // Deck 1
   if (IsKeyPressed(m->playPause1)) {
-    if (engine) {
-      bool starting = !engine->Decks[0].IsMotorOn;
-      DeckAudio_SetPlaying(&engine->Decks[0], starting);
-      if (starting) {
-        if (d1->SyncMode == 2 && !d1->IsMaster) {
-          Sync_RequestPhaseSnap(d1, d2, engine);
+    if (d1->IsCueHeld) {
+      d1->IsCueHeld = false;
+      d1->IsPlaying = true;
+    } else {
+      if (engine) {
+        bool starting = !engine->Decks[0].IsMotorOn;
+        DeckAudio_SetPlaying(&engine->Decks[0], starting);
+        if (starting) {
+          if (d1->SyncMode == 2 && !d1->IsMaster) {
+            Sync_RequestPhaseSnap(d1, d2, engine);
+          }
+        } else {
+          // Revert to BPM sync on stop to avoid snapping during motor brake
+          if (d1->SyncMode == 2)
+            d1->SyncMode = 1;
         }
-      } else {
-        // Revert to BPM sync on stop to avoid snapping during motor brake
-        if (d1->SyncMode == 2)
-          d1->SyncMode = 1;
       }
     }
   }
@@ -63,9 +68,11 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2,
             if (d1->QuantizeEnabled) {
               int32_t waitMs =
                   Quantize_GetWaitMs(d1->LoadedTrack, d1->PositionMs);
+              DeckAudio_ExitLoop(&engine->Decks[0]);
               DeckAudio_QueueJumpMs(&engine->Decks[0], targetMs,
                                     (uint32_t)waitMs);
             } else {
+              DeckAudio_ExitLoop(&engine->Decks[0]);
               DeckAudio_JumpToMs(&engine->Decks[0], targetMs);
               DeckAudio_InstantPlay(&engine->Decks[0]);
             }
@@ -78,17 +85,22 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2,
 
   // Deck 2
   if (IsKeyPressed(m->playPause2)) {
-    if (engine) {
-      bool starting = !engine->Decks[1].IsMotorOn;
-      DeckAudio_SetPlaying(&engine->Decks[1], starting);
-      if (starting) {
-        if (d2->SyncMode == 2 && !d2->IsMaster) {
-          Sync_RequestPhaseSnap(d2, d1, engine);
+    if (d2->IsCueHeld) {
+      d2->IsCueHeld = false;
+      d2->IsPlaying = true;
+    } else {
+      if (engine) {
+        bool starting = !engine->Decks[1].IsMotorOn;
+        DeckAudio_SetPlaying(&engine->Decks[1], starting);
+        if (starting) {
+          if (d2->SyncMode == 2 && !d2->IsMaster) {
+            Sync_RequestPhaseSnap(d2, d1, engine);
+          }
+        } else {
+          // Revert to BPM sync on stop to avoid snapping during motor brake
+          if (d2->SyncMode == 2)
+            d2->SyncMode = 1;
         }
-      } else {
-        // Revert to BPM sync on stop to avoid snapping during motor brake
-        if (d2->SyncMode == 2)
-          d2->SyncMode = 1;
       }
     }
   }
@@ -102,9 +114,11 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2,
             if (d2->QuantizeEnabled) {
               int32_t waitMs =
                   Quantize_GetWaitMs(d2->LoadedTrack, d2->PositionMs);
+              DeckAudio_ExitLoop(&engine->Decks[1]);
               DeckAudio_QueueJumpMs(&engine->Decks[1], targetMs,
                                     (uint32_t)waitMs);
             } else {
+              DeckAudio_ExitLoop(&engine->Decks[1]);
               DeckAudio_JumpToMs(&engine->Decks[1], targetMs);
               DeckAudio_InstantPlay(&engine->Decks[1]);
             }
@@ -145,24 +159,32 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2,
   if (IsKeyPressed(m->cue1)) {
     if (engine->Decks[0].IsMotorOn) {
       // If playing: Stop and jump to Cue
-      DeckAudio_SetPlaying(&engine->Decks[0], false);
+      DeckAudio_InstantStop(&engine->Decks[0]);
+      DeckAudio_ExitLoop(&engine->Decks[0]);
       d1->SeekMs = d1->MainCueMs;
       d1->HasSeekRequest = true;
+      d1->PositionMs = d1->MainCueMs;
       d1->IsPlaying = false;
     } else {
       // If stopped: Set new cue if moved, and start preview
       if (d1->PositionMs != d1->MainCueMs) {
-        d1->MainCueMs = d1->PositionMs;
+        if (d1->QuantizeEnabled && d1->LoadedTrack) {
+          d1->MainCueMs =
+              Quantize_GetNearestBeatMs(d1->LoadedTrack, d1->PositionMs);
+        } else {
+          d1->MainCueMs = d1->PositionMs;
+        }
       }
-      DeckAudio_SetPlaying(&engine->Decks[0], true);
+      DeckAudio_InstantPlay(&engine->Decks[0]);
       d1->IsPlaying = true;
       d1->IsCueHeld = true;
     }
   }
   if (d1->IsCueHeld && IsKeyReleased(m->cue1)) {
-    DeckAudio_SetPlaying(&engine->Decks[0], false);
+    DeckAudio_InstantStop(&engine->Decks[0]);
     d1->SeekMs = d1->MainCueMs;
     d1->HasSeekRequest = true;
+    d1->PositionMs = d1->MainCueMs;
     d1->IsPlaying = false;
     d1->IsCueHeld = false;
   }
@@ -170,23 +192,31 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2,
   // Deck 2 Cue Handling
   if (IsKeyPressed(m->cue2)) {
     if (engine->Decks[1].IsMotorOn) {
-      DeckAudio_SetPlaying(&engine->Decks[1], false);
+      DeckAudio_InstantStop(&engine->Decks[1]);
+      DeckAudio_ExitLoop(&engine->Decks[1]);
       d2->SeekMs = d2->MainCueMs;
       d2->HasSeekRequest = true;
+      d2->PositionMs = d2->MainCueMs;
       d2->IsPlaying = false;
     } else {
       if (d2->PositionMs != d2->MainCueMs) {
-        d2->MainCueMs = d2->PositionMs;
+        if (d2->QuantizeEnabled && d2->LoadedTrack) {
+          d2->MainCueMs =
+              Quantize_GetNearestBeatMs(d2->LoadedTrack, d2->PositionMs);
+        } else {
+          d2->MainCueMs = d2->PositionMs;
+        }
       }
-      DeckAudio_SetPlaying(&engine->Decks[1], true);
+      DeckAudio_InstantPlay(&engine->Decks[1]);
       d2->IsPlaying = true;
       d2->IsCueHeld = true;
     }
   }
   if (d2->IsCueHeld && IsKeyReleased(m->cue2)) {
-    DeckAudio_SetPlaying(&engine->Decks[1], false);
+    DeckAudio_InstantStop(&engine->Decks[1]);
     d2->SeekMs = d2->MainCueMs;
     d2->HasSeekRequest = true;
+    d2->PositionMs = d2->MainCueMs;
     d2->IsPlaying = false;
     d2->IsCueHeld = false;
   }

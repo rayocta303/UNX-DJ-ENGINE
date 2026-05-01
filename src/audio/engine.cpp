@@ -820,7 +820,6 @@ void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching) {
     deck->JogRate = deck->OutlinedRate;
 }
 void DeckAudio_JumpToMs(DeckAudioState *deck, int64_t ms) {
-  deck->IsLooping = false;
 
   // Enforce -4 bar limit
   int64_t limitMs = 0;

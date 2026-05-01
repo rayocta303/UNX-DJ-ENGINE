@@ -137,7 +137,22 @@ void Sync_RequestPhaseSnap(DeckState *follower, DeckState *master, AudioEngine *
         
         // 3. Perform the jump in the audio engine
         int deckIdx = (follower->ID == 0) ? 0 : 1; 
-        DeckAudio_JumpToMs(&audioEngine->Decks[deckIdx], targetMs);
+        DeckAudioState *audio = &audioEngine->Decks[deckIdx];
+
+        // If looping, ensure targetMs wraps within the loop boundaries
+        if (audio->IsLooping) {
+            double sr = (double)audio->SampleRate;
+            uint32_t loopStartMs = (uint32_t)((audio->LoopStartPos / sr) * 1000.0);
+            uint32_t loopEndMs = (uint32_t)((audio->LoopEndPos / sr) * 1000.0);
+            uint32_t loopLenMs = loopEndMs - loopStartMs;
+
+            if (loopLenMs > 0) {
+                while (targetMs >= loopEndMs) targetMs -= loopLenMs;
+                while (targetMs < loopStartMs) targetMs += loopLenMs;
+            }
+        }
+
+        DeckAudio_JumpToMs(audio, targetMs);
     }
 }
 

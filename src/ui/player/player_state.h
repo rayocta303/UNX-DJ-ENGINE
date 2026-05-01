@@ -111,6 +111,7 @@ typedef struct DeckState {
   long long MainCueMs;
   bool IsCueHeld;
   bool IsCueActive; // For blinking or UI feedback
+  bool IsLooping;
 
   // MIDI Interaction Flags
   bool MidiRequestHotCue[8];
@@ -126,6 +127,8 @@ typedef struct DeckState {
   bool MidiRequestBeatJumpForward;
   bool MidiRequestBeatJumpBackward;
   bool MidiRequestAutoLoop[5]; // 1, 2, 4, 8, 16 beats
+  bool MidiRequestPlay;
+  bool MidiRequestCue;
 } DeckState;
 
 typedef struct BeatFXState {

@@ -511,6 +511,7 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
       ds->HasSeekRequest = true;
 
       // Start playback immediately without motor ramp
+      DeckAudio_ExitLoop(audio);
       DeckAudio_InstantPlay(audio);
       (void)ds; // Mark as used
     }
@@ -624,6 +625,7 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
 
     // Perform jump IMMEDIATELY on engine for maximum responsiveness
     double currentMs = (audio->Position / trackSR) * 1000.0;
+    DeckAudio_ExitLoop(audio);
     DeckAudio_JumpToMs(audio, (int64_t)(currentMs + (beats * beatDurationMs)));
 
     a->padState.ActiveLoopIdx[deckIdx] = -1;
@@ -632,6 +634,7 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
       HotCue hc = ds->LoadedTrack->HotCues[padIdx];
       ds->SeekMs = hc.Start;
       ds->HasSeekRequest = true;
+      DeckAudio_ExitLoop(audio);
       DeckAudio_InstantPlay(audio);
     }
   } else if (mode == PAD_MODE_RELEASE_FX) {
@@ -673,7 +676,7 @@ void OnPadRelease(void *ctx, int deckIdx, int padIdx) {
     DeckAudio_SetSlip(audio, false);
     a->padState.ActiveLoopIdx[deckIdx] = -1;
   } else if (mode == PAD_MODE_GATE_CUE) {
-    DeckAudio_Stop(audio);
+    DeckAudio_InstantStop(audio);
   }
 }
 
@@ -1129,8 +1132,10 @@ SetTargetFPS(60);
 
   // Register Controls after Init
   CO_Init();
-  CO_Register("[Channel1]", "play", CO_TYPE_BOOL,
-              &audioEngine->Decks[0].IsMotorOn, 0, 1);
+  CO_Register("[Channel1]", "play", CO_TYPE_BOOL, &app->deckA.MidiRequestPlay, 0,
+              1);
+  CO_Register("[Channel1]", "cue", CO_TYPE_BOOL, &app->deckA.MidiRequestCue, 0,
+              1);
   CO_Register("[Channel1]", "volume", CO_TYPE_FLOAT,
               &audioEngine->Decks[0].Trim, 0, 2.0f);
   CO_Register("[Channel1]", "filterHigh", CO_TYPE_FLOAT,
@@ -1213,8 +1218,10 @@ SetTargetFPS(60);
   CO_Register("[Channel1]", "autoloop_16", CO_TYPE_BOOL,
               &app->deckA.MidiRequestAutoLoop[4], 0, 1);
 
-  CO_Register("[Channel2]", "play", CO_TYPE_BOOL,
-              &audioEngine->Decks[1].IsMotorOn, 0, 1);
+  CO_Register("[Channel2]", "play", CO_TYPE_BOOL, &app->deckB.MidiRequestPlay, 0,
+              1);
+  CO_Register("[Channel2]", "cue", CO_TYPE_BOOL, &app->deckB.MidiRequestCue, 0,
+              1);
   CO_Register("[Channel2]", "volume", CO_TYPE_FLOAT,
               &audioEngine->Decks[1].Trim, 0, 2.0f);
   CO_Register("[Channel2]", "filterHigh", CO_TYPE_FLOAT,
@@ -1538,6 +1545,10 @@ void UpdateDrawFrame(App *app) {
   app->deckB.IsLoading = audioEngine->Decks[1].IsLoading;
   app->deckA.LoadingProgress = audioEngine->Decks[0].LoadingProgress;
   app->deckB.LoadingProgress = audioEngine->Decks[1].LoadingProgress;
+  app->deckA.IsLooping = audioEngine->Decks[0].IsLooping;
+  app->deckB.IsLooping = audioEngine->Decks[1].IsLooping;
+  if (!app->deckA.IsLooping) app->padState.ActiveLoopIdx[0] = -1;
+  if (!app->deckB.IsLooping) app->padState.ActiveLoopIdx[1] = -1;
 
   if (audioEngine->Decks[0].PCMBuffer) {
     // Position is already frame-based (L+R pair = 1 frame)
@@ -1719,6 +1730,57 @@ void UpdateDrawFrame(App *app) {
     DeckState *ds = (i == 0) ? &app->deckA : &app->deckB;
     DeckAudioState *audio = &audioEngine->Decks[i];
 
+    // Process MIDI Play Trigger
+    static bool lastMidiPlay[2] = {false};
+    if (ds->MidiRequestPlay && !lastMidiPlay[i]) {
+      if (ds->IsCueHeld) {
+        ds->IsCueHeld = false;
+        ds->IsPlaying = true;
+      } else {
+        bool target = !audio->IsMotorOn;
+        DeckAudio_SetPlaying(audio, target);
+        ds->IsPlaying = target;
+      }
+    }
+    lastMidiPlay[i] = ds->MidiRequestPlay;
+
+    // Process MIDI Cue Trigger
+    static bool lastMidiCue[2] = {false};
+    if (ds->MidiRequestCue && !lastMidiCue[i]) {
+      // Press
+      if (audio->IsMotorOn) {
+        DeckAudio_InstantStop(audio);
+        DeckAudio_ExitLoop(audio);
+        ds->SeekMs = ds->MainCueMs;
+        ds->HasSeekRequest = true;
+        ds->PositionMs = ds->MainCueMs;
+        ds->IsPlaying = false;
+      } else {
+        if (ds->PositionMs != ds->MainCueMs) {
+          if (ds->QuantizeEnabled && ds->LoadedTrack) {
+            ds->MainCueMs =
+                Quantize_GetNearestBeatMs(ds->LoadedTrack, ds->PositionMs);
+          } else {
+            ds->MainCueMs = ds->PositionMs;
+          }
+        }
+        DeckAudio_InstantPlay(audio);
+        ds->IsPlaying = true;
+        ds->IsCueHeld = true;
+      }
+    } else if (!ds->MidiRequestCue && lastMidiCue[i]) {
+      // Release
+      if (ds->IsCueHeld) {
+        DeckAudio_InstantStop(audio);
+        ds->SeekMs = ds->MainCueMs;
+        ds->HasSeekRequest = true;
+        ds->PositionMs = ds->MainCueMs;
+        ds->IsPlaying = false;
+        ds->IsCueHeld = false;
+      }
+    }
+    lastMidiCue[i] = ds->MidiRequestCue;
+
     // Hot Cues
     for (int j = 0; j < 8; j++) {
       if (ds->MidiRequestHotCue[j]) {
@@ -1728,11 +1790,13 @@ void UpdateDrawFrame(App *app) {
           if (ds->QuantizeEnabled && ds->IsPlaying) {
              int32_t waitMs = Quantize_GetWaitMs(ds->LoadedTrack, ds->PositionMs);
              if (waitMs > 5) { // Only queue if more than 5ms wait (avoid jitter)
+                 DeckAudio_ExitLoop(audio);
                  DeckAudio_QueueJumpMs(audio, targetMs, (uint32_t)waitMs);
                  ds->IsPlaying = true;
                  audio->IsPlaying = true;
                  audio->IsMotorOn = true;
              } else {
+                 DeckAudio_ExitLoop(audio);
                  ds->SeekMs = targetMs;
                  ds->HasSeekRequest = true;
                  ds->IsPlaying = true;
@@ -1740,6 +1804,7 @@ void UpdateDrawFrame(App *app) {
                  audio->IsMotorOn = true;
              }
           } else {
+             DeckAudio_ExitLoop(audio);
              ds->SeekMs = targetMs;
              ds->HasSeekRequest = true;
              ds->IsPlaying = true;
