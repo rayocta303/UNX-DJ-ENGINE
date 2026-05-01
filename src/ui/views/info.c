@@ -191,7 +191,7 @@ static void Info_Draw(Component *base) {
 
       // Comment
       if (trk->Comment[0]) {
-        float commY = panelY + panelH - S(26);
+        float commY = panelY + panelH - S(15);
         DrawRectangle(infoX, commY, panelW - (infoX - panelX) - S(10), S(14),
                       ColorDark1);
         UIDrawText("COMMENT:", faceXXS, infoX + S(5), commY + S(3.5f), S(7),
@@ -206,7 +206,8 @@ static void Info_Draw(Component *base) {
       if (trk->FilePath[0]) {
         char tPath[256];
         truncateStr(trk->FilePath, tPath, 150);
-        UIDrawText(tPath, faceXXS, panelX + S(10), panelY + panelH - S(9), S(6),
+        float pathY = trk->Comment[0] ? (panelY + panelH - S(22)) : (panelY + panelH - S(8));
+        UIDrawText(tPath, faceXXS, panelX + S(10), pathY, S(6),
                    Fade(ColorShadow, 0.4f));
       }
     }
