@@ -274,7 +274,7 @@ void OnSettingsApply(void *ctx) {
   }
 
   Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig,
-                a->activeControllerPath);
+                a->fxState, a->activeControllerPath);
 }
 
 void UpdateChannelOptions(App *a, int deviceIdx) {
@@ -344,7 +344,7 @@ void OnSettingsValueChanged(void *ctx, int idx) {
       PopulateMidiSettings(a);
       // Save immediately when preset changes
       Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig,
-                    a->activeControllerPath);
+                    a->fxState, a->activeControllerPath);
     }
   }
 }
@@ -728,6 +728,12 @@ void App_Init(App *a) {
   for (int i = 0; i < 3; i++)
     a->browserState.PlaylistBank[i].PlaylistIdx = -1;
 
+  // Init FX State (Defaults before loading)
+  memset(&a->fxState, 0, sizeof(BeatFXState));
+  a->fxState.LevelDepth = 0.5f;
+  a->fxState.SelectedPad = 4; // 1 Beat
+  a->fxState.Quantize = true;
+
   Browser_RefreshStorages(&a->browserState);
   UNX_LOG_INFO("[APP] App_Init completed.");
 
@@ -750,7 +756,7 @@ void App_Init(App *a) {
 
   // Load persisted settings
   Settings_Load(&a->deckA.Waveform, &a->deckB.Waveform, &a->activeAudioConfig,
-                a->activeControllerPath);
+                &a->fxState, a->activeControllerPath);
   if (a->activeControllerPath[0] != '\0') {
     MIDI_RefreshMapping(a->activeControllerPath);
   }
@@ -899,10 +905,6 @@ void App_Init(App *a) {
   // Init Info State
   memset(&a->infoState, 0, sizeof(InfoState));
   a->infoState.IsActive = false;
-
-  // Init FX State
-  memset(&a->fxState, 0, sizeof(BeatFXState));
-  a->fxState.LevelDepth = 0.5f;
 
   // Init About State
   memset(&a->aboutState, 0, sizeof(AboutState));
@@ -1403,6 +1405,9 @@ SetTargetFPS(60);
   }
 
   UNX_LOG_INFO("[MAIN] Shutting down...");
+  Settings_Save(app->deckA.Waveform, app->deckB.Waveform,
+                app->activeAudioConfig, app->fxState,
+                app->activeControllerPath);
   UIFonts_Unload();
 
   // Browser Cleanup (Inline to reduce external functions)

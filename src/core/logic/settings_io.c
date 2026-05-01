@@ -31,7 +31,7 @@ static void EnsureControllersExist(const char* baseDir) {
     }
 }
 
-static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio) {
+static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx) {
     if (!json) return;
     
     const char* p = json;
@@ -71,19 +71,18 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         if (sscanf(strstr(p, "\"buf\""), "\"buf\": %d", &ival) == 1) audio->BufferSizeFrames = ival;
         if (sscanf(strstr(p, "\"bitdepth\""), "\"bitdepth\": %d", &ival) == 1) audio->PCMBitDepth = ival;
     }
-    // Controllers
-    if ((p = strstr(json, "\"controllers\""))) {
-        char *start = strstr(p, "\"path\": \"");
-        if (start) {
-            start += 9;
-            char *end = strchr(start, '\"');
-            if (end) {
-            }
-        }
+    // Beat FX
+    if ((p = strstr(json, "\"beatfx\""))) {
+        if (sscanf(strstr(p, "\"fx\""), "\"fx\": %d", &ival) == 1) fx->SelectedFX = ival;
+        if (sscanf(strstr(p, "\"pad\""), "\"pad\": %d", &ival) == 1) fx->SelectedPad = ival;
+        if (sscanf(strstr(p, "\"ch\""), "\"ch\": %d", &ival) == 1) fx->SelectedChannel = ival;
+        if (sscanf(strstr(p, "\"depth\""), "\"depth\": %f", &val) == 1) fx->LevelDepth = val;
+        if (sscanf(strstr(p, "\"q\""), "\"q\": %d", &ival) == 1) fx->Quantize = (bool)ival;
+        if (sscanf(strstr(p, "\"tab\""), "\"tab\": %d", &ival) == 1) fx->ShowBeatFXTab = (bool)ival;
     }
 }
 
-void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, char *controllerPath) {
+void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, char *controllerPath) {
     // Defaults
     controllerPath[0] = '\0';
     wfmA->Style = WAVEFORM_STYLE_RGB;
@@ -95,6 +94,12 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     audio->MasterOutL = 0; audio->MasterOutR = 1;
     audio->CueOutL = 2; audio->CueOutR = 3;
     audio->SampleRate = 48000; audio->BufferSizeFrames = 256; audio->PCMBitDepth = 16;
+    
+    fx->SelectedFX = 0;
+    fx->SelectedPad = 4; // 1 Beat
+    fx->SelectedChannel = 0; // Master
+    fx->LevelDepth = 0.5f;
+    fx->Quantize = true;
 
     char path[512];
 
@@ -135,7 +140,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
 
     if (!f) {
         EnsureControllersExist("."); // Fallback to current dir if nothing else
-        Settings_Save(*wfmA, *wfmB, *audio, controllerPath);
+        Settings_Save(*wfmA, *wfmB, *audio, *fx, controllerPath);
         return;
     }
 
@@ -147,7 +152,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     if (buf) {
         fread(buf, 1, size, f);
         buf[size] = '\0';
-        LoadFromJSON(buf, wfmA, wfmB, audio);
+        LoadFromJSON(buf, wfmA, wfmB, audio, fx);
         
         // Extract controller path manually to avoid changing too many signatures
         const char *p;
@@ -169,7 +174,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     fclose(f);
 }
 
-void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendConfig audio, const char *controllerPath) {
+void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendConfig audio, BeatFXState fx, const char *controllerPath) {
     char path[512];
 
 #if defined(__ANDROID__)
@@ -206,6 +211,8 @@ void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendCon
             wfmB.Style, wfmB.GainLow, wfmB.GainMid, wfmB.GainHigh, wfmB.VinylStartMs, wfmB.VinylStopMs, wfmB.LoadLock ? 1 : 0);
     fprintf(f, "  \"audio\": { \"devIdx\": %d, \"mastL\": %d, \"mastR\": %d, \"cueL\": %d, \"cueR\": %d, \"sr\": %d, \"buf\": %d, \"bitdepth\": %d },\n",
             audio.DeviceIndex, audio.MasterOutL, audio.MasterOutR, audio.CueOutL, audio.CueOutR, audio.SampleRate, audio.BufferSizeFrames, audio.PCMBitDepth);
+    fprintf(f, "  \"beatfx\": { \"fx\": %d, \"pad\": %d, \"ch\": %d, \"depth\": %.2f, \"q\": %d, \"tab\": %d },\n",
+            fx.SelectedFX, fx.SelectedPad, fx.SelectedChannel, fx.LevelDepth, fx.Quantize ? 1 : 0, fx.ShowBeatFXTab ? 1 : 0);
     fprintf(f, "  \"controllers\": { \"path\": \"%s\" }\n", controllerPath ? controllerPath : "");
     fprintf(f, "}\n");
 
