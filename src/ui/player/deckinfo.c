@@ -32,9 +32,11 @@ static int DeckInfo_Update(Component *base) {
     float btnW = (deckInfoW - margin * 2 - S(6)) / 2.0f;
 
     // 1. Eject
-    float ejectX = deckInfoW - S(16);
-    float ejectY = y + S(3.5f);
-    Rectangle ejectRect = { ejectX - S(4), ejectY - S(2), S(20), S(12) };
+    float ejectW = S(20);
+    float ejectH = S(9);
+    float ejectX = deckInfoW - ejectW - S(3);
+    float ejectY = y + (headerH - ejectH) / 2.0f;
+    Rectangle ejectRect = { ejectX, ejectY, ejectW, ejectH };
     
     if (d->State->LoadedTrack != NULL && CheckCollisionPointRec(UIGetMousePosition(), ejectRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         DeckAudio_Unload(&d->Engine->Decks[d->ID]);
@@ -166,13 +168,22 @@ static void DeckInfo_Draw(Component *base) {
     sprintf(deckLabel, "DECK %d", d->ID + 1);
     UIDrawText(deckLabel, faceXXS, margin, y + S(3.5f), S(7), ColorWhite);
 
-    // Eject
-    float ejectX = deckInfoW - S(16);
-    float ejectY = y + S(3.5f);
-    Rectangle ejectRect = { ejectX - S(4), ejectY - S(2), S(20), S(12) };
+    // Eject Button
+    float ejectW = S(20);
+    float ejectH = S(9);
+    float ejectX = deckInfoW - ejectW - S(3);
+    float ejectY = y + (headerH - ejectH) / 2.0f;
+    Rectangle ejectRect = { ejectX, ejectY, ejectW, ejectH };
+
     if (d->State->LoadedTrack != NULL) {
         bool hoverEject = CheckCollisionPointRec(UIGetMousePosition(), ejectRect);
-        UIDrawText("\uf052", faceIcon, ejectX, ejectY, S(10), hoverEject ? ColorRed : ColorShadow);
+        
+        // Button Background
+        DrawRectangleRounded(ejectRect, 0.4f, 6, hoverEject ? ColorRed : Fade(ColorBlack, 0.4f));
+        DrawRectangleLinesEx(ejectRect, S(0.6f), hoverEject ? ColorWhite : ColorShadow);
+        
+        // Icon (Eject) - Adjusted size for better fit
+        UIDrawText("\uf052", faceIcon, ejectRect.x + (ejectW - S(7))/2.0f, ejectRect.y + S(1.0f), S(7), ColorWhite);
     }
 
     float contentY = y + headerH + S(6);

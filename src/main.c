@@ -1442,11 +1442,6 @@ void ManageArtwork(DeckState *ds) {
       strncpy(fixedPath, ds->ArtworkPath, 511);
       fixedPath[511] = '\0';
 
-      // Remove trailing ']' if present
-      size_t len = strlen(fixedPath);
-      if (len > 0 && fixedPath[len - 1] == ']')
-        fixedPath[len - 1] = '\0';
-
       // Normalize slashes for Windows
       for (int p = 0; fixedPath[p]; p++)
         if (fixedPath[p] == '\\')
@@ -1539,6 +1534,11 @@ void UpdateDrawFrame(App *app) {
   }
 
   // --- Sync Audio Engine State to UI State ---
+  app->deckA.IsLoading = audioEngine->Decks[0].IsLoading;
+  app->deckB.IsLoading = audioEngine->Decks[1].IsLoading;
+  app->deckA.LoadingProgress = audioEngine->Decks[0].LoadingProgress;
+  app->deckB.LoadingProgress = audioEngine->Decks[1].LoadingProgress;
+
   if (audioEngine->Decks[0].PCMBuffer) {
     // Position is already frame-based (L+R pair = 1 frame)
     double playheadFrames = audioEngine->Decks[0].Position;

@@ -38,9 +38,8 @@ static std::string RB_GetString(rekordbox_pdb_t::device_sql_string_t* rbs) {
     else if (auto b = dynamic_cast<rekordbox_pdb_t::device_sql_long_ascii_t*>(body)) result = b->text();
     else if (auto b = dynamic_cast<rekordbox_pdb_t::device_sql_short_ascii_t*>(body)) result = b->text();
     
-    // Cleanup: Remove any trailing garbage like ']' or non-printable chars
+    // Cleanup: Remove non-printable chars (whitespace, etc.)
     while (!result.empty() && (unsigned char)result.back() <= 32) result.pop_back();
-    if (!result.empty() && result.back() == ']') result.pop_back();
     
     return result;
 }

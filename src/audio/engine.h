@@ -113,6 +113,7 @@ typedef struct DeckAudioState {
   // Release FX State
   int ReleaseFXType;   // 0=None, 1=Brake, 2=Spin, 3=Echo
   float ReleaseFXTimer; 
+  uint32_t LastLoadID; // Track latest load request ID for task cancellation
 } DeckAudioState;
 
 typedef struct AudioEngine {

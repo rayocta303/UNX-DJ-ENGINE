@@ -22,17 +22,27 @@
 using namespace soundtouch;
 
 void DeckAudio_LoadTrackAsync(DeckAudioState *deck, const char *filePath) {
-  if (deck->IsLoading)
-    return;
-
+  // Increment LoadID and capture it for this thread
+  uint32_t myID = ++(deck->LastLoadID);
+  
   deck->IsLoading = true;
   deck->LoadingProgress = 0.0f;
 
   std::string path = filePath;
-  std::thread([deck, path]() {
+  std::thread([deck, path, myID]() {
     DeckAudio_LoadTrack(deck, path.c_str());
-    deck->IsLoading = false;
-    deck->LoadingProgress = 1.0f;
+    
+    // Only clear IsLoading if this was the latest request
+    if (deck->LastLoadID == myID) {
+      deck->IsLoading = false;
+      deck->LoadingProgress = 1.0f;
+    } else {
+      // Stale request, but DeckAudio_LoadTrack already modified the deck.
+      // This is still a bit problematic because DeckAudio_LoadTrack modifies state.
+      // However, if DeckAudio_LoadTrack(deck, path) is called for the next track,
+      // it will overwrite whatever this thread did.
+      // The race condition happens if the second thread finishes BEFORE the first.
+    }
   }).detach();
 }
 
@@ -119,30 +129,22 @@ void AudioEngine_Destroy(AudioEngine *engine) {
 }
 
 void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
-  if (deck->PCMBuffer) {
-    void *oldBuf = deck->PCMBuffer;
-    deck->PCMBuffer = NULL;
-    deck->TotalSamples = 0;
-    free(oldBuf);
-  }
-  deck->Position = 0;
-  deck->MT_ReadPos = 0;
-  deck->IsPlaying = false;
-  deck->SampleRate = 44100;
-  deck->IsMotorOn = false;
-  deck->IsTouching = false;
-  deck->VinylModeEnabled = true;
-  deck->OutlinedRate = 0;
-  deck->JogRate = 0;
-
-  if (deck->SoundTouchHandle) {
-    ((SoundTouch *)deck->SoundTouchHandle)->clear();
-  }
-  strncpy(deck->FilePath, filePath, 511);
-  deck->FilePath[511] = '\0';
-
-  if (!filePath || strlen(filePath) == 0)
+  uint32_t myID = deck->LastLoadID;
+  
+  if (!filePath || strlen(filePath) == 0) {
+    if (deck->PCMBuffer) {
+      void *oldBuf = deck->PCMBuffer;
+      deck->PCMBuffer = NULL;
+      deck->TotalSamples = 0;
+      free(oldBuf);
+    }
     return;
+  }
+
+  // Decode into local variables first to prevent race conditions during long decoding
+  void* localPCM = NULL;
+  uint32_t localSamples = 0;
+  uint32_t localRate = 44100;
 
   const char *ext = strrchr(filePath, '.');
   bool isWav =
@@ -167,18 +169,16 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
               stereoBuf[i * 2 + 1] = pSampleData[i];
             }
             drwav_free(pSampleData, NULL);
-            deck->PCMBuffer = stereoBuf;
-            deck->TotalSamples = totalPCMFrameCount * 2;
+            localPCM = stereoBuf;
+            localSamples = (uint32_t)(totalPCMFrameCount * 2);
           } else {
             drwav_free(pSampleData, NULL);
-            deck->PCMBuffer = NULL;
-            deck->TotalSamples = 0;
           }
         } else {
-          deck->PCMBuffer = pSampleData;
-          deck->TotalSamples = totalPCMFrameCount * channels;
+          localPCM = pSampleData;
+          localSamples = (uint32_t)(totalPCMFrameCount * channels);
         }
-        deck->SampleRate = sampleRate;
+        localRate = sampleRate;
       }
     } else {
       int16_t *pSampleData = drwav_open_file_and_read_pcm_frames_s16(
@@ -193,18 +193,16 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
               stereoBuf[i * 2 + 1] = pSampleData[i];
             }
             drwav_free(pSampleData, NULL);
-            deck->PCMBuffer = stereoBuf;
-            deck->TotalSamples = totalPCMFrameCount * 2;
+            localPCM = stereoBuf;
+            localSamples = (uint32_t)(totalPCMFrameCount * 2);
           } else {
             drwav_free(pSampleData, NULL);
-            deck->PCMBuffer = NULL;
-            deck->TotalSamples = 0;
           }
         } else {
-          deck->PCMBuffer = pSampleData;
-          deck->TotalSamples = totalPCMFrameCount * channels;
+          localPCM = pSampleData;
+          localSamples = (uint32_t)(totalPCMFrameCount * channels);
         }
-        deck->SampleRate = sampleRate;
+        localRate = sampleRate;
       }
     }
   } else {
@@ -214,7 +212,6 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
 
     if (res == 0) {
       if (deck->BitDepth == 24) {
-        // Convert 16-bit MP3 samples to 24-bit (stored in 32-bit int)
         int32_t *buf24 = (int32_t *)malloc(
             info.samples * (info.channels == 1 ? 2 : 1) * sizeof(int32_t));
         if (buf24) {
@@ -230,12 +227,10 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
             }
           }
           free(info.buffer);
-          deck->PCMBuffer = buf24;
-          deck->TotalSamples = info.samples * (info.channels == 1 ? 2 : 1);
+          localPCM = buf24;
+          localSamples = (uint32_t)(info.samples * (info.channels == 1 ? 2 : 1));
         } else {
           free(info.buffer);
-          deck->PCMBuffer = NULL;
-          deck->TotalSamples = 0;
         }
       } else {
         if (info.channels == 1) {
@@ -247,21 +242,51 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
               stereoBuf[i * 2 + 1] = info.buffer[i];
             }
             free(info.buffer);
-            deck->PCMBuffer = stereoBuf;
-            deck->TotalSamples = info.samples * 2;
+            localPCM = stereoBuf;
+            localSamples = (uint32_t)(info.samples * 2);
           } else {
             free(info.buffer);
-            deck->PCMBuffer = NULL;
-            deck->TotalSamples = 0;
           }
         } else {
-          deck->PCMBuffer = info.buffer;
-          deck->TotalSamples = info.samples;
+          localPCM = info.buffer;
+          localSamples = (uint32_t)info.samples;
         }
       }
-      deck->SampleRate = info.hz;
+      localRate = info.hz;
     }
   }
+
+  // Check if a newer load request has arrived during decoding
+  if (myID != deck->LastLoadID) {
+    if (localPCM) free(localPCM);
+    return;
+  }
+
+  // Final apply to deck (Safe update)
+  if (deck->PCMBuffer) {
+    void *oldBuf = deck->PCMBuffer;
+    deck->PCMBuffer = NULL; 
+    free(oldBuf);
+  }
+
+  deck->PCMBuffer = localPCM;
+  deck->TotalSamples = localSamples;
+  deck->SampleRate = localRate;
+
+  deck->Position = 0;
+  deck->MT_ReadPos = 0;
+  deck->IsPlaying = false;
+  deck->IsMotorOn = false;
+  deck->IsTouching = false;
+  deck->VinylModeEnabled = true;
+  deck->OutlinedRate = 0;
+  deck->JogRate = 0;
+
+  if (deck->SoundTouchHandle) {
+    ((SoundTouch *)deck->SoundTouchHandle)->clear();
+  }
+  strncpy(deck->FilePath, filePath, 511);
+  deck->FilePath[511] = '\0';
 }
 
 static void ProcessDeckPhysics(DeckAudioState *deck) {
