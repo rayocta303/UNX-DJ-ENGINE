@@ -103,6 +103,10 @@ SystemStats GetSystemStats() {
 
     return stats;
 }
+
+void System_ShowKeyboard(bool show) {
+    (void)show;
+}
 #elif defined(__linux__)
 #include <sys/sysinfo.h>
 #include <stdio.h>
@@ -165,6 +169,10 @@ SystemStats GetSystemStats() {
 
     return stats;
 }
+
+void System_ShowKeyboard(bool show) {
+    (void)show;
+}
 #elif defined(__ANDROID__)
 #include <android/native_app_glue.h>
 
@@ -195,6 +203,17 @@ SystemStats GetSystemStats() {
     }
     return stats;
 }
+
+void System_ShowKeyboard(bool show) {
+    struct android_app *app = GetAndroidApp();
+    if (app && app->activity) {
+        if (show) {
+            ANativeActivity_showSoftInput(app->activity, ANATIVEACTIVITY_SHOW_SOFT_INPUT_FORCED);
+        } else {
+            ANativeActivity_hideSoftInput(app->activity, 0);
+        }
+    }
+}
 #elif defined(__APPLE__) && TARGET_OS_IPHONE
 SystemStats GetSystemStats() {
     SystemStats stats = {0.05f, 150.0f, 8192.0f, -1.0f, false};
@@ -202,9 +221,17 @@ SystemStats GetSystemStats() {
     stats.isCharging = ios_is_battery_charging();
     return stats;
 }
+
+void System_ShowKeyboard(bool show) {
+    (void)show;
+}
 #else
 SystemStats GetSystemStats() {
     SystemStats stats = {0.05f, 150.0f, 8192.0f, -1.0f, false};
     return stats;
+}
+
+void System_ShowKeyboard(bool show) {
+    (void)show;
 }
 #endif

@@ -12,5 +12,6 @@ typedef struct {
 } SystemStats;
 
 SystemStats GetSystemStats(void);
+void System_ShowKeyboard(bool show);
 
 #endif

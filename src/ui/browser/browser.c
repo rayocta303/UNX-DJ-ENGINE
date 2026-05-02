@@ -5,11 +5,31 @@
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
 #include "ui/player/player_state.h"
+#include "core/system_info.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <ctype.h>
 #include <sys/stat.h>
+
+// Case-insensitive substring search helper
+static const char* stristr_local(const char* haystack, const char* needle) {
+  if (!*needle) return haystack;
+  for (; *haystack; ++haystack) {
+    if (tolower((unsigned char)*haystack) == tolower((unsigned char)*needle)) {
+      const char* h = haystack;
+      const char* n = needle;
+      while (*h && *n && tolower((unsigned char)*h) == tolower((unsigned char)*n)) {
+        ++h;
+        ++n;
+      }
+      if (!*n) return haystack;
+    }
+  }
+  return NULL;
+}
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -138,10 +158,39 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
       }
     }
   }
+
+  // Apply search filter
+  if (s->IsSearching && s->SearchQuery[0] != '\0') {
+    int filteredCount = 0;
+    if (s->DatabaseType == 0 && s->TrackPointers) { // Rekordbox
+      for (int i = 0; i < s->ActiveTrackCount; i++) {
+        RBTrack *t = s->TrackPointers[i];
+        if (t) {
+          if (stristr_local(t->Title, s->SearchQuery) || stristr_local(t->Artist, s->SearchQuery)) {
+            s->TrackPointers[filteredCount++] = t;
+          }
+        }
+      }
+    } else if (s->DatabaseType == 1 && s->SeratoTrackPointers) { // Serato
+      for (int i = 0; i < s->ActiveTrackCount; i++) {
+        SeratoTrack *t = s->SeratoTrackPointers[i];
+        if (t) {
+          if (stristr_local(t->Title, s->SearchQuery) || stristr_local(t->Artist, s->SearchQuery)) {
+            s->SeratoTrackPointers[filteredCount++] = t;
+          }
+        }
+      }
+    }
+    s->ActiveTrackCount = filteredCount;
+  }
 }
 
 void Browser_Back(BrowserState *s) {
-  if (s->IsTagList) {
+  if (s->IsSearching) {
+      s->IsSearching = false;
+      s->SearchQuery[0] = '\0';
+      Browser_UpdateActiveTracks(s);
+  } else if (s->IsTagList) {
     s->IsTagList = false;
   } else if (s->BrowseLevel < 3) {
     s->BrowseLevel++;
@@ -367,6 +416,63 @@ static int Browser_Update(Component *base) {
   int loadToDeck = -1;
   bool triggerEnter = false;
 
+  // Search Box Click Interaction
+  Vector2 mousePos = UIGetMousePosition();
+  if (s->BrowseLevel == 0) {
+    float sidebarW = S(40);
+    float listW = SCREEN_WIDTH - sidebarW - S(8);
+    if (s->InfoEnabled)
+      listW = SCREEN_WIDTH - sidebarW - S(160);
+    Rectangle searchBoxRect = {sidebarW, TOP_BAR_H, listW, S(28.0f)};
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (CheckCollisionPointRec(mousePos, searchBoxRect)) {
+            if (!s->IsSearching) {
+                s->IsSearching = true;
+                System_ShowKeyboard(true);
+            }
+        } else {
+            // Click outside, maybe close search keyboard but don't clear query
+            if (s->IsSearching) {
+                s->IsSearching = false;
+                System_ShowKeyboard(false);
+            }
+        }
+    }
+  }
+
+  // Keyboard Typing Interaction
+  if (s->IsSearching) {
+    bool queryChanged = false;
+    int key = GetCharPressed();
+    while (key > 0) {
+      if ((key >= 32) && (key <= 125) && (strlen(s->SearchQuery) < 63)) {
+        int len = strlen(s->SearchQuery);
+        s->SearchQuery[len] = (char)key;
+        s->SearchQuery[len+1] = '\0';
+        queryChanged = true;
+      }
+      key = GetCharPressed();
+    }
+    
+    if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) {
+      int len = strlen(s->SearchQuery);
+      if (len > 0) {
+        s->SearchQuery[len-1] = '\0';
+        queryChanged = true;
+      }
+    }
+    
+    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_ESCAPE)) {
+      s->IsSearching = false;
+      System_ShowKeyboard(false);
+    }
+    
+    if (queryChanged) {
+      s->CursorPos = s->ScrollOffset = 0;
+      Browser_UpdateActiveTracks(s);
+    }
+  }
+
   // MIDI Navigation
   if (s->MidiBrowseDelta != 0) {
       if (s->MidiBrowseDelta > 0) {
@@ -403,7 +509,6 @@ static int Browser_Update(Component *base) {
   }
 
   int targetIdx = s->ScrollOffset + s->CursorPos;
-  Vector2 mousePos = UIGetMousePosition();
 
   // Load Popup Dialog Interaction handled FIRST to prevent same-frame double
   // triggers
@@ -449,10 +554,14 @@ static int Browser_Update(Component *base) {
       loadToDeck = 1;
   }
 
-  // Mouse Interaction
   float sidebarW = S(40);
   float rowH = S(28.0f);
   int totalVisible = 10;
+  float listYOffset = TOP_BAR_H;
+  if (s->BrowseLevel == 0) {
+      totalVisible = 9;
+      listYOffset += rowH;
+  }
   float listW = SCREEN_WIDTH - sidebarW - S(8);
   if (s->InfoEnabled)
     listW = SCREEN_WIDTH - sidebarW - S(160);
@@ -581,7 +690,7 @@ static int Browser_Update(Component *base) {
       if (idx >= totalItems)
         break;
 
-      Rectangle itemRect = {sidebarW, TOP_BAR_H + i * rowH, listW, rowH};
+      Rectangle itemRect = {sidebarW, listYOffset + i * rowH, listW, rowH};
       if (CheckCollisionPointRec(mousePos, itemRect)) {
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
           s->TouchDragAccumulator = 0;
@@ -602,7 +711,7 @@ static int Browser_Update(Component *base) {
         // Check if internal "LOAD" button area was clicked (only for tracks)
         float loadBtnW = S(45);
         Rectangle loadBtnRect = {sidebarW + listW - loadBtnW - S(5),
-                                 TOP_BAR_H + i * rowH + S(4), loadBtnW,
+                                 listYOffset + i * rowH + S(4), loadBtnW,
                                  rowH - S(8)};
         bool isLoadClick = (s->BrowseLevel == 0) &&
                            CheckCollisionPointRec(mousePos, loadBtnRect);
@@ -1121,12 +1230,39 @@ static void Browser_Draw(Component *base) {
                S(10), headerClr);
   }
 
+  float listYOffset = TOP_BAR_H;
   float rowH = S(28.0f);
   int totalVisible = 10;
   float listX = sidebarW;
   float listW = SCREEN_WIDTH - sidebarW - S(8);
   if (s->InfoEnabled)
     listW = SCREEN_WIDTH - sidebarW - S(160);
+
+  // Draw Search Box
+  if (s->BrowseLevel == 0) {
+    totalVisible = 9;
+    Rectangle searchBoxRect = {listX, listYOffset, listW, rowH};
+    listYOffset += rowH;
+    
+    DrawRectangleRec(searchBoxRect, s->IsSearching ? ColorDark1 : ColorDark2);
+    DrawRectangleLinesEx(searchBoxRect, 1.0f, s->IsSearching ? ColorBlue : ColorDark1);
+    
+    char displayQuery[128];
+    if (strlen(s->SearchQuery) > 0) {
+        snprintf(displayQuery, sizeof(displayQuery), "%s", s->SearchQuery);
+    } else {
+        snprintf(displayQuery, sizeof(displayQuery), s->IsSearching ? "" : "Search...");
+    }
+    
+    // Draw text with a simple blink cursor if searching
+    if (s->IsSearching && (int)(GetTime() * 2) % 2 == 0) {
+        strncat(displayQuery, "|", sizeof(displayQuery) - strlen(displayQuery) - 1);
+    }
+    
+    // Draw Search Icon and Text
+    UIDrawText("\uf002", faceIcon, searchBoxRect.x + S(8), searchBoxRect.y + S(8), S(12), s->IsSearching ? ColorWhite : ColorShadow);
+    UIDrawText(displayQuery, faceXS, searchBoxRect.x + S(30), searchBoxRect.y + S(9), S(10), s->IsSearching ? ColorWhite : ColorShadow);
+  }
 
   for (int i = 0; i < totalVisible; i++) {
     int idx = s->ScrollOffset + i;
@@ -1190,7 +1326,7 @@ static void Browser_Draw(Component *base) {
     if (title[0] == '\0')
       continue;
 
-    float ry = TOP_BAR_H + i * rowH;
+    float ry = listYOffset + i * rowH;
     bool isCursor = (i == s->CursorPos);
 
     if (isCursor) {
@@ -1246,9 +1382,9 @@ static void Browser_Draw(Component *base) {
 
     // BPM & Key & LOAD Button
     if (s->BrowseLevel == 0 && !s->InfoEnabled) {
-      UIDrawText(bpmText, faceXS, listX + listW - S(125), ry + S(4), S(10),
+      UIDrawText(bpmText, faceXS, listX + listW - S(125), ry + S(9), S(10),
                  isCursor ? ColorWhite : ColorShadow);
-      UIDrawText(keyStr, faceXS, listX + listW - S(85), ry + S(4), S(10),
+      UIDrawText(keyStr, faceXS, listX + listW - S(85), ry + S(9), S(10),
                  isCursor ? ColorWhite : ColorShadow);
 
       // LOAD Button
@@ -1260,7 +1396,7 @@ static void Browser_Draw(Component *base) {
       DrawRectangleRec(loadRect, hoverLoad ? ColorBlue : ColorDark3);
       DrawRectangleLinesEx(loadRect, 1.0f, ColorShadow);
       DrawCentredText("LOAD", faceXS, loadRect.x, loadRect.width,
-                      loadRect.y + S(2), S(10), ColorWhite);
+                      loadRect.y + S(5), S(10), ColorWhite);
     }
 
     // Storage icons

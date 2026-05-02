@@ -70,6 +70,10 @@ typedef struct {
     int MidiBrowseDelta;
     bool MidiRequestLoadA;
     bool MidiRequestLoadB;
+
+    // Search functionality
+    char SearchQuery[64];
+    bool IsSearching;
 } BrowserState;
 
 void Browser_RefreshStorages(BrowserState *s);

@@ -1660,8 +1660,11 @@ void UpdateDrawFrame(App *app) {
   lastMasterA = app->deckA.IsMaster;
   lastMasterB = app->deckB.IsMaster;
 
-  HandleKeyboardInputs(&app->keyMap, &app->deckA, &app->deckB, audioEngine,
-                       &app->fxState);
+  // Skip deck/mixer keyboard shortcuts when browser is open
+  if (!app->browserState.IsActive) {
+    HandleKeyboardInputs(&app->keyMap, &app->deckA, &app->deckB, audioEngine,
+                         &app->fxState);
+  }
   MIDI_Update(&app->midiCtx, &app->deckA, &app->deckB, audioEngine);
 
   // --- Global Beat FX Sync ---
@@ -1705,7 +1708,8 @@ void UpdateDrawFrame(App *app) {
   }
 
   // --- MIDI UI Navigation ---
-  if (app->MidiRequestBrowser || IsKeyPressed(app->keyMap.toggleBrowser)) {
+  bool _searchFocused = app->browserState.IsActive && app->browserState.IsSearching;
+  if (app->MidiRequestBrowser || (!_searchFocused && IsKeyPressed(app->keyMap.toggleBrowser))) {
     TopBar_OnBrowse(app);
     app->MidiRequestBrowser = false;
   }
@@ -1987,7 +1991,9 @@ void UpdateDrawFrame(App *app) {
         1.0f / ((ds->Waveform.VinylStopMs / 1000.0f) * blocksPerSec + 1.0f);
   }
 
-  if (IsKeyPressed(app->keyMap.toggleInfo)) {
+  bool browserSearchFocused = app->browserState.IsActive && app->browserState.IsSearching;
+
+  if (!browserSearchFocused && IsKeyPressed(app->keyMap.toggleInfo)) {
     if (app->screen == ScreenInfo) {
       app->screen = ScreenPlayer;
       app->infoState.IsActive = false;
@@ -2017,7 +2023,9 @@ void UpdateDrawFrame(App *app) {
     }
   }
 
-  if (IsKeyPressed(app->keyMap.toggleSettings)) {
+  // Block view-switch and back hotkeys while the browser search bar is focused
+
+  if (!browserSearchFocused && IsKeyPressed(app->keyMap.toggleSettings)) {
     if (app->screen == ScreenSettings) {
       app->screen = ScreenPlayer;
       app->settingsState.IsActive = false;
@@ -2027,7 +2035,7 @@ void UpdateDrawFrame(App *app) {
     }
   }
 
-  if (IsKeyPressed(app->keyMap.toggleMixer)) {
+  if (!browserSearchFocused && IsKeyPressed(app->keyMap.toggleMixer)) {
     if (app->screen == ScreenMixer) {
       app->screen = ScreenPlayer;
       app->mixerState.IsActive = false;
@@ -2040,7 +2048,7 @@ void UpdateDrawFrame(App *app) {
   }
 
   // ESC / Back logic
-  if (IsKeyPressed(app->keyMap.back)) {
+  if (!browserSearchFocused && IsKeyPressed(app->keyMap.back)) {
     if (app->screen == ScreenBrowser) {
       if (app->browserState.BrowseLevel == 3 && !app->browserState.IsTagList) {
         app->screen = ScreenPlayer;
