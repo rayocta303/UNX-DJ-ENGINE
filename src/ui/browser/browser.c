@@ -90,6 +90,68 @@ static void Browser_SwitchStorageByPath(BrowserState *s, const char *path) {
   }
 }
 
+// Sorter Helpers
+static int CompareTracks_BPM_RB(const void *a, const void *b) {
+    RBTrack *ta = *(RBTrack **)a;
+    RBTrack *tb = *(RBTrack **)b;
+    if (!ta || !tb) return 0;
+    if (ta->BPM < tb->BPM) return -1;
+    if (ta->BPM > tb->BPM) return 1;
+    return 0;
+}
+
+static int CompareTracks_Key_RB(const void *a, const void *b) {
+    RBTrack *ta = *(RBTrack **)a;
+    RBTrack *tb = *(RBTrack **)b;
+    if (!ta || !tb) return 0;
+    return strcmp(ta->Key, tb->Key);
+}
+
+static int CompareTracks_BPM_Serato(const void *a, const void *b) {
+    SeratoTrack *ta = *(SeratoTrack **)a;
+    SeratoTrack *tb = *(SeratoTrack **)b;
+    if (!ta || !tb) return 0;
+    if (ta->BPM < tb->BPM) return -1;
+    if (ta->BPM > tb->BPM) return 1;
+    return 0;
+}
+
+static int CompareTracks_Key_Serato(const void *a, const void *b) {
+    SeratoTrack *ta = *(SeratoTrack **)a;
+    SeratoTrack *tb = *(SeratoTrack **)b;
+    if (!ta || !tb) return 0;
+    return strcmp(ta->Key, tb->Key);
+}
+static int CompareTracks_Title_RB(const void *a, const void *b) {
+    RBTrack *ta = *(RBTrack **)a;
+    RBTrack *tb = *(RBTrack **)b;
+    if (!ta || !tb) return 0;
+    return strcmp(ta->Title, tb->Title);
+}
+
+static int CompareTracks_Rating_RB(const void *a, const void *b) {
+    RBTrack *ta = *(RBTrack **)a;
+    RBTrack *tb = *(RBTrack **)b;
+    if (!ta || !tb) return 0;
+    // Sort ratings descending (5 stars first)
+    if (ta->Rating > tb->Rating) return -1;
+    if (ta->Rating < tb->Rating) return 1;
+    return 0;
+}
+
+static int CompareTracks_Title_Serato(const void *a, const void *b) {
+    SeratoTrack *ta = *(SeratoTrack **)a;
+    SeratoTrack *tb = *(SeratoTrack **)b;
+    if (!ta || !tb) return 0;
+    return strcmp(ta->Title, tb->Title);
+}
+
+static int CompareTracks_Rating_Serato(const void *a, const void *b) {
+    // SeratoTrack struct currently lacks a Rating field in the DB v2 parser.
+    // Retain original order.
+    return 0;
+}
+
 static void Browser_UpdateActiveTracks(BrowserState *s) {
   if (s->DatabaseType == 0) { // Rekordbox
     if (!s->DB) {
@@ -182,6 +244,20 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
       }
     }
     s->ActiveTrackCount = filteredCount;
+  }
+  // Apply Sort
+  if (s->SortMode > 0 && s->ActiveTrackCount > 0) {
+      if (s->DatabaseType == 0 && s->TrackPointers) { // Rekordbox
+          if (s->SortMode == 1) qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *), CompareTracks_BPM_RB);
+          else if (s->SortMode == 2) qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *), CompareTracks_Key_RB);
+          else if (s->SortMode == 3) qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *), CompareTracks_Title_RB);
+          else if (s->SortMode == 4) qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *), CompareTracks_Rating_RB);
+      } else if (s->DatabaseType == 1 && s->SeratoTrackPointers) { // Serato
+          if (s->SortMode == 1) qsort(s->SeratoTrackPointers, s->ActiveTrackCount, sizeof(SeratoTrack *), CompareTracks_BPM_Serato);
+          else if (s->SortMode == 2) qsort(s->SeratoTrackPointers, s->ActiveTrackCount, sizeof(SeratoTrack *), CompareTracks_Key_Serato);
+          else if (s->SortMode == 3) qsort(s->SeratoTrackPointers, s->ActiveTrackCount, sizeof(SeratoTrack *), CompareTracks_Title_Serato);
+          else if (s->SortMode == 4) qsort(s->SeratoTrackPointers, s->ActiveTrackCount, sizeof(SeratoTrack *), CompareTracks_Rating_Serato);
+      }
   }
 }
 
@@ -416,22 +492,69 @@ static int Browser_Update(Component *base) {
   int loadToDeck = -1;
   bool triggerEnter = false;
 
-  // Search Box Click Interaction
+  // Dropdown and Search Box Interaction
   Vector2 mousePos = UIGetMousePosition();
   if (s->BrowseLevel == 0) {
     float sidebarW = S(40);
     float listW = SCREEN_WIDTH - sidebarW - S(8);
-    if (s->InfoEnabled)
-      listW = SCREEN_WIDTH - sidebarW - S(160);
-    Rectangle searchBoxRect = {sidebarW, TOP_BAR_H, listW, S(28.0f)};
-    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    if (s->InfoEnabled) listW = SCREEN_WIDTH - sidebarW - S(160);
+    
+    float sortButtonW = S(80);
+    Rectangle sortButtonRect = {sidebarW + listW - sortButtonW, TOP_BAR_H, sortButtonW, S(28.0f)};
+    Rectangle dropdownRect = {sortButtonRect.x, sortButtonRect.y + sortButtonRect.height, sortButtonW, S(28.0f) * 5}; // 5 items
+    Rectangle searchBoxRect = {sidebarW, TOP_BAR_H, listW - sortButtonW - S(4), S(28.0f)};
+
+    if (s->ShowSortDropdown) {
+        bool hoverDropdown = CheckCollisionPointRec(mousePos, dropdownRect);
+        bool hoverButton = CheckCollisionPointRec(mousePos, sortButtonRect);
+
+        // 1. Handle Selection on Release
+        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+            if (hoverDropdown) {
+                int clickedIdx = (mousePos.y - dropdownRect.y) / S(28.0f);
+                if (clickedIdx >= 0 && clickedIdx < 5) {
+                    s->SortMode = clickedIdx;
+                    s->CursorPos = s->ScrollOffset = 0;
+                    Browser_UpdateActiveTracks(s);
+                }
+                s->ShowSortDropdown = false;
+            } else if (!hoverButton) {
+                // If they drag out of the menu and release, close it safely
+                s->ShowSortDropdown = false;
+            }
+            
+            // Absorb the release event so the UI underneath doesn't react
+            return 0; 
+        }
+        
+        // 2. Handle Clicks (Press) to close the menu
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            if (!hoverDropdown) {
+                // Clicked outside or on the button itself -> close menu
+                s->ShowSortDropdown = false; 
+                return 0; // Absorb click so it doesn't interact with tracks underneath
+            }
+            return 0; // Pressed inside the dropdown, absorb it
+        }
+        
+        // Block hovers on underlying elements if the mouse is over the menu
+        if (hoverDropdown || hoverButton) return 0;
+    } 
+    else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        // Handle Sort Button (Open Menu)
+        if (CheckCollisionPointRec(mousePos, sortButtonRect)) {
+            s->ShowSortDropdown = true;
+            return 0; // Absorb click
+        }
+
+        // Handle Search Box
         if (CheckCollisionPointRec(mousePos, searchBoxRect)) {
             if (!s->IsSearching) {
                 s->IsSearching = true;
                 System_ShowKeyboard(true);
             }
         } else {
-            // Click outside, maybe close search keyboard but don't clear query
+            // Click outside search box
             if (s->IsSearching) {
                 s->IsSearching = false;
                 System_ShowKeyboard(false);
@@ -1238,12 +1361,15 @@ static void Browser_Draw(Component *base) {
   if (s->InfoEnabled)
     listW = SCREEN_WIDTH - sidebarW - S(160);
 
-  // Draw Search Box
+  // Draw Search Box & Sort Button
   if (s->BrowseLevel == 0) {
     totalVisible = 9;
-    Rectangle searchBoxRect = {listX, listYOffset, listW, rowH};
+    float sortButtonW = S(80);
+    Rectangle searchBoxRect = {listX, listYOffset, listW - sortButtonW - S(4), rowH};
+    Rectangle sortButtonRect = {listX + listW - sortButtonW, listYOffset, sortButtonW, rowH};
     listYOffset += rowH;
     
+    // Draw Search Input
     DrawRectangleRec(searchBoxRect, s->IsSearching ? ColorDark1 : ColorDark2);
     DrawRectangleLinesEx(searchBoxRect, 1.0f, s->IsSearching ? ColorBlue : ColorDark1);
     
@@ -1253,15 +1379,18 @@ static void Browser_Draw(Component *base) {
     } else {
         snprintf(displayQuery, sizeof(displayQuery), s->IsSearching ? "" : "Search...");
     }
-    
-    // Draw text with a simple blink cursor if searching
     if (s->IsSearching && (int)(GetTime() * 2) % 2 == 0) {
         strncat(displayQuery, "|", sizeof(displayQuery) - strlen(displayQuery) - 1);
     }
-    
-    // Draw Search Icon and Text
     UIDrawText("\uf002", faceIcon, searchBoxRect.x + S(8), searchBoxRect.y + S(8), S(12), s->IsSearching ? ColorWhite : ColorShadow);
     UIDrawText(displayQuery, faceXS, searchBoxRect.x + S(30), searchBoxRect.y + S(9), S(10), s->IsSearching ? ColorWhite : ColorShadow);
+
+    // Draw Sort Button
+    DrawRectangleRec(sortButtonRect, s->ShowSortDropdown ? ColorDark1 : ColorDark2);
+    DrawRectangleLinesEx(sortButtonRect, 1.0f, ColorDark1);
+    const char* sortLabels[] = {"Default", "BPM", "Key", "Title", "Rating"}; // Added 2 labels
+    UIDrawText(sortLabels[s->SortMode], faceXS, sortButtonRect.x + S(8), sortButtonRect.y + S(9), S(10), ColorWhite);
+    UIDrawText("\uf0d7", faceIcon, sortButtonRect.x + sortButtonW - S(18), sortButtonRect.y + S(10), S(10), ColorShadow); // Chevrons
   }
 
   for (int i = 0; i < totalVisible; i++) {
@@ -1496,6 +1625,28 @@ static void Browser_Draw(Component *base) {
     DrawRectangle(mPos.x + 10, mPos.y + 10, dw, dh, Fade(ColorDark3, 0.8f));
     DrawRectangleLines(mPos.x + 10, mPos.y + 10, dw, dh, ColorBlue);
     UIDrawText(dragName, faceXS, mPos.x + 15, mPos.y + 15, S(10), ColorWhite);
+  }
+
+  // Overlay Dropdown Menu
+  if (s->BrowseLevel == 0 && s->ShowSortDropdown) {
+    float listW = SCREEN_WIDTH - sidebarW - S(8);
+    if (s->InfoEnabled) listW = SCREEN_WIDTH - sidebarW - S(160);
+    float sortButtonW = S(80);
+    
+    Rectangle dropdownRect = {sidebarW + listW - sortButtonW, TOP_BAR_H + rowH, sortButtonW, rowH * 5};
+    DrawRectangleRec(dropdownRect, ColorDark2);
+    DrawRectangleLinesEx(dropdownRect, 1.0f, ColorShadow);
+
+    const char* sortLabelsList[] = {"Default", "BPM", "Key", "Title", "Rating"};
+    for (int i = 0; i < 5; i++) { // Loop to 5
+        Rectangle itemRect = {dropdownRect.x, dropdownRect.y + i * rowH, dropdownRect.width, rowH};
+        bool hover = CheckCollisionPointRec(mPos, itemRect);
+        
+        if (hover) DrawRectangleRec(itemRect, ColorDark1);
+        if (s->SortMode == i) DrawRectangle(itemRect.x, itemRect.y, S(3), itemRect.height, ColorBlue);
+
+        UIDrawText(sortLabelsList[i], faceXS, itemRect.x + S(10), itemRect.y + S(9), S(10), hover ? ColorWhite : ColorShadow);
+    }
   }
 }
 

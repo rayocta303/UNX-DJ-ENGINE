@@ -74,6 +74,10 @@ typedef struct {
     // Search functionality
     char SearchQuery[64];
     bool IsSearching;
+
+    // Sort functionality
+    int SortMode;         // 0 = Default, 1 = BPM, 2 = Key
+    bool ShowSortDropdown;
 } BrowserState;
 
 void Browser_RefreshStorages(BrowserState *s);
