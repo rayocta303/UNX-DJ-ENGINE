@@ -512,15 +512,17 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
     return;
 
   if (mode == PAD_MODE_HOT_CUE) {
-    if (padIdx < ds->LoadedTrack->HotCuesCount) {
-      HotCue hc = ds->LoadedTrack->HotCues[padIdx];
-      ds->SeekMs = hc.Start;
-      ds->HasSeekRequest = true;
+    for (int i = 0; i < ds->LoadedTrack->HotCuesCount; i++) {
+      if (ds->LoadedTrack->HotCues[i].ID == (unsigned int)(padIdx + 1)) {
+        HotCue hc = ds->LoadedTrack->HotCues[i];
+        ds->SeekMs = hc.Start;
+        ds->HasSeekRequest = true;
 
-      // Start playback immediately without motor ramp
-      DeckAudio_ExitLoop(audio);
-      DeckAudio_InstantPlay(audio);
-      (void)ds; // Mark as used
+        // Start playback immediately without motor ramp
+        DeckAudio_ExitLoop(audio);
+        DeckAudio_InstantPlay(audio);
+        break;
+      }
     }
   } else if (mode == PAD_MODE_BEAT_LOOP || mode == PAD_MODE_SLIP_LOOP) {
     if (mode == PAD_MODE_BEAT_LOOP &&
@@ -638,12 +640,15 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
 
     a->padState.ActiveLoopIdx[deckIdx] = -1;
   } else if (mode == PAD_MODE_GATE_CUE) {
-    if (padIdx < ds->LoadedTrack->HotCuesCount) {
-      HotCue hc = ds->LoadedTrack->HotCues[padIdx];
-      ds->SeekMs = hc.Start;
-      ds->HasSeekRequest = true;
-      DeckAudio_ExitLoop(audio);
-      DeckAudio_InstantPlay(audio);
+    for (int i = 0; i < ds->LoadedTrack->HotCuesCount; i++) {
+      if (ds->LoadedTrack->HotCues[i].ID == (unsigned int)(padIdx + 1)) {
+        HotCue hc = ds->LoadedTrack->HotCues[i];
+        ds->SeekMs = hc.Start;
+        ds->HasSeekRequest = true;
+        DeckAudio_ExitLoop(audio);
+        DeckAudio_InstantPlay(audio);
+        break;
+      }
     }
   } else if (mode == PAD_MODE_RELEASE_FX) {
     if (padIdx == 0)
@@ -1818,32 +1823,38 @@ void UpdateDrawFrame(App *app) {
     // Hot Cues
     for (int j = 0; j < 8; j++) {
       if (ds->MidiRequestHotCue[j]) {
-        if (ds->LoadedTrack && j < ds->LoadedTrack->HotCuesCount) {
-          uint32_t targetMs = ds->LoadedTrack->HotCues[j].Start;
-          
-          if (ds->QuantizeEnabled && ds->IsPlaying) {
-             int32_t waitMs = Quantize_GetWaitMs(ds->LoadedTrack, ds->PositionMs);
-             if (waitMs > 5) { // Only queue if more than 5ms wait (avoid jitter)
-                 DeckAudio_ExitLoop(audio);
-                 DeckAudio_QueueJumpMs(audio, targetMs, (uint32_t)waitMs);
-                 ds->IsPlaying = true;
-                 audio->IsPlaying = true;
-                 audio->IsMotorOn = true;
-             } else {
+        if (ds->LoadedTrack) {
+          int targetID = j + 1;
+          for (int h = 0; h < ds->LoadedTrack->HotCuesCount; h++) {
+            if (ds->LoadedTrack->HotCues[h].ID == (unsigned int)targetID) {
+              uint32_t targetMs = ds->LoadedTrack->HotCues[h].Start;
+              
+              if (ds->QuantizeEnabled && ds->IsPlaying) {
+                 int32_t waitMs = Quantize_GetWaitMs(ds->LoadedTrack, ds->PositionMs);
+                 if (waitMs > 5) { // Only queue if more than 5ms wait (avoid jitter)
+                     DeckAudio_ExitLoop(audio);
+                     DeckAudio_QueueJumpMs(audio, targetMs, (uint32_t)waitMs);
+                     ds->IsPlaying = true;
+                     audio->IsPlaying = true;
+                     audio->IsMotorOn = true;
+                 } else {
+                     DeckAudio_ExitLoop(audio);
+                     ds->SeekMs = targetMs;
+                     ds->HasSeekRequest = true;
+                     ds->IsPlaying = true;
+                     audio->IsPlaying = true;
+                     audio->IsMotorOn = true;
+                 }
+              } else {
                  DeckAudio_ExitLoop(audio);
                  ds->SeekMs = targetMs;
                  ds->HasSeekRequest = true;
                  ds->IsPlaying = true;
                  audio->IsPlaying = true;
                  audio->IsMotorOn = true;
-             }
-          } else {
-             DeckAudio_ExitLoop(audio);
-             ds->SeekMs = targetMs;
-             ds->HasSeekRequest = true;
-             ds->IsPlaying = true;
-             audio->IsPlaying = true;
-             audio->IsMotorOn = true;
+              }
+              break;
+            }
           }
         }
         ds->MidiRequestHotCue[j] = false;
