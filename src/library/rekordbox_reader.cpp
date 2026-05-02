@@ -80,44 +80,32 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
                             switch (table->type()) {
                                 case rekordbox_pdb_t::PAGE_TYPE_ARTISTS: {
                                     auto r = static_cast<rekordbox_pdb_t::artist_row_t*>(body);
-                                    std::string val = RB_GetString(r->name());
-                                    artists[r->id()] = val;
-                                    UNX_LOG_INFO("[RB-PASS1] Artist ID %u = '%s'", r->id(), val.c_str());
+                                    artists[r->id()] = RB_GetString(r->name());
                                     break;
                                 }
                                 case rekordbox_pdb_t::PAGE_TYPE_ALBUMS: {
                                     auto r = static_cast<rekordbox_pdb_t::album_row_t*>(body);
-                                    std::string val = RB_GetString(r->name());
-                                    albums[r->id()] = val;
-                                    UNX_LOG_INFO("[RB-PASS1] Album ID %u = '%s'", r->id(), val.c_str());
+                                    albums[r->id()] = RB_GetString(r->name());
                                     break;
                                 }
                                 case rekordbox_pdb_t::PAGE_TYPE_GENRES: {
                                     auto r = static_cast<rekordbox_pdb_t::genre_row_t*>(body);
-                                    std::string val = RB_GetString(r->name());
-                                    genres[r->id()] = val;
-                                    UNX_LOG_INFO("[RB-PASS1] Genre ID %u = '%s'", r->id(), val.c_str());
+                                    genres[r->id()] = RB_GetString(r->name());
                                     break;
                                 }
                                 case rekordbox_pdb_t::PAGE_TYPE_KEYS: {
                                     auto r = static_cast<rekordbox_pdb_t::key_row_t*>(body);
-                                    std::string val = RB_GetString(r->name());
-                                    keys[r->id()] = val;
-                                    UNX_LOG_INFO("[RB-PASS1] Key ID %u = '%s'", r->id(), val.c_str());
+                                    keys[r->id()] = RB_GetString(r->name());
                                     break;
                                 }
                                 case rekordbox_pdb_t::PAGE_TYPE_ARTWORK: {
                                     auto r = static_cast<rekordbox_pdb_t::artwork_row_t*>(body);
-                                    std::string val = RB_GetString(r->path());
-                                    artworks[r->id()] = val;
-                                    UNX_LOG_INFO("[RB-PASS1] Artwork ID %u = '%s'", r->id(), val.c_str());
+                                    artworks[r->id()] = RB_GetString(r->path());
                                     break;
                                 }
                                 case rekordbox_pdb_t::PAGE_TYPE_LABELS: {
                                     auto r = static_cast<rekordbox_pdb_t::label_row_t*>(body);
-                                    std::string val = RB_GetString(r->name());
-                                    labels[r->id()] = val;
-                                    UNX_LOG_INFO("[RB-PASS1] Label ID %u = '%s'", r->id(), val.c_str());
+                                    labels[r->id()] = RB_GetString(r->name());
                                     break;
                                 }
                                 default: break;
@@ -181,10 +169,6 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
                                     t.DiscNumber = r->disc_number();
                                     
                                     strncpy(t.AnalyzePath, RB_GetString(r->analyze_path()).c_str(), 511);
-
-                                    // DEBUG LOGGING
-                                    printf("[RB] Track ID %u: Title='%s', ArtistID=%u, AlbumID=%u, GenreID=%u, KeyID=%u, ArtID=%u\n", 
-                                           t.ID, t.Title, r->artist_id(), r->album_id(), r->genre_id(), r->key_id(), r->artwork_id());
 
                                     rbTracks.push_back(t);
                                     break;
@@ -448,6 +432,8 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
 
 extern "C" void RB_LoadTrackData(RBTrack* track, const char* rootPath) {
     if (!track || track->AnalyzePath[0] == '\0') return;
+
+    UNX_LOG_INFO("[RB] Loading Track Data: %s (ID: %u)", track->Title, track->ID);
 
     std::string datPath = std::string(rootPath) + "/" + track->AnalyzePath;
     RB_ParseAnlz(datPath, track);

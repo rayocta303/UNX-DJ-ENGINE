@@ -38,10 +38,17 @@
 #define ShowCursor WinShowCursor
 #define DrawText WinDrawText
 #include <windows.h>
+#include <GL/gl.h>
 #undef Rectangle
 #undef CloseWindow
 #undef ShowCursor
 #undef DrawText
+#elif defined(__ANDROID__)
+#include <GLES2/gl2.h>
+#include <unistd.h>
+#elif defined(__APPLE__)
+#include <OpenGL/gl.h>
+#include <unistd.h>
 #else
 #include <unistd.h>
 #endif
@@ -1008,8 +1015,12 @@ int main(void) {
                IsWindowReady() ? "SUCCESS" : "FAILED");
   SetTargetFPS(60);
   Log_Init(); // Initialize logger after Raylib is ready (required for Android paths)
+  Log_RegisterCrashHandlers();
+  const char* gpuModel = (const char*)glGetString(0x1F01); // GL_RENDERER
+  Log_LogDeviceInfo(gpuModel);
 #else
 // Desktop (X11, Wayland, Windows)
+Log_Init(); 
 printf("[MAIN] Platform: DESKTOP (X11/Wayland/Windows)\n");
 SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
 
@@ -1031,6 +1042,9 @@ if (IsWindowReady()) {
 
 SetWindowMinSize(REF_WIDTH, REF_HEIGHT);
 SetTargetFPS(60);
+Log_RegisterCrashHandlers();
+const char* gpuModel = (const char*)glGetString(0x1F01); // GL_RENDERER
+Log_LogDeviceInfo(gpuModel);
 #endif
 
   SetExitKey(KEY_NULL); // ESC is for 'back'
@@ -1067,7 +1081,7 @@ SetTargetFPS(60);
                (float)sizeof(App) / (1024.0f * 1024.0f),
                (float)sizeof(AudioEngine) / (1024.0f * 1024.0f));
 
-  App *app = (App *)malloc(sizeof(App));
+  App *app = (App *)UNX_MALLOC(sizeof(App));
   if (!app) {
     UNX_LOG_ERR("[CRITICAL] Failed to allocate App on heap!");
     return -1;
@@ -1114,7 +1128,7 @@ SetTargetFPS(60);
 
   UNX_LOG_INFO("[MAIN] Initializing Audio Engine (Heap)...");
 
-  AudioEngine *audioEngine = (AudioEngine *)malloc(sizeof(AudioEngine));
+  AudioEngine *audioEngine = (AudioEngine *)UNX_MALLOC(sizeof(AudioEngine));
   if (!audioEngine) {
     UNX_LOG_ERR("[CRITICAL] Failed to allocate AudioEngine on heap!");
     return -1;
@@ -1507,6 +1521,14 @@ void UpdateDrawFrame(App *app) {
     return;
 #endif
 #endif
+
+  Log_Heartbeat();
+
+  // CPU Throttling / Stall Detection
+  float dt = GetFrameTime();
+  if (dt > 0.1f) { // More than 100ms frame
+    UNX_LOG_WARN("[PERF] CPU Stall Detected: Frame took %.2f ms (Throttling?)", dt * 1000.0f);
+  }
 
   AudioEngine *audioEngine = globalAudioEngine;
   if (!audioEngine)

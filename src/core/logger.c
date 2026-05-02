@@ -6,7 +6,9 @@
 #include <string.h>
 #include <stdbool.h>
 #include "raylib.h"
-
+#include <signal.h>
+#include <sys/stat.h>
+#include <errno.h>
 
 #if defined(_WIN32)
     #define WIN32_LEAN_AND_MEAN
@@ -22,20 +24,35 @@
     #undef ShowCursor
     #undef DrawText
     #include <psapi.h>
+    #include <direct.h>
     static CRITICAL_SECTION g_logLock;
     static bool g_lockInitialized = false;
 #elif defined(__ANDROID__)
     #include <android/log.h>
     #include <unistd.h>
     #include <pthread.h>
+    #include <sys/utsname.h>
+    #include <sys/sysinfo.h>
     static pthread_mutex_t g_logLock = PTHREAD_MUTEX_INITIALIZER;
 #else
     #include <unistd.h>
     #include <pthread.h>
+    #include <sys/utsname.h>
+    #include <sys/sysinfo.h>
     #if defined(__APPLE__)
         #include <mach/mach.h>
+        #include <sys/sysctl.h>
     #endif
     static pthread_mutex_t g_logLock = PTHREAD_MUTEX_INITIALIZER;
+#endif
+
+// Watchdog state
+static time_t g_lastHeartbeat = 0;
+static bool g_watchdogRunning = false;
+#if defined(_WIN32)
+static HANDLE g_watchdogThread = NULL;
+#else
+static pthread_t g_watchdogThread;
 #endif
 
 static FILE* g_logFile = NULL;
@@ -52,14 +69,21 @@ void Log_Init(void) {
 
 #if defined(__ANDROID__)
     static char androidPath[512];
-    // Attempt 1: Accessible SD Card path
-    strncpy(androidPath, "/sdcard/unx.log", sizeof(androidPath)-1);
+    // Attempt 1: Accessible SD Card path (Older Android / STB focus)
+    // We try to create a folder to be more organized
+    const char* sdDir = "/sdcard/XDJ-UNX";
+#if !defined(_WIN32)
+    mkdir(sdDir, 0777);
+#endif
+    snprintf(androidPath, sizeof(androidPath), "%s/unx.log", sdDir);
+    
     FILE *testFile = fopen(androidPath, "a");
     if (testFile) {
         fclose(testFile);
     } else {
-        // Attempt 2: Try creating via "w" in case "a" is restricted on new file
-        testFile = fopen(androidPath, "w");
+        // Attempt 2: Try direct /sdcard/unx.log
+        strncpy(androidPath, "/sdcard/unx.log", sizeof(androidPath)-1);
+        testFile = fopen(androidPath, "a");
         if (testFile) {
             fclose(testFile);
         } else {
@@ -82,6 +106,31 @@ void Log_Init(void) {
 #endif
 
     g_logFile = fopen(logPath, "a");
+    if (!g_logFile) {
+        // Desktop Fallback: If local directory is read-only, try User AppData/Home
+#if defined(_WIN32)
+        const char* appData = getenv("APPDATA");
+        if (appData) {
+            static char fallbackPath[512];
+            snprintf(fallbackPath, sizeof(fallbackPath), "%s\\XDJ-UNX", appData);
+            _mkdir(fallbackPath);
+            strncat(fallbackPath, "\\unx.log", sizeof(fallbackPath) - strlen(fallbackPath) - 1);
+            g_logFile = fopen(fallbackPath, "a");
+            if (g_logFile) logPath = fallbackPath;
+        }
+#elif !defined(__ANDROID__) && !defined(PLATFORM_IOS)
+        const char* home = getenv("HOME");
+        if (home) {
+            static char fallbackPath[512];
+            snprintf(fallbackPath, sizeof(fallbackPath), "%s/.xdj-unx", home);
+            mkdir(fallbackPath, 0777);
+            strncat(fallbackPath, "/unx.log", sizeof(fallbackPath) - strlen(fallbackPath) - 1);
+            g_logFile = fopen(fallbackPath, "a");
+            if (g_logFile) logPath = fallbackPath;
+        }
+#endif
+    }
+
     if (g_logFile) {
         time_t now = time(NULL);
         char* timeStr = ctime(&now);
@@ -89,7 +138,8 @@ void Log_Init(void) {
         fflush(g_logFile);
     }
     
-    UNX_LOG_INFO("Logger initialized on %s", 
+    UNX_LOG_INFO("Logger initialized at: %s", logPath);
+    UNX_LOG_INFO("Platform: %s", 
 #if defined(_WIN32)
         "Windows"
 #elif defined(PLATFORM_IOS)
@@ -185,6 +235,181 @@ void Log_Write(LogLevel level, const char* fmt, ...) {
 #else
     pthread_mutex_unlock(&g_logLock);
 #endif
+}
+
+// --- Watchdog Thread ---
+#if defined(_WIN32)
+static DWORD WINAPI WatchdogProc(LPVOID lpParam) {
+    (void)lpParam;
+#else
+static void* WatchdogProc(void* arg) {
+    (void)arg;
+#endif
+    UNX_LOG_INFO("[WATCHDOG] Thread started.");
+    while (g_watchdogRunning) {
+#if defined(_WIN32)
+        Sleep(2000);
+#else
+        sleep(2);
+#endif
+        time_t now = time(NULL);
+        if (g_lastHeartbeat > 0 && (now - g_lastHeartbeat) > 5) {
+            UNX_LOG_ERR("!!! [DEADLOCK DETECTED] Main thread has not responded for %d seconds!", (int)(now - g_lastHeartbeat));
+            // In a real deadlock, we might want to force a crash dump or exit
+            // For now, we just log it repeatedly.
+        }
+    }
+    return 0;
+}
+
+void Log_Heartbeat(void) {
+    g_lastHeartbeat = time(NULL);
+}
+
+// --- Signal Handlers ---
+static void SignalHandler(int sig) {
+    const char* sigName = "UNKNOWN";
+    switch (sig) {
+        case SIGSEGV: sigName = "SEGMENTATION FAULT (SIGSEGV)"; break;
+        case SIGFPE:  sigName = "FLOATING POINT ERROR (SIGFPE)"; break;
+        case SIGILL:  sigName = "ILLEGAL INSTRUCTION (SIGILL)"; break;
+        case SIGABRT: sigName = "ABORTED (SIGABRT)"; break;
+#if !defined(_WIN32)
+        case SIGBUS:  sigName = "BUS ERROR (SIGBUS)"; break;
+#endif
+    }
+    
+    UNX_LOG_ERR("!!! [CRASH] Fatal signal received: %s !!!", sigName);
+    Log_Flush();
+    
+    // Default action (usually termination)
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
+#if defined(_WIN32)
+static LONG WINAPI UnhandledExceptionFilterEx(EXCEPTION_POINTERS* info) {
+    UNX_LOG_ERR("!!! [CRASH] Unhandled Exception: 0x%08X at address 0x%p !!!", 
+                info->ExceptionRecord->ExceptionCode, info->ExceptionRecord->ExceptionAddress);
+    Log_Flush();
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+#endif
+
+void Log_RegisterCrashHandlers(void) {
+    signal(SIGSEGV, SignalHandler);
+    signal(SIGFPE,  SignalHandler);
+    signal(SIGILL,  SignalHandler);
+    signal(SIGABRT, SignalHandler);
+#if !defined(_WIN32)
+    signal(SIGBUS,  SignalHandler);
+#else
+    SetUnhandledExceptionFilter(UnhandledExceptionFilterEx);
+#endif
+
+    // Start Watchdog
+    g_watchdogRunning = true;
+    g_lastHeartbeat = time(NULL);
+#if defined(_WIN32)
+    g_watchdogThread = CreateThread(NULL, 0, WatchdogProc, NULL, 0, NULL);
+#else
+    pthread_create(&g_watchdogThread, NULL, WatchdogProc, NULL);
+#endif
+}
+
+// --- Device Info Logging ---
+void Log_LogDeviceInfo(const char* gpuModel) {
+    UNX_LOG_INFO("=== DEVICE INFO ===");
+    
+    // OS & Arch
+#if defined(_WIN32)
+    UNX_LOG_INFO("OS          : Windows (x64)");
+#elif defined(__ANDROID__)
+    struct utsname un;
+    uname(&un);
+    UNX_LOG_INFO("OS          : Android (%s %s)", un.sysname, un.release);
+    UNX_LOG_INFO("Kernel      : %s", un.version);
+    UNX_LOG_INFO("Arch        : %s", un.machine);
+    
+    // Root status check
+    bool isRooted = (access("/system/bin/su", F_OK) == 0 || access("/system/xbin/su", F_OK) == 0);
+    UNX_LOG_INFO("Root Status : %s", isRooted ? "Rooted" : "Not Rooted");
+#elif defined(__APPLE__)
+    UNX_LOG_INFO("OS          : iOS / macOS");
+#else
+    struct utsname un;
+    uname(&un);
+    UNX_LOG_INFO("OS          : %s %s", un.sysname, un.release);
+    UNX_LOG_INFO("Arch        : %s", un.machine);
+#endif
+
+    // CPU Cores
+#if defined(_WIN32)
+    SYSTEM_INFO sysInfo;
+    GetSystemInfo(&sysInfo);
+    UNX_LOG_INFO("CPU Cores   : %d", (int)sysInfo.dwNumberOfProcessors);
+#else
+    UNX_LOG_INFO("CPU Cores   : %ld", sysconf(_SC_NPROCESSORS_ONLN));
+#endif
+
+    // RAM
+    float totalRAM = 0, freeRAM = 0;
+#if defined(_WIN32)
+    MEMORYSTATUSEX memInfo;
+    memInfo.dwLength = sizeof(MEMORYSTATUSEX);
+    if (GlobalMemoryStatusEx(&memInfo)) {
+        totalRAM = (float)memInfo.ullTotalPhys / (1024.0f * 1024.0f);
+        freeRAM = (float)memInfo.ullAvailPhys / (1024.0f * 1024.0f);
+    }
+#else
+    struct sysinfo si;
+    if (sysinfo(&si) == 0) {
+        totalRAM = (float)(si.totalram * si.mem_unit) / (1024.0f * 1024.0f);
+        freeRAM = (float)(si.freeram * si.mem_unit) / (1024.0f * 1024.0f);
+    }
+#endif
+    UNX_LOG_INFO("Total RAM   : %.0f MB", totalRAM);
+    UNX_LOG_INFO("Free RAM    : %.0f MB %s", freeRAM, (freeRAM < 256.0f) ? "(CRITICAL: Low Memory)" : "");
+
+    // Display
+    UNX_LOG_INFO("Display     : %dx%d @ %dHz", GetScreenWidth(), GetScreenHeight(), GetMonitorRefreshRate(GetCurrentMonitor()));
+
+    // GPU
+    UNX_LOG_INFO("GPU Model   : %s", gpuModel ? gpuModel : "Unknown");
+
+    UNX_LOG_INFO("=== END DEVICE INFO ===");
+}
+
+// --- Memory Wrappers ---
+void* Log_Malloc(size_t size, const char* file, int line) {
+    void* ptr = malloc(size);
+    if (!ptr && size > 0) {
+        UNX_LOG_ERR("[OOM] Failed to allocate %zu bytes at %s:%d (Current RAM: %.2f MB)", size, file, line, Log_GetRAMUsage());
+        Log_Flush();
+    }
+    return ptr;
+}
+
+void* Log_Calloc(size_t nmemb, size_t size, const char* file, int line) {
+    void* ptr = calloc(nmemb, size);
+    if (!ptr && nmemb > 0 && size > 0) {
+        UNX_LOG_ERR("[OOM] Failed to calloc %zu bytes at %s:%d (Current RAM: %.2f MB)", nmemb * size, file, line, Log_GetRAMUsage());
+        Log_Flush();
+    }
+    return ptr;
+}
+
+void* Log_Realloc(void* ptr, size_t size, const char* file, int line) {
+    void* newPtr = realloc(ptr, size);
+    if (!newPtr && size > 0) {
+        UNX_LOG_ERR("[OOM] Failed to realloc %zu bytes at %s:%d (Current RAM: %.2f MB)", size, file, line, Log_GetRAMUsage());
+        Log_Flush();
+    }
+    return newPtr;
+}
+
+void Log_Free(void* ptr) {
+    free(ptr);
 }
 
 float Log_GetRAMUsage(void) {

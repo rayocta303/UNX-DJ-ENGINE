@@ -13,6 +13,9 @@
 #define MINIMP3_IMPLEMENTATION
 #include "minimp3.h"
 #include "minimp3_ex.h"
+#include "core/logger.h"
+#include <chrono>
+#include <thread>
 
 #define DRWAV_API static
 #define DRWAV_PRIVATE static
@@ -88,6 +91,12 @@ void AudioEngine_Init(AudioEngine *engine, uint32_t outputSampleRate) {
   BeatFXManager_Init(&engine->BeatFX);
   engine->Crossfader = 0.0f;
   engine->LastCrossfader = 0.0f;
+
+  UNX_LOG_INFO("=== AUDIO ENGINE SPECIFICS ===");
+  UNX_LOG_INFO("Sample Rate : %u Hz", engine->OutputSampleRate);
+  UNX_LOG_INFO("Channels    : %d", CHANNELS);
+  UNX_LOG_INFO("API         : Raylib Audio (Internal)");
+  UNX_LOG_INFO("=== END AUDIO ENGINE SPECIFICS ===");
 }
 
 void AudioEngine_SetOutputSampleRate(AudioEngine *engine, uint32_t sampleRate) {
@@ -661,6 +670,17 @@ void AudioEngine_SetFXRouting(AudioEngine *engine, FXRoutingMode mode) {
 }
 
 void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
+  static std::thread::id g_audioThreadId;
+  static bool g_audioThreadIdSet = false;
+  auto startTime = std::chrono::high_resolution_clock::now();
+
+  if (!g_audioThreadIdSet) {
+    g_audioThreadId = std::this_thread::get_id();
+    g_audioThreadIdSet = true;
+  } else if (g_audioThreadId != std::this_thread::get_id()) {
+    UNX_LOG_ERR("[AUDIO] Race Condition! AudioEngine_Process called from multiple threads!");
+  }
+
   static float masterMix[4096 * 2];
   static float cleanMasterMix[4096 * 2];
   static float cueMix[4096 * 2];
@@ -725,6 +745,14 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
   else
     engine->MasterVuR = engine->MasterVuR * 0.88f + pMR * 0.12f;
   engine->LastCrossfader = engine->Crossfader;
+
+  auto endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed = endTime - startTime;
+  double budget = (double)frames / (double)engine->OutputSampleRate;
+  if (elapsed.count() > budget) {
+    UNX_LOG_WARN("[AUDIO] Buffer Underrun Detected! Processed %d frames in %.2f ms (Budget: %.2f ms)",
+                 frames, elapsed.count() * 1000.0, budget * 1000.0);
+  }
 }
 
 void DeckAudio_Play(DeckAudioState *deck) { deck->IsMotorOn = true; }

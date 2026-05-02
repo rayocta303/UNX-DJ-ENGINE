@@ -7,6 +7,7 @@
 #include <iostream>
 #include <filesystem>
 #include <map>
+#include "core/logger.h"
 
 namespace fs = std::filesystem;
 
@@ -141,6 +142,8 @@ extern "C" void Serato_FreeWaveform(SeratoWaveform* wf) {
 
 extern "C" void Serato_LoadTrackData(SeratoTrack* track, const char* rootPath) {
     if (!track) return;
+
+    UNX_LOG_INFO("[Serato] Loading Track Data: %s (ID: %u)", track->Title, track->ID);
 
     std::string fullPath;
     if (track->FilePath[0] == '/' || track->FilePath[0] == '\\') {
