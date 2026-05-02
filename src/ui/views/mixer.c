@@ -52,6 +52,7 @@ static void HandleVerticalFader(MixerState *state, float *val, float fx, float f
   }
 }
 
+/*
 static void DrawVerticalFader(float x, float y, float w, float h, float val,
                               bool cueActive) {
   float handleH = S(22);
@@ -86,6 +87,7 @@ static void DrawVerticalFader(float x, float y, float w, float h, float val,
                      Fade(ColorOrange, 0.4f));
   }
 }
+*/
 
 static bool DrawFXButton(const char *label, float x, float y, float w, float h,
                          bool active) {

@@ -5,7 +5,9 @@
 
 typedef struct {
   unsigned int Start; // ms
+  unsigned int LoopTime; // ms (0 if not loop)
   unsigned int ID;
+  unsigned int Status; // 1=Enabled, 4=ActiveLoop
   unsigned char Color[3]; // RGB
 } HotCue;
 
@@ -63,6 +65,8 @@ typedef struct DeckState {
   char AlbumName[128];
   char GenreName[64];
   char LabelName[128];
+  char MixName[128];
+  char Remixer[128];
   char Comment[256];
   int Rating;
   int Year;

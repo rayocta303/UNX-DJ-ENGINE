@@ -15,6 +15,8 @@ typedef struct {
   char Source[32];
   char FilePath[256];
   char Label[128];
+  char MixName[128];
+  char Remixer[128];
   int Year;
   char Comment[256];
   char ArtworkPath[256];

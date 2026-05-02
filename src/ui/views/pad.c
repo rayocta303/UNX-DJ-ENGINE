@@ -199,6 +199,12 @@ static void Pad_Draw(Component *base) {
                         if (deck->LoadedTrack->HotCues[h].ID == (unsigned int)(i + 1)) {
                             HotCue hc = deck->LoadedTrack->HotCues[h];
                             padColor = GetCueColor(hc, hcPalette[i % 8]);
+                            
+                            // Active Loop blinking
+                            if (hc.Status == 4 && (int)(GetTime() * 4) % 2 == 0) {
+                                padColor = ColorWhite;
+                            }
+                            
                             hasData = true;
                             break;
                         }

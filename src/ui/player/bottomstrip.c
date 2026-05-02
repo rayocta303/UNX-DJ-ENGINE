@@ -131,15 +131,21 @@ static void BottomStrip_Draw(Component *base) {
                         {0, 255, 255, 255}, {128, 0, 255, 255}};
                         
                     for (int h = 0; h < ds->LoadedTrack->HotCuesCount; h++) {
-                        if (ds->LoadedTrack->HotCues[h].ID == (unsigned int)(i + 1)) {
-                            unsigned int ms = ds->LoadedTrack->HotCues[h].Start;
+                        HotCue hc = ds->LoadedTrack->HotCues[h];
+                        if (hc.ID == (unsigned int)(i + 1)) {
+                            unsigned int ms = hc.Start;
                             int totalSec = ms / 1000;
                             int min = totalSec / 60;
                             int sec = totalSec % 60;
                             int frm = (ms % 1000) / 10;
                             sprintf(timeStr, "%02d:%02d.%02d", min, sec, frm);
                             hasCue = true;
-                            cueColor = GetCueColor(ds->LoadedTrack->HotCues[h], hcPalette[i % 8]);
+                            cueColor = GetCueColor(hc, hcPalette[i % 8]);
+                            
+                            // Active Loop blinking
+                            if (hc.Status == 4 && (int)(GetTime() * 4) % 2 == 0) {
+                                cueColor = ColorWhite;
+                            }
                             break;
                         }
                     }

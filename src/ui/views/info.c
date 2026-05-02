@@ -189,6 +189,22 @@ static void Info_Draw(Component *base) {
       UIDrawText(trk->Source[0] ? trk->Source : "---", faceMd, c3X + S(15),
                  gridY + rowStep * 2 + S(8), S(10), ColorBlue);
 
+      // Row 4
+      if (trk->Remixer[0]) {
+        UIDrawText("\uf001", iconSm, c1X, gridY + rowStep * 3 + S(2), S(10), ColorShadow);
+        UIDrawText("REMIXER", faceXXS, c1X + S(15), gridY + rowStep * 3, S(7), ColorShadow);
+        char tRemix[64];
+        truncateStr(trk->Remixer, tRemix, 30);
+        UIDrawText(tRemix, faceMd, c1X + S(15), gridY + rowStep * 3 + S(8), S(10), ColorWhite);
+      }
+      if (trk->MixName[0]) {
+        UIDrawText("\uf001", iconSm, c2X, gridY + rowStep * 3 + S(2), S(10), ColorShadow);
+        UIDrawText("MIX", faceXXS, c2X + S(15), gridY + rowStep * 3, S(7), ColorShadow);
+        char tMix[64];
+        truncateStr(trk->MixName, tMix, 30);
+        UIDrawText(tMix, faceMd, c2X + S(15), gridY + rowStep * 3 + S(8), S(10), ColorWhite);
+      }
+
       // Comment
       if (trk->Comment[0]) {
         float commY = panelY + panelH - S(15);

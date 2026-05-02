@@ -487,6 +487,14 @@ void TopBar_OnInfo(void *ctx) {
       strcpy(it->Key, ds->TrackKey);
       it->Duration = ds->TrackLengthMs / 1000;
       strcpy(it->Source, ds->SourceName);
+      strcpy(it->Album, ds->AlbumName);
+      strcpy(it->Genre, ds->GenreName);
+      strcpy(it->Label, ds->LabelName);
+      strcpy(it->MixName, ds->MixName);
+      strcpy(it->Remixer, ds->Remixer);
+      strcpy(it->Comment, ds->Comment);
+      it->Year = ds->Year;
+      it->Rating = ds->Rating;
     }
   }
 }
