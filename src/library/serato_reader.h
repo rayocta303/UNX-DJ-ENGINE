@@ -46,6 +46,8 @@ typedef struct {
 
 typedef struct {
     uint32_t ID;
+    uint32_t ParentID; // 0 if root
+    bool IsFolder;
     char Name[256];
     uint32_t* TrackIDs;
     uint32_t TrackCount;

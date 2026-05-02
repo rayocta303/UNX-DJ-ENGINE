@@ -12,6 +12,7 @@ typedef struct {
     uint32_t Time; // ms
     uint16_t ID;   // 1-8 for HotCue, 0 for Memory
     uint16_t Type; // 1=Memory, 2=Loop
+    uint16_t Status; // 1=Enabled, 4=ActiveLoop
     uint32_t LoopTime; 
     char Comment[64];
     unsigned char Color[3]; // RGB
@@ -93,6 +94,8 @@ typedef struct {
     uint32_t TrackCount;
     RBPlaylist* Playlists;
     uint32_t PlaylistCount;
+    RBPlaylist* History;
+    uint32_t HistoryCount;
 } RBDatabase;
 
 // Path should be the root of the USB (e.g. "p:/UNX-ENGINE/usb_test")

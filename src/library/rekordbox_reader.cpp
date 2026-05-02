@@ -12,6 +12,7 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <algorithm>
 #include <cstring>
 #include <iostream>
 #include "core/logger.h"
@@ -63,10 +64,13 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
         std::map<uint32_t, std::string> keys;
         std::map<uint32_t, std::string> artworks;
         std::map<uint32_t, std::string> labels;
+        std::map<uint32_t, std::string> colors;
 
         std::vector<RBTrack> rbTracks;
         std::vector<RBPlaylist> rbPlaylists;
-        std::map<uint32_t, std::vector<uint32_t>> playlistTracks;
+        std::vector<RBPlaylist> rbHistory;
+        std::map<uint32_t, std::vector<std::pair<uint32_t, uint32_t>>> playlistTracks; // entry_index, track_id
+        std::map<uint32_t, std::vector<std::pair<uint32_t, uint32_t>>> historyTracks;  // entry_index, track_id
 
         // PASS 1: Metadata Tables
         for (auto table : *pdb.tables()) {
@@ -107,6 +111,11 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
                                 case rekordbox_pdb_t::PAGE_TYPE_LABELS: {
                                     auto r = static_cast<rekordbox_pdb_t::label_row_t*>(body);
                                     labels[r->id()] = RB_GetString(r->name());
+                                    break;
+                                }
+                                case rekordbox_pdb_t::PAGE_TYPE_COLORS: {
+                                    auto r = static_cast<rekordbox_pdb_t::color_row_t*>(body);
+                                    colors[r->id()] = RB_GetString(r->name());
                                     break;
                                 }
                                 default: break;
@@ -187,7 +196,22 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
                                 }
                                 case rekordbox_pdb_t::PAGE_TYPE_PLAYLIST_ENTRIES: {
                                     auto r = static_cast<rekordbox_pdb_t::playlist_entry_row_t*>(body);
-                                    playlistTracks[r->playlist_id()].push_back(r->track_id());
+                                    playlistTracks[r->playlist_id()].push_back({r->entry_index(), r->track_id()});
+                                    break;
+                                }
+                                case rekordbox_pdb_t::PAGE_TYPE_HISTORY_PLAYLISTS: {
+                                    auto r = static_cast<rekordbox_pdb_t::history_playlist_row_t*>(body);
+                                    RBPlaylist pl;
+                                    memset(&pl, 0, sizeof(RBPlaylist));
+                                    pl.ID = r->id();
+                                    pl.IsFolder = false;
+                                    strncpy(pl.Name, RB_GetString(r->name()).c_str(), 255);
+                                    rbHistory.push_back(pl);
+                                    break;
+                                }
+                                case rekordbox_pdb_t::PAGE_TYPE_HISTORY_ENTRIES: {
+                                    auto r = static_cast<rekordbox_pdb_t::history_entry_row_t*>(body);
+                                    historyTracks[r->playlist_id()].push_back({r->entry_index(), r->track_id()});
                                     break;
                                 }
                                 default: break;
@@ -212,10 +236,31 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
             auto& tids = playlistTracks[db->Playlists[i].ID];
             db->Playlists[i].TrackCount = (uint32_t)tids.size();
             if (db->Playlists[i].TrackCount > 0) {
+                // Sort by entry_index
+                std::sort(tids.begin(), tids.end(), [](const std::pair<uint32_t, uint32_t>& a, const std::pair<uint32_t, uint32_t>& b) {
+                    return a.first < b.first;
+                });
                 db->Playlists[i].TrackIDs = new uint32_t[db->Playlists[i].TrackCount];
-                for (size_t j = 0; j < tids.size(); j++) db->Playlists[i].TrackIDs[j] = tids[j];
+                for (size_t j = 0; j < tids.size(); j++) db->Playlists[i].TrackIDs[j] = tids[j].second;
             } else {
                 db->Playlists[i].TrackIDs = nullptr;
+            }
+        }
+
+        db->HistoryCount = (uint32_t)rbHistory.size();
+        db->History = new RBPlaylist[db->HistoryCount];
+        for (size_t i = 0; i < rbHistory.size(); i++) {
+            db->History[i] = rbHistory[i];
+            auto& tids = historyTracks[db->History[i].ID];
+            db->History[i].TrackCount = (uint32_t)tids.size();
+            if (db->History[i].TrackCount > 0) {
+                std::sort(tids.begin(), tids.end(), [](const std::pair<uint32_t, uint32_t>& a, const std::pair<uint32_t, uint32_t>& b) {
+                    return a.first < b.first;
+                });
+                db->History[i].TrackIDs = new uint32_t[db->History[i].TrackCount];
+                for (size_t j = 0; j < tids.size(); j++) db->History[i].TrackIDs[j] = tids[j].second;
+            } else {
+                db->History[i].TrackIDs = nullptr;
             }
         }
 
@@ -248,6 +293,12 @@ extern "C" void RB_FreeDatabase(RBDatabase* db) {
         }
         delete[] db->Playlists;
     }
+    if (db->History) {
+        for (uint32_t i = 0; i < db->HistoryCount; i++) {
+            if (db->History[i].TrackIDs) delete[] db->History[i].TrackIDs;
+        }
+        delete[] db->History;
+    }
     delete db;
 }
 
@@ -278,22 +329,27 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
                 std::vector<RBCue> found;
                 if (tag == rekordbox_anlz_t::SECTION_TAGS_CUES) {
                     auto ct = static_cast<rekordbox_anlz_t::cue_tag_t*>(section->body());
+                    bool isMemorySection = (ct->type() == 0);
                     for (auto& entry : *ct->cues()) {
                         RBCue rc;
                         memset(&rc, 0, sizeof(RBCue));
                         rc.Time = entry->time();
-                        rc.ID = (uint16_t)entry->hot_cue();
+                        rc.ID = isMemorySection ? 0 : (uint16_t)entry->hot_cue();
                         rc.Type = (uint16_t)entry->type();
+                        rc.Status = (uint16_t)entry->status();
+                        rc.LoopTime = entry->loop_time();
                         found.push_back(rc);
                     }
                 } else {
                     auto ct = static_cast<rekordbox_anlz_t::cue_extended_tag_t*>(section->body());
+                    bool isMemorySection = (ct->type() == 0);
                     for (auto& entry : *ct->cues()) {
                         RBCue rc;
                         memset(&rc, 0, sizeof(RBCue));
                         rc.Time = entry->time();
-                        rc.ID = (uint16_t)entry->hot_cue();
+                        rc.ID = isMemorySection ? 0 : (uint16_t)entry->hot_cue();
                         rc.Type = (uint16_t)entry->type();
+                        rc.LoopTime = entry->loop_time();
                         std::string comment = entry->comment();
                         strncpy(rc.Comment, comment.c_str(), 63);
                         
