@@ -147,10 +147,10 @@ static int DeckStrip_Update(Component *base) {
   // Handle Seeks via waveform touch
   static bool uiTouching[2] = {false, false};
   if (d->State->LoadedTrack != NULL) {
-    float wx = x + lColW + S(12);
-    float ww = bpmX - wx - S(10);
+    float wx = x + lColW + S(4);
+    float ww = stripW - lColW - S(8);
     float wy = y + DECK_STR_H - S(30);
-    float wh = S(22);
+    float wh = S(26);
     Rectangle wfmRect = {wx, wy, ww, wh};
 
     if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) && CheckCollisionPointRec(mouse, wfmRect)) {
@@ -211,7 +211,8 @@ static void DeckStrip_Draw(Component *base) {
     Font iconFace = UIFonts_GetIcon(S(9));
     UIDrawText("\xef\x80\x81", iconFace, mx, y + S(2), S(9),
                ColorWhite); // f001 music note
-    UIDrawText(title, faceSm, mx + S(12), y + S(2), S(9), ColorWhite);
+    float maxW = stripW - (mx - x) - S(20);
+    UIDrawTextTruncated(title, faceSm, mx + S(12), y + S(2), S(9), ColorWhite, maxW);
   } else {
     UIDrawText(title, faceSm, mx, y + S(2), S(9), ColorWhite);
   }
@@ -356,10 +357,10 @@ static void DeckStrip_Draw(Component *base) {
 
   // === New Preview Waveform rendering ===
   if (d->State->LoadedTrack != NULL) {
-    float wx = lColX + lColW + S(12);
-    float ww = bpmX - wx - S(10);
-    float wy = y + DECK_STR_H - S(30); // Slightly more padding from bottom
-    float wh = S(22); // Increased height
+    float wx = lColX + lColW + S(4);
+    float ww = stripW - lColW - S(8);
+    float wy = y + DECK_STR_H - S(30);
+    float wh = S(26); // Increased height for S(4) bottom margin
 
     // Background box
     DrawRectangle(wx, wy, ww, wh, (Color){5, 5, 5, 255});

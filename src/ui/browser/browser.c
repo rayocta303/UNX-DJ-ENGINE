@@ -801,15 +801,23 @@ static int Browser_Update(Component *base) {
 
           struct DeckState *targetDeck = loadToDeck == 0 ? s->DeckA : s->DeckB;
           if (targetDeck) {
-            strcpy(targetDeck->TrackTitle, t->Title);
-            strcpy(targetDeck->ArtistName, t->Artist);
-            strcpy(targetDeck->AlbumName, t->Album);
-            strcpy(targetDeck->GenreName, t->Genre);
-            strcpy(targetDeck->TrackKey, t->Key);
-            strcpy(targetDeck->LabelName, t->Label);
-            strcpy(targetDeck->Comment, t->Comment);
+            strncpy(targetDeck->TrackTitle, t->Title, 127);
+            targetDeck->TrackTitle[127] = '\0';
+            strncpy(targetDeck->ArtistName, t->Artist, 127);
+            targetDeck->ArtistName[127] = '\0';
+            strncpy(targetDeck->AlbumName, t->Album, 127);
+            targetDeck->AlbumName[127] = '\0';
+            strncpy(targetDeck->GenreName, t->Genre, 63);
+            targetDeck->GenreName[63] = '\0';
+            strncpy(targetDeck->TrackKey, t->Key, 15);
+            targetDeck->TrackKey[15] = '\0';
+            strncpy(targetDeck->LabelName, t->Label, 127);
+            targetDeck->LabelName[127] = '\0';
+            strncpy(targetDeck->Comment, t->Comment, 255);
+            targetDeck->Comment[255] = '\0';
             targetDeck->Rating = t->Rating;
             targetDeck->Year = t->Year;
+            targetDeck->TrackNumber = t->TrackNumber;
             targetDeck->OriginalBPM = t->BPM;
             targetDeck->CurrentBPM = t->BPM;
 
@@ -913,15 +921,23 @@ static int Browser_Update(Component *base) {
 
           struct DeckState *targetDeck = loadToDeck == 0 ? s->DeckA : s->DeckB;
           if (targetDeck) {
-            strcpy(targetDeck->TrackTitle, t->Title);
-            strcpy(targetDeck->ArtistName, t->Artist);
-            strcpy(targetDeck->AlbumName, t->Album);
-            strcpy(targetDeck->GenreName, t->Genre);
-            strcpy(targetDeck->TrackKey, t->Key);
-            strcpy(targetDeck->LabelName, t->Label);
-            strcpy(targetDeck->Comment, t->Comment);
+            strncpy(targetDeck->TrackTitle, t->Title, 127);
+            targetDeck->TrackTitle[127] = '\0';
+            strncpy(targetDeck->ArtistName, t->Artist, 127);
+            targetDeck->ArtistName[127] = '\0';
+            strncpy(targetDeck->AlbumName, t->Album, 127);
+            targetDeck->AlbumName[127] = '\0';
+            strncpy(targetDeck->GenreName, t->Genre, 63);
+            targetDeck->GenreName[63] = '\0';
+            strncpy(targetDeck->TrackKey, t->Key, 15);
+            targetDeck->TrackKey[15] = '\0';
+            strncpy(targetDeck->LabelName, t->Label, 127);
+            targetDeck->LabelName[127] = '\0';
+            strncpy(targetDeck->Comment, t->Comment, 255);
+            targetDeck->Comment[255] = '\0';
             targetDeck->Rating = 0; // Serato rating not in DB v2
             targetDeck->Year = t->Year;
+            targetDeck->TrackNumber = 0; // Not available in Serato DB v2
             targetDeck->OriginalBPM = t->BPM;
             targetDeck->CurrentBPM = t->BPM;
 
@@ -1195,7 +1211,7 @@ static void Browser_Draw(Component *base) {
     float textY = ry + (artist[0] == '\0' ? S(6) : S(2));
 
     // Marquee Logic for Title (Optimized: only measure for cursor item)
-    float maxTitleW = listW - (textX - listX) - S(90);
+    float maxTitleW = listW - (textX - listX) - S(130);
 
     if (isCursor) {
       Vector2 fullSize = MeasureTextEx(faceSm, title, S(13), 1.0f);
@@ -1219,10 +1235,8 @@ static void Browser_Draw(Component *base) {
         UIDrawText(title, faceSm, textX, textY, S(13), ColorWhite);
       }
     } else {
-      // Normal truncated display (no measurement needed for non-cursor items)
-      BeginScissorMode(textX, ry, maxTitleW, rowH);
-      UIDrawText(title, faceSm, textX, textY, S(13), ColorWhite);
-      EndScissorMode();
+      // Normal truncated display with ellipsis
+      UIDrawTextTruncated(title, faceSm, textX, textY, S(13), ColorWhite, maxTitleW);
     }
 
     if (artist[0] != '\0' && s->BrowseLevel == 0 && !s->InfoEnabled) {

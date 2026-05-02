@@ -103,7 +103,6 @@ static int BeatFX_Update(Component *base) {
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         if (CheckCollisionPointRec(mouse, b->FXButton)) {
             b->State->IsFXOn = !b->State->IsFXOn;
-            if (b->AudioPlugin) b->AudioPlugin->BeatFX.isFxOn = b->State->IsFXOn;
         }
     }
 

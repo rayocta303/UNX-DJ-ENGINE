@@ -1332,7 +1332,7 @@ SetTargetFPS(60);
   CO_Register("[Master]", "beatfx_time", CO_TYPE_FLOAT,
               &audioEngine->BeatFX.beatMs, 0, 2000.0f);
   CO_Register("[Master]", "beatfx_on", CO_TYPE_BOOL,
-              &audioEngine->BeatFX.isFxOn, 0, 1);
+              &app->fxState.IsFXOn, 0, 1);
   CO_Register("[Master]", "beatfx_channel", CO_TYPE_INT,
               &audioEngine->BeatFX.targetChannel, 0, 2);
 
@@ -1686,7 +1686,9 @@ void UpdateDrawFrame(App *app) {
 
   audioEngine->BeatFX.activeFX = app->fxState.SelectedFX;
   audioEngine->BeatFX.targetChannel = app->fxState.SelectedChannel;
-  audioEngine->BeatFX.isFxOn = app->fxState.IsFXOn;
+  if (app->fxState.IsFXOn != audioEngine->BeatFX.isFxOn) {
+      BeatFXManager_SetFXOn(&audioEngine->BeatFX, app->fxState.IsFXOn);
+  }
   audioEngine->BeatFX.beatMs = fxMs;
   audioEngine->BeatFX.levelDepth = app->fxState.LevelDepth;
   audioEngine->BeatFX.scrubVal = app->fxState.XPadScrubValue;

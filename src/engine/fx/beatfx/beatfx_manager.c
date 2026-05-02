@@ -44,7 +44,54 @@ void BeatFXManager_Free(BeatFXManager* mgr) {
 }
 
 void BeatFXManager_SetFX(BeatFXManager* mgr, BeatFXType type) {
-    mgr->activeFX = type;
+    if (mgr->activeFX != type) {
+        mgr->activeFX = type;
+        // Optional: Reset when switching effect types? 
+        // BeatFXManager_Reset(mgr);
+    }
+}
+
+void BeatFXManager_SetFXOn(BeatFXManager* mgr, bool on) {
+    if (on && !mgr->isFxOn) {
+        // Just turned ON: Reset the active effect state to clear any old tails
+        BeatFXManager_Reset(mgr);
+    }
+    mgr->isFxOn = on;
+}
+
+void BeatFXManager_Reset(BeatFXManager* mgr) {
+    // Clear all delay-based effects to ensure a clean start
+    DelayLine_Clear(&mgr->delay.delayL);
+    DelayLine_Clear(&mgr->delay.delayR);
+    
+    DelayLine_Clear(&mgr->echo.delayL);
+    DelayLine_Clear(&mgr->echo.delayR);
+    mgr->echo.lastOutL = 0;
+    mgr->echo.lastOutR = 0;
+
+    DelayLine_Clear(&mgr->pingpong.delayL);
+    DelayLine_Clear(&mgr->pingpong.delayR);
+
+    DelayLine_Clear(&mgr->spiral.delayL);
+    DelayLine_Clear(&mgr->spiral.delayR);
+
+    for (int i = 0; i < 8; i++) {
+        DelayLine_Clear(&mgr->reverb.delayL[i]);
+        DelayLine_Clear(&mgr->reverb.delayR[i]);
+        mgr->reverb.lastL[i] = 0;
+        mgr->reverb.lastR[i] = 0;
+    }
+
+    // Roll and SlipRoll might need specialized reset if they are mid-loop
+    // For now, clearing their buffers
+    DelayLine_Clear(&mgr->roll.delayL);
+    DelayLine_Clear(&mgr->roll.delayR);
+    
+    DelayLine_Clear(&mgr->sliproll.delayL);
+    DelayLine_Clear(&mgr->sliproll.delayR);
+
+    DelayLine_Clear(&mgr->helix.delayL);
+    DelayLine_Clear(&mgr->helix.delayR);
 }
 
 void BeatFXManager_Process(BeatFXManager* mgr, float* outL, float* outR, float inL, float inR, float sampleRate) {

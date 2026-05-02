@@ -3,6 +3,7 @@
 #include "ui/components/fonts.h"
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -74,8 +75,39 @@ void DrawBadge(float x, float y, float w, float h, Color bg, Color textClr, cons
 
 void DrawCentredText(const char* str, Font font, float padX, float width, float y, float fontSize, Color clr) {
     Vector2 size = MeasureTextEx(font, str, fontSize, 1.0f);
-    float x = padX + (width - size.x) / 2.0f;
-    UIDrawText(str, font, x, y, fontSize, clr);
+    if (size.x > width - S(4)) {
+        UIDrawTextTruncated(str, font, padX + S(2), y, fontSize, clr, width - S(4));
+    } else {
+        float x = padX + (width - size.x) / 2.0f;
+        UIDrawText(str, font, x, y, fontSize, clr);
+    }
+}
+
+void UIDrawTextTruncated(const char* str, Font font, float x, float y, float size, Color clr, float maxWidth) {
+    if (!str || str[0] == '\0') return;
+    
+    Vector2 fullSize = MeasureTextEx(font, str, size, 1.0f);
+    if (fullSize.x <= maxWidth) {
+        UIDrawText(str, font, x, y, size, clr);
+        return;
+    }
+
+    float dotsW = MeasureTextEx(font, "...", size, 1.0f).x;
+    float availableW = maxWidth - dotsW;
+
+    char buffer[512];
+    strncpy(buffer, str, sizeof(buffer)-1);
+    buffer[sizeof(buffer)-1] = '\0';
+    
+    int len = strlen(buffer);
+    while (len > 0) {
+        buffer[len] = '\0';
+        if (MeasureTextEx(font, buffer, size, 1.0f).x <= availableW) break;
+        len--;
+    }
+    
+    strcat(buffer, "...");
+    UIDrawText(buffer, font, x, y, size, clr);
 }
 
 void UIDrawKnob(float x, float y, float radius, float value, float min, float max, const char* unit, Color color, bool centerZero) {
