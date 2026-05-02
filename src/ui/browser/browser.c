@@ -539,7 +539,7 @@ static int Browser_Update(Component *base) {
         s->ShowLoadPopup = false;
       }
     }
-    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
+    if (!s->IsSearching && (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE))) {
       s->ShowLoadPopup = false;
     }
 
@@ -770,7 +770,7 @@ static int Browser_Update(Component *base) {
     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
       s->IsDragging = false;
 
-    if (IsKeyPressed(KEY_DOWN)) {
+    if (!s->IsSearching && IsKeyPressed(KEY_DOWN)) {
       if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
         if (s->CursorPos < totalVisible - 1)
           s->CursorPos++;
@@ -778,7 +778,7 @@ static int Browser_Update(Component *base) {
           s->ScrollOffset++;
       }
     }
-    if (IsKeyPressed(KEY_UP)) {
+    if (!s->IsSearching && IsKeyPressed(KEY_UP)) {
       if (s->CursorPos > 0)
         s->CursorPos--;
       else if (s->ScrollOffset > 0)
@@ -874,7 +874,7 @@ static int Browser_Update(Component *base) {
     }
   }
 
-  if (IsKeyPressed(KEY_BACKSPACE)) {
+  if (!s->IsSearching && IsKeyPressed(KEY_BACKSPACE)) {
     Browser_Back(s);
   }
 
@@ -1092,7 +1092,7 @@ static int Browser_Update(Component *base) {
     }
   }
 
-  if ((IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_ESCAPE)) &&
+  if (!s->IsSearching && (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_ESCAPE)) &&
       !s->ShowLoadPopup) {
     if (s->BrowseLevel == 0) {
       if (s->CurrentPlaylistIdx >= 0)
