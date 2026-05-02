@@ -27,22 +27,26 @@
     #include <direct.h>
     static CRITICAL_SECTION g_logLock;
     static bool g_lockInitialized = false;
-#elif defined(__ANDROID__)
-    #include <android/log.h>
+#elif defined(__ANDROID__) || defined(__linux__)
+    #if defined(__ANDROID__)
+        #include <android/log.h>
+    #endif
     #include <unistd.h>
     #include <pthread.h>
     #include <sys/utsname.h>
     #include <sys/sysinfo.h>
     static pthread_mutex_t g_logLock = PTHREAD_MUTEX_INITIALIZER;
+#elif defined(__APPLE__)
+    #include <unistd.h>
+    #include <pthread.h>
+    #include <sys/utsname.h>
+    #include <mach/mach.h>
+    #include <sys/sysctl.h>
+    static pthread_mutex_t g_logLock = PTHREAD_MUTEX_INITIALIZER;
 #else
     #include <unistd.h>
     #include <pthread.h>
     #include <sys/utsname.h>
-    #include <sys/sysinfo.h>
-    #if defined(__APPLE__)
-        #include <mach/mach.h>
-        #include <sys/sysctl.h>
-    #endif
     static pthread_mutex_t g_logLock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
@@ -401,7 +405,18 @@ void Log_LogDeviceInfo(const char* gpuModel) {
         totalRAM = (float)memInfo.ullTotalPhys / (1024.0f * 1024.0f);
         freeRAM = (float)memInfo.ullAvailPhys / (1024.0f * 1024.0f);
     }
-#else
+#elif defined(__APPLE__)
+    int64_t total_mem = 0;
+    size_t len = sizeof(total_mem);
+    if (sysctlbyname("hw.memsize", &total_mem, &len, NULL, 0) == 0) {
+        totalRAM = (float)total_mem / (1024.0f * 1024.0f);
+    }
+    vm_statistics_data_t vm_stats;
+    mach_msg_type_number_t info_count = HOST_VM_INFO_COUNT;
+    if (host_statistics(mach_host_self(), HOST_VM_INFO, (host_info_t)&vm_stats, &info_count) == KERN_SUCCESS) {
+        freeRAM = (float)vm_stats.free_count * (float)sysconf(_SC_PAGESIZE) / (1024.0f * 1024.0f);
+    }
+#elif defined(__ANDROID__) || defined(__linux__)
     struct sysinfo si;
     if (sysinfo(&si) == 0) {
         totalRAM = (float)(si.totalram * si.mem_unit) / (1024.0f * 1024.0f);
