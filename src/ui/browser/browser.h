@@ -19,8 +19,6 @@ typedef struct {
     int BrowseLevel; // 0=Tracks, 1=Playlists, 2=Categories, 3=Source
     bool InfoEnabled;
     int CurrentPlaylistIdx;
-    uint32_t CurrentParentID;
-    bool BrowseHistory;
     bool IsTagList;
     uint16_t TagList[256];
     int TagListCount;
@@ -36,9 +34,7 @@ typedef struct {
     // Filtered view
     RBTrack **TrackPointers;
     SeratoTrack **SeratoTrackPointers;
-    int* ActivePlaylistPointers; // Indices for filtered playlists/folders
     int ActiveTrackCount;
-    int ActivePlaylistCount;
     
     // Core Engine Reference
     struct AudioEngine *AudioPlugin;
