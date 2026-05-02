@@ -45,6 +45,7 @@ static std::string RB_GetString(rekordbox_pdb_t::device_sql_string_t* rbs) {
 }
 
 extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
+    auto startTime = std::chrono::steady_clock::now();
     std::string pdbPath = std::string(rootPath) + "/PIONEER/rekordbox/export.pdb";
     std::ifstream is(pdbPath, std::ios::binary);
     if (!is.is_open()) {
@@ -217,6 +218,10 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
                 db->Playlists[i].TrackIDs = nullptr;
             }
         }
+
+        auto endTime = std::chrono::steady_clock::now();
+        double duration = std::chrono::duration<double, std::milli>(endTime - startTime).count();
+        UNX_LOG_INFO("[PERF] [DB] Database Loaded: %u tracks in %.2f ms", db->TrackCount, duration);
 
         return db;
 

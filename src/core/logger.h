@@ -25,7 +25,7 @@ void Log_Flush(void);
 void Log_RegisterCrashHandlers(void);
 
 // Heartbeat for deadlock detection
-void Log_Heartbeat(void);
+void Log_Heartbeat(float fps, float frameTime);
 
 // Detailed hardware/software info logging
 void Log_LogDeviceInfo(const char* gpuModel);

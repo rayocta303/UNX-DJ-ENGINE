@@ -262,8 +262,16 @@ static void* WatchdogProc(void* arg) {
     return 0;
 }
 
-void Log_Heartbeat(void) {
+void Log_Heartbeat(float fps, float frameTime) {
     g_lastHeartbeat = time(NULL);
+
+    // Periodic Performance Logging (every 5 seconds)
+    static time_t lastPerfLog = 0;
+    if (g_lastHeartbeat - lastPerfLog >= 5) {
+        float ram = Log_GetRAMUsage();
+        UNX_LOG_INFO("[PERF] Heartbeat - FPS: %.1f, Frame: %.2f ms, RAM: %.2f MB", fps, frameTime * 1000.0f, ram);
+        lastPerfLog = g_lastHeartbeat;
+    }
 }
 
 // --- Signal Handlers ---
@@ -343,12 +351,44 @@ void Log_LogDeviceInfo(const char* gpuModel) {
     UNX_LOG_INFO("Arch        : %s", un.machine);
 #endif
 
-    // CPU Cores
+    // CPU Info
+    char cpuModel[128] = "Unknown";
 #if defined(_WIN32)
+    HKEY hKey;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        DWORD size = sizeof(cpuModel);
+        RegQueryValueExA(hKey, "ProcessorNameString", NULL, NULL, (LPBYTE)cpuModel, &size);
+        RegCloseKey(hKey);
+    }
     SYSTEM_INFO sysInfo;
     GetSystemInfo(&sysInfo);
+    const char* arch = "Unknown";
+    switch(sysInfo.wProcessorArchitecture) {
+        case PROCESSOR_ARCHITECTURE_AMD64: arch = "x64"; break;
+        case PROCESSOR_ARCHITECTURE_ARM64: arch = "ARM64"; break;
+        case PROCESSOR_ARCHITECTURE_INTEL: arch = "x86"; break;
+        case PROCESSOR_ARCHITECTURE_ARM:   arch = "ARM"; break;
+    }
+    UNX_LOG_INFO("Processor   : %s", cpuModel);
+    UNX_LOG_INFO("Arch        : %s", arch);
     UNX_LOG_INFO("CPU Cores   : %d", (int)sysInfo.dwNumberOfProcessors);
 #else
+    FILE* f = fopen("/proc/cpuinfo", "r");
+    if (f) {
+        char line[256];
+        while (fgets(line, sizeof(line), f)) {
+            if (strncmp(line, "model name", 10) == 0 || strncmp(line, "Hardware", 8) == 0) {
+                char* colon = strchr(line, ':');
+                if (colon) {
+                    strncpy(cpuModel, colon + 2, sizeof(cpuModel) - 1);
+                    cpuModel[strlen(cpuModel)-1] = '\0'; // Remove newline
+                    break;
+                }
+            }
+        }
+        fclose(f);
+    }
+    UNX_LOG_INFO("Processor   : %s", cpuModel);
     UNX_LOG_INFO("CPU Cores   : %ld", sysconf(_SC_NPROCESSORS_ONLN));
 #endif
 

@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UNX-DJ | Log Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #020617;
+            --card-bg: #0f172a;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-dark);
+            color: #f8fafc;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .glass {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #6366f1;
+        }
+
+        [x-cloak] {
+            display: none !important;
+        }
+
+        @keyframes subtle-pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .pulse-soft {
+            animation: subtle-pulse 3s infinite ease-in-out;
+        }
+
+        @media (max-width: 1024px) {
+            .main-layout {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100% !important;
+                border-right: 0 !important;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                height: auto !important;
+                max-height: 300px;
+            }
+        }
+    </style>
+</head>
+
+<body x-data="logApp()" class="min-h-screen flex flex-col overflow-hidden h-screen">
+
+    <!-- Header -->
+    <header class="h-16 glass flex items-center justify-between px-6 z-50 shrink-0">
+        <div class="flex items-center gap-4">
+            <button @click="sidebarOpen = !sidebarOpen" class="p-2 text-slate-400 hover:text-white transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7">
+                    </path>
+                </svg>
+            </button>
+            <div class="flex items-center gap-3">
+                <div class="hidden sm:block">
+                    <h1 class="text-lg font-extrabold tracking-tight leading-none text-white">UNX<span
+                            class="text-indigo-400"> DJ</span> <span class="font-light text-slate-500">ENGINE</span>
+                    </h1>
+                    <p class="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mt-1">Diagnostic Tool</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div x-show="hasData" class="hidden md:flex gap-2">
+                <span
+                    class="px-3 py-1 bg-slate-800/50 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest border border-white/5"
+                    x-text="currentSession.deviceInfo['OS'] || 'OS Unknown'"></span>
+                <span
+                    class="px-3 py-1 bg-indigo-500/10 rounded-full text-[9px] font-black text-indigo-400 uppercase tracking-widest border border-indigo-500/20"
+                    x-text="currentSession.deviceInfo['Arch'] || 'Arch Unknown'"></span>
+            </div>
+            <button @click="$refs.fileInput.click()"
+                class="bg-white hover:bg-slate-100 text-slate-950 px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 shadow-xl shadow-white/5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                </svg>
+                LOAD LOG
+            </button>
+            <input type="file" x-ref="fileInput" @change="handleFileUpload" class="hidden" accept=".log,.txt">
+        </div>
+    </header>
+
+    <main class="flex-1 flex overflow-hidden main-layout relative">
+
+        <!-- Welcome Overlay -->
+        <div x-show="!hasData"
+            class="absolute inset-0 z-[60] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-xl transition-all duration-500"
+            @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false" @drop.prevent="handleDrop">
+            <div class="max-w-md w-full text-center p-12 glass rounded-[3rem] border-2 border-dashed relative overflow-hidden"
+                :class="dragging ? 'border-indigo-500 shadow-2xl shadow-indigo-500/20' : 'border-slate-800'">
+                <div
+                    class="w-24 h-24 bg-slate-900 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
+                    <svg class="w-12 h-12 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                        </path>
+                    </svg>
+                </div>
+                <h2 class="text-3xl font-black mb-4 tracking-tight">System Diagnostic</h2>
+                <p class="text-slate-400 mb-10 text-sm leading-relaxed">Analyze CPU architecture, processor specs, and
+                    deep latency metrics.</p>
+                <button @click="$refs.fileInput.click()"
+                    class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl font-black transition-all">Select
+                    Local File</button>
+            </div>
+        </div>
+
+        <!-- Sidebar Sessions -->
+        <aside x-show="sidebarOpen"
+            class="sidebar w-85 glass border-y-0 border-l-0 flex flex-col shrink-0 custom-scrollbar overflow-hidden transition-all duration-300"
+            x-cloak>
+            <div class="p-5 border-b border-white/5 shrink-0 bg-slate-900/40">
+                <h3 class="text-[10px] font-black text-slate-500 uppercase tracking-[0.25em] mb-4">LOG SESSIONS</h3>
+                <input type="text" x-model="sessionSearch" placeholder="Filter sessions..."
+                    class="w-full bg-slate-950/50 border border-white/10 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:border-indigo-500/50">
+            </div>
+            <div class="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar bg-slate-950/20">
+                <template x-for="(session, index) in filteredSessions" :key="index">
+                    <div class="space-y-1">
+                        <div @click="selectSession(session.id)"
+                            class="p-5 rounded-[2rem] cursor-pointer transition-all border group relative"
+                            :class="selectedSessionId === session.id ? 'bg-indigo-600/10 border-indigo-500/40' : 'hover:bg-white/5 border-transparent'">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[9px] font-black text-slate-600" x-text="'ID: ' + session.id"></span>
+                                <span class="text-[10px] font-black text-slate-300" x-text="session.startTime"></span>
+                            </div>
+                            <div class="flex items-center gap-3 text-[10px] font-black">
+                                <span class="text-slate-500 uppercase tracking-tighter"
+                                    x-text="session.logs.length + ' EVENTS'"></span>
+                                <span x-show="session.stats.errors" class="text-red-500"
+                                    x-text="session.stats.errors + ' ERR'"></span>
+                            </div>
+                        </div>
+                        <!-- Checkpoints -->
+                        <div x-show="selectedSessionId === session.id"
+                            class="ml-8 pl-4 space-y-4 py-4 border-l-2 border-white/5">
+                            <template x-for="cp in session.checkpoints" :key="cp.originalIdx">
+                                <div class="relative flex items-start gap-3 group cursor-pointer"
+                                    @click="scrollToLog(cp.originalIdx)">
+                                    <div class="mt-1 w-2 h-2 rounded-full shrink-0 transition-all group-hover:scale-150"
+                                        :class="cp.level === 'ERR ' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : (cp.level === 'WARN' ? 'bg-amber-500' : 'bg-indigo-500')">
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-[10px] font-black text-slate-400 group-hover:text-slate-100 transition-colors truncate uppercase"
+                                            x-text="cp.message"></p>
+                                        <p class="text-[8px] font-bold text-slate-600" x-text="cp.time"></p>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </aside>
+
+        <!-- Main Dashboard -->
+        <div x-show="hasData" class="flex-1 flex flex-col overflow-hidden bg-slate-950" x-cloak>
+
+            <div class="h-16 border-b border-white/5 flex items-center justify-between px-8 shrink-0 bg-slate-900/10">
+                <div class="flex gap-10 h-full">
+                    <button @click="tab = 'overview'"
+                        class="relative h-full flex items-center px-2 text-xs font-black tracking-widest transition-all"
+                        :class="tab === 'overview' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'">
+                        OVERVIEW
+                        <div x-show="tab === 'overview'"
+                            class="absolute bottom-0 left-0 right-0 h-1 bg-indigo-500 rounded-t-full shadow-[0_-2px_15px_rgba(99,102,241,0.6)]">
+                        </div>
+                    </button>
+                    <button @click="tab = 'logs'"
+                        class="relative h-full flex items-center px-2 text-xs font-black tracking-widest transition-all"
+                        :class="tab === 'logs' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'">
+                        DIAGNOSTIC LOGS
+                        <div x-show="tab === 'logs'"
+                            class="absolute bottom-0 left-0 right-0 h-1 bg-indigo-500 rounded-t-full shadow-[0_-2px_15px_rgba(99,102,241,0.6)]">
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-6 lg:p-10 custom-scrollbar">
+
+                <div x-show="tab === 'overview'"
+                    class="mx-auto space-y-10 animate-in slide-in-from-bottom-4 duration-700 pb-12">
+
+                    <!-- Top Info Banner -->
+                    <div
+                        class="glass p-8 rounded-[3rem] border-white/5 flex flex-col md:flex-row items-center justify-between gap-8 bg-gradient-to-r from-indigo-500/5 to-transparent">
+                        <div class="flex items-center gap-6">
+                            <div
+                                class="w-16 h-16 bg-white/5 rounded-3xl flex items-center justify-center shrink-0 border border-white/10">
+                                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2-2v10a2 2 0 002 2zM9 9h6v6H9V9z">
+                                    </path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-black text-white leading-tight uppercase tracking-tight"
+                                    x-text="currentSession.deviceInfo['Processor'] || 'Unknown Processor'"></h3>
+                                <div class="flex gap-3 mt-1.5 items-center">
+                                    <span class="text-[10px] font-black text-indigo-400 uppercase tracking-widest"
+                                        x-text="currentSession.deviceInfo['Arch'] || 'Arch Unknown'"></span>
+                                    <span class="w-1 h-1 bg-slate-700 rounded-full"></span>
+                                    <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest"
+                                        x-text="currentSession.deviceInfo['CPU Cores'] ? currentSession.deviceInfo['CPU Cores'] + ' CORES' : 'Cores Unknown'"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="text-right">
+                                <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Uptime
+                                </p>
+                                <p class="text-xl font-black text-white tabular-nums"
+                                    x-text="currentSession.stats.duration || '00:00:00'"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 1: Summary Performance Stats -->
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="glass p-8 rounded-[2.5rem] border-white/5">
+                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Peak Memory
+                            </p>
+                            <p class="text-2xl font-black text-indigo-400 tabular-nums"
+                                x-text="currentSession.stats.peakRAM.toFixed(1) + ' MB'"></p>
+                        </div>
+                        <div class="glass p-8 rounded-[2.5rem] border-white/5">
+                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Avg
+                                Stability</p>
+                            <p class="text-2xl font-black text-emerald-400 tabular-nums"
+                                x-text="currentSession.stats.avgFPS.toFixed(1) + ' FPS'"></p>
+                        </div>
+                        <div class="glass p-8 rounded-[2.5rem] border-white/5">
+                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">System
+                                Stalls</p>
+                            <p class="text-2xl font-black text-red-500 tabular-nums"
+                                x-text="currentSession.stats.stalls"></p>
+                        </div>
+                        <div class="glass p-8 rounded-[2.5rem] border-white/5">
+                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Diagnostic
+                                Events</p>
+                            <p class="text-2xl font-black text-white tabular-nums" x-text="currentSession.logs.length">
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Activity Counters (Styled like Performance Stats) -->
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="glass p-8 rounded-[2.5rem] border-white/5 group hover:bg-white/5 transition-all">
+                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Track Loads
+                            </p>
+                            <p class="text-2xl font-black text-purple-400 tabular-nums"
+                                x-text="currentSession.stats.trackLoads"></p>
+                        </div>
+                        <div class="glass p-8 rounded-[2.5rem] border-white/5 group hover:bg-white/5 transition-all">
+                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">UI Toggles
+                            </p>
+                            <p class="text-2xl font-black text-blue-400 tabular-nums"
+                                x-text="currentSession.stats.screenChanges"></p>
+                        </div>
+                        <div class="glass p-8 rounded-[2.5rem] border-white/5 group hover:bg-white/5 transition-all">
+                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Applied
+                                Tuning</p>
+                            <p class="text-2xl font-black text-emerald-400 tabular-nums"
+                                x-text="currentSession.stats.settingsApplied"></p>
+                        </div>
+                        <div class="glass p-8 rounded-[2.5rem] border-white/5 group hover:bg-white/5 transition-all">
+                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Database
+                            </p>
+                            <p class="text-2xl font-black text-slate-300 tabular-nums"
+                                x-text="currentSession.stats.dbEntities + ' TRACKS'"></p>
+                        </div>
+                    </div>
+
+                    <!-- Environment Detail Section -->
+                    <div class="glass rounded-[3.5rem] border-white/5 overflow-hidden bg-slate-500/10">
+                        <div class="px-10 py-6 border-b border-white/5 bg-white/2 flex items-center justify-between">
+                            <h4 class="text-xs font-black text-slate-500 uppercase tracking-[0.2em]">Detailed
+                                Environment Profile</h4>
+                            <div class="flex gap-2">
+                                <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                                <span class="w-2 h-2 rounded-full bg-indigo-500/50"></span>
+                                <span class="w-2 h-2 rounded-full bg-indigo-500/20"></span>
+                            </div>
+                        </div>
+                        <div class="p-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-8">
+                            <template x-for="(val, key) in currentSession.deviceInfo" :key="key">
+                                <div
+                                    class="flex flex-col border-l-2 border-white/5 pl-6 group transition-all hover:border-indigo-500/50">
+                                    <span
+                                        class="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1 group-hover:text-indigo-400 transition-colors"
+                                        x-text="key"></span>
+                                    <span class="text-sm font-black text-slate-200 leading-snug break-words"
+                                        x-text="val"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Charts Section -->
+                    <div class="grid grid-cols-1 gap-10">
+                        <div class="glass p-10 rounded-[3.5rem] border-white/5 relative overflow-hidden group">
+                            <div
+                                class="flex flex-col md:flex-row items-start md:items-center justify-between mb-10 gap-6">
+                                <h4 class="text-sm font-black uppercase tracking-[0.2em] text-white">Latency Profiler
+                                    (ms)</h4>
+                                <div class="flex flex-wrap gap-4">
+                                    <div
+                                        class="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-xl">
+                                        <span class="w-2 h-2 bg-red-500 rounded-full"></span>
+                                        <span class="text-[9px] font-black text-red-400 uppercase tracking-tighter">GUI
+                                            Stall</span>
+                                    </div>
+                                    <div
+                                        class="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                                        <span class="w-2 h-2 bg-amber-400 rounded-full"></span>
+                                        <span
+                                            class="text-[9px] font-black text-amber-400 uppercase tracking-tighter">Audio
+                                            Proc</span>
+                                    </div>
+                                    <div
+                                        class="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                                        <span class="w-2 h-2 bg-blue-400 rounded-full"></span>
+                                        <span class="text-[9px] font-black text-blue-400 uppercase tracking-tighter">DB
+                                            Load</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="h-80 w-full relative">
+                                <canvas id="latencyChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="glass p-10 rounded-[3.5rem] border-white/5">
+                            <div class="flex items-center justify-between mb-10">
+                                <h4 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Resource
+                                    Monitor</h4>
+                                <div class="flex gap-6">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-2.5 h-2.5 bg-indigo-500 rounded-lg"></span>
+                                        <span class="text-[9px] font-black text-indigo-400 uppercase">Memory</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-2.5 h-2.5 bg-emerald-500 rounded-lg"></span>
+                                        <span class="text-[9px] font-black text-emerald-400 uppercase">FPS</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="h-72 w-full">
+                                <canvas id="resourceChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Logs Feed -->
+                <div x-show="tab === 'logs'"
+                    class="h-full flex flex-col space-y-8 animate-in fade-in duration-700 mx-auto pb-12">
+                    <div class="flex flex-col md:flex-row gap-5 shrink-0">
+                        <input type="text" x-model="searchQuery" placeholder="Filter log content..."
+                            class="flex-1 bg-white/5 border border-white/10 rounded-2xl px-8 py-5 text-sm font-bold focus:outline-none focus:border-indigo-500/50">
+                        <div class="flex gap-2">
+                            <template x-for="lvl in ['ALL', 'INFO', 'WARN', 'ERR ', 'DEBG']">
+                                <button @click="levelFilter = lvl"
+                                    class="px-6 py-5 rounded-2xl text-[10px] font-black tracking-widest transition-all border uppercase shrink-0"
+                                    :class="levelFilter === lvl ? 'bg-indigo-600 border-indigo-500' : 'bg-white/5 border-white/5 text-slate-500'"
+                                    x-text="lvl"></button>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="glass rounded-[3rem] overflow-hidden flex-1 flex flex-col border-white/5 shadow-2xl">
+                        <div class="overflow-x-auto flex-1 custom-scrollbar">
+                            <table class="w-full text-left border-separate border-spacing-0">
+                                <thead class="sticky top-0 z-10">
+                                    <tr
+                                        class="glass bg-slate-900 border-b border-white/10 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                        <th class="px-10 py-6 w-32">Time</th>
+                                        <th class="px-4 py-6 w-24 text-center">Level</th>
+                                        <th class="px-8 py-6 w-40">Source</th>
+                                        <th class="px-8 py-6">Message</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5 mono text-[12px] bg-slate-950/30">
+                                    <template x-for="(log, idx) in filteredLogs" :key="idx">
+                                        <tr :id="'log-row-' + log.idx" class="transition-colors group" :class="{
+                                                'bg-red-500/5 hover:bg-red-500/10': log.level === 'ERR ',
+                                                'bg-amber-500/5 hover:bg-amber-500/10': log.level === 'WARN',
+                                                'hover:bg-indigo-500/5': log.level === 'INFO'
+                                            }">
+                                            <td class="px-10 py-5 text-slate-600 font-bold tabular-nums"
+                                                x-text="log.time"></td>
+                                            <td class="px-4 py-5 text-center">
+                                                <span class="inline-block px-3 py-1 rounded-lg text-[9px] font-black"
+                                                    :class="{
+                                                          'bg-blue-500/20 text-blue-400': log.level === 'INFO',
+                                                          'bg-amber-500/20 text-amber-400': log.level === 'WARN',
+                                                          'bg-red-500/20 text-red-400': log.level === 'ERR ',
+                                                          'bg-slate-500/20 text-slate-500': log.level === 'DEBG'
+                                                      }" x-text="log.level"></span>
+                                            </td>
+                                            <td class="px-8 py-5">
+                                                <span x-show="log.category"
+                                                    class="px-2.5 py-1 rounded-md text-[10px] font-black bg-indigo-500/10 border border-indigo-500/20 text-indigo-300"
+                                                    x-text="log.category"></span>
+                                            </td>
+                                            <td class="px-8 py-5 text-slate-300 font-medium leading-relaxed"
+                                                x-text="log.message"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function logApp() {
+            return {
+                hasData: false,
+                dragging: false,
+                sidebarOpen: true,
+                tab: 'overview',
+                sessions: [],
+                sessionSearch: '',
+                selectedSessionId: 0,
+                searchQuery: '',
+                levelFilter: 'ALL',
+                latencyChart: null,
+                resourceChart: null,
+
+                get currentSession() {
+                    return this.sessions.find(s => s.id === this.selectedSessionId) || { logs: [], stats: { peakRAM: 0, avgFPS: 0, stalls: 0 }, stallData: [], audioLatency: [], dbLatency: [], heartbeatData: [], deviceInfo: {} };
+                },
+
+                get filteredSessions() {
+                    return this.sessionSearch ? this.sessions.filter(s => s.startTime.toLowerCase().includes(this.sessionSearch.toLowerCase())) : this.sessions;
+                },
+
+                get filteredLogs() {
+                    return this.currentSession.logs.filter(log => {
+                        const content = (log.message + ' ' + (log.category || '')).toLowerCase();
+                        const matchesSearch = content.includes(this.searchQuery.toLowerCase());
+                        const matchesLevel = this.levelFilter === 'ALL' || log.level === this.levelFilter;
+                        return matchesSearch && matchesLevel;
+                    });
+                },
+
+                handleDrop(e) { this.dragging = false; const f = e.dataTransfer.files[0]; if (f) this.readFile(f); },
+                handleFileUpload(e) { const f = e.target.files[0]; if (f) this.readFile(f); },
+
+                readFile(file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.parseLog(e.target.result);
+                        this.hasData = true;
+                        this.$nextTick(() => this.updateCharts());
+                    };
+                    reader.readAsText(file);
+                },
+
+                parseLog(text) {
+                    const lines = text.split(/\r?\n/);
+                    const parsedSessions = [];
+                    let currentSession = null;
+                    let idCounter = 0;
+                    let inDeviceInfo = false;
+                    let inAudioInfo = false;
+
+                    lines.forEach((line) => {
+                        if (line.includes('--- SESSION START:')) {
+                            if (currentSession) parsedSessions.push(currentSession);
+                            currentSession = {
+                                id: idCounter++,
+                                startTime: line.split('--- SESSION START:')[1].trim(),
+                                logs: [], deviceInfo: {}, audioInfo: {},
+                                stats: { errors: 0, warnings: 0, stalls: 0, duration: '', trackLoads: 0, screenChanges: 0, settingsApplied: 0, dbEntities: 0, peakRAM: 0, avgFPS: 0 },
+                                stallData: [], audioLatency: [], dbLatency: [], heartbeatData: [], checkpoints: []
+                            };
+                            return;
+                        }
+                        if (!currentSession) return;
+
+                        const logMatch = line.match(/^\[(\d{2}:\d{2}:\d{2})\]\s+\[(INFO|WARN|ERR\s|DEBG)\]\s+(.*)/);
+                        if (logMatch) {
+                            const time = logMatch[1];
+                            const level = logMatch[2];
+                            let msg = logMatch[3];
+                            let category = '';
+                            const catMatch = msg.match(/^\[(.*?)\]\s+(.*)/);
+                            if (catMatch) { category = catMatch[1]; msg = catMatch[2]; }
+
+                            const entryIdx = currentSession.logs.length;
+                            currentSession.logs.push({ idx: entryIdx, time, level, category, message: msg });
+
+                            if (level === 'ERR ') currentSession.stats.errors++;
+                            if (msg.includes('Loading Track Data:')) currentSession.stats.trackLoads++;
+                            if (msg.includes('Screen changed to:')) currentSession.stats.screenChanges++;
+                            if (msg.includes('Applied Style:')) currentSession.stats.settingsApplied++;
+                            if (msg.includes('Metadata Loaded:')) {
+                                const m = msg.match(/Artists:(\d+).*Albums:(\d+).*Genres:(\d+)/);
+                                if (m) currentSession.stats.dbEntities = parseInt(m[1]) + parseInt(m[2]) + parseInt(m[3]);
+                            }
+
+                            if (category === 'PERF') {
+                                if (msg.includes('[GUI]') && msg.includes('Stall')) {
+                                    const m = msg.match(/took\s+([\d.]+)\s+ms/);
+                                    if (m) { currentSession.stallData.push({ time, val: parseFloat(m[1]) }); currentSession.stats.stalls++; }
+                                }
+                                if (msg.includes('[AUDIO]') && msg.includes('Latency')) {
+                                    const m = msg.match(/Latency:\s+([\d.]+)\s+ms/);
+                                    if (m) currentSession.audioLatency.push({ time, val: parseFloat(m[1]) });
+                                }
+                                if (msg.includes('[DB]') && msg.includes('Loaded')) {
+                                    const m = msg.match(/Loaded:\s+(\d+)\s+tracks\s+in\s+([\d.]+)\s+ms/);
+                                    if (m) {
+                                        currentSession.stats.dbEntities = parseInt(m[1]);
+                                        currentSession.dbLatency.push({ time, val: parseFloat(m[2]) });
+                                    } else {
+                                        const mOld = msg.match(/Loaded\s+in\s+([\d.]+)\s+ms/);
+                                        if (mOld) currentSession.dbLatency.push({ time, val: parseFloat(mOld[1]) });
+                                    }
+                                }
+                                if (msg.includes('Heartbeat')) {
+                                    const m = msg.match(/FPS:\s+([\d.]+).*RAM:\s+([\d.]+)/);
+                                    if (m) {
+                                        const fps = parseFloat(m[1]), ram = parseFloat(m[2]);
+                                        currentSession.heartbeatData.push({ time, fps, ram });
+                                        if (ram > currentSession.stats.peakRAM) currentSession.stats.peakRAM = ram;
+                                        currentSession.stats.avgFPS = currentSession.heartbeatData.reduce((a, b) => a + b.fps, 0) / currentSession.heartbeatData.length;
+                                    }
+                                }
+                            }
+
+                            if (msg.includes('=== DEVICE INFO ===')) { inDeviceInfo = true; return; }
+                            if (msg.includes('=== END DEVICE INFO ===')) { inDeviceInfo = false; return; }
+                            if (msg.includes('=== AUDIO ENGINE SPECIFICS ===')) { inAudioInfo = true; return; }
+                            if (msg.includes('=== END AUDIO ENGINE SPECIFICS ===')) { inAudioInfo = false; return; }
+
+                            if (inDeviceInfo) { const kv = msg.match(/^(.*?)\s+:\s+(.*)/); if (kv) currentSession.deviceInfo[kv[1].trim()] = kv[2].trim(); }
+                            else if (inAudioInfo) { const kv = msg.match(/^(.*?)\s+:\s+(.*)/); if (kv) currentSession.audioInfo[kv[1].trim()] = kv[2].trim(); }
+
+                            const lMsg = msg.toLowerCase();
+                            if (lMsg.includes('init') || lMsg.includes('success') || lMsg.includes('loading') || lMsg.includes('stall') || lMsg.includes('error')) {
+                                currentSession.checkpoints.push({ time, level, message: msg.length > 30 ? msg.substring(0, 27) + '...' : msg, originalIdx: entryIdx });
+                            }
+                            currentSession.stats.duration = this.calcDuration(currentSession.logs[0].time, time);
+                        }
+                    });
+                    if (currentSession) parsedSessions.push(currentSession);
+                    this.sessions = parsedSessions;
+                    this.selectedSessionId = parsedSessions.length > 0 ? parsedSessions[parsedSessions.length - 1].id : 0;
+                },
+
+                calcDuration(s, e) {
+                    const st = s.split(':').map(Number), et = e.split(':').map(Number);
+                    let sec = (et[0] * 3600 + et[1] * 60 + et[2]) - (st[0] * 3600 + st[1] * 60 + st[2]);
+                    if (sec < 0) sec += 86400;
+                    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), r = sec % 60;
+                    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${r.toString().padStart(2, '0')}`;
+                },
+
+                selectSession(id) { this.selectedSessionId = id; this.$nextTick(() => this.updateCharts()); },
+
+                scrollToLog(idx) {
+                    this.tab = 'logs';
+                    this.$nextTick(() => {
+                        const el = document.getElementById('log-row-' + idx);
+                        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('bg-indigo-500/30'); setTimeout(() => el.classList.remove('bg-indigo-500/30'), 2000); }
+                    });
+                },
+
+                updateCharts() { this.updateLatencyChart(); this.updateResourceChart(); },
+
+                updateLatencyChart() {
+                    const ctx = document.getElementById('latencyChart');
+                    if (!ctx) return;
+                    if (this.latencyChart) this.latencyChart.destroy();
+                    const cs = this.currentSession;
+                    const allTimes = Array.from(new Set([...cs.stallData.map(d => d.time), ...cs.audioLatency.map(d => d.time), ...cs.dbLatency.map(d => d.time)])).sort();
+                    this.latencyChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: allTimes,
+                            datasets: [
+                                { label: 'GUI Stall', data: allTimes.map(t => cs.stallData.find(d => d.time === t)?.val || null), borderColor: '#ef4444', borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#ef4444', showLine: false },
+                                { label: 'Audio Proc', data: allTimes.map(t => cs.audioLatency.find(d => d.time === t)?.val || null), borderColor: '#fbbf24', borderWidth: 2, tension: 0.4 },
+                                { label: 'DB Load', data: allTimes.map(t => cs.dbLatency.find(d => d.time === t)?.val || null), borderColor: '#3b82f6', borderWidth: 2, pointRadius: 6, pointStyle: 'rectRot', showLine: false }
+                            ]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b' } }, x: { grid: { display: false }, ticks: { color: '#64748b' } } } }
+                    });
+                },
+
+                updateResourceChart() {
+                    const ctx = document.getElementById('resourceChart');
+                    if (!ctx) return;
+                    if (this.resourceChart) this.resourceChart.destroy();
+                    const d = this.currentSession.heartbeatData;
+                    if (!d.length) return;
+                    this.resourceChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: d.map(x => x.time),
+                            datasets: [
+                                { label: 'RAM Usage', data: d.map(x => x.ram), borderColor: '#6366f1', borderWidth: 3, tension: 0.4, fill: true, backgroundColor: 'rgba(99, 102, 241, 0.1)', yAxisID: 'y' },
+                                { label: 'FPS', data: d.map(x => x.fps), borderColor: '#10b981', borderWidth: 3, tension: 0.4, yAxisID: 'y1' }
+                            ]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            scales: { y: { position: 'left', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6366f1' } }, y1: { position: 'right', grid: { display: false }, ticks: { color: '#10b981' } }, x: { grid: { display: false }, ticks: { color: '#64748b' } } },
+                            plugins: { legend: { display: false } }
+                        }
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -583,6 +583,7 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
               trackSR;
         } else {
           // Fallback to BPM
+          Log_Heartbeat((float)GetFPS(), GetFrameTime());
           double beatDurationMs =
               60000.0 / (ds->CurrentBPM > 0 ? ds->CurrentBPM : 120.0);
           loopLengthSamples = (beats * beatDurationMs / 1000.0) * trackSR;
@@ -1522,12 +1523,12 @@ void UpdateDrawFrame(App *app) {
 #endif
 #endif
 
-  Log_Heartbeat();
+  Log_Heartbeat((float)GetFPS(), GetFrameTime());
 
   // CPU Throttling / Stall Detection
   float dt = GetFrameTime();
   if (dt > 0.1f) { // More than 100ms frame
-    UNX_LOG_WARN("[PERF] CPU Stall Detected: Frame took %.2f ms (Throttling?)", dt * 1000.0f);
+    UNX_LOG_WARN("[PERF] [GUI] CPU Stall Detected: Frame took %.2f ms (Throttling?)", dt * 1000.0f);
   }
 
   AudioEngine *audioEngine = globalAudioEngine;

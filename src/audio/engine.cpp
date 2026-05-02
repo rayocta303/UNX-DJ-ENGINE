@@ -749,6 +749,24 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
   auto endTime = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed = endTime - startTime;
   double budget = (double)frames / (double)engine->OutputSampleRate;
+  
+  // Periodic Performance Logging (every 5 seconds)
+  static double accumTime = 0;
+  static int accumCount = 0;
+  static auto lastLogTime = std::chrono::steady_clock::now();
+  accumTime += elapsed.count();
+  accumCount++;
+  
+  auto now = std::chrono::steady_clock::now();
+  if (std::chrono::duration_cast<std::chrono::seconds>(now - lastLogTime).count() >= 5) {
+      double avgMs = (accumTime / accumCount) * 1000.0;
+      double budgetMs = budget * 1000.0;
+      UNX_LOG_INFO("[PERF] [AUDIO] Latency: %.2f ms (Budget: %.2f ms)", avgMs, budgetMs);
+      accumTime = 0;
+      accumCount = 0;
+      lastLogTime = now;
+  }
+
   if (elapsed.count() > budget) {
     UNX_LOG_WARN("[AUDIO] Buffer Underrun Detected! Processed %d frames in %.2f ms (Budget: %.2f ms)",
                  frames, elapsed.count() * 1000.0, budget * 1000.0);
