@@ -3,7 +3,7 @@
 #include <math.h>
 
 int64_t Quantize_GetNearestBeatMs(TrackState *track, int64_t currentMs) {
-    if (!track || track->BeatGridCount == 0) return currentMs;
+    if (!track || track->BeatGridCount == 0 || !track->BeatGrid) return currentMs;
     
     // Find closest beat in BeatGrid array
     int64_t closestBeatMs = (int64_t)track->BeatGrid[0].Time;
@@ -24,13 +24,13 @@ int64_t Quantize_GetNearestBeatMs(TrackState *track, int64_t currentMs) {
 }
 
 int32_t Quantize_GetPhaseErrorMs(TrackState *track, int64_t currentMs) {
-    if (!track || track->BeatGridCount == 0) return 0;
+    if (!track || track->BeatGridCount == 0 || !track->BeatGrid) return 0;
     int64_t nearest = Quantize_GetNearestBeatMs(track, currentMs);
     return (int32_t)(currentMs - nearest);
 }
 
 int32_t Quantize_GetWaitMs(TrackState *track, int64_t currentMs) {
-    if (!track || track->BeatGridCount == 0) return 0;
+    if (!track || track->BeatGridCount == 0 || !track->BeatGrid) return 0;
     
     // Look forward for the *next* or *current* beat grid marker
     for (int i = 0; i < track->BeatGridCount; i++) {
@@ -42,7 +42,7 @@ int32_t Quantize_GetWaitMs(TrackState *track, int64_t currentMs) {
 }
 
 double Quantize_GetBeatDistance(TrackState *track, int64_t currentMs) {
-    if (!track || track->BeatGridCount < 2) return 0.0;
+    if (!track || track->BeatGridCount < 2 || !track->BeatGrid) return 0.0;
 
     for (int i = 0; i < track->BeatGridCount - 1; i++) {
         if (currentMs >= (int64_t)track->BeatGrid[i].Time && currentMs < (int64_t)track->BeatGrid[i+1].Time) {
@@ -57,7 +57,7 @@ double Quantize_GetBeatDistance(TrackState *track, int64_t currentMs) {
 }
 
 int Quantize_GetCurrentBeat(TrackState *track, int64_t currentMs) {
-    if (!track || track->BeatGridCount == 0) return 1;
+    if (!track || track->BeatGridCount == 0 || !track->BeatGrid) return 1;
     for (int i = 0; i < track->BeatGridCount; i++) {
         if ((int64_t)track->BeatGrid[i].Time > currentMs) {
             if (i == 0) return track->BeatGrid[0].BeatNumber;
@@ -68,7 +68,7 @@ int Quantize_GetCurrentBeat(TrackState *track, int64_t currentMs) {
 }
 
 float Quantize_GetBeatFXLengthMs(TrackState *track, float targetRatio) {
-    if (!track || track->BeatGridCount < 2) return 0.0f;
+    if (!track || track->BeatGridCount < 2 || !track->BeatGrid) return 0.0f;
     
     // Calculate average ms per beat from the grid
     int count = track->BeatGridCount;

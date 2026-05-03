@@ -1082,15 +1082,26 @@ static int Browser_Update(Component *base) {
               newTrack->StaticWaveformType = t->StaticWaveformType;
               memcpy(newTrack->StaticWaveform, t->StaticWaveform,
                      t->StaticWaveformLen > 8192 ? 8192 : t->StaticWaveformLen);
-              newTrack->DynamicWaveform = t->DynamicWaveform;
+              
+              // DEEP COPY: Isolate dynamic waveform memory per deck
               newTrack->DynamicWaveformLen = t->DynamicWaveformLen;
+              if (newTrack->DynamicWaveformLen > 0 && t->DynamicWaveform != NULL) {
+                  newTrack->DynamicWaveform = (unsigned char*)malloc(newTrack->DynamicWaveformLen);
+                  if (newTrack->DynamicWaveform) {
+                      memcpy(newTrack->DynamicWaveform, t->DynamicWaveform, newTrack->DynamicWaveformLen);
+                  }
+              } else {
+                  newTrack->DynamicWaveform = NULL;
+              }
               newTrack->WaveformType = t->WaveformType;
 
               // Cues and Beats
               newTrack->BeatGridCount = t->BeatGridCount;
-              if (newTrack->BeatGridCount > 0) {
+              if (newTrack->BeatGridCount > 0 && t->BeatGrid != NULL) {
                   newTrack->BeatGrid = (RBBeat*)malloc(sizeof(RBBeat) * newTrack->BeatGridCount);
-                  memcpy(newTrack->BeatGrid, t->BeatGrid, sizeof(RBBeat) * newTrack->BeatGridCount);
+                  if (newTrack->BeatGrid) {
+                      memcpy(newTrack->BeatGrid, t->BeatGrid, sizeof(RBBeat) * newTrack->BeatGridCount);
+                  }
               } else {
                   newTrack->BeatGrid = NULL;
               }
@@ -1112,9 +1123,12 @@ static int Browser_Update(Component *base) {
               }
 
               TrackState *oldTrack = targetDeck->LoadedTrack;
-              targetDeck->LoadedTrack = newTrack;
+              targetDeck->LoadedTrack = newTrack; // Atomic pointer swap on UI thread
+
+              // Cleanup old track memory (including buffers)
               if (oldTrack){
                 if (oldTrack->BeatGrid != NULL) free(oldTrack->BeatGrid);
+                if (oldTrack->DynamicWaveform != NULL) free(oldTrack->DynamicWaveform);
                 free(oldTrack);
               }
                 
@@ -1202,8 +1216,11 @@ static int Browser_Update(Component *base) {
 
               TrackState *oldTrack = targetDeck->LoadedTrack;
               targetDeck->LoadedTrack = newTrack;
-              if (oldTrack)
+              if (oldTrack) {
+                if (oldTrack->BeatGrid != NULL) free(oldTrack->BeatGrid);
+                if (oldTrack->DynamicWaveform != NULL) free(oldTrack->DynamicWaveform);
                 free(oldTrack);
+              }
               targetDeck->PositionMs =
                   (newTrack->CuesCount > 0) ? newTrack->Cues[0].Start : 0;
               DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck],
