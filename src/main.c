@@ -445,12 +445,25 @@ void PopulateMidiSettings(App *a) {
   a->settingsState.ItemsCount = totalCount;
 }
 
+static void App_DeactivateAllViews(App *a) {
+  a->browserState.IsActive = false;
+  a->infoState.IsActive = false;
+  a->mixerState.IsActive = false;
+  a->settingsState.IsActive = false;
+  a->padState.IsActive = false;
+  a->aboutState.IsActive = false;
+  a->creditsState.IsActive = false;
+  // Crucial: reset input focus flags
+  a->browserState.IsSearching = false;
+}
+
 void TopBar_OnBrowse(void *ctx) {
   App *a = (App *)ctx;
   if (a->screen == ScreenBrowser) {
     a->screen = ScreenPlayer;
-    a->browserState.IsActive = false;
+    App_DeactivateAllViews(a);
   } else {
+    App_DeactivateAllViews(a);
     a->screen = ScreenBrowser;
     a->browserState.IsActive = true;
   }
@@ -460,8 +473,9 @@ void TopBar_OnMixer(void *ctx) {
   App *a = (App *)ctx;
   if (a->screen == ScreenMixer) {
     a->screen = ScreenPlayer;
-    a->mixerState.IsActive = false;
+    App_DeactivateAllViews(a);
   } else {
+    App_DeactivateAllViews(a);
     a->screen = ScreenMixer;
     a->mixerState.IsActive = true;
     a->mixerState.AudioPlugin = globalAudioEngine;
@@ -472,11 +486,12 @@ void TopBar_OnInfo(void *ctx) {
   App *a = (App *)ctx;
   if (a->screen == ScreenInfo) {
     a->screen = ScreenPlayer;
-    a->infoState.IsActive = false;
+    App_DeactivateAllViews(a);
   } else {
+    App_DeactivateAllViews(a);
     a->screen = ScreenInfo;
     a->infoState.IsActive = true;
-
+    
     // Sync Info State
     for (int i = 0; i < 2; i++) {
       DeckState *ds = (i == 0) ? &a->deckA : &a->deckB;
@@ -503,8 +518,9 @@ void TopBar_OnPad(void *ctx) {
   App *a = (App *)ctx;
   if (a->screen == ScreenPad) {
     a->screen = ScreenPlayer;
-    a->padState.IsActive = false;
+    App_DeactivateAllViews(a);
   } else {
+    App_DeactivateAllViews(a);
     a->screen = ScreenPad;
     a->padState.IsActive = true;
   }
@@ -705,8 +721,9 @@ void TopBar_OnSettings(void *ctx) {
   App *a = (App *)ctx;
   if (a->screen == ScreenSettings) {
     a->screen = ScreenPlayer;
-    a->settingsState.IsActive = false;
+    App_DeactivateAllViews(a);
   } else {
+    App_DeactivateAllViews(a);
     a->screen = ScreenSettings;
     a->settingsState.IsActive = true;
   }
@@ -1696,8 +1713,11 @@ void UpdateDrawFrame(App *app) {
   lastMasterA = app->deckA.IsMaster;
   lastMasterB = app->deckB.IsMaster;
 
-  // Skip deck/mixer keyboard shortcuts when browser is open
+  // Skip deck/mixer keyboard shortcuts when browser is open or search is focused
   if (!app->browserState.IsActive) {
+    // Safety: ensure focus is cleared when browser is not active
+    app->browserState.IsSearching = false; 
+    
     HandleKeyboardInputs(&app->keyMap, &app->deckA, &app->deckB, audioEngine,
                          &app->fxState);
   }
