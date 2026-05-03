@@ -25,7 +25,7 @@ static int DeckInfo_Update(Component *base) {
     float contentY = y + headerH + S(6);
     float statusH = S(22);
     float utilY = contentY + statusH + S(6);
-    float utilW = (deckInfoW - margin * 2 - S(8)) / 3.0f;
+    float utilW = (deckInfoW - margin * 2 - S(12)) / 4.0f; // 4 buttons now
     float utilH = S(14);
     float btnH = S(26);
     float btnY = y + deckInfoH - btnH - S(6); // More breathing room from bottom
@@ -59,12 +59,19 @@ static int DeckInfo_Update(Component *base) {
 
     // 2. Utility Buttons
     Rectangle msRect = { margin, utilY, utilW, utilH };
-    if (CheckCollisionPointRec(UIGetMousePosition(), msRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) d->State->IsMaster = !d->State->IsMaster;
+    if (CheckCollisionPointRec(UIGetMousePosition(), msRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        d->State->IsMaster = true; // Exclusivity handled in main.c loop
+    }
 
-    Rectangle mtRect = { margin + utilW + S(4), utilY, utilW, utilH };
+    Rectangle syRect = { margin + utilW + S(4), utilY, utilW, utilH };
+    if (CheckCollisionPointRec(UIGetMousePosition(), syRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        d->State->SyncMode = (d->State->SyncMode + 1) % 3;
+    }
+
+    Rectangle mtRect = { margin + (utilW + S(4)) * 2, utilY, utilW, utilH };
     if (CheckCollisionPointRec(UIGetMousePosition(), mtRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) d->State->MasterTempo = !d->State->MasterTempo;
 
-    Rectangle viRect = { margin + (utilW + S(4)) * 2, utilY, utilW, utilH };
+    Rectangle viRect = { margin + (utilW + S(4)) * 3, utilY, utilW, utilH };
     if (CheckCollisionPointRec(UIGetMousePosition(), viRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) d->State->VinylModeEnabled = !d->State->VinylModeEnabled;
 
     // 3. Main Controls
@@ -226,9 +233,9 @@ static void DeckInfo_Draw(Component *base) {
     }
     UIDrawText(barsVal, faceSm, col2X + S(2), contentY + S(11), S(10), d->ID == 0 ? ColorOrange : ColorWhite);
 
-    // --- Row 2: Utility Buttons (Master, MT, Vinyl) ---
+    // --- Row 2: Utility Buttons (Master, Sync, MT, Vinyl) ---
     float utilY = contentY + statusH + S(6);
-    float utilW = (deckInfoW - margin * 2 - S(8)) / 3.0f;
+    float utilW = (deckInfoW - margin * 2 - S(12)) / 4.0f;
     float utilH = S(14);
 
     // Master
@@ -237,17 +244,32 @@ static void DeckInfo_Draw(Component *base) {
     DrawRectangleLinesEx(msRect, S(1), d->State->IsMaster ? ColorOrange : ColorShadow);
     DrawTextureEx(crownTex, (Vector2){msRect.x + (utilW - S(9))/2.0f, msRect.y + S(2.5f)}, 0.0f, 1.0f, d->State->IsMaster ? ColorOrange : ColorShadow);
 
+    // Sync
+    Rectangle syRect = { margin + utilW + S(4), utilY, utilW, utilH };
+    bool syncActive = d->State->SyncMode > 0;
+    bool isBeatSync = d->State->SyncMode == 2;
+    bool blink = (d->State->IsPhaseDrifted && ((int)(GetTime() * 4) % 2 == 0));
+    
+    Color syncColor = isBeatSync ? ColorBlue : ColorWhite;
+    if (blink) syncColor = ColorOrange;
+
+    DrawRectangleRec(syRect, syncActive ? Fade(syncColor, 0.3f) : ColorDark1);
+    DrawRectangleLinesEx(syRect, S(1), syncActive ? syncColor : ColorShadow);
+    UIDrawText("SYNC", faceXXS, syRect.x + (utilW - S(20))/2.0f, syRect.y + S(4), S(7), syncActive ? ColorWhite : ColorShadow);
+
     // MT
-    Rectangle mtRect = { margin + utilW + S(4), utilY, utilW, utilH };
-    DrawRectangleRec(mtRect, d->State->MasterTempo ? Fade(ColorBlue, 0.3f) : ColorDark1);
-    DrawRectangleLinesEx(mtRect, S(1), d->State->MasterTempo ? ColorBlue : ColorShadow);
+    Rectangle mtRect = { margin + (utilW + S(4)) * 2, utilY, utilW, utilH };
+    DrawRectangleRec(mtRect, d->State->MasterTempo ? Fade(ColorRed, 0.3f) : ColorDark1);
+    DrawRectangleLinesEx(mtRect, S(1), d->State->MasterTempo ? ColorRed : ColorShadow);
     UIDrawText("MT", faceXXS, mtRect.x + (utilW - S(10))/2.0f, mtRect.y + S(4), S(7), d->State->MasterTempo ? ColorWhite : ColorShadow);
 
     // Vinyl
-    Rectangle viRect = { margin + (utilW + S(4)) * 2, utilY, utilW, utilH };
-    DrawRectangleRec(viRect, d->State->VinylModeEnabled ? Fade(ColorBlue, 0.3f) : ColorDark1);
-    DrawRectangleLinesEx(viRect, S(1), d->State->VinylModeEnabled ? ColorBlue : ColorShadow);
-    UIDrawText(d->State->VinylModeEnabled ? "VINYL" : "CDJ", faceXXS, viRect.x + (utilW - (d->State->VinylModeEnabled?S(20):S(14)))/2.0f, viRect.y + S(4), S(7), d->State->VinylModeEnabled ? ColorWhite : ColorShadow);
+    Rectangle viRect = { margin + (utilW + S(4)) * 3, utilY, utilW, utilH };
+    bool vinylOn = d->State->VinylModeEnabled;
+    Color viColor = vinylOn ? ColorBlue : ColorRed;
+    DrawRectangleRec(viRect, Fade(viColor, 0.3f));
+    DrawRectangleLinesEx(viRect, S(1), viColor);
+    UIDrawText(vinylOn ? "VINYL" : "CDJ", faceXXS, viRect.x + (utilW - (vinylOn?S(20):S(14)))/2.0f, viRect.y + S(4), S(7), ColorWhite);
 
     // --- Row 3: Main Controls (Cue, Play) ---
     float btnH = S(26);

@@ -102,6 +102,7 @@ typedef struct DeckState {
   float OriginalBPM; // Added OriginalBPM missing from struct
 
   float LastPhaseAdjustment; // For Phase (Beat) Sync proportional control
+  bool IsPhaseDrifted;        // Sync is on but phase doesn't match master
   void *bpmCtx;
 
   WaveformSettings Waveform;

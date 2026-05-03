@@ -344,10 +344,10 @@ static void DeckStrip_Draw(Component *base) {
   Color syncColor = ColorShadow;
   const char *syncText = "SYNC";
   if (d->State->SyncMode == 1) {
-    syncColor = ColorOrange;
+    syncColor = ColorWhite;
     syncText = "BPM";
   } else if (d->State->SyncMode == 2) {
-    syncColor = ColorOrange;
+    syncColor = ColorBlue;
     syncText = "BEAT";
   }
 

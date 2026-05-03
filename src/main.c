@@ -1693,21 +1693,33 @@ void UpdateDrawFrame(App *app) {
     else if (app->deckB.SyncMode > 0 && lastSyncB == 0)
       app->deckA.IsMaster = true;
   }
+
+  // Force Instant Snap when Sync is turned ON to BEAT mode
+  if (app->deckA.SyncMode == 2 && lastSyncA != 2 && app->deckB.IsMaster) {
+      Sync_RequestPhaseSnap(&app->deckA, &app->deckB, audioEngine);
+  }
+  if (app->deckB.SyncMode == 2 && lastSyncB != 2 && app->deckA.IsMaster) {
+      Sync_RequestPhaseSnap(&app->deckB, &app->deckA, audioEngine);
+  }
+
   lastSyncA = app->deckA.SyncMode;
   lastSyncB = app->deckB.SyncMode;
 
-  // Auto Takeover: If Master stops, other deck becomes Master if playing
-  if (app->deckA.IsMaster && !app->deckA.IsPlaying && app->deckB.IsPlaying) {
+  // Auto Takeover: If Master stops or is unloaded, other deck becomes Master if playing
+  if (app->deckA.IsMaster && (!app->deckA.IsPlaying || !app->deckA.LoadedTrack) && app->deckB.IsPlaying && app->deckB.LoadedTrack) {
     app->deckA.IsMaster = false;
     app->deckB.IsMaster = true;
-  } else if (app->deckB.IsMaster && !app->deckB.IsPlaying &&
-             app->deckA.IsPlaying) {
+  } else if (app->deckB.IsMaster && (!app->deckB.IsPlaying || !app->deckB.LoadedTrack) &&
+             app->deckA.IsPlaying && app->deckA.LoadedTrack) {
     app->deckB.IsMaster = false;
     app->deckA.IsMaster = true;
   }
 
+  // Ensure Exclusivity
   if (app->deckA.IsMaster && !lastMasterA)
     app->deckB.IsMaster = false;
+  if (app->deckB.IsMaster && !lastMasterB)
+    app->deckA.IsMaster = false;
   if (app->deckB.IsMaster && !lastMasterB)
     app->deckA.IsMaster = false;
   lastMasterA = app->deckA.IsMaster;
@@ -1951,17 +1963,17 @@ void UpdateDrawFrame(App *app) {
     }
   }
 
+  // --- Sync Control Logic ---
+  Sync_Update(&app->deckA, &app->deckB, audioEngine);
+
   // Tempo Calculation (10000 = 100%)
-  float realPitchA = 1.0f + (app->deckA.TempoPercent / 100.0f);
+  float realPitchA = 1.0f + (app->deckA.TempoPercent / 100.0f) + app->deckA.LastPhaseAdjustment;
   audioEngine->Decks[0].Pitch = (uint16_t)(realPitchA * 10000.0f);
   app->deckA.CurrentBPM = app->deckA.OriginalBPM * realPitchA;
 
-  float realPitchB = 1.0f + (app->deckB.TempoPercent / 100.0f);
+  float realPitchB = 1.0f + (app->deckB.TempoPercent / 100.0f) + app->deckB.LastPhaseAdjustment;
   audioEngine->Decks[1].Pitch = (uint16_t)(realPitchB * 10000.0f);
   app->deckB.CurrentBPM = app->deckB.OriginalBPM * realPitchB;
-
-  // --- Sync Control Logic ---
-  Sync_Update(&app->deckA, &app->deckB, audioEngine);
 
   // --- Sync UI Jog/Modes back to Audio Engine ---
   // Deck A

@@ -47,6 +47,12 @@ void Sync_Update(DeckState *deckA, DeckState *deckB, AudioEngine *audioEngine) {
 
     if (!master || !follower) return;
     
+    // Scratch Safety: If either deck is being scratched, downgrade Beat Sync to BPM Sync
+    // This prevents the synced deck from snapping or following the scratch movement.
+    if (follower->SyncMode == 2 && (master->IsTouching || follower->IsTouching)) {
+        follower->SyncMode = 1;
+    }
+
     // Reset sync if sync is off or invalid
     if (follower->SyncMode == 0) return;
 
@@ -82,13 +88,41 @@ void Sync_Update(DeckState *deckA, DeckState *deckB, AudioEngine *audioEngine) {
         
         double driftMs = error * (double)fBeatLen;
         
-        // If drift exceeds threshold (15ms), perform a hard snap
-        if (fabs(driftMs) > 15.0) {
-            Sync_RequestPhaseSnap(follower, master, audioEngine);
+        // Tracking drift status for UI feedback
+        if (fabs(driftMs) > 5.0) follower->IsPhaseDrifted = true;
+        else if (fabs(driftMs) < 1.0) follower->IsPhaseDrifted = false;
+
+        // --- PRO SYNC LOGIC: Pitch Bending vs Snapping ---
+        if (follower->IsTouching) {
+            // Manual nudge: Disable automatic correction but track status
+            follower->LastPhaseAdjustment = 0.0f;
         }
+        // 1. Hard Snap: If error is huge (> 100ms) or we just started playing
+        else if (fabs(driftMs) > 100.0) {
+            Sync_RequestPhaseSnap(follower, master, audioEngine);
+            follower->LastPhaseAdjustment = 0.0f;
+            follower->IsPhaseDrifted = false;
+        } 
+        // 2. Smooth Correction: Pitch Bending for smaller errors
+        else if (fabs(driftMs) > 1.0) {
+            // Apply a pitch bend to catch up. 
+            float correction = (float)(-driftMs / (fBeatLen * 2.0)); 
+            
+            // Cap the correction to 1.5% to avoid audible warbling
+            if (correction > 0.015f) correction = 0.015f;
+            if (correction < -0.015f) correction = -0.015f;
+            
+            follower->LastPhaseAdjustment = correction;
+        } else {
+            // Perfectly in sync
+            follower->LastPhaseAdjustment = 0.0f;
+            follower->IsPhaseDrifted = false;
+        }
+    } else {
+        follower->LastPhaseAdjustment = 0.0f;
+        follower->IsPhaseDrifted = false;
     }
     
-    follower->LastPhaseAdjustment = 0.0f; // No longer using pitch bending for phase
     float finalTempoPercent = targetTempoPercent;
 
     // Soft takeover logic
