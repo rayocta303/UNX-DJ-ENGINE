@@ -515,6 +515,8 @@ static int Browser_Update(Component *base) {
                 if (clickedIdx >= 0 && clickedIdx < 5) {
                     s->SortMode = clickedIdx;
                     s->CursorPos = s->ScrollOffset = 0;
+        s->VisualScroll = 0;
+        s->ScrollVelocity = 0;
                     Browser_UpdateActiveTracks(s);
                 }
                 s->ShowSortDropdown = false;
@@ -698,6 +700,8 @@ static int Browser_Update(Component *base) {
       if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (i < 4) {
           s->ScrollOffset = 0;
+          s->VisualScroll = 0;
+          s->ScrollVelocity = 0;
           if (i == 3) {
             // Navigate to Drive / Source
             s->BrowseLevel = 3;
@@ -730,6 +734,8 @@ static int Browser_Update(Component *base) {
             s->BrowseLevel = 0; // Tracks
             Browser_UpdateActiveTracks(s);
             s->CursorPos = s->ScrollOffset = 0;
+        s->VisualScroll = 0;
+        s->ScrollVelocity = 0;
           }
         }
       }
@@ -758,35 +764,7 @@ static int Browser_Update(Component *base) {
     }
   }
 
-  // Mouse Wheel Scroll
-  float wheel = GetMouseWheelMove();
-  if (wheel != 0 && !s->ShowLoadPopup) {
-    if (wheel > 0) {
-      if (s->CursorPos > 0)
-        s->CursorPos--;
-      else if (s->ScrollOffset > 0)
-        s->ScrollOffset--;
-    } else {
-      int total = 0;
-      if (s->BrowseLevel == 3)
-        total = s->StorageCount;
-      else if (s->BrowseLevel == 2)
-        total = 5;
-      else if (s->BrowseLevel == 1)
-        total = s->DB ? s->DB->PlaylistCount : 0;
-      else
-        total = s->ActiveTrackCount;
-
-      if (s->CursorPos < totalVisible - 1 &&
-          s->CursorPos + s->ScrollOffset < total - 1) {
-        s->CursorPos++;
-      } else if (s->ScrollOffset + totalVisible < total) {
-        s->ScrollOffset++;
-      }
-    }
-  }
-
-  // 2. List Item Interaction
+  // 2. Data State
   int totalItems = 0;
   if (s->IsTagList)
     totalItems = s->TagListCount;
@@ -796,7 +774,10 @@ static int Browser_Update(Component *base) {
       totalItems = s->ActiveTrackCount;
       break;
     case 1:
-      totalItems = s->DB ? s->DB->PlaylistCount : 0;
+      if (s->DatabaseType == 0)
+        totalItems = s->DB ? s->DB->PlaylistCount : 0;
+      else
+        totalItems = s->SeratoDB ? s->SeratoDB->PlaylistCount : 0;
       break;
     case 2:
       totalItems = 5 + (s->HasBothDatabases ? 1 : 0);
@@ -807,105 +788,137 @@ static int Browser_Update(Component *base) {
     }
   }
 
+  // 3. Smooth Scrolling & Momentum Logic
   if (!s->ShowLoadPopup) {
-    for (int i = 0; i < totalVisible; i++) {
-      int idx = s->ScrollOffset + i;
-      if (idx >= totalItems)
-        break;
+    float maxScroll = (totalItems - totalVisible) * rowH;
+    if (maxScroll < 0) maxScroll = 0;
 
-      Rectangle itemRect = {sidebarW, listYOffset + i * rowH, listW, rowH};
+    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+      Vector2 delta = GetMouseDelta();
+      s->TouchDragAccumulator += fabsf(delta.y) + fabsf(delta.x);
+      
+      if (!s->IsDragging && s->TouchDragAccumulator > S(15.0f)) {
+        s->IsDragging = true;
+      }
+
+      if (s->IsDragging) {
+        float resistance = 1.0f;
+        if (s->VisualScroll < 0 && delta.y > 0) resistance = 0.4f;
+        if (s->VisualScroll > maxScroll && delta.y < 0) resistance = 0.4f;
+        
+        s->VisualScroll -= delta.y * resistance;
+        s->ScrollVelocity = (-delta.y * resistance) / GetFrameTime();
+      }
+    } else {
+        // Apply Inertia
+        s->VisualScroll += s->ScrollVelocity * GetFrameTime();
+        s->ScrollVelocity *= 0.94f; // Friction
+        if (fabsf(s->ScrollVelocity) < 1.0f) s->ScrollVelocity = 0;
+
+        // Bungee return (Smooth spring)
+        float springK = 10.0f; 
+        if (s->VisualScroll < 0) {
+            s->VisualScroll -= s->VisualScroll * springK * GetFrameTime();
+            if (fabsf(s->VisualScroll) < 0.5f) s->VisualScroll = 0;
+        }
+        if (s->VisualScroll > maxScroll) {
+            float diff = s->VisualScroll - maxScroll;
+            s->VisualScroll -= diff * springK * GetFrameTime();
+            if (fabsf(s->VisualScroll - maxScroll) < 0.5f) s->VisualScroll = maxScroll;
+        }
+    }
+
+    // Wheel Scroll (Smooth)
+    float wheelMove = GetMouseWheelMove();
+    if (wheelMove != 0) {
+        s->VisualScroll -= wheelMove * rowH * 3.0f;
+        s->ScrollVelocity = 0; 
+    }
+
+    // Constraints for interaction safety (Higher limit to allow bungee)
+    if (s->VisualScroll < -S(120)) s->VisualScroll = -S(120);
+    if (s->VisualScroll > maxScroll + S(120)) s->VisualScroll = maxScroll + S(120);
+
+    // Sync back to discrete offsets for logic compatibility
+    s->ScrollOffset = (int)(s->VisualScroll / rowH);
+    if (s->ScrollOffset < 0) s->ScrollOffset = 0;
+    int maxOffset = totalItems - totalVisible;
+    if (maxOffset < 0) maxOffset = 0;
+    if (s->ScrollOffset > maxOffset) s->ScrollOffset = maxOffset;
+  }
+
+  // 3. List Item Interaction
+  if (!s->ShowLoadPopup) {
+    float pixelOffset = fmodf(s->VisualScroll, rowH);
+    for (int i = 0; i < totalVisible + 1; i++) {
+      int idx = s->ScrollOffset + i;
+      if (idx < 0 || idx >= totalItems) continue;
+
+      float ry = listYOffset - pixelOffset + i * rowH;
+      Rectangle itemRect = {sidebarW, ry, listW, rowH};
+
+      // Visually within the list clip area
+      if (ry < listYOffset - S(10) || ry > SCREEN_HEIGHT - DECK_STR_H - S(5)) continue;
+
       if (CheckCollisionPointRec(mousePos, itemRect)) {
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
           s->TouchDragAccumulator = 0;
-          s->IsDragging = false; // Start as potential drag
+          s->IsDragging = false; 
           s->DraggingIdx = idx;
-          if (s->BrowseLevel == 1)
-            s->DraggingType = 1; // Playlist
-          else if (s->BrowseLevel == 0)
-            s->DraggingType = 0; // Track
-          else
-            s->DraggingType = -1; // Other
-          if (s->CursorPos != i) {
-            s->CursorPos = i;
-            s->MarqueeScrollX = 0; // Reset marquee on selection change
+          if (s->BrowseLevel == 1) s->DraggingType = 1; 
+          else if (s->BrowseLevel == 0) s->DraggingType = 0;
+          else s->DraggingType = -1;
+
+          if (s->CursorPos + s->ScrollOffset != idx) {
+            s->CursorPos = idx - s->ScrollOffset;
+            s->MarqueeScrollX = 0; 
           }
         }
 
-        // Check if internal "LOAD" button area was clicked (only for tracks)
         float loadBtnW = S(45);
-        Rectangle loadBtnRect = {sidebarW + listW - loadBtnW - S(5),
-                                 listYOffset + i * rowH + S(4), loadBtnW,
-                                 rowH - S(8)};
-        bool isLoadClick = (s->BrowseLevel == 0) &&
-                           CheckCollisionPointRec(mousePos, loadBtnRect);
+        Rectangle loadBtnRect = {sidebarW + listW - loadBtnW - S(5), ry + S(4), loadBtnW, rowH - S(8)};
+        bool isLoadClick = (s->BrowseLevel == 0) && CheckCollisionPointRec(mousePos, loadBtnRect);
 
         if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && !s->IsDragging) {
-          if (fabsf(s->TouchDragAccumulator) < 10.0f) { // Not a drag
+          if (fabsf(s->TouchDragAccumulator) < S(10.0f)) {
             if (isLoadClick) {
               s->ShowLoadPopup = true;
               s->PopupTrackIdx = idx;
             } else if (!s->IsTagList) {
               triggerEnter = true;
-            } else {
-              // Just select (already handled in Pressed)
             }
           }
         }
       }
     }
+  }
 
-    // Drag logic for Playlist Banking (Horizontal/Significant move) or
-    // Scrolling
-    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-      Vector2 delta = GetMouseDelta();
-      s->TouchDragAccumulator += fabsf(delta.y) + fabsf(delta.x);
+  if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+    s->IsDragging = false;
 
-      // If we are on Level 1 (Playlists) and move enough, trigger actual Drag
-      // state
-      if (s->DraggingType == 1 && !s->IsDragging &&
-          s->TouchDragAccumulator > S(15.0f)) {
-        s->IsDragging = true;
-      }
-
-      if (!s->IsDragging) {
-        // List Scrolling logic (only if not dragging to bank)
-        static float scrollAccum = 0;
-        scrollAccum += delta.y;
-        float threshold = S(20.0f);
-        if (scrollAccum < -threshold) {
-          if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
-            if (s->CursorPos < totalVisible - 1)
-              s->CursorPos++;
-            else
-              s->ScrollOffset++;
-          }
-          scrollAccum = 0;
-        } else if (scrollAccum > threshold) {
-          if (s->CursorPos > 0)
-            s->CursorPos--;
-          else if (s->ScrollOffset > 0)
-            s->ScrollOffset--;
-          scrollAccum = 0;
+  // 4. Keyboard Navigation (Sync with VisualScroll)
+  if (!s->IsSearching && !s->ShowLoadPopup) {
+    if (IsKeyPressed(KEY_DOWN)) {
+      if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
+        s->CursorPos++;
+        // Keep cursor in view
+        if (s->CursorPos >= totalVisible) {
+            s->CursorPos = totalVisible - 1;
+            s->VisualScroll += rowH;
+            s->ScrollVelocity = 0;
         }
       }
     }
-
-    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
-      s->IsDragging = false;
-
-    if (!s->IsSearching && IsKeyPressed(KEY_DOWN)) {
-      if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
-        if (s->CursorPos < totalVisible - 1)
-          s->CursorPos++;
-        else
-          s->ScrollOffset++;
-      }
-    }
-    if (!s->IsSearching && IsKeyPressed(KEY_UP)) {
-      if (s->CursorPos > 0)
+    if (IsKeyPressed(KEY_UP)) {
+      if (s->CursorPos + s->ScrollOffset > 0) {
         s->CursorPos--;
-      else if (s->ScrollOffset > 0)
-        s->ScrollOffset--;
+        // Keep cursor in view
+        if (s->CursorPos < 0) {
+            s->CursorPos = 0;
+            s->VisualScroll -= rowH;
+            s->ScrollVelocity = 0;
+        }
+      }
     }
   }
 
@@ -947,6 +960,8 @@ static int Browser_Update(Component *base) {
 
         s->BrowseLevel = 2; // Categories level
         s->CursorPos = s->ScrollOffset = 0;
+        s->VisualScroll = 0;
+        s->ScrollVelocity = 0;
         printf("[BROWSER] Selected storage: %s (DB Found: %s)\n", 
                s->SelectedStorage->Path, (s->DB || s->SeratoDB) ? "YES" : "NO");
 
@@ -959,6 +974,8 @@ static int Browser_Update(Component *base) {
                s->DatabaseType == 0 ? "Rekordbox" : "Serato");
         s->CurrentPlaylistIdx = -1; // Reset playlist selection on switch
         s->CursorPos = s->ScrollOffset = 0;
+        s->VisualScroll = 0;
+        s->ScrollVelocity = 0;
         Browser_UpdateActiveTracks(s);
       } else if (s->CursorPos == 2) {
         s->BrowseLevel = 1; // Categories to Playlists
@@ -978,6 +995,8 @@ static int Browser_Update(Component *base) {
           s->BrowseLevel = 0;
           Browser_UpdateActiveTracks(s);
           s->CursorPos = s->ScrollOffset = 0;
+        s->VisualScroll = 0;
+        s->ScrollVelocity = 0;
         }
       } else {
         if (s->SeratoDB && idx < (int)s->SeratoDB->PlaylistCount) {
@@ -985,6 +1004,8 @@ static int Browser_Update(Component *base) {
           s->BrowseLevel = 0;
           Browser_UpdateActiveTracks(s);
           s->CursorPos = s->ScrollOffset = 0;
+        s->VisualScroll = 0;
+        s->ScrollVelocity = 0;
         }
       }
     } else if (s->BrowseLevel == 0) {
@@ -1410,8 +1431,29 @@ static void Browser_Draw(Component *base) {
     UIDrawText("\uf0d7", faceIcon, sortButtonRect.x + sortButtonW - S(18), sortButtonRect.y + S(10), S(10), ColorShadow); // Chevrons
   }
 
-  for (int i = 0; i < totalVisible; i++) {
+  int totalItems = 0;
+  if (s->BrowseLevel == 0)
+    totalItems = s->ActiveTrackCount;
+  else if (s->BrowseLevel == 1) {
+    if (s->DatabaseType == 0)
+      totalItems = s->DB ? (int)s->DB->PlaylistCount : 0;
+    else
+      totalItems = s->SeratoDB ? (int)s->SeratoDB->PlaylistCount : 0;
+  } else if (s->BrowseLevel == 2)
+    totalItems = 5 + (s->HasBothDatabases ? 1 : 0);
+  else if (s->BrowseLevel == 3)
+    totalItems = s->StorageCount;
+
+  float listAreaH = (viewH - listYOffset);
+  BeginScissorMode((int)listX, (int)listYOffset, (int)listW + S(10), (int)listAreaH);
+
+  float pixelOffset = fmodf(s->VisualScroll, rowH);
+  int itemsToDraw = totalVisible + 1;
+
+  for (int i = 0; i < itemsToDraw; i++) {
     int idx = s->ScrollOffset + i;
+    if (idx < 0 || idx >= totalItems) continue;
+
     const char *title = "";
     const char *artist = "";
     const char *bpmText = "124.0";
@@ -1472,8 +1514,8 @@ static void Browser_Draw(Component *base) {
     if (title[0] == '\0')
       continue;
 
-    float ry = listYOffset + i * rowH;
-    bool isCursor = (i == s->CursorPos);
+    float ry = listYOffset - pixelOffset + i * rowH;
+    bool isCursor = (idx == s->CursorPos + s->ScrollOffset);
 
     if (isCursor) {
       DrawRectangle(listX, ry + 1, listW, rowH - 2, ColorBlue);
@@ -1492,34 +1534,17 @@ static void Browser_Draw(Component *base) {
 
     float textY = ry + (artist[0] == '\0' ? S(6) : S(2));
 
-    // Marquee Logic for Title (Optimized: only measure for cursor item)
-    float maxTitleW = listW - (textX - listX) - S(130);
-
-    if (isCursor) {
-      Vector2 fullSize = MeasureTextEx(faceSm, title, S(13), 1.0f);
-      if (fullSize.x > maxTitleW) {
-        // Animation
-        double now = GetTime();
-        if (s->LastAnimTime == 0)
-          s->LastAnimTime = now;
-        float dt = (float)(now - s->LastAnimTime);
-        s->LastAnimTime = now;
-
-        s->MarqueeScrollX += dt * S(40.0f); // 40px per second
-        if (s->MarqueeScrollX > fullSize.x + S(40.0f))
-          s->MarqueeScrollX = -S(20.0f); // Loop with gap
-
-        BeginScissorMode(textX, ry, maxTitleW, rowH);
-        UIDrawText(title, faceSm, textX - s->MarqueeScrollX, textY, S(13),
-                   ColorWhite);
-        EndScissorMode();
-      } else {
-        UIDrawText(title, faceSm, textX, textY, S(13), ColorWhite);
-      }
-    } else {
-      // Normal truncated display with ellipsis
-      UIDrawTextTruncated(title, faceSm, textX, textY, S(13), ColorWhite, maxTitleW);
+    // Marquee Logic for Title
+    static int lastCursor = -1;
+    if (s->CursorPos != lastCursor) {
+        s->MarqueeScrollX = 0;
+        lastCursor = s->CursorPos;
     }
+    if (isCursor) s->MarqueeScrollX += GetFrameTime();
+
+    float maxTitleW = listW - (textX - listX) - S(130);
+    Rectangle titleRect = { textX, textY, maxTitleW, rowH };
+    UIDrawScrollingText(title, faceSm, titleRect, S(13), ColorWhite, isCursor ? s->MarqueeScrollX : 0.0f);
 
     if (artist[0] != '\0' && s->BrowseLevel == 0 && !s->InfoEnabled) {
       UIDrawText(artist, faceXS, textX, ry + S(15), S(10),
@@ -1561,6 +1586,7 @@ static void Browser_Draw(Component *base) {
       UIDrawText(icon, iconFont, listX + S(11), ry + S(7), S(12), ColorWhite);
     }
   }
+  EndScissorMode();
 
   // Scrollbar
   int maxItems = 0;

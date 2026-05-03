@@ -173,3 +173,37 @@ void UIDrawKnob(float x, float y, float radius, float value, float min, float ma
         DrawCentredText(unit, face, x - radius * 2.0f, radius * 4.0f, y + radius + S(12), S(9), Fade(ColorWhite, 0.7f));
     }
 }
+
+void UIDrawScrollingText(const char* str, Font font, Rectangle rect, float fontSize, Color clr, float elapsedTime) {
+    if (!str || str[0] == '\0') return;
+
+    Vector2 size = MeasureTextEx(font, str, fontSize, 1.0f);
+    
+    // If it fits, just draw it normally
+    if (size.x <= rect.width) {
+        UIDrawText(str, font, rect.x, rect.y, fontSize, clr);
+        return;
+    }
+
+    // If elapsedTime is 0, draw truncated
+    if (elapsedTime <= 0.0f) {
+        UIDrawTextTruncated(str, font, rect.x, rect.y, fontSize, clr, rect.width);
+        return;
+    }
+
+    // Scrolling with looping
+    float gap = S(40);
+    float totalW = size.x + gap;
+    float speed = S(40); // pixels per second
+    float offset = fmodf(elapsedTime * speed, totalW);
+
+    BeginScissorMode((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height);
+    
+    // First instance
+    UIDrawText(str, font, rect.x - offset, rect.y, fontSize, clr);
+    
+    // Second instance (connected loop)
+    UIDrawText(str, font, rect.x - offset + totalW, rect.y, fontSize, clr);
+    
+    EndScissorMode();
+}

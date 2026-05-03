@@ -12,3 +12,4 @@ void DrawCentredText(const char* str, Font font, float padX, float width, float 
 void UIDrawTextTruncated(const char* str, Font font, float x, float y, float size, Color clr, float maxWidth);
 void UIDrawText(const char* str, Font font, float x, float y, float size, Color clr);
 void UIDrawKnob(float x, float y, float radius, float value, float min, float max, const char* unit, Color color, bool centerZero);
+void UIDrawScrollingText(const char* str, Font font, Rectangle rect, float fontSize, Color clr, float elapsedTime);

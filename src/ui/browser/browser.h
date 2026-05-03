@@ -58,9 +58,11 @@ typedef struct {
     bool ShowLoadPopup;
     int PopupTrackIdx;
 
-    // Animation for Marquee
+    // Animation for Marquee and Smooth Scrolling
     float MarqueeScrollX;
     double LastAnimTime;
+    float VisualScroll;      // Pixel-based scroll position
+    float ScrollVelocity;    // For momentum
 
     // MIDI/External Interaction Flags
     bool MidiRequestEnter;

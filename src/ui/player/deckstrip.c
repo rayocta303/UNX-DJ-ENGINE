@@ -212,7 +212,14 @@ static void DeckStrip_Draw(Component *base) {
     UIDrawText("\xef\x80\x81", iconFace, mx, y + S(2), S(9),
                ColorWhite); // f001 music note
     float maxW = stripW - (mx - x) - S(20);
-    UIDrawTextTruncated(title, faceSm, mx + S(12), y + S(2), S(9), ColorWhite, maxW);
+    Rectangle titleRect = { mx + S(12), y + S(2), maxW, S(16) };
+    bool isHovered = CheckCollisionPointRec(GetMousePosition(), titleRect);
+    
+    static float hoverTimer[2] = {0, 0};
+    if (isHovered) hoverTimer[d->ID] += GetFrameTime();
+    else hoverTimer[d->ID] = 0;
+
+    UIDrawScrollingText(title, faceSm, titleRect, S(9), ColorWhite, hoverTimer[d->ID]);
   } else {
     UIDrawText(title, faceSm, mx, y + S(2), S(9), ColorWhite);
   }
