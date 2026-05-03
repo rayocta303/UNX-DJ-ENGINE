@@ -555,7 +555,7 @@ static void Waveform_Draw(Component *base) {
     for (int i = 0; i < r->State->LoadedTrack->BeatGridCount; i++) {
       unsigned int originalMs = r->State->LoadedTrack->BeatGrid[i].Time;
       uint16_t beatNum = r->State->LoadedTrack->BeatGrid[i].BeatNumber;
-      if (originalMs == 0xFFFFFFFF || originalMs == 0)
+      if (originalMs == 0xFFFFFFFF || (i > 0 && originalMs == 0))
         break;
 
       double beatPosHF = (double)originalMs * 0.15;
