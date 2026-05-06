@@ -43,7 +43,10 @@ static int DeckInfo_Update(Component *base) {
         if (d->State->LoadedTrack) {
             TrackState *t = d->State->LoadedTrack;
             d->State->LoadedTrack = NULL;
-            if (t->BeatGrid != NULL) free(t->BeatGrid);
+            if (t->Analysis.BeatGrid != NULL) free(t->Analysis.BeatGrid);
+            if (t->Analysis.Phrases != NULL) free(t->Analysis.Phrases);
+            if (t->Analysis.Cues != NULL) free(t->Analysis.Cues);
+            if (t->Analysis.DynamicWaveform != NULL) free(t->Analysis.DynamicWaveform);
             free(t);
         }
         d->State->TrackTitle[0] = '\0';
@@ -220,14 +223,14 @@ static void DeckInfo_Draw(Component *base) {
     if (d->State->LoadedTrack) {
         long long posMs = d->State->PositionMs;
         int beatIdx = -1;
-        for (int i = 0; i < 1024 && d->State->LoadedTrack->BeatGrid[i].Time != 0xFFFFFFFF; i++) {
-            if (d->State->LoadedTrack->BeatGrid[i].Time <= posMs) beatIdx = i;
+        for (int i = 0; i < d->State->LoadedTrack->Analysis.BeatGridCount; i++) {
+            if (d->State->LoadedTrack->Analysis.BeatGrid[i].Time <= posMs) beatIdx = i;
             else break;
         }
         if (beatIdx >= 0) {
-            int currentBeat = d->State->LoadedTrack->BeatGrid[beatIdx].BeatNumber;
-            int currentBar = 1;
-            for (int i = 0; i <= beatIdx; i++) if (d->State->LoadedTrack->BeatGrid[i].BeatNumber == 1) currentBar++;
+            int currentBeat = d->State->LoadedTrack->Analysis.BeatGrid[beatIdx].BeatNumber;
+            int currentBar = 0;
+            for (int i = 0; i <= beatIdx; i++) if (d->State->LoadedTrack->Analysis.BeatGrid[i].BeatNumber == 1) currentBar++;
             sprintf(barsVal, "%02d.%d", currentBar, currentBeat);
         }
     }

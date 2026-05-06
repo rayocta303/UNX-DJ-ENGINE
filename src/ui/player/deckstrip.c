@@ -376,9 +376,9 @@ static void DeckStrip_Draw(Component *base) {
     // Center guide line
     DrawLine(wx, wy + wh * 0.5f, wx + ww, wy + wh * 0.5f, (Color){40, 40, 40, 255});
 
-    int type = d->State->LoadedTrack->StaticWaveformType;
-    unsigned char *data = d->State->LoadedTrack->StaticWaveform;
-    int dataLen = d->State->LoadedTrack->StaticWaveformLen;
+    int type = d->State->LoadedTrack->Analysis.StaticWaveformType;
+    unsigned char *data = d->State->LoadedTrack->Analysis.StaticWaveform;
+    int dataLen = d->State->LoadedTrack->Analysis.StaticWaveformLen;
     float totalMs = (float)d->State->TrackLengthMs;
     float playedRatio = (totalMs > 0) ? (float)d->State->PositionMs / totalMs : 0;
 
@@ -393,16 +393,16 @@ static void DeckStrip_Draw(Component *base) {
 
       // Decide which data source to use (High-res Dynamic or Low-res Static)
       // We prefer dynamic for 3-Band because it looks much better
-      bool useDyn = (d->State->LoadedTrack->DynamicWaveformLen > 0);
-      unsigned char *renderData = useDyn ? d->State->LoadedTrack->DynamicWaveform : data;
-      int renderType = useDyn ? d->State->LoadedTrack->WaveformType : type;
+      bool useDyn = (d->State->LoadedTrack->Analysis.DynamicWaveformLen > 0);
+      unsigned char *renderData = useDyn ? d->State->LoadedTrack->Analysis.DynamicWaveform : data;
+      int renderType = useDyn ? d->State->LoadedTrack->Analysis.WaveformType : type;
       
       int bpf = 1;
       if (renderType == 3) bpf = 3;      // PWV7
       else if (renderType == 2) bpf = 2; // PWV4
       else bpf = 1;                     // PWV2
       
-      int totalFrames = (useDyn ? d->State->LoadedTrack->DynamicWaveformLen : dataLen) / bpf;
+      int totalFrames = (useDyn ? d->State->LoadedTrack->Analysis.DynamicWaveformLen : dataLen) / bpf;
       float yy = wy + wh * 0.5f;
 
       // Pioneer Palette

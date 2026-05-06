@@ -314,10 +314,9 @@
                                 x-text="currentSession.stats.settingsApplied"></p>
                         </div>
                         <div class="glass p-8 rounded-[2.5rem] border-white/5 group hover:bg-white/5 transition-all">
-                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Database
-                            </p>
+                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Avg Wfm RAM</p>
                             <p class="text-2xl font-black text-slate-300 tabular-nums"
-                                x-text="currentSession.stats.dbEntities + ' TRACKS'"></p>
+                                x-text="currentSession.stats.avgWfmRAM.toFixed(2) + ' MB'"></p>
                         </div>
                     </div>
 
@@ -526,8 +525,8 @@
                                 id: idCounter++,
                                 startTime: line.split('--- SESSION START:')[1].trim(),
                                 logs: [], deviceInfo: {}, audioInfo: {},
-                                stats: { errors: 0, warnings: 0, stalls: 0, duration: '', trackLoads: 0, screenChanges: 0, settingsApplied: 0, dbEntities: 0, peakRAM: 0, avgFPS: 0 },
-                                stallData: [], audioLatency: [], dbLatency: [], heartbeatData: [], checkpoints: []
+                                stats: { errors: 0, warnings: 0, stalls: 0, duration: '', trackLoads: 0, screenChanges: 0, settingsApplied: 0, dbEntities: 0, peakRAM: 0, avgFPS: 0, avgWfmRAM: 0 },
+                                stallData: [], audioLatency: [], dbLatency: [], heartbeatData: [], checkpoints: [], wfmSizes: []
                             };
                             return;
                         }
@@ -552,6 +551,13 @@
                             if (msg.includes('Metadata Loaded:')) {
                                 const m = msg.match(/Artists:(\d+).*Albums:(\d+).*Genres:(\d+)/);
                                 if (m) currentSession.stats.dbEntities = parseInt(m[1]) + parseInt(m[2]) + parseInt(m[3]);
+                            }
+                            if (msg.includes('Allocated DynamicWaveform:')) {
+                                const m = msg.match(/([\d.]+)\s+MB/);
+                                if (m) {
+                                    currentSession.wfmSizes.push(parseFloat(m[1]));
+                                    currentSession.stats.avgWfmRAM = currentSession.wfmSizes.reduce((a, b) => a + b, 0) / currentSession.wfmSizes.length;
+                                }
                             }
 
                             if (category === 'PERF') {
@@ -593,7 +599,7 @@
                             else if (inAudioInfo) { const kv = msg.match(/^(.*?)\s+:\s+(.*)/); if (kv) currentSession.audioInfo[kv[1].trim()] = kv[2].trim(); }
 
                             const lMsg = msg.toLowerCase();
-                            if (lMsg.includes('init') || lMsg.includes('success') || lMsg.includes('loading') || lMsg.includes('stall') || lMsg.includes('error')) {
+                            if (lMsg.includes('init') || lMsg.includes('success') || lMsg.includes('loading') || lMsg.includes('stall') || lMsg.includes('error') || lMsg.includes('allocated') || lMsg.includes('oom')) {
                                 currentSession.checkpoints.push({ time, level, message: msg.length > 30 ? msg.substring(0, 27) + '...' : msg, originalIdx: entryIdx });
                             }
                             currentSession.stats.duration = this.calcDuration(currentSession.logs[0].time, time);

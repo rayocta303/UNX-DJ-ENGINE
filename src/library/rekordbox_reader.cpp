@@ -228,13 +228,16 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
             }
         }
 
-        RBDatabase* db = new RBDatabase();
+        RBDatabase* db = (RBDatabase*)malloc(sizeof(RBDatabase));
+        memset(db, 0, sizeof(RBDatabase));
         db->TrackCount = (uint32_t)rbTracks.size();
-        db->Tracks = new RBTrack[db->TrackCount];
+        db->Tracks = (RBTrack*)malloc(sizeof(RBTrack) * db->TrackCount);
+        memset(db->Tracks, 0, sizeof(RBTrack) * db->TrackCount);
         for (size_t i = 0; i < rbTracks.size(); i++) db->Tracks[i] = rbTracks[i];
         
         db->PlaylistCount = (uint32_t)rbPlaylists.size();
-        db->Playlists = new RBPlaylist[db->PlaylistCount];
+        db->Playlists = (RBPlaylist*)malloc(sizeof(RBPlaylist) * db->PlaylistCount);
+        memset(db->Playlists, 0, sizeof(RBPlaylist) * db->PlaylistCount);
         for (size_t i = 0; i < rbPlaylists.size(); i++) {
             db->Playlists[i] = rbPlaylists[i];
             auto& tids = playlistTracks[db->Playlists[i].ID];
@@ -244,7 +247,7 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
                 std::sort(tids.begin(), tids.end(), [](const std::pair<uint32_t, uint32_t>& a, const std::pair<uint32_t, uint32_t>& b) {
                     return a.first < b.first;
                 });
-                db->Playlists[i].TrackIDs = new uint32_t[db->Playlists[i].TrackCount];
+                db->Playlists[i].TrackIDs = (uint32_t*)malloc(sizeof(uint32_t) * db->Playlists[i].TrackCount);
                 for (size_t j = 0; j < tids.size(); j++) db->Playlists[i].TrackIDs[j] = tids[j].second;
             } else {
                 db->Playlists[i].TrackIDs = nullptr;
@@ -252,7 +255,8 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
         }
 
         db->HistoryCount = (uint32_t)rbHistory.size();
-        db->History = new RBPlaylist[db->HistoryCount];
+        db->History = (RBPlaylist*)malloc(sizeof(RBPlaylist) * db->HistoryCount);
+        memset(db->History, 0, sizeof(RBPlaylist) * db->HistoryCount);
         for (size_t i = 0; i < rbHistory.size(); i++) {
             db->History[i] = rbHistory[i];
             auto& tids = historyTracks[db->History[i].ID];
@@ -261,7 +265,7 @@ extern "C" RBDatabase* RB_LoadDatabase(const char* rootPath) {
                 std::sort(tids.begin(), tids.end(), [](const std::pair<uint32_t, uint32_t>& a, const std::pair<uint32_t, uint32_t>& b) {
                     return a.first < b.first;
                 });
-                db->History[i].TrackIDs = new uint32_t[db->History[i].TrackCount];
+                db->History[i].TrackIDs = (uint32_t*)malloc(sizeof(uint32_t) * db->History[i].TrackCount);
                 for (size_t j = 0; j < tids.size(); j++) db->History[i].TrackIDs[j] = tids[j].second;
             } else {
                 db->History[i].TrackIDs = nullptr;
@@ -284,29 +288,29 @@ extern "C" void RB_FreeDatabase(RBDatabase* db) {
     if (!db) return;
     if (db->Tracks) {
         for (uint32_t i = 0; i < db->TrackCount; i++) {
-            if (db->Tracks[i].Cues) delete[] db->Tracks[i].Cues;
-            if (db->Tracks[i].Phrases) delete[] db->Tracks[i].Phrases;
-            if (db->Tracks[i].DynamicWaveform) delete[] db->Tracks[i].DynamicWaveform;
-            if (db->Tracks[i].BeatGrid) delete[] db->Tracks[i].BeatGrid;
+            if (db->Tracks[i].Analysis.Cues) free(db->Tracks[i].Analysis.Cues);
+            if (db->Tracks[i].Analysis.Phrases) free(db->Tracks[i].Analysis.Phrases);
+            if (db->Tracks[i].Analysis.DynamicWaveform) free(db->Tracks[i].Analysis.DynamicWaveform);
+            if (db->Tracks[i].Analysis.BeatGrid) free(db->Tracks[i].Analysis.BeatGrid);
         }
-        delete[] db->Tracks;
+        free(db->Tracks);
     }
     if (db->Playlists) {
         for (uint32_t i = 0; i < db->PlaylistCount; i++) {
-            if (db->Playlists[i].TrackIDs) delete[] db->Playlists[i].TrackIDs;
+            if (db->Playlists[i].TrackIDs) free(db->Playlists[i].TrackIDs);
         }
-        delete[] db->Playlists;
+        free(db->Playlists);
     }
     if (db->History) {
         for (uint32_t i = 0; i < db->HistoryCount; i++) {
-            if (db->History[i].TrackIDs) delete[] db->History[i].TrackIDs;
+            if (db->History[i].TrackIDs) free(db->History[i].TrackIDs);
         }
-        delete[] db->History;
+        free(db->History);
     }
-    delete db;
+    free(db);
 }
 
-static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
+static void RB_ParseAnlz(const std::string& path, RBAnalysis* analysis) {
     std::ifstream is(path, std::ios::binary);
     if (!is.is_open()) return;
 
@@ -319,20 +323,21 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
             auto tag = section->fourcc();
             if (tag == rekordbox_anlz_t::SECTION_TAGS_BEAT_GRID) {
                 auto bg = static_cast<rekordbox_anlz_t::beat_grid_tag_t*>(section->body());
-                track->BeatGridCount = bg->num_beats();
+                analysis->BeatGridCount = bg->num_beats();
 
-                if (track->BeatGrid) delete[] track->BeatGrid;
-                track->BeatGrid = new (std::nothrow) RBBeat[track->BeatGridCount];
-                if (!track->BeatGrid) {
-                    UNX_LOG_ERR("[ANLZ] OOM: Failed to allocate BeatGrid (%d entries)", track->BeatGridCount);
-                    track->BeatGridCount = 0;
+                if (analysis->BeatGrid) free(analysis->BeatGrid);
+                analysis->BeatGrid = (RBBeat*)malloc(analysis->BeatGridCount * sizeof(RBBeat));
+                if (!analysis->BeatGrid) {
+                    UNX_LOG_ERR("[ANLZ] OOM: Failed to allocate BeatGrid (%d entries)", analysis->BeatGridCount);
+                    analysis->BeatGridCount = 0;
                     return; // Abort further parsing if critical OOM
                 }
+                UNX_LOG_INFO("[ANLZ] Allocated BeatGrid: %d entries (%.2f KB)", analysis->BeatGridCount, (analysis->BeatGridCount * sizeof(RBBeat)) / 1024.0f);
                 for (uint32_t i = 0; i < bg->num_beats(); i++) {
                     auto b = (*bg->beats())[i].get();
-                    track->BeatGrid[i].Time = b->time();
-                    track->BeatGrid[i].BPM = b->tempo();
-                    track->BeatGrid[i].BeatNumber = b->beat_number();
+                    analysis->BeatGrid[i].Time = b->time();
+                    analysis->BeatGrid[i].BPM = b->tempo();
+                    analysis->BeatGrid[i].BeatNumber = b->beat_number();
                 }
             } else if (tag == rekordbox_anlz_t::SECTION_TAGS_CUES || tag == rekordbox_anlz_t::SECTION_TAGS_CUES_2) {
                 std::vector<RBCue> found;
@@ -374,27 +379,28 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
 
                 for (auto& f : found) {
                     bool exists = false;
-                    for (uint32_t i=0; i<track->CueCount; i++) {
-                        if (track->Cues[i].Time == f.Time && track->Cues[i].ID == f.ID) {
+                    for (uint32_t i=0; i<analysis->CueCount; i++) {
+                        if (analysis->Cues[i].Time == f.Time && analysis->Cues[i].ID == f.ID) {
                             exists = true; 
                             break;
                         }
                     }
                     if (!exists) {
-                        RBCue* next = new (std::nothrow) RBCue[track->CueCount + 1];
+                        RBCue* next = (RBCue*)malloc(sizeof(RBCue) * (analysis->CueCount + 1));
                         if (!next) {
-                            UNX_LOG_ERR("[ANLZ] OOM: Failed to allocate Cues (%d)", track->CueCount + 1);
+                            UNX_LOG_ERR("[ANLZ] OOM: Failed to allocate Cues (%d)", analysis->CueCount + 1);
                             break;
                         }
-                        if (track->Cues) {
-                            memcpy(next, track->Cues, sizeof(RBCue) * track->CueCount);
-                            delete[] track->Cues;
+                        if (analysis->Cues) {
+                            memcpy(next, analysis->Cues, sizeof(RBCue) * analysis->CueCount);
+                            free(analysis->Cues);
                         }
-                        next[track->CueCount] = f;
-                        track->Cues = next;
-                        track->CueCount++;
+                        next[analysis->CueCount] = f;
+                        analysis->Cues = next;
+                        analysis->CueCount++;
                     }
                 }
+                UNX_LOG_INFO("[ANLZ] Allocated Cues: %d entries (%.2f KB)", analysis->CueCount, (analysis->CueCount * sizeof(RBCue)) / 1024.0f);
             } else if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_TINY || tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_PREVIEW || 
                        tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_COLOR_PREVIEW || tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_3BAND_PREVIEW) {
                 std::string data;
@@ -414,9 +420,9 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
                 }
 
                 if (prio > currentStaticPrio) {
-                    track->StaticWaveformLen = data.length() > 8192 ? 8192 : data.length();
-                    track->StaticWaveformType = prio;
-                    memcpy(track->StaticWaveform, data.data(), track->StaticWaveformLen);
+                    analysis->StaticWaveformLen = data.length() > 8192 ? 8192 : data.length();
+                    analysis->StaticWaveformType = prio;
+                    memcpy(analysis->StaticWaveform, data.data(), analysis->StaticWaveformLen);
                     currentStaticPrio = prio;
                 }
             } else if ((tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_SCROLL || tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_COLOR_SCROLL || tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_3BAND_SCROLL)) {
@@ -446,73 +452,75 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
                     type = 3;
                 }
                 
-                if (track->DynamicWaveform) delete[] track->DynamicWaveform;
-                track->DynamicWaveformLen = data.length();
-                track->WaveformType = type;
-                if (track->DynamicWaveformLen > 0) {
-                    track->DynamicWaveform = new (std::nothrow) unsigned char[track->DynamicWaveformLen];
-                    if (!track->DynamicWaveform) {
-                        UNX_LOG_ERR("[ANLZ] OOM: Failed to allocate DynamicWaveform (%d bytes)", (int)track->DynamicWaveformLen);
-                        track->DynamicWaveformLen = 0;
+                if (analysis->DynamicWaveform) free(analysis->DynamicWaveform);
+                analysis->DynamicWaveformLen = data.length();
+                analysis->WaveformType = type;
+                if (analysis->DynamicWaveformLen > 0) {
+                    analysis->DynamicWaveform = (unsigned char*)malloc(analysis->DynamicWaveformLen);
+                    if (!analysis->DynamicWaveform) {
+                        UNX_LOG_ERR("[ANLZ] OOM: Failed to allocate DynamicWaveform (%d bytes)", (int)analysis->DynamicWaveformLen);
+                        analysis->DynamicWaveformLen = 0;
                     } else {
-                        memcpy(track->DynamicWaveform, data.data(), track->DynamicWaveformLen);
+                        memcpy(analysis->DynamicWaveform, data.data(), analysis->DynamicWaveformLen);
+                        UNX_LOG_INFO("[ANLZ] Allocated DynamicWaveform: %d bytes (%.2f MB)", (int)analysis->DynamicWaveformLen, analysis->DynamicWaveformLen / (1024.0f * 1024.0f));
                     }
                 }
             } else if (tag == rekordbox_anlz_t::SECTION_TAGS_SONG_STRUCTURE) {
                 auto ss = static_cast<rekordbox_anlz_t::song_structure_tag_t*>(section->body());
                 if (ss && ss->body() && ss->body()->entries()) {
                     auto entries = ss->body()->entries();
-                    if (!track->Phrases) {
-                        track->PhraseCount = entries->size();
-                        track->Phrases = new (std::nothrow) RBPhrase[track->PhraseCount];
-                        if (!track->Phrases) {
-                            UNX_LOG_ERR("[ANLZ] OOM: Failed to allocate Phrases (%d)", track->PhraseCount);
-                            track->PhraseCount = 0;
+                    if (!analysis->Phrases) {
+                        analysis->PhraseCount = entries->size();
+                        analysis->Phrases = (RBPhrase*)malloc(analysis->PhraseCount * sizeof(RBPhrase));
+                        if (!analysis->Phrases) {
+                            UNX_LOG_ERR("[ANLZ] OOM: Failed to allocate Phrases (%d)", analysis->PhraseCount);
+                            analysis->PhraseCount = 0;
                         } else {
-                            for (size_t i = 0; i < track->PhraseCount; i++) {
+                            UNX_LOG_INFO("[ANLZ] Allocated Phrases: %d entries (%.2f KB)", analysis->PhraseCount, (analysis->PhraseCount * sizeof(RBPhrase)) / 1024.0f);
+                            for (size_t i = 0; i < analysis->PhraseCount; i++) {
                             auto entry = (*entries)[i].get();
-                            track->Phrases[i].Index = entry->index();
-                            track->Phrases[i].Beat = entry->beat();
-                            track->Phrases[i].KindID = 0;
-                            strcpy(track->Phrases[i].Kind, "Unknown");
+                            analysis->Phrases[i].Index = entry->index();
+                            analysis->Phrases[i].Beat = entry->beat();
+                            analysis->Phrases[i].KindID = 0;
+                            strcpy(analysis->Phrases[i].Kind, "Unknown");
                             
                             auto kind = entry->kind();
                             if (auto kh = dynamic_cast<rekordbox_anlz_t::phrase_high_t*>(kind)) {
-                                track->Phrases[i].KindID = kh->id();
+                                analysis->Phrases[i].KindID = kh->id();
                                 switch (kh->id()) {
-                                    case rekordbox_anlz_t::MOOD_HIGH_PHRASE_INTRO: strcpy(track->Phrases[i].Kind, "Intro"); break;
-                                    case rekordbox_anlz_t::MOOD_HIGH_PHRASE_UP: strcpy(track->Phrases[i].Kind, "Up"); break;
-                                    case rekordbox_anlz_t::MOOD_HIGH_PHRASE_DOWN: strcpy(track->Phrases[i].Kind, "Down"); break;
-                                    case rekordbox_anlz_t::MOOD_HIGH_PHRASE_CHORUS: strcpy(track->Phrases[i].Kind, "Chorus"); break;
-                                    case rekordbox_anlz_t::MOOD_HIGH_PHRASE_OUTRO: strcpy(track->Phrases[i].Kind, "Outro"); break;
+                                    case rekordbox_anlz_t::MOOD_HIGH_PHRASE_INTRO: strcpy(analysis->Phrases[i].Kind, "Intro"); break;
+                                    case rekordbox_anlz_t::MOOD_HIGH_PHRASE_UP: strcpy(analysis->Phrases[i].Kind, "Up"); break;
+                                    case rekordbox_anlz_t::MOOD_HIGH_PHRASE_DOWN: strcpy(analysis->Phrases[i].Kind, "Down"); break;
+                                    case rekordbox_anlz_t::MOOD_HIGH_PHRASE_CHORUS: strcpy(analysis->Phrases[i].Kind, "Chorus"); break;
+                                    case rekordbox_anlz_t::MOOD_HIGH_PHRASE_OUTRO: strcpy(analysis->Phrases[i].Kind, "Outro"); break;
                                 }
                             } else if (auto km = dynamic_cast<rekordbox_anlz_t::phrase_mid_t*>(kind)) {
-                                track->Phrases[i].KindID = km->id();
+                                analysis->Phrases[i].KindID = km->id();
                                 switch (km->id()) {
-                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_INTRO: strcpy(track->Phrases[i].Kind, "Intro"); break;
-                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_1: strcpy(track->Phrases[i].Kind, "Verse 1"); break;
-                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_2: strcpy(track->Phrases[i].Kind, "Verse 2"); break;
-                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_3: strcpy(track->Phrases[i].Kind, "Verse 3"); break;
-                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_4: strcpy(track->Phrases[i].Kind, "Verse 4"); break;
-                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_5: strcpy(track->Phrases[i].Kind, "Verse 5"); break;
-                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_6: strcpy(track->Phrases[i].Kind, "Verse 6"); break;
-                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_BRIDGE: strcpy(track->Phrases[i].Kind, "Bridge"); break;
-                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_CHORUS: strcpy(track->Phrases[i].Kind, "Chorus"); break;
-                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_OUTRO: strcpy(track->Phrases[i].Kind, "Outro"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_INTRO: strcpy(analysis->Phrases[i].Kind, "Intro"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_1: strcpy(analysis->Phrases[i].Kind, "Verse 1"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_2: strcpy(analysis->Phrases[i].Kind, "Verse 2"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_3: strcpy(analysis->Phrases[i].Kind, "Verse 3"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_4: strcpy(analysis->Phrases[i].Kind, "Verse 4"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_5: strcpy(analysis->Phrases[i].Kind, "Verse 5"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_VERSE_6: strcpy(analysis->Phrases[i].Kind, "Verse 6"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_BRIDGE: strcpy(analysis->Phrases[i].Kind, "Bridge"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_CHORUS: strcpy(analysis->Phrases[i].Kind, "Chorus"); break;
+                                    case rekordbox_anlz_t::MOOD_MID_PHRASE_OUTRO: strcpy(analysis->Phrases[i].Kind, "Outro"); break;
                                 }
                             } else if (auto kl = dynamic_cast<rekordbox_anlz_t::phrase_low_t*>(kind)) {
-                                track->Phrases[i].KindID = kl->id();
+                                analysis->Phrases[i].KindID = kl->id();
                                 switch(kl->id()) {
-                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_INTRO: strcpy(track->Phrases[i].Kind, "Intro"); break;
-                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_1: strcpy(track->Phrases[i].Kind, "Verse 1"); break;
-                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_1B: strcpy(track->Phrases[i].Kind, "Verse 1B"); break;
-                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_1C: strcpy(track->Phrases[i].Kind, "Verse 1C"); break;
-                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_2: strcpy(track->Phrases[i].Kind, "Verse 2"); break;
-                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_2B: strcpy(track->Phrases[i].Kind, "Verse 2B"); break;
-                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_2C: strcpy(track->Phrases[i].Kind, "Verse 2C"); break;
-                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_BRIDGE: strcpy(track->Phrases[i].Kind, "Bridge"); break;
-                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_CHORUS: strcpy(track->Phrases[i].Kind, "Chorus"); break;
-                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_OUTRO: strcpy(track->Phrases[i].Kind, "Outro"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_INTRO: strcpy(analysis->Phrases[i].Kind, "Intro"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_1: strcpy(analysis->Phrases[i].Kind, "Verse 1"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_1B: strcpy(analysis->Phrases[i].Kind, "Verse 1B"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_1C: strcpy(analysis->Phrases[i].Kind, "Verse 1C"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_2: strcpy(analysis->Phrases[i].Kind, "Verse 2"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_2B: strcpy(analysis->Phrases[i].Kind, "Verse 2B"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_VERSE_2C: strcpy(analysis->Phrases[i].Kind, "Verse 2C"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_BRIDGE: strcpy(analysis->Phrases[i].Kind, "Bridge"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_CHORUS: strcpy(analysis->Phrases[i].Kind, "Chorus"); break;
+                                    case rekordbox_anlz_t::MOOD_LOW_PHRASE_OUTRO: strcpy(analysis->Phrases[i].Kind, "Outro"); break;
                                 }
                             }
                         }
@@ -524,19 +532,28 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
     } catch (...) {}
 }
 
-extern "C" void RB_LoadTrackData(RBTrack* track, const char* rootPath) {
-    if (!track || track->AnalyzePath[0] == '\0') return;
+extern "C" void RB_LoadTrackData(RBAnalysis* analysis, const char* analyzePath, const char* title, uint32_t id, const char* rootPath) {
+    if (!analysis || !analyzePath || analyzePath[0] == '\0') return;
 
-    UNX_LOG_INFO("[RB] Loading Track Data: %s (ID: %u)", track->Title, track->ID);
+    UNX_LOG_INFO("[RB] Loading Track Data: %s (ID: %u)", title, id);
 
-    std::string datPath = std::string(rootPath) + "/" + track->AnalyzePath;
-    RB_ParseAnlz(datPath, track);
+    std::string datPath = std::string(rootPath) + "/" + analyzePath;
+    
+    FILE* f = fopen(datPath.c_str(), "rb");
+    if (f) {
+        fseek(f, 0, SEEK_END);
+        long size = ftell(f);
+        fclose(f);
+        UNX_LOG_INFO("[RB] Analysis File Size: %.2f KB", size / 1024.0f);
+    }
+
+    RB_ParseAnlz(datPath, analysis);
 
     // Also look for .EXT
     std::string extPath = datPath;
     if (extPath.size() > 4) {
         extPath.replace(extPath.size() - 3, 3, "EXT");
-        RB_ParseAnlz(extPath, track);
+        RB_ParseAnlz(extPath, analysis);
     }
 }
 
@@ -572,7 +589,7 @@ extern "C" void RB_ReloadWaveform(const char* path, unsigned char** outData, int
                 *outLen = data.length();
                 *outType = type;
                 if (*outLen > 0) {
-                    *outData = new (std::nothrow) unsigned char[*outLen];
+                    *outData = (unsigned char*)malloc(*outLen);
                     if (*outData) {
                         memcpy(*outData, data.data(), *outLen);
                     } else {

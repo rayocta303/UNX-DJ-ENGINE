@@ -573,13 +573,13 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
     double trackSR = (double)audio->SampleRate;
 
     if (ds->QuantizeEnabled && ds->LoadedTrack &&
-        ds->LoadedTrack->BeatGridCount > 0) {
+        ds->LoadedTrack->Analysis.BeatGridCount > 0) {
       // Find nearest beat index
       double currentMs = (startPos / trackSR) * 1000.0;
       int nearestIdx = 0;
       double minDist = 10000.0;
-      for (int i = 0; i < ds->LoadedTrack->BeatGridCount; i++) {
-        double d = fabs(ds->LoadedTrack->BeatGrid[i].Time - currentMs);
+      for (int i = 0; i < ds->LoadedTrack->Analysis.BeatGridCount; i++) {
+        double d = fabs(ds->LoadedTrack->Analysis.BeatGrid[i].Time - currentMs);
         if (d < minDist) {
           minDist = d;
           nearestIdx = i;
@@ -587,26 +587,26 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
       }
 
       startPos =
-          (ds->LoadedTrack->BeatGrid[nearestIdx].Time / 1000.0) * trackSR;
+          (ds->LoadedTrack->Analysis.BeatGrid[nearestIdx].Time / 1000.0) * trackSR;
 
       // Calculate end pos using grid if possible (assuming 1 grid entry per
       // beat)
       int beatsCount = (int)beats;
       if (beats < 1.0f) {
         // Fractional beat loop (e.g. 1/4, 1/2)
-        double nextBeatMs = (nearestIdx + 1 < ds->LoadedTrack->BeatGridCount)
-                                ? ds->LoadedTrack->BeatGrid[nearestIdx + 1].Time
-                                : (ds->LoadedTrack->BeatGrid[nearestIdx].Time +
+        double nextBeatMs = (nearestIdx + 1 < ds->LoadedTrack->Analysis.BeatGridCount)
+                                ? ds->LoadedTrack->Analysis.BeatGrid[nearestIdx + 1].Time
+                                : (ds->LoadedTrack->Analysis.BeatGrid[nearestIdx].Time +
                                    (60000.0 / ds->CurrentBPM));
         double beatDurationMs =
-            nextBeatMs - ds->LoadedTrack->BeatGrid[nearestIdx].Time;
+            nextBeatMs - ds->LoadedTrack->Analysis.BeatGrid[nearestIdx].Time;
         loopLengthSamples = (beats * beatDurationMs / 1000.0) * trackSR;
       } else {
         int endIdx = nearestIdx + beatsCount;
-        if (endIdx < ds->LoadedTrack->BeatGridCount) {
-          double endMs = ds->LoadedTrack->BeatGrid[endIdx].Time;
+        if (endIdx < ds->LoadedTrack->Analysis.BeatGridCount) {
+          double endMs = ds->LoadedTrack->Analysis.BeatGrid[endIdx].Time;
           loopLengthSamples =
-              ((endMs - ds->LoadedTrack->BeatGrid[nearestIdx].Time) / 1000.0) *
+              ((endMs - ds->LoadedTrack->Analysis.BeatGrid[nearestIdx].Time) / 1000.0) *
               trackSR;
         } else {
           // Fallback to BPM
@@ -1648,9 +1648,9 @@ void UpdateDrawFrame(App *app) {
     DeckState *ds = (i == 0) ? &app->deckA : &app->deckB;
     if (ds->IsPlaying && ds->LoadedTrack) {
       long long endMs = ds->TrackLengthMs;
-      if (ds->LoadedTrack->BeatGridCount > 0) {
+      if (ds->LoadedTrack->Analysis.BeatGridCount > 0) {
         endMs = (long long)ds->LoadedTrack
-                    ->BeatGrid[ds->LoadedTrack->BeatGridCount - 1]
+                    ->Analysis.BeatGrid[ds->LoadedTrack->Analysis.BeatGridCount - 1]
                     .Time;
       }
 
@@ -1954,7 +1954,9 @@ void UpdateDrawFrame(App *app) {
     int loopSizes[] = {1, 2, 4, 8, 16};
     for (int k = 0; k < 5; k++) {
       if (ds->MidiRequestAutoLoop[k]) {
-        double beatMs = (60000.0f / ds->CurrentBPM);
+        double currentBpm = ds->CurrentBPM;
+        if (currentBpm < 1.0) currentBpm = 120.0;
+        double beatMs = (60000.0f / currentBpm);
         double loopLenFrames =
             (beatMs * loopSizes[k] * audio->SampleRate) / 1000.0f;
         DeckAudio_SetLoop(audio, true, audio->Position,

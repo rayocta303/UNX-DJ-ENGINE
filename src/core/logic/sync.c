@@ -78,10 +78,10 @@ void Sync_Update(DeckState *deckA, DeckState *deckB, AudioEngine *audioEngine) {
         // We need the current beat length to convert fraction to ms
         uint32_t fCurrentMs = follower->PositionMs;
         uint32_t fBeatLen = 500; // Default fallback (120 BPM)
-        for (int i = 0; i < follower->LoadedTrack->BeatGridCount - 1; i++) {
-            if (fCurrentMs >= follower->LoadedTrack->BeatGrid[i].Time && 
-                fCurrentMs < follower->LoadedTrack->BeatGrid[i+1].Time) {
-                fBeatLen = follower->LoadedTrack->BeatGrid[i+1].Time - follower->LoadedTrack->BeatGrid[i].Time;
+        for (int i = 0; i < follower->LoadedTrack->Analysis.BeatGridCount - 1; i++) {
+            if (fCurrentMs >= follower->LoadedTrack->Analysis.BeatGrid[i].Time && 
+                fCurrentMs < follower->LoadedTrack->Analysis.BeatGrid[i+1].Time) {
+                fBeatLen = follower->LoadedTrack->Analysis.BeatGrid[i+1].Time - follower->LoadedTrack->Analysis.BeatGrid[i].Time;
                 break;
             }
         }
@@ -151,18 +151,18 @@ void Sync_RequestPhaseSnap(DeckState *follower, DeckState *master, AudioEngine *
     uint32_t beatEnd = 0;
     
     // Find the beat segment the follower is currently in
-    for (int i = 0; i < fTrack->BeatGridCount - 1; i++) {
-        if (currentMs >= fTrack->BeatGrid[i].Time && currentMs < fTrack->BeatGrid[i+1].Time) {
-            beatStart = fTrack->BeatGrid[i].Time;
-            beatEnd = fTrack->BeatGrid[i+1].Time;
+    for (int i = 0; i < fTrack->Analysis.BeatGridCount - 1; i++) {
+        if (currentMs >= fTrack->Analysis.BeatGrid[i].Time && currentMs < fTrack->Analysis.BeatGrid[i+1].Time) {
+            beatStart = fTrack->Analysis.BeatGrid[i].Time;
+            beatEnd = fTrack->Analysis.BeatGrid[i+1].Time;
             break;
         }
     }
     
     // Fallback if not found (e.g. at the very start or end)
-    if (beatEnd == 0 && fTrack->BeatGridCount >= 2) {
-        beatStart = fTrack->BeatGrid[0].Time;
-        beatEnd = fTrack->BeatGrid[1].Time;
+    if (beatEnd == 0 && fTrack->Analysis.BeatGridCount >= 2) {
+        beatStart = fTrack->Analysis.BeatGrid[0].Time;
+        beatEnd = fTrack->Analysis.BeatGrid[1].Time;
     }
     
     if (beatEnd > beatStart) {

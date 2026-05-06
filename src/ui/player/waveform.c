@@ -22,10 +22,10 @@ static int Waveform_Update(Component *base) {
     r->cachedTrackLength = r->State->TrackLengthMs;
 
     if (r->cachedTrack != NULL) {
-      int bpf = (r->cachedTrack->WaveformType == 3)   ? 3
-                : (r->cachedTrack->WaveformType == 2) ? 2
+      int bpf = (r->cachedTrack->Analysis.WaveformType == 3)   ? 3
+                : (r->cachedTrack->Analysis.WaveformType == 2) ? 2
                                                       : 1;
-      r->dynWfmFrames = r->cachedTrack->DynamicWaveformLen / bpf;
+      r->dynWfmFrames = r->cachedTrack->Analysis.DynamicWaveformLen / bpf;
 
       if (r->State->TrackLengthMs > 0 && r->dynWfmFrames > 0) {
         // Recordbox waveforms are typically 150 Hz (0.15 frames per ms)
@@ -53,24 +53,24 @@ static int Waveform_Update(Component *base) {
   bool isInteracting = (inWaveform || r->State->IsPlaying || r->State->IsTouching);
   if (isInteracting) r->lastInteractionTime = GetTime();
 
-  if (r->cachedTrack && r->cachedTrack->DynamicWaveform == NULL && r->cachedTrack->DynamicWaveformLen > 0) {
+  if (r->cachedTrack && r->cachedTrack->Analysis.DynamicWaveform == NULL && r->cachedTrack->Analysis.DynamicWaveformLen > 0) {
       // Reload if we are interacting OR we are master
       if (isInteracting || r->State->IsMaster) {
           UNX_LOG_INFO("[WAVE] Reloading evicted buffer for Deck %c", r->ID == 0 ? 'A' : 'B');
           RB_ReloadWaveform(r->cachedTrack->AnalyzePath, 
-                          &r->cachedTrack->DynamicWaveform,
-                          &r->cachedTrack->DynamicWaveformLen,
-                          &r->cachedTrack->WaveformType);
+                          &r->cachedTrack->Analysis.DynamicWaveform,
+                          &r->cachedTrack->Analysis.DynamicWaveformLen,
+                          &r->cachedTrack->Analysis.WaveformType);
       }
   }
 
   // AUTO EVICT: If idle and memory is low, clear buffer
-  if (r->cachedTrack && r->cachedTrack->DynamicWaveform != NULL) {
+  if (r->cachedTrack && r->cachedTrack->Analysis.DynamicWaveform != NULL) {
       if (!isInteracting && !r->State->IsPlaying && !r->State->IsMaster) {
           if (MemoryGuard_GetLevel() >= MEM_MODE_LITE && (GetTime() - r->lastInteractionTime > 5.0)) {
               UNX_LOG_INFO("[WAVE] Evicting idle buffer for Deck %c to save RAM", r->ID == 0 ? 'A' : 'B');
-              free(r->cachedTrack->DynamicWaveform);
-              r->cachedTrack->DynamicWaveform = NULL;
+              free(r->cachedTrack->Analysis.DynamicWaveform);
+              r->cachedTrack->Analysis.DynamicWaveform = NULL;
           }
       }
   }
@@ -367,14 +367,41 @@ static void Waveform_Draw(Component *base) {
   Color colorHigh = BL_HIGH;
 
   int wfType =
-      r->State->LoadedTrack->WaveformType; // track data format (1, 2, or 3)
+      r->State->LoadedTrack->Analysis.WaveformType; // track data format (1, 2, or 3)
 
-  unsigned char *wfData = r->State->LoadedTrack->DynamicWaveform;
+  unsigned char *wfData = r->State->LoadedTrack->Analysis.DynamicWaveform;
   if (wfData == NULL) {
       EndScissorMode();
       return;
   }
   int64_t wfFrames = r->dynWfmFrames;
+
+/* 
+  // 1. Static Waveform (Deckstrip)
+  if (r->State->LoadedTrack != NULL && r->State->LoadedTrack->Analysis.StaticWaveformLen > 0) {
+      float dsY = wfY + waveH - S(10);
+      float dsH = S(8);
+      
+      // Background for the strip
+      DrawRectangleRec((Rectangle){ wfLeft, dsY, wfW, dsH }, (Color){ 20, 20, 20, 200 });
+
+      for (int i = 0; i < r->State->LoadedTrack->Analysis.StaticWaveformLen; i++) {
+          float x = wfLeft + ((float)i / (float)r->State->LoadedTrack->Analysis.StaticWaveformLen) * wfW;
+          unsigned char val = r->State->LoadedTrack->Analysis.StaticWaveform[i];
+          
+          float h = (float)val / 255.0f * dsH;
+          Color c = ColorBlue;
+          if (r->State->LoadedTrack->Analysis.StaticWaveformType == 2) c = ColorRed; // Placeholder for Color
+          else if (r->State->LoadedTrack->Analysis.StaticWaveformType == 3) c = (Color){ 100, 200, 255, 255 };
+
+          DrawLineV((Vector2){x, dsY + dsH}, (Vector2){x, dsY + dsH - h}, c);
+      }
+      
+      // Current position marker on deckstrip
+      float playPos = (float)((double)r->State->PositionMs / (double)r->State->TrackLengthMs) * wfW;
+      DrawRectangle(wfLeft + playPos - 1, dsY, 2, dsH, ColorWhite);
+  }
+*/
 
   float smLo = 0, smMi = 0, smHi = 0;
   Color smCol = {0, 0, 0, 0};
@@ -614,10 +641,10 @@ static void Waveform_Draw(Component *base) {
   // Beat Grid — ticks use semi-transparent overlay to preserve waveform pixels
   // beneath
   if (r->State->LoadedTrack != NULL) {
-    for (int i = 0; i < r->State->LoadedTrack->BeatGridCount; i++) {
-      unsigned int originalMs = r->State->LoadedTrack->BeatGrid[i].Time;
-      uint16_t beatNum = r->State->LoadedTrack->BeatGrid[i].BeatNumber;
-      if (originalMs == 0xFFFFFFFF || originalMs == 0)
+    for (int i = 0; i < r->State->LoadedTrack->Analysis.BeatGridCount; i++) {
+      unsigned int originalMs = r->State->LoadedTrack->Analysis.BeatGrid[i].Time;
+      uint16_t beatNum = r->State->LoadedTrack->Analysis.BeatGrid[i].BeatNumber;
+      if (originalMs == 0xFFFFFFFF)
         break;
 
       double beatPosHF = (double)originalMs * 0.15;
@@ -627,7 +654,7 @@ static void Waveform_Draw(Component *base) {
 
       if (bx >= wfLeft && bx <= wfRight) {
         bool isBar = (beatNum == 1);
-        bool isLastBeat = (i == r->State->LoadedTrack->BeatGridCount - 1);
+        bool isLastBeat = (i == r->State->LoadedTrack->Analysis.BeatGridCount - 1);
 
         // Top cap tick (3px wide) — solid but semi-transparent
         Color capColor = isBar ? Fade(ColorRed, 0.85f) : Fade(colorHigh, 0.55f);

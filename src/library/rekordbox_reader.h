@@ -37,6 +37,21 @@ typedef struct {
 } RBBeatGrid;
 
 typedef struct {
+    RBCue* Cues;
+    uint32_t CueCount;
+    RBPhrase* Phrases;
+    uint32_t PhraseCount;
+    RBBeat* BeatGrid;
+    int BeatGridCount;
+    unsigned char StaticWaveform[8192];
+    int StaticWaveformLen;
+    int StaticWaveformType; // 0=None, 1=Blue, 2=Color, 3=3Band
+    unsigned char* DynamicWaveform;
+    int DynamicWaveformLen;
+    int WaveformType; // 0=None, 1=Blue, 2=Color, 3=3Band
+} RBAnalysis;
+
+typedef struct {
     uint32_t ID;
     char Title[256];
     char Artist[256];
@@ -65,19 +80,7 @@ typedef struct {
     int TrackNumber;
     int DiscNumber;
     
-    // Analysis data
-    RBCue* Cues;
-    uint32_t CueCount;
-    RBPhrase* Phrases;
-    uint32_t PhraseCount;
-    RBBeat* BeatGrid;
-    int BeatGridCount;
-    unsigned char StaticWaveform[8192];
-    int StaticWaveformLen;
-    int StaticWaveformType; // 0=None, 1=Blue, 2=Color, 3=3Band
-    unsigned char* DynamicWaveform;
-    int DynamicWaveformLen;
-    int WaveformType; // 0=None, 1=Blue, 2=Color, 3=3Band
+    RBAnalysis Analysis;
 } RBTrack;
 
 typedef struct {
@@ -103,7 +106,7 @@ RBDatabase* RB_LoadDatabase(const char* rootPath);
 void RB_FreeDatabase(RBDatabase* db);
 
 // Loads analysis data for a specific track
-void RB_LoadTrackData(RBTrack* track, const char* rootPath);
+void RB_LoadTrackData(RBAnalysis* analysis, const char* analyzePath, const char* title, uint32_t id, const char* rootPath);
 
 // Low-level reload for memory management (re-parses waveform sections into existing pointers)
 void RB_ReloadWaveform(const char* path, unsigned char** outData, int* outLen, int* outType);

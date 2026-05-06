@@ -34,15 +34,10 @@ typedef struct {
 } WaveformSettings;
 
 typedef struct TrackState {
-  RBBeat* BeatGrid;
+  RBAnalysis Analysis; // Source of truth for raw data
+  
+  // Legacy/UI specific mappings (preserved for backward compatibility)
   unsigned int GridOffset;
-  int BeatGridCount;
-  unsigned char StaticWaveform[8192];
-  int StaticWaveformLen;
-  int StaticWaveformType; // 0=None, 1=Blue, 2=Color, 3=3Band
-  unsigned char *DynamicWaveform;
-  int DynamicWaveformLen;
-  int WaveformType; // 0=None, 1=Blue, 2=Color, 3=3Band
   HotCue HotCues[8];
   int HotCuesCount;
   HotCue Cues[32]; // Memory Cues
@@ -55,6 +50,7 @@ typedef struct TrackState {
     int KindID;
   } Phrases[64];
   int PhraseCount;
+
   char AnalyzePath[512]; // Path to .ANLZ/EXT file for reloading
 } TrackState;
 

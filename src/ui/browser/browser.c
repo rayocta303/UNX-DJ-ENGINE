@@ -1049,7 +1049,7 @@ static int Browser_Update(Component *base) {
         }
 
         if (s->SelectedStorage) {
-          RB_LoadTrackData(t, s->SelectedStorage->Path);
+          RB_LoadTrackData(&t->Analysis, t->AnalyzePath, t->Title, t->ID, s->SelectedStorage->Path);
 
           if (s->AudioPlugin) {
             char fullPath[1024];
@@ -1082,6 +1082,7 @@ static int Browser_Update(Component *base) {
             targetDeck->TrackNumber = t->TrackNumber;
             targetDeck->OriginalBPM = t->BPM;
             targetDeck->CurrentBPM = t->BPM;
+            targetDeck->OriginalBPM = (t->BPM > 0) ? t->BPM : 120.0f;
 
             if (s->SelectedStorage) {
               strncpy(targetDeck->SourceName, s->SelectedStorage->Name, 31);
@@ -1118,51 +1119,71 @@ static int Browser_Update(Component *base) {
                 snprintf(newTrack->AnalyzePath, sizeof(newTrack->AnalyzePath), "%s/%s", s->SelectedStorage->Path, t->AnalyzePath);
               }
 
-              newTrack->StaticWaveformLen = t->StaticWaveformLen;
-              newTrack->StaticWaveformType = t->StaticWaveformType;
-              memcpy(newTrack->StaticWaveform, t->StaticWaveform,
-                     t->StaticWaveformLen > 8192 ? 8192 : t->StaticWaveformLen);
+              newTrack->Analysis.StaticWaveformLen = t->Analysis.StaticWaveformLen;
+              newTrack->Analysis.StaticWaveformType = t->Analysis.StaticWaveformType;
+              memcpy(newTrack->Analysis.StaticWaveform, t->Analysis.StaticWaveform,
+                     t->Analysis.StaticWaveformLen > 8192 ? 8192 : t->Analysis.StaticWaveformLen);
               
               // DEEP COPY: Isolate dynamic waveform memory per deck
-              newTrack->DynamicWaveformLen = t->DynamicWaveformLen;
-              if (newTrack->DynamicWaveformLen > 0 && t->DynamicWaveform != NULL) {
-                  newTrack->DynamicWaveform = (unsigned char*)malloc(newTrack->DynamicWaveformLen);
-                  if (newTrack->DynamicWaveform) {
-                      memcpy(newTrack->DynamicWaveform, t->DynamicWaveform, newTrack->DynamicWaveformLen);
-                  } else {
-                      UNX_LOG_ERR("[BROWSER] OOM: Failed to allocate DynamicWaveform buffer (%d bytes)", (int)newTrack->DynamicWaveformLen);
-                      newTrack->DynamicWaveformLen = 0;
+              newTrack->Analysis.DynamicWaveformLen = t->Analysis.DynamicWaveformLen;
+              if (newTrack->Analysis.DynamicWaveformLen > 0 && t->Analysis.DynamicWaveform != NULL) {
+                  newTrack->Analysis.DynamicWaveform = (unsigned char*)malloc(newTrack->Analysis.DynamicWaveformLen);
+                  if (newTrack->Analysis.DynamicWaveform) {
+                      memcpy(newTrack->Analysis.DynamicWaveform, t->Analysis.DynamicWaveform, newTrack->Analysis.DynamicWaveformLen);
+                      newTrack->Analysis.WaveformType = t->Analysis.WaveformType;
                   }
-              } else {
-                  newTrack->DynamicWaveform = NULL;
-              }
-              newTrack->WaveformType = t->WaveformType;
-
-              // Cues and Beats
-              newTrack->BeatGridCount = t->BeatGridCount;
-              if (newTrack->BeatGridCount > 0 && t->BeatGrid != NULL) {
-                  newTrack->BeatGrid = (RBBeat*)malloc(sizeof(RBBeat) * newTrack->BeatGridCount);
-                  if (newTrack->BeatGrid) {
-                      memcpy(newTrack->BeatGrid, t->BeatGrid, sizeof(RBBeat) * newTrack->BeatGridCount);
-                  }
-              } else {
-                  newTrack->BeatGrid = NULL;
               }
 
-              for (uint32_t i = 0; i < t->CueCount && i < 32; i++) {
-                if (t->Cues[i].ID >= 1 && t->Cues[i].ID <= 8) {
-                  newTrack->HotCues[newTrack->HotCuesCount].ID = t->Cues[i].ID;
+              // Deep copy BeatGrid
+              newTrack->Analysis.BeatGridCount = t->Analysis.BeatGridCount;
+              if (newTrack->Analysis.BeatGridCount > 0 && t->Analysis.BeatGrid != NULL) {
+                  newTrack->Analysis.BeatGrid = (RBBeat*)malloc(sizeof(RBBeat) * newTrack->Analysis.BeatGridCount);
+                  if (newTrack->Analysis.BeatGrid) {
+                      memcpy(newTrack->Analysis.BeatGrid, t->Analysis.BeatGrid, sizeof(RBBeat) * newTrack->Analysis.BeatGridCount);
+                  }
+              }
+
+              // Deep copy Phrases
+              newTrack->Analysis.PhraseCount = t->Analysis.PhraseCount;
+              if (newTrack->Analysis.PhraseCount > 0 && t->Analysis.Phrases != NULL) {
+                  newTrack->Analysis.Phrases = (RBPhrase*)malloc(sizeof(RBPhrase) * newTrack->Analysis.PhraseCount);
+                  if (newTrack->Analysis.Phrases) {
+                      memcpy(newTrack->Analysis.Phrases, t->Analysis.Phrases, sizeof(RBPhrase) * newTrack->Analysis.PhraseCount);
+                  }
+              }
+
+              // Deep copy Cues
+              newTrack->Analysis.CueCount = t->Analysis.CueCount;
+              if (newTrack->Analysis.CueCount > 0 && t->Analysis.Cues != NULL) {
+                  newTrack->Analysis.Cues = (RBCue*)malloc(sizeof(RBCue) * newTrack->Analysis.CueCount);
+                  if (newTrack->Analysis.Cues) {
+                      memcpy(newTrack->Analysis.Cues, t->Analysis.Cues, sizeof(RBCue) * newTrack->Analysis.CueCount);
+                  }
+              }
+
+              for (uint32_t i = 0; i < t->Analysis.CueCount && i < 32; i++) {
+                if (t->Analysis.Cues[i].ID >= 1 && t->Analysis.Cues[i].ID <= 8) {
+                  newTrack->HotCues[newTrack->HotCuesCount].ID = t->Analysis.Cues[i].ID;
                   newTrack->HotCues[newTrack->HotCuesCount].Start =
-                      t->Cues[i].Time;
+                      t->Analysis.Cues[i].Time;
                   memcpy(newTrack->HotCues[newTrack->HotCuesCount].Color,
-                         t->Cues[i].Color, 3);
+                         t->Analysis.Cues[i].Color, 3);
                   newTrack->HotCuesCount++;
-                } else if (t->Cues[i].ID == 0) {
-                  newTrack->Cues[newTrack->CuesCount].Start = t->Cues[i].Time;
+                } else if (t->Analysis.Cues[i].ID == 0) {
+                  newTrack->Cues[newTrack->CuesCount].Start = t->Analysis.Cues[i].Time;
                   memcpy(newTrack->Cues[newTrack->CuesCount].Color,
-                         t->Cues[i].Color, 3);
+                         t->Analysis.Cues[i].Color, 3);
                   newTrack->CuesCount++;
                 }
+              }
+
+              // Also copy Phrases to legacy array if needed for UI
+              newTrack->PhraseCount = t->Analysis.PhraseCount > 64 ? 64 : t->Analysis.PhraseCount;
+              for (int i = 0; i < newTrack->PhraseCount; i++) {
+                  newTrack->Phrases[i].Index = t->Analysis.Phrases[i].Index;
+                  newTrack->Phrases[i].Beat = t->Analysis.Phrases[i].Beat;
+                  newTrack->Phrases[i].KindID = t->Analysis.Phrases[i].KindID;
+                  strncpy(newTrack->Phrases[i].Kind, t->Analysis.Phrases[i].Kind, 31);
               }
 
               TrackState *oldTrack = targetDeck->LoadedTrack;
@@ -1170,15 +1191,17 @@ static int Browser_Update(Component *base) {
 
               // Cleanup old track memory (including buffers)
               if (oldTrack){
-                if (oldTrack->BeatGrid != NULL) free(oldTrack->BeatGrid);
-                if (oldTrack->DynamicWaveform != NULL) free(oldTrack->DynamicWaveform);
+                if (oldTrack->Analysis.BeatGrid != NULL) free(oldTrack->Analysis.BeatGrid);
+                if (oldTrack->Analysis.Cues != NULL) free(oldTrack->Analysis.Cues);
+                if (oldTrack->Analysis.Phrases != NULL) free(oldTrack->Analysis.Phrases);
+                if (oldTrack->Analysis.DynamicWaveform != NULL) free(oldTrack->Analysis.DynamicWaveform);
                 free(oldTrack);
               }
                 
               targetDeck->PositionMs = (newTrack->CuesCount > 0)
                                            ? newTrack->Cues[0].Start
-                                           : (newTrack->BeatGridCount > 0
-                                                  ? newTrack->BeatGrid[0].Time
+                                           : (newTrack->Analysis.BeatGridCount > 0
+                                                  ? newTrack->Analysis.BeatGrid[0].Time
                                                   : 0);
               DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck],
                                  (uint32_t)targetDeck->PositionMs);
@@ -1228,6 +1251,7 @@ static int Browser_Update(Component *base) {
             targetDeck->TrackNumber = 0; // Not available in Serato DB v2
             targetDeck->OriginalBPM = t->BPM;
             targetDeck->CurrentBPM = t->BPM;
+            targetDeck->OriginalBPM = (t->BPM > 0) ? t->BPM : 120.0f;
 
             if (s->SelectedStorage) {
               strncpy(targetDeck->SourceName, s->SelectedStorage->Name, 31);
@@ -1248,7 +1272,7 @@ static int Browser_Update(Component *base) {
                   memcpy(newTrack->HotCues[newTrack->HotCuesCount].Color,
                          t->Cues[i].Color, 3);
                   newTrack->HotCuesCount++;
-                } else {
+                } else if (t->Cues[i].ID == 0) {
                   newTrack->Cues[newTrack->CuesCount].Start = t->Cues[i].Time;
                   memcpy(newTrack->Cues[newTrack->CuesCount].Color,
                          t->Cues[i].Color, 3);
@@ -1259,8 +1283,10 @@ static int Browser_Update(Component *base) {
               TrackState *oldTrack = targetDeck->LoadedTrack;
               targetDeck->LoadedTrack = newTrack;
               if (oldTrack) {
-                if (oldTrack->BeatGrid != NULL) free(oldTrack->BeatGrid);
-                if (oldTrack->DynamicWaveform != NULL) free(oldTrack->DynamicWaveform);
+                if (oldTrack->Analysis.BeatGrid != NULL) free(oldTrack->Analysis.BeatGrid);
+                if (oldTrack->Analysis.Phrases != NULL) free(oldTrack->Analysis.Phrases);
+                if (oldTrack->Analysis.Cues != NULL) free(oldTrack->Analysis.Cues);
+                if (oldTrack->Analysis.DynamicWaveform != NULL) free(oldTrack->Analysis.DynamicWaveform);
                 free(oldTrack);
               }
               targetDeck->PositionMs =

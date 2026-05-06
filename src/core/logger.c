@@ -419,12 +419,13 @@ void Log_LogDeviceInfo(const char* gpuModel) {
 #elif defined(__ANDROID__) || defined(__linux__)
     struct sysinfo si;
     if (sysinfo(&si) == 0) {
-        totalRAM = (float)(si.totalram * si.mem_unit) / (1024.0f * 1024.0f);
-        freeRAM = (float)(si.freeram * si.mem_unit) / (1024.0f * 1024.0f);
+        totalRAM = (float)((uint64_t)si.totalram * si.mem_unit) / (1024.0f * 1024.0f);
+        freeRAM = (float)((uint64_t)si.freeram * si.mem_unit) / (1024.0f * 1024.0f);
     }
 #endif
-    UNX_LOG_INFO("Total RAM   : %.0f MB", totalRAM);
-    UNX_LOG_INFO("Free RAM    : %.0f MB %s", freeRAM, (freeRAM < 256.0f) ? "(CRITICAL: Low Memory)" : "");
+    UNX_LOG_INFO("Total RAM   : %.0f MB (%.2f GB)", totalRAM, totalRAM / 1024.0f);
+    float freePercent = (totalRAM > 0) ? (freeRAM / totalRAM) * 100.0f : 0;
+    UNX_LOG_INFO("Free RAM    : %.0f MB (%.1f%%) %s", freeRAM, freePercent, (freeRAM < 256.0f) ? "!!! LOW MEMORY !!!" : "");
 
     // Display
     UNX_LOG_INFO("Display     : %dx%d @ %dHz", GetScreenWidth(), GetScreenHeight(), GetMonitorRefreshRate(GetCurrentMonitor()));
@@ -483,10 +484,10 @@ float Log_GetRAMUsage(void) {
     // Linux fallback via /proc/self/statm
     FILE* f = fopen("/proc/self/statm", "r");
     if (f) {
-        long pages;
-        if (fscanf(f, "%ld", &pages) == 1) {
+        long total_pages, rss_pages;
+        if (fscanf(f, "%ld %ld", &total_pages, &rss_pages) == 2) {
             fclose(f);
-            return (float)(pages * sysconf(_SC_PAGESIZE)) / (1024.0f * 1024.0f);
+            return (float)((uint64_t)rss_pages * sysconf(_SC_PAGESIZE)) / (1024.0f * 1024.0f);
         }
         fclose(f);
     }
