@@ -2,6 +2,7 @@
 #define LOGGER_H
 
 #include <stddef.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,6 +37,9 @@ void Log_Write(LogLevel level, const char* fmt, ...);
 
 // Get current RAM usage in MB
 float Log_GetRAMUsage(void);
+float Log_GetFreeRAM(void);
+bool Log_IsMemoryCritical(void);
+#include <stdbool.h>
 
 
 

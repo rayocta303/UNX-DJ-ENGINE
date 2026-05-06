@@ -1,4 +1,6 @@
 #include "ui/browser/browser.h"
+#include "core/memory_guard.h"
+#include "core/logger.h"
 #include "audio/engine.h"
 #include "rlgl.h"
 #include "ui/components/fonts.h"
@@ -633,7 +635,7 @@ static int Browser_Update(Component *base) {
       s->MidiRequestLoadB = false;
   }
 
-  int targetIdx = s->ScrollOffset + s->CursorPos;
+
 
   // Load Popup Dialog Interaction handled FIRST to prevent same-frame double
   // triggers
@@ -1032,12 +1034,18 @@ static int Browser_Update(Component *base) {
       return 0; // Prevent load
     }
 
-    int idx = targetIdx;
+    int idx = s->PopupTrackIdx;
     if (s->DatabaseType == 0) { // Rekordbox
       if (idx < s->ActiveTrackCount && s->TrackPointers[idx]) {
         RBTrack *t = s->TrackPointers[idx];
         printf("[BROWSER] Loading RB track: %s to Deck %c\n", t->Title,
                loadToDeck == 0 ? 'A' : 'B');
+
+        if (MemoryGuard_GetLevel() == MEM_MODE_CRITICAL) {
+            UNX_LOG_ERR("[BROWSER] LOAD BLOCKED: Memory is critical.");
+            s->ShowLoadPopup = false;
+            return 0;
+        }
 
         if (s->SelectedStorage) {
           RB_LoadTrackData(t, s->SelectedStorage->Path);
@@ -1097,8 +1105,13 @@ static int Browser_Update(Component *base) {
 
             // Allocate and setup TrackState
             TrackState *newTrack = (TrackState *)malloc(sizeof(TrackState));
-            if (newTrack) {
-              memset(newTrack, 0, sizeof(TrackState));
+            if (!newTrack) {
+                UNX_LOG_ERR("[BROWSER] OOM: Failed to allocate TrackState");
+                s->ShowLoadPopup = false;
+                return 0;
+            }
+            
+            memset(newTrack, 0, sizeof(TrackState));
               newTrack->StaticWaveformLen = t->StaticWaveformLen;
               newTrack->StaticWaveformType = t->StaticWaveformType;
               memcpy(newTrack->StaticWaveform, t->StaticWaveform,
@@ -1110,6 +1123,9 @@ static int Browser_Update(Component *base) {
                   newTrack->DynamicWaveform = (unsigned char*)malloc(newTrack->DynamicWaveformLen);
                   if (newTrack->DynamicWaveform) {
                       memcpy(newTrack->DynamicWaveform, t->DynamicWaveform, newTrack->DynamicWaveformLen);
+                  } else {
+                      UNX_LOG_ERR("[BROWSER] OOM: Failed to allocate DynamicWaveform buffer (%d bytes)", (int)newTrack->DynamicWaveformLen);
+                      newTrack->DynamicWaveformLen = 0;
                   }
               } else {
                   newTrack->DynamicWaveform = NULL;
@@ -1160,7 +1176,6 @@ static int Browser_Update(Component *base) {
                                                   : 0);
               DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck],
                                  (uint32_t)targetDeck->PositionMs);
-            }
           }
         }
       }

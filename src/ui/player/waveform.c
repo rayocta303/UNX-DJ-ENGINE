@@ -1,4 +1,5 @@
 #include "ui/player/waveform.h"
+#include "core/memory_guard.h"
 #include "audio/engine.h"
 #include "core/logic/quantize.h"
 #include "rlgl.h"
@@ -353,6 +354,10 @@ static void Waveform_Draw(Component *base) {
   // scrolling offsets.
   {
     double preRollWidth = 100.0;
+    MemoryLevel mem = MemoryGuard_GetLevel();
+    if (mem == MEM_MODE_ECO) preRollWidth = 40.0;
+    else if (mem >= MEM_MODE_LITE) preRollWidth = 10.0;
+
     for (int i = 0; i <= (int)preRollWidth; i++) {
       double px = (double)i - preRollWidth;
       double pA =
@@ -441,6 +446,12 @@ static void Waveform_Draw(Component *base) {
   float distLeft = centerX - wfLeft;
   float distRight = wfRight - centerX;
   float maxVisibleDist = (distLeft > distRight) ? distLeft : distRight;
+  
+  // ECO MODE: Reduce viewport width if memory is low
+  MemoryLevel mem = MemoryGuard_GetLevel();
+  if (mem == MEM_MODE_ECO) maxVisibleDist *= 0.8f;
+  else if (mem >= MEM_MODE_LITE) maxVisibleDist *= 0.5f;
+
   double halfVisibleFrames = (maxVisibleDist + 10.0f) * framesPerPixel;
   
   int64_t startFrame =
@@ -467,8 +478,19 @@ static void Waveform_Draw(Component *base) {
   rlBegin(RL_TRIANGLES);
   for (int64_t i = startFrame; i < endFrame; i++) {
     // --- STEP 3A: SAMPLE & DECODE EVERY FRAME ---
-    // We decode every single frame (step = 1) to ensure the smoothing filter
-    // captures all peaks. Skipping frames causes missing data and flickering.
+    
+    // ECO MODE: Skip decoding distant frames to save CPU
+    int adaptiveStep = 1;
+    if (mem >= MEM_MODE_ECO) {
+        float cxCurrent = (float)(((double)i - elapsedHalfFrames * r->dataDensity) / framesPerPixel + centerX);
+        float distToCenter = fabsf(cxCurrent - centerX);
+        if (distToCenter > 350) adaptiveStep = 8;
+        else if (distToCenter > 150) adaptiveStep = 4;
+        else if (distToCenter > 60) adaptiveStep = 2;
+        
+        if (i % adaptiveStep != 0 && i != endFrame - 1) continue;
+    }
+
     float rL = 0, rM = 0, rH = 0;
     Color colRaw = {0, 0, 0, 255};
 
@@ -500,9 +522,16 @@ static void Waveform_Draw(Component *base) {
 
     // --- STEP 3B: ATTACK/RELEASE SMOOTHING ---
     // Simulates an analog-style envelope for smooth peak transitions.
-    smLo += (rL - smLo) * ((rL > smLo) ? ATK : REL);
-    smMi += (rM - smMi) * ((rM > smMi) ? ATK : REL);
-    smHi += (rH - smHi) * ((rH > smHi) ? ATK : REL);
+    float curAtk = ATK, curRel = REL;
+    if (adaptiveStep > 1) {
+        // Adjust smoothing coefficients for larger time steps
+        curAtk = 1.0f - powf(1.0f - ATK, (float)adaptiveStep);
+        curRel = 1.0f - powf(1.0f - REL, (float)adaptiveStep);
+    }
+
+    smLo += (rL - smLo) * ((rL > smLo) ? curAtk : curRel);
+    smMi += (rM - smMi) * ((rM > smMi) ? curAtk : curRel);
+    smHi += (rH - smHi) * ((rH > smHi) ? curAtk : curRel);
     if (wfType != 3) {
       smCol.r = (unsigned char)(smCol.r + (colRaw.r - smCol.r) * ATK);
       smCol.g = (unsigned char)(smCol.g + (colRaw.g - smCol.g) * ATK);

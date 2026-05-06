@@ -494,5 +494,32 @@ float Log_GetRAMUsage(void) {
     return 0.0f;
 }
 
+float Log_GetFreeRAM(void) {
+    float freeRAM = 0;
+#if defined(_WIN32)
+    MEMORYSTATUSEX memInfo;
+    memInfo.dwLength = sizeof(MEMORYSTATUSEX);
+    if (GlobalMemoryStatusEx(&memInfo)) {
+        freeRAM = (float)memInfo.ullAvailPhys / (1024.0f * 1024.0f);
+    }
+#elif defined(__APPLE__)
+    vm_statistics_data_t vm_stats;
+    mach_msg_type_number_t info_count = HOST_VM_INFO_COUNT;
+    if (host_statistics(mach_host_self(), HOST_VM_INFO, (host_info_t)&vm_stats, &info_count) == KERN_SUCCESS) {
+        freeRAM = (float)vm_stats.free_count * (float)sysconf(_SC_PAGESIZE) / (1024.0f * 1024.0f);
+    }
+#elif defined(__ANDROID__) || defined(__linux__)
+    struct sysinfo si;
+    if (sysinfo(&si) == 0) {
+        freeRAM = (float)(si.freeram * si.mem_unit) / (1024.0f * 1024.0f);
+    }
+#endif
+    return freeRAM;
+}
+
+bool Log_IsMemoryCritical(void) {
+    return Log_GetFreeRAM() < 128.0f; // Critical below 128MB
+}
+
 
 

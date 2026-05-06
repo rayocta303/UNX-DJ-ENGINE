@@ -15,7 +15,11 @@
 #include <algorithm>
 #include <cstring>
 #include <iostream>
+#include <new>
+extern "C" {
 #include "core/logger.h"
+#include "core/memory_guard.h"
+}
 
 // Helper to safely get string from RB device string
 static std::string RB_GetString(rekordbox_pdb_t::device_sql_string_t* rbs) {
@@ -318,7 +322,12 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
                 track->BeatGridCount = bg->num_beats();
 
                 if (track->BeatGrid) delete[] track->BeatGrid;
-                track->BeatGrid = new RBBeat[track->BeatGridCount];
+                track->BeatGrid = new (std::nothrow) RBBeat[track->BeatGridCount];
+                if (!track->BeatGrid) {
+                    UNX_LOG_ERR("[ANLZ] OOM: Failed to allocate BeatGrid (%d entries)", track->BeatGridCount);
+                    track->BeatGridCount = 0;
+                    return; // Abort further parsing if critical OOM
+                }
                 for (uint32_t i = 0; i < bg->num_beats(); i++) {
                     auto b = (*bg->beats())[i].get();
                     track->BeatGrid[i].Time = b->time();
@@ -372,7 +381,11 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
                         }
                     }
                     if (!exists) {
-                        RBCue* next = new RBCue[track->CueCount + 1];
+                        RBCue* next = new (std::nothrow) RBCue[track->CueCount + 1];
+                        if (!next) {
+                            UNX_LOG_ERR("[ANLZ] OOM: Failed to allocate Cues (%d)", track->CueCount + 1);
+                            break;
+                        }
                         if (track->Cues) {
                             memcpy(next, track->Cues, sizeof(RBCue) * track->CueCount);
                             delete[] track->Cues;
@@ -406,7 +419,17 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
                     memcpy(track->StaticWaveform, data.data(), track->StaticWaveformLen);
                     currentStaticPrio = prio;
                 }
-            } else if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_SCROLL || tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_COLOR_SCROLL || tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_3BAND_SCROLL) {
+            } else if ((tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_SCROLL || tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_COLOR_SCROLL || tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_3BAND_SCROLL)) {
+                // ECO MODE: Skip dynamic waveform if memory is very low
+                if (MemoryGuard_GetLevel() >= MEM_MODE_LITE) {
+                    static bool warned = false;
+                    if (!warned) {
+                        UNX_LOG_WARN("[ANLZ] LITE MODE: Skipping dynamic waveform parsing to save RAM.");
+                        warned = true;
+                    }
+                    continue;
+                }
+                
                 std::string data;
                 int type = 0;
                 if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_SCROLL) {
@@ -427,8 +450,13 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
                 track->DynamicWaveformLen = data.length();
                 track->WaveformType = type;
                 if (track->DynamicWaveformLen > 0) {
-                    track->DynamicWaveform = new unsigned char[track->DynamicWaveformLen];
-                    memcpy(track->DynamicWaveform, data.data(), track->DynamicWaveformLen);
+                    track->DynamicWaveform = new (std::nothrow) unsigned char[track->DynamicWaveformLen];
+                    if (!track->DynamicWaveform) {
+                        UNX_LOG_ERR("[ANLZ] OOM: Failed to allocate DynamicWaveform (%d bytes)", (int)track->DynamicWaveformLen);
+                        track->DynamicWaveformLen = 0;
+                    } else {
+                        memcpy(track->DynamicWaveform, data.data(), track->DynamicWaveformLen);
+                    }
                 }
             } else if (tag == rekordbox_anlz_t::SECTION_TAGS_SONG_STRUCTURE) {
                 auto ss = static_cast<rekordbox_anlz_t::song_structure_tag_t*>(section->body());
@@ -436,8 +464,12 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
                     auto entries = ss->body()->entries();
                     if (!track->Phrases) {
                         track->PhraseCount = entries->size();
-                        track->Phrases = new RBPhrase[track->PhraseCount];
-                        for (size_t i = 0; i < track->PhraseCount; i++) {
+                        track->Phrases = new (std::nothrow) RBPhrase[track->PhraseCount];
+                        if (!track->Phrases) {
+                            UNX_LOG_ERR("[ANLZ] OOM: Failed to allocate Phrases (%d)", track->PhraseCount);
+                            track->PhraseCount = 0;
+                        } else {
+                            for (size_t i = 0; i < track->PhraseCount; i++) {
                             auto entry = (*entries)[i].get();
                             track->Phrases[i].Index = entry->index();
                             track->Phrases[i].Beat = entry->beat();
@@ -488,6 +520,7 @@ static void RB_ParseAnlz(const std::string& path, RBTrack* track) {
                 }
             }
         }
+    }
     } catch (...) {}
 }
 

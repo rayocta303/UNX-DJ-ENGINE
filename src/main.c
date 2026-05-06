@@ -5,6 +5,7 @@
 #include "core/logic/sync.h"
 #include "core/midi/midi_handler.h"
 #include "core/system_info.h"
+#include "core/memory_guard.h"
 #include "input/keyboard.h"
 #include "raylib.h"
 #include "rlgl.h"
@@ -2210,6 +2211,9 @@ void UpdateDrawFrame(App *app) {
   rlPushMatrix();
   rlTranslatef(UI_OffsetX, UI_OffsetY, 0);
 
+  // Update memory state once per frame
+  MemoryGuard_Update();
+
   // High-level Screen Router
   switch (app->screen) {
   case ScreenPlayer:
@@ -2320,6 +2324,20 @@ void UpdateDrawFrame(App *app) {
     }
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE))
       app->showExitConfirm = false;
+  }
+
+  // GLOBAL MEMORY WARNING OVERLAY
+  if (MemoryGuard_GetLevel() >= MEM_MODE_LITE) {
+      float warnW = S(100);
+      float warnH = S(16);
+      float warnX = SCREEN_WIDTH - warnW - S(10);
+      float warnY = TOP_BAR_H + S(5);
+      
+      DrawRectangle(warnX, warnY, warnW, warnH, Fade(ColorRed, 0.7f));
+      DrawRectangleLinesEx((Rectangle){warnX, warnY, warnW, warnH}, 1.0f, ColorWhite);
+      
+      Font fSm = UIFonts_GetFace(S(9));
+      DrawCentredText(MemoryGuard_GetStatusString(), fSm, warnX, warnW, warnY + S(3), S(9), ColorWhite);
   }
 
   rlPopMatrix();
