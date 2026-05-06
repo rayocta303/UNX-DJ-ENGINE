@@ -539,3 +539,48 @@ extern "C" void RB_LoadTrackData(RBTrack* track, const char* rootPath) {
         RB_ParseAnlz(extPath, track);
     }
 }
+
+extern "C" void RB_ReloadWaveform(const char* path, unsigned char** outData, int* outLen, int* outType) {
+    if (!path || !outData || !outLen || !outType) return;
+    
+    std::ifstream is(path, std::ios::binary);
+    if (!is.is_open()) return;
+
+    try {
+        kaitai::kstream ks(&is);
+        rekordbox_anlz_t anlz(&ks);
+
+        for (auto& section : *anlz.sections()) {
+            auto tag = section->fourcc();
+            if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_SCROLL || tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_COLOR_SCROLL || tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_3BAND_SCROLL) {
+                std::string data;
+                int type = 0;
+                if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_SCROLL) {
+                    auto ws = static_cast<rekordbox_anlz_t::wave_scroll_tag_t*>(section->body());
+                    data = ws->entries();
+                    type = 1;
+                } else if (tag == rekordbox_anlz_t::SECTION_TAGS_WAVE_COLOR_SCROLL) {
+                    auto wc = static_cast<rekordbox_anlz_t::wave_color_scroll_tag_t*>(section->body());
+                    data = wc->entries();
+                    type = 2;
+                } else {
+                    auto w3 = static_cast<rekordbox_anlz_t::wave_3band_scroll_tag_t*>(section->body());
+                    data = w3->entries();
+                    type = 3;
+                }
+                
+                *outLen = data.length();
+                *outType = type;
+                if (*outLen > 0) {
+                    *outData = new (std::nothrow) unsigned char[*outLen];
+                    if (*outData) {
+                        memcpy(*outData, data.data(), *outLen);
+                    } else {
+                        *outLen = 0;
+                    }
+                }
+                return; // Found it
+            }
+        }
+    } catch (...) {}
+}

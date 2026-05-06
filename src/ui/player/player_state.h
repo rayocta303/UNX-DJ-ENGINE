@@ -55,6 +55,7 @@ typedef struct TrackState {
     int KindID;
   } Phrases[64];
   int PhraseCount;
+  char AnalyzePath[512]; // Path to .ANLZ/EXT file for reloading
 } TrackState;
 
 typedef struct DeckState {

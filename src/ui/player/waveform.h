@@ -15,6 +15,7 @@ struct WaveformRenderer {
   int dynWfmFrames;
   float dataDensity;
   float lastMouseX;
+  double lastInteractionTime;
 };
 
 static const float ZOOM_LEVELS[] = {

@@ -1,5 +1,6 @@
 #include "ui/player/waveform.h"
 #include "core/memory_guard.h"
+#include "core/logger.h"
 #include "audio/engine.h"
 #include "core/logic/quantize.h"
 #include "rlgl.h"
@@ -48,6 +49,32 @@ static int Waveform_Update(Component *base) {
   bool inWaveform = (mouse.x >= wfLeft && mouse.x <= wfRight &&
                      mouse.y >= wfY && mouse.y <= wfY + waveH);
 
+  // AUTO RELOAD: If focused and buffer was evicted, reload it
+  bool isInteracting = (inWaveform || r->State->IsPlaying || r->State->IsTouching);
+  if (isInteracting) r->lastInteractionTime = GetTime();
+
+  if (r->cachedTrack && r->cachedTrack->DynamicWaveform == NULL && r->cachedTrack->DynamicWaveformLen > 0) {
+      // Reload if we are interacting OR we are master
+      if (isInteracting || r->State->IsMaster) {
+          UNX_LOG_INFO("[WAVE] Reloading evicted buffer for Deck %c", r->ID == 0 ? 'A' : 'B');
+          RB_ReloadWaveform(r->cachedTrack->AnalyzePath, 
+                          &r->cachedTrack->DynamicWaveform,
+                          &r->cachedTrack->DynamicWaveformLen,
+                          &r->cachedTrack->WaveformType);
+      }
+  }
+
+  // AUTO EVICT: If idle and memory is low, clear buffer
+  if (r->cachedTrack && r->cachedTrack->DynamicWaveform != NULL) {
+      if (!isInteracting && !r->State->IsPlaying && !r->State->IsMaster) {
+          if (MemoryGuard_GetLevel() >= MEM_MODE_LITE && (GetTime() - r->lastInteractionTime > 5.0)) {
+              UNX_LOG_INFO("[WAVE] Evicting idle buffer for Deck %c to save RAM", r->ID == 0 ? 'A' : 'B');
+              free(r->cachedTrack->DynamicWaveform);
+              r->cachedTrack->DynamicWaveform = NULL;
+          }
+      }
+  }
+
   // Zoom & Jog Interaction Logic
   int gesture = GetGestureDetected();
   if (inWaveform) {
@@ -86,7 +113,13 @@ static int Waveform_Update(Component *base) {
 
       // Clamp the index
       if (currentIndex < 0) currentIndex = 0;
-      if (currentIndex >= NUM_ZOOM_LEVELS) currentIndex = NUM_ZOOM_LEVELS - 1;
+      
+      int maxZoomIndex = NUM_ZOOM_LEVELS - 1;
+      // ECO MODE: Limit maximum zoom out to prevent heavy rendering
+      if (MemoryGuard_GetLevel() >= MEM_MODE_ECO) {
+          maxZoomIndex = (NUM_ZOOM_LEVELS / 2) + 1; // Limit to mid-zoom
+      }
+      if (currentIndex > maxZoomIndex) currentIndex = maxZoomIndex;
 
       r->State->ZoomScale = ZOOM_LEVELS[currentIndex];
       
@@ -815,4 +848,5 @@ void WaveformRenderer_Init(WaveformRenderer *r, int id, DeckState *state,
   r->cachedTrack = NULL;
   r->dynWfmFrames = 480;
   r->lastMouseX = 0;
+  r->lastInteractionTime = GetTime();
 }

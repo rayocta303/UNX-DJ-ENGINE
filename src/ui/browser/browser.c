@@ -492,6 +492,7 @@ static int Browser_Update(Component *base) {
     return 0;
 
   int loadToDeck = -1;
+  int targetIdx = s->ScrollOffset + s->CursorPos;
   bool triggerEnter = false;
 
   // Dropdown and Search Box Interaction
@@ -1034,7 +1035,7 @@ static int Browser_Update(Component *base) {
       return 0; // Prevent load
     }
 
-    int idx = s->PopupTrackIdx;
+    int idx = targetIdx;
     if (s->DatabaseType == 0) { // Rekordbox
       if (idx < s->ActiveTrackCount && s->TrackPointers[idx]) {
         RBTrack *t = s->TrackPointers[idx];
@@ -1112,6 +1113,11 @@ static int Browser_Update(Component *base) {
             }
             
             memset(newTrack, 0, sizeof(TrackState));
+              
+              if (s->SelectedStorage) {
+                snprintf(newTrack->AnalyzePath, sizeof(newTrack->AnalyzePath), "%s/%s", s->SelectedStorage->Path, t->AnalyzePath);
+              }
+
               newTrack->StaticWaveformLen = t->StaticWaveformLen;
               newTrack->StaticWaveformType = t->StaticWaveformType;
               memcpy(newTrack->StaticWaveform, t->StaticWaveform,

@@ -105,6 +105,9 @@ void RB_FreeDatabase(RBDatabase* db);
 // Loads analysis data for a specific track
 void RB_LoadTrackData(RBTrack* track, const char* rootPath);
 
+// Low-level reload for memory management (re-parses waveform sections into existing pointers)
+void RB_ReloadWaveform(const char* path, unsigned char** outData, int* outLen, int* outType);
+
 #ifdef __cplusplus
 }
 #endif
