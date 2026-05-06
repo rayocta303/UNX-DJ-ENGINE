@@ -357,8 +357,8 @@ static void Waveform_Draw(Component *base) {
   const float HIGH_SCALE = 1.0f;
   const float NORM = 2.0f / 255.0f; // Boosted to 2.0x to fill canvas and prevent empty space
   const float PWV2_HSCALE = waveCenter / 31.0f;
-  const float ATK = 1.0f; // Instant attack (no smoothing)
-  const float REL = 1.0f; // Instant release
+  const float ATK = 0.9f; // Fast attack
+  const float REL = 0.12f; // Smooth release for that 'tail' look
 
   // hardware-accurate 3-band palette (Blue/Green/White)
   Color BL_LOW = {16, 105, 238, 255};   // Teensy col_blue

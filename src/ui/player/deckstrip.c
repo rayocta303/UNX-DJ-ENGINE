@@ -411,8 +411,8 @@ static void DeckStrip_Draw(Component *base) {
       Color BL_HIGH = {246, 251, 246, 255};
 
       float smLo = 0, smMi = 0, smHi = 0;
-      const float ATK = 1.0f; // Instant
-      const float REL = 1.0f;
+      const float ATK = 0.9f;
+      const float REL = 0.12f;
 
       for (int xi = 0; xi < (int)ww; xi++) {
         float r0 = (float)xi / ww;
