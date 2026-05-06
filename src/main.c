@@ -1354,7 +1354,7 @@ Log_LogDeviceInfo(gpuModel);
   CO_Register("[Master]", "crossfader", CO_TYPE_FLOAT, &audioEngine->Crossfader,
               -1.0f, 1.0f);
   CO_Register("[Master]", "volume", CO_TYPE_FLOAT, &audioEngine->MasterVolume,
-              0, 1.0f);
+              0, 2.0f);
 
   // --- Color FX ---
   CO_Register("[Channel1]", "colorfx_select", CO_TYPE_INT,

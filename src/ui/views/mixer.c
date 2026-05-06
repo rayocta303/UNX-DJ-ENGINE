@@ -365,8 +365,8 @@ static void Mixer_Draw(Component *base) {
   BeatFXState *fxs = r->State->FXState;
   DrawRectangle(rightX + S(2), panelY + S(2), colRightW - S(4), panelH - S(4), (Color){20, 20, 20, 255});
   float masterKnobY = panelY + S(25);
-  Mixer_DrawKnob(rightX + colRightW / 2.0f, masterKnobY, S(15), eng->MasterVolume, 0.0f, 1.0f, "MASTER", ColorRed, true);
-  HandleKnob(r->State, &eng->MasterVolume, rightX + colRightW / 2.0f, masterKnobY, S(15), 0.0f, 1.0f, true, mousePos, mDown);
+  Mixer_DrawKnob(rightX + colRightW / 2.0f, masterKnobY, S(15), eng->MasterVolume, 0.0f, 2.0f, "MASTER", ColorRed, true);
+  HandleKnob(r->State, &eng->MasterVolume, rightX + colRightW / 2.0f, masterKnobY, S(15), 0.0f, 2.0f, true, mousePos, mDown);
 
   float bfxY = masterKnobY + S(40);
   DrawCentredText("BEAT FX", fTiny, rightX, colRightW, bfxY, S(7), ColorShadow);
