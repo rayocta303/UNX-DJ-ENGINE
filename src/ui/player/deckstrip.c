@@ -405,14 +405,14 @@ static void DeckStrip_Draw(Component *base) {
       int totalFrames = (useDyn ? d->State->LoadedTrack->Analysis.DynamicWaveformLen : dataLen) / bpf;
       float yy = wy + wh * 0.5f;
 
-      // Pioneer Palette
-      Color BL_LOW = {32, 83, 217, 255};
-      Color BL_MID = {242, 170, 60, 255};
-      Color BL_HIGH = {255, 255, 255, 255};
+      // hardware-accurate 3-band palette (Blue/Green/White)
+      Color BL_LOW = {16, 105, 238, 255};
+      Color BL_MID = {16, 190, 82, 255};
+      Color BL_HIGH = {246, 251, 246, 255};
 
       float smLo = 0, smMi = 0, smHi = 0;
-      const float ATK = 0.85f; 
-      const float REL = 0.40f;
+      const float ATK = 1.0f; // Instant
+      const float REL = 1.0f;
 
       for (int xi = 0; xi < (int)ww; xi++) {
         float r0 = (float)xi / ww;
@@ -451,17 +451,31 @@ static void DeckStrip_Draw(Component *base) {
         // 2. STYLE APPLICATION (Apply Gains & Final Colors)
         if (style == WAVEFORM_STYLE_3BAND) {
           // Render as 3 discrete layers
-          rL = (rL / 255.0f) * wh * 0.5f * gLow * 2.1f;
-          rM = (rM / 255.0f) * wh * 0.5f * gMid * 2.1f;
-          rH = (rH / 255.0f) * wh * 0.5f * gHigh * 2.1f;
+          rL = (rL / 255.0f) * wh * 0.5f * gLow * 2.0f;
+          rM = (rM / 255.0f) * wh * 0.5f * gMid * 2.0f;
+          rH = (rH / 255.0f) * wh * 0.5f * gHigh * 2.0f;
           
           if (rL > wh * 0.5f) rL = wh * 0.5f;
           if (rM > wh * 0.5f) rM = wh * 0.5f;
           if (rH > wh * 0.5f) rH = wh * 0.5f;
 
-          float pLo = smLo; smLo = pLo + (rL - pLo) * ((rL > pLo) ? ATK : REL);
-          float pMi = smMi; smMi = pMi + (rM - pMi) * ((rM > pMi) ? ATK : REL);
-          float pHi = smHi; smHi = pHi + (rH - pHi) * ((rH > pHi) ? ATK : REL);
+          float pLo = smLo;
+          float pMi = smMi;
+          float pHi = smHi;
+
+          smLo = rL;
+          smMi = rM;
+          smHi = rH;
+
+          // Boost and Clamp for visibility
+          float halfH = wh * 0.5f;
+          if (smLo > halfH) smLo = halfH;
+          if (smMi > halfH) smMi = halfH;
+          if (smHi > halfH) smHi = halfH;
+          
+          if (smLo < 0.5f && rL > 0) smLo = 0.5f;
+          if (smMi < 0.5f && rM > 0) smMi = 0.5f;
+          if (smHi < 0.5f && rH > 0) smHi = 0.5f;
 
           Color clL = played ? Fade(BL_LOW, 0.4f) : BL_LOW;
           Color clM = played ? Fade(BL_MID, 0.4f) : BL_MID;

@@ -351,19 +351,19 @@ static void Waveform_Draw(Component *base) {
   float gHigh =
       (r->State->Waveform.GainHigh > 0) ? r->State->Waveform.GainHigh : 1.0f;
 
-  // Scaling constants for 3-Band
-  const float LOW_SCALE = 0.4f;
-  const float MID_SCALE = 0.3f;
-  const float HIGH_SCALE = 0.06f;
-  const float NORM = 1.0f / (255.0f * LOW_SCALE);
+  // Scaling constants for 3-Band (Matched to Teensy/CDJ-1000)
+  const float LOW_SCALE = 1.0f;
+  const float MID_SCALE = 1.0f;
+  const float HIGH_SCALE = 1.0f;
+  const float NORM = 2.0f / 255.0f; // Boosted to 2.0x to fill canvas and prevent empty space
   const float PWV2_HSCALE = waveCenter / 31.0f;
-  const float ATK = 0.45f;
-  const float REL = 0.10f;
+  const float ATK = 1.0f; // Instant attack (no smoothing)
+  const float REL = 1.0f; // Instant release
 
-  // beat-link 3-band palette
-  Color BL_LOW = {32, 83, 217, 255};
-  Color BL_MID = {242, 170, 60, 255};
-  Color BL_HIGH = {255, 255, 255, 255};
+  // hardware-accurate 3-band palette (Blue/Green/White)
+  Color BL_LOW = {16, 105, 238, 255};   // Teensy col_blue
+  Color BL_MID = {16, 190, 82, 255};    // Teensy col_green
+  Color BL_HIGH = {246, 251, 246, 255}; // Teensy col_white
   Color colorHigh = BL_HIGH;
 
   int wfType =
@@ -592,6 +592,16 @@ static void Waveform_Draw(Component *base) {
     smLo += (rL - smLo) * ((rL > smLo) ? curAtk : curRel);
     smMi += (rM - smMi) * ((rM > smMi) ? curAtk : curRel);
     smHi += (rH - smHi) * ((rH > smHi) ? curAtk : curRel);
+
+    // Clamp and add minimum height to prevent empty space
+    if (smLo > waveCenter) smLo = waveCenter;
+    if (smMi > waveCenter) smMi = waveCenter;
+    if (smHi > waveCenter) smHi = waveCenter;
+    
+    // Add noise floor for visibility
+    if (smLo < 0.5f && rL > 0) smLo = 0.5f;
+    if (smMi < 0.5f && rM > 0) smMi = 0.5f;
+    if (smHi < 0.5f && rH > 0) smHi = 0.5f;
     if (wfType != 3) {
       smCol.r = (unsigned char)(smCol.r + (colRaw.r - smCol.r) * ATK);
       smCol.g = (unsigned char)(smCol.g + (colRaw.g - smCol.g) * ATK);
