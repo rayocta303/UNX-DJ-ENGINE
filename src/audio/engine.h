@@ -113,6 +113,8 @@ typedef struct DeckAudioState {
   // Release FX State
   int ReleaseFXType;   // 0=None, 1=Brake, 2=Spin, 3=Echo
   float ReleaseFXTimer; 
+  float DryGain;              // 0.0 to 1.0 (smooth dry volume fade for Release FX Echo)
+  bool ReleaseFXEchoActive;   // True while Release FX Echo is held down
   uint32_t LastLoadID; // Track latest load request ID for task cancellation
 } DeckAudioState;
 

@@ -281,7 +281,12 @@ void Get3BandPeak(unsigned char *data, int64_t maxFrames, double start,
     e = maxFrames;
 
   float maxL = 0, maxM = 0, maxH = 0;
-  for (int64_t i = s; i < e; i++) {
+  int64_t step = 1;
+  int64_t count = e - s;
+  if (count > 16) {
+    step = count / 16;
+  }
+  for (int64_t i = s; i < e; i += step) {
     // Byte layout: [Mid, High, Low]
     if ((float)data[i * 3] > maxM)
       maxM = (float)data[i * 3];
@@ -342,14 +347,23 @@ static void Waveform_Draw(Component *base) {
   float zoomDelta = effectiveZoom * r->dataDensity;
 
   // === Style from Settings ===
+  // === Style & EQ Gains from Channel Mixer ===
   WaveformStyle userStyle = r->State->Waveform.Style;
 
+  extern AudioEngine *globalAudioEngine;
+  float eqLowMult = 1.0f, eqMidMult = 1.0f, eqHighMult = 1.0f;
+  if (globalAudioEngine != NULL && r->ID >= 0 && r->ID < 2) {
+      eqLowMult = globalAudioEngine->Decks[r->ID].EqLow * 2.0f;
+      eqMidMult = globalAudioEngine->Decks[r->ID].EqMid * 2.0f;
+      eqHighMult = globalAudioEngine->Decks[r->ID].EqHigh * 2.0f;
+  }
+
   float gLow =
-      (r->State->Waveform.GainLow > 0) ? r->State->Waveform.GainLow : 1.0f;
+      ((r->State->Waveform.GainLow > 0) ? r->State->Waveform.GainLow : 1.0f) * eqLowMult;
   float gMid =
-      (r->State->Waveform.GainMid > 0) ? r->State->Waveform.GainMid : 1.0f;
+      ((r->State->Waveform.GainMid > 0) ? r->State->Waveform.GainMid : 1.0f) * eqMidMult;
   float gHigh =
-      (r->State->Waveform.GainHigh > 0) ? r->State->Waveform.GainHigh : 1.0f;
+      ((r->State->Waveform.GainHigh > 0) ? r->State->Waveform.GainHigh : 1.0f) * eqHighMult;
 
   // Scaling constants for 3-Band (Matched to Teensy/CDJ-1000)
   const float LOW_SCALE = 1.0f;
@@ -413,10 +427,10 @@ static void Waveform_Draw(Component *base) {
   // (pre-roll), its value at x=0 will be the same regardless of sub-pixel
   // scrolling offsets.
   {
-    double preRollWidth = 100.0;
+    double preRollWidth = 12.0;
     MemoryLevel mem = MemoryGuard_GetLevel();
-    if (mem == MEM_MODE_ECO) preRollWidth = 40.0;
-    else if (mem >= MEM_MODE_LITE) preRollWidth = 10.0;
+    if (mem == MEM_MODE_ECO) preRollWidth = 8.0;
+    else if (mem >= MEM_MODE_LITE) preRollWidth = 4.0;
 
     for (int i = 0; i <= (int)preRollWidth; i++) {
       double px = (double)i - preRollWidth;
@@ -446,28 +460,19 @@ static void Waveform_Draw(Component *base) {
         }
 
         float rL, rM, rH;
-        if (userStyle == WAVEFORM_STYLE_3BAND) {
-          float baseH = h * PWV2_HSCALE;
-          if (col.r > col.b && col.r > col.g) {
-            rL = baseH * 0.4f;
-            rM = baseH * 0.9f;
-            rH = baseH * 0.2f;
-          } else if (col.b > col.r && col.b > col.g) {
-            rL = baseH * 0.95f;
-            rM = baseH * 0.6f;
-            rH = baseH * 0.1f;
-          } else {
-            rL = baseH * 0.8f;
-            rM = baseH * 0.8f;
-            rH = baseH * 0.6f;
-          }
-          rL *= gLow;
-          rM *= gMid;
-          rH *= gHigh;
+        float baseH = h * PWV2_HSCALE;
+        if (wfType == 2) {
+          rL = baseH * ((float)col.r / 255.0f) * gLow;
+          rM = baseH * ((float)col.g / 255.0f) * gMid;
+          rH = baseH * ((float)col.b / 255.0f) * gHigh;
         } else {
-          rL = h * PWV2_HSCALE * gLow;
-          rM = 0;
-          rH = 0;
+          if (col.r > col.b && col.r > col.g) {
+            rL = baseH * 0.4f * gLow; rM = baseH * 0.9f * gMid; rH = baseH * 0.2f * gHigh;
+          } else if (col.b > col.r && col.b > col.g) {
+            rL = baseH * 0.95f * gLow; rM = baseH * 0.6f * gMid; rH = baseH * 0.1f * gHigh;
+          } else {
+            rL = baseH * 0.8f * gLow; rM = baseH * 0.8f * gMid; rH = baseH * 0.6f * gHigh;
+          }
         }
 
         smLo += (rL - smLo) * ((rL > smLo) ? ATK : REL);
@@ -539,17 +544,16 @@ static void Waveform_Draw(Component *base) {
   for (int64_t i = startFrame; i < endFrame; i++) {
     // --- STEP 3A: SAMPLE & DECODE EVERY FRAME ---
     
-    // ECO MODE: Skip decoding distant frames to save CPU
-    int adaptiveStep = 1;
+    // LOD ADAPTIVE STEPPING: Skip decoding intermediate frames when zoomed out
+    int adaptiveStep = (renderStep > 8 ? 8 : (renderStep > 4 ? 4 : (renderStep > 2 ? 2 : 1)));
     if (mem >= MEM_MODE_ECO) {
         float cxCurrent = (float)(((double)i - elapsedHalfFrames * r->dataDensity) / framesPerPixel + centerX);
         float distToCenter = fabsf(cxCurrent - centerX);
         if (distToCenter > 350) adaptiveStep = 8;
         else if (distToCenter > 150) adaptiveStep = 4;
         else if (distToCenter > 60) adaptiveStep = 2;
-        
-        if (i % adaptiveStep != 0 && i != endFrame - 1) continue;
     }
+    if (adaptiveStep > 1 && (i % adaptiveStep != 0) && i != endFrame - 1) continue;
 
     float rL = 0, rM = 0, rH = 0;
     Color colRaw = {0, 0, 0, 255};
@@ -565,18 +569,19 @@ static void Waveform_Draw(Component *base) {
       else
         h = PWV2_Decode(wfData[i], &colRaw);
 
-      if (userStyle == WAVEFORM_STYLE_3BAND) {
-        float baseH = h * PWV2_HSCALE;
-        if (colRaw.r > colRaw.b && colRaw.r > colRaw.g) {
-          rL = baseH * 0.4f; rM = baseH * 0.9f; rH = baseH * 0.2f;
-        } else if (colRaw.b > colRaw.r && colRaw.b > colRaw.g) {
-          rL = baseH * 0.95f; rM = baseH * 0.6f; rH = baseH * 0.1f;
-        } else {
-          rL = baseH * 0.8f; rM = baseH * 0.8f; rH = baseH * 0.6f;
-        }
-        rL *= gLow; rM *= gMid; rH *= gHigh;
+      float baseH = h * PWV2_HSCALE;
+      if (wfType == 2) {
+        rL = baseH * ((float)colRaw.r / 255.0f) * gLow;
+        rM = baseH * ((float)colRaw.g / 255.0f) * gMid;
+        rH = baseH * ((float)colRaw.b / 255.0f) * gHigh;
       } else {
-        rL = h * PWV2_HSCALE * gLow;
+        if (colRaw.r > colRaw.b && colRaw.r > colRaw.g) {
+          rL = baseH * 0.4f * gLow; rM = baseH * 0.9f * gMid; rH = baseH * 0.2f * gHigh;
+        } else if (colRaw.b > colRaw.r && colRaw.b > colRaw.g) {
+          rL = baseH * 0.95f * gLow; rM = baseH * 0.6f * gMid; rH = baseH * 0.1f * gHigh;
+        } else {
+          rL = baseH * 0.8f * gLow; rM = baseH * 0.8f * gMid; rH = baseH * 0.6f * gHigh;
+        }
       }
     }
 
@@ -625,15 +630,27 @@ static void Waveform_Draw(Component *base) {
 
       if (cx1 >= wfLeft - 2 && cx0 <= wfRight + 2) {
         if (userStyle == WAVEFORM_STYLE_BLUE || userStyle == WAVEFORM_STYLE_RGB) {
-          if (pLo > 0.1f || smLo > 0.1f) {
-            rlColor4ub(pCol.r, pCol.g, pCol.b, 255);
-            rlVertex2f(cx0, yy - pLo); rlVertex2f(cx0, yy + pLo);
-            rlColor4ub(smCol.r, smCol.g, smCol.b, 255);
-            rlVertex2f(cx1, yy + smLo);
-            rlColor4ub(pCol.r, pCol.g, pCol.b, 255);
-            rlVertex2f(cx0, yy - pLo);
-            rlColor4ub(smCol.r, smCol.g, smCol.b, 255);
-            rlVertex2f(cx1, yy + smLo); rlVertex2f(cx1, yy - smLo);
+          float h0 = fmaxf(pLo, fmaxf(pMi, pHi));
+          float h1 = fmaxf(smLo, fmaxf(smMi, smHi));
+          if (h0 > 0.1f || h1 > 0.1f) {
+            Color c0 = pCol;
+            Color c1 = smCol;
+            if (userStyle == WAVEFORM_STYLE_RGB) {
+              c0.r = (unsigned char)fminf(255.0f, (float)pCol.r * eqLowMult);
+              c0.g = (unsigned char)fminf(255.0f, (float)pCol.g * eqMidMult);
+              c0.b = (unsigned char)fminf(255.0f, (float)pCol.b * eqHighMult);
+              c1.r = (unsigned char)fminf(255.0f, (float)smCol.r * eqLowMult);
+              c1.g = (unsigned char)fminf(255.0f, (float)smCol.g * eqMidMult);
+              c1.b = (unsigned char)fminf(255.0f, (float)smCol.b * eqHighMult);
+            }
+            rlColor4ub(c0.r, c0.g, c0.b, 255);
+            rlVertex2f(cx0, yy - h0); rlVertex2f(cx0, yy + h0);
+            rlColor4ub(c1.r, c1.g, c1.b, 255);
+            rlVertex2f(cx1, yy + h1);
+            rlColor4ub(c0.r, c0.g, c0.b, 255);
+            rlVertex2f(cx0, yy - h0);
+            rlColor4ub(c1.r, c1.g, c1.b, 255);
+            rlVertex2f(cx1, yy + h1); rlVertex2f(cx1, yy - h1);
           }
         } else {
           if (pLo > 0.1f || smLo > 0.1f) { rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 255); DRAW_TRAP(pLo, smLo); }

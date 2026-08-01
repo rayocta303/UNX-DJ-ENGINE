@@ -1,4 +1,5 @@
 #include "ui/player/deckstrip.h"
+#include "audio/engine.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
@@ -386,10 +387,18 @@ static void DeckStrip_Draw(Component *base) {
       rlDrawRenderBatchActive();
       rlBegin(RL_TRIANGLES);
 
+      extern AudioEngine *globalAudioEngine;
+      float eqLowMult = 1.0f, eqMidMult = 1.0f, eqHighMult = 1.0f;
+      if (globalAudioEngine != NULL && d->ID >= 0 && d->ID < 2) {
+          eqLowMult = globalAudioEngine->Decks[d->ID].EqLow * 2.0f;
+          eqMidMult = globalAudioEngine->Decks[d->ID].EqMid * 2.0f;
+          eqHighMult = globalAudioEngine->Decks[d->ID].EqHigh * 2.0f;
+      }
+
       WaveformStyle style = d->State->Waveform.Style;
-      float gLow = d->State->Waveform.GainLow;
-      float gMid = d->State->Waveform.GainMid;
-      float gHigh = d->State->Waveform.GainHigh;
+      float gLow = d->State->Waveform.GainLow * eqLowMult;
+      float gMid = d->State->Waveform.GainMid * eqMidMult;
+      float gHigh = d->State->Waveform.GainHigh * eqHighMult;
 
       // Decide which data source to use (High-res Dynamic or Low-res Static)
       // We prefer dynamic for 3-Band because it looks much better
@@ -498,20 +507,21 @@ static void DeckStrip_Draw(Component *base) {
 
         } else {
           // Render as single symmetric layer (RGB or BLUE)
-          float hVal = 0;
+          float hVal = fmaxf(rL, fmaxf(rM, rH));
           Color finalCol = col;
           
           if (renderType == 3) {
-             hVal = ((rL + rM + rH) / 3.0f) * (wh / 255.0f) * 0.5f * gLow * 2.1f;
              if (style == WAVEFORM_STYLE_RGB) {
-                if (rL > rM && rL > rH) finalCol = BL_LOW;
-                else if (rM > rH) finalCol = BL_MID;
+                if (rL >= rM && rL >= rH) finalCol = BL_LOW;
+                else if (rM >= rH) finalCol = BL_MID;
                 else finalCol = BL_HIGH;
              } else finalCol = ColorBlue;
           } else {
-             float baseH = (renderType == 2 ? (rM / 0.9f) : (rL / 0.95f)); // Recover base height
-             hVal = (baseH / 255.0f) * wh * 0.5f * gLow * 2.1f;
-             if (style == WAVEFORM_STYLE_BLUE) finalCol = ColorBlue;
+             if (style == WAVEFORM_STYLE_RGB) {
+                finalCol.r = (unsigned char)fminf(255.0f, (float)col.r * eqLowMult);
+                finalCol.g = (unsigned char)fminf(255.0f, (float)col.g * eqMidMult);
+                finalCol.b = (unsigned char)fminf(255.0f, (float)col.b * eqHighMult);
+             } else finalCol = ColorBlue;
           }
           
           if (hVal > wh * 0.5f) hVal = wh * 0.5f;

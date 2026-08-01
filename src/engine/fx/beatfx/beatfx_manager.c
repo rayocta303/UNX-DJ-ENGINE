@@ -130,10 +130,31 @@ void BeatFXManager_ProcessWetOnly(BeatFXManager* mgr, float* wetL, float* wetR, 
         case BEATFX_REVERB:
             Reverb_Process(&mgr->reverb, wetL, wetR, mixInL, mixInR, mgr->beatMs, mgr->levelDepth, mgr->scrubVal, sampleRate);
             break;
-        case BEATFX_TRANS:
+        case BEATFX_FILTER:
             if (mgr->isFxOn) {
-                Trans_Process(&mgr->trans, wetL, wetR, inL, inR, mgr->beatMs, mgr->levelDepth, sampleRate);
+                BFilter_Process(&mgr->bfilter, wetL, wetR, inL, inR, mgr->beatMs, mgr->levelDepth, sampleRate);
             }
+            break;
+        case BEATFX_FLANGER:
+            if (mgr->isFxOn) {
+                Flanger_Process(&mgr->flanger, wetL, wetR, inL, inR, mgr->beatMs, mgr->levelDepth, mgr->scrubVal, mgr->isScrubbing, sampleRate);
+            }
+            break;
+        case BEATFX_PHASER:
+            if (mgr->isFxOn) {
+                Phaser_Process(&mgr->phaser, wetL, wetR, inL, inR, mgr->beatMs, mgr->levelDepth, sampleRate);
+            }
+            break;
+        case BEATFX_PITCH:
+            if (mgr->isFxOn) {
+                Pitch_Process(&mgr->pitch, wetL, wetR, inL, inR, mgr->beatMs, mgr->levelDepth, sampleRate);
+            }
+            break;
+        case BEATFX_SLIPROLL:
+            SlipRoll_Process(&mgr->sliproll, wetL, wetR, inL, inR, mgr->beatMs, mgr->levelDepth, sampleRate, mgr->isFxOn);
+            break;
+        case BEATFX_VINYLBRAKE:
+            VinylBrake_Process(&mgr->vinylbrake, wetL, wetR, inL, inR, mgr->beatMs, mgr->levelDepth, sampleRate, mgr->isFxOn);
             break;
         case BEATFX_ROLL:
             Roll_Process(&mgr->roll, wetL, wetR, inL, inR, mgr->beatMs, mgr->levelDepth, sampleRate, mgr->isFxOn);

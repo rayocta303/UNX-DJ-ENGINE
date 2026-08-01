@@ -688,7 +688,7 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
       a->fxState.SelectedFX = 1; // ECHO
       a->fxState.LevelDepth = 0.85f;
 
-      DeckAudio_TriggerReleaseFX(audio, 5); // Stop deck playback
+      audio->ReleaseFXEchoActive = true;
     } else if (padIdx == 7) {
       // Mute / Instant Stop
       DeckAudio_Stop(audio);
@@ -698,8 +698,6 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
 }
 
 void OnPadRelease(void *ctx, int deckIdx, int padIdx) {
-  (void)padIdx;
-
   App *a = (App *)ctx;
   DeckAudioState *audio = &globalAudioEngine->Decks[deckIdx];
   PadMode mode = a->padState.Mode[deckIdx];
@@ -710,6 +708,10 @@ void OnPadRelease(void *ctx, int deckIdx, int padIdx) {
     a->padState.ActiveLoopIdx[deckIdx] = -1;
   } else if (mode == PAD_MODE_GATE_CUE) {
     DeckAudio_InstantStop(audio);
+  } else if (mode == PAD_MODE_RELEASE_FX) {
+    if (padIdx >= 4 && padIdx <= 6) {
+      audio->ReleaseFXEchoActive = false;
+    }
   }
 }
 

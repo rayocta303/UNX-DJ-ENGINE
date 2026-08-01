@@ -615,6 +615,16 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     maxL = fmaxf(maxL, fabsf(l));
     maxR = fmaxf(maxR, fabsf(r));
 
+    // Smooth DryGain ramping for Release FX Echo
+    float targetDry = deck->ReleaseFXEchoActive ? 0.0f : 1.0f;
+    if (deck->DryGain < targetDry) {
+      deck->DryGain += 0.0008f;
+      if (deck->DryGain > targetDry) deck->DryGain = targetDry;
+    } else if (deck->DryGain > targetDry) {
+      deck->DryGain -= 0.0008f;
+      if (deck->DryGain < targetDry) deck->DryGain = targetDry;
+    }
+
     // Channel Fader (Post-Cue) with Ramping
     float t = (float)i / (float)received;
     float currentTotalGain =
@@ -622,16 +632,18 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     float sendL = l * currentTotalGain;
     float sendR = r * currentTotalGain;
 
+    float dryL = sendL * deck->DryGain;
+    float dryR = sendR * deck->DryGain;
+
     // Professional Routing Logic
     if (engine->RoutingMode == FX_ROUTING_POST_FADER) {
-      // MASTER gets Dry signal (Post-Fader)
-      outMaster[i * 2] += sendL;
-      outMaster[i * 2 + 1] += sendR;
-      // Also add to clean sum for Master FX
-      outCleanMaster[i * 2] += sendL;
-      outCleanMaster[i * 2 + 1] += sendR;
+      // MASTER gets Dry signal (Post-Fader) attenuated by DryGain
+      outMaster[i * 2] += dryL;
+      outMaster[i * 2 + 1] += dryR;
+      outCleanMaster[i * 2] += dryL;
+      outCleanMaster[i * 2 + 1] += dryR;
 
-      // BEAT FX gets Send signal (Post-Fader), MASTER gets Wet signal (Return)
+      // BEAT FX gets Send signal (un-attenuated sendL/sendR while Echo active so tail captures full audio)
       float wetL = 0, wetR = 0;
       if (engine->BeatFX.targetChannel == deckIndex + 1) {
         BeatFXManager_ProcessWetOnly(&engine->BeatFX, &wetL, &wetR, sendL,
@@ -645,11 +657,16 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
       if (engine->BeatFX.targetChannel == deckIndex + 1) {
         BeatFXManager_Process(&engine->BeatFX, &fxOutL, &fxOutR, sendL, sendR,
                               fs);
+        outMaster[i * 2] += fxOutL * deck->DryGain;
+        outMaster[i * 2 + 1] += fxOutR * deck->DryGain;
+        outCleanMaster[i * 2] += fxOutL * deck->DryGain;
+        outCleanMaster[i * 2 + 1] += fxOutR * deck->DryGain;
+      } else {
+        outMaster[i * 2] += dryL;
+        outMaster[i * 2 + 1] += dryR;
+        outCleanMaster[i * 2] += dryL;
+        outCleanMaster[i * 2 + 1] += dryR;
       }
-      outMaster[i * 2] += fxOutL;
-      outMaster[i * 2 + 1] += fxOutR;
-      outCleanMaster[i * 2] += fxOutL;
-      outCleanMaster[i * 2 + 1] += fxOutR;
     }
   }
 
@@ -802,6 +819,8 @@ void DeckAudio_Unload(DeckAudioState *deck) {
   deck->SlipActive = false;
   deck->ReleaseFXType = 0;
   deck->ReleaseFXTimer = 0.0f;
+  deck->DryGain = 1.0f;
+  deck->ReleaseFXEchoActive = false;
   if (deck->PCMBuffer) {
     void *ptr = deck->PCMBuffer;
     deck->PCMBuffer = NULL;
@@ -816,38 +835,57 @@ void DeckAudio_Unload(DeckAudioState *deck) {
 }
 
 void DeckAudio_TriggerReleaseFX(DeckAudioState *deck, int type) {
+  float bpm = (deck->BPM > 10.0) ? (float)deck->BPM : 120.0f;
+  float beatSec = 60.0f / bpm; // 1 Beat duration in seconds
+
   deck->ReleaseFXType = type;
-  deck->ReleaseFXTimer = 3.0f; // Automatic reset after 3s
+
   switch (type) {
-  case 1: // Vinyl Brake Short
-    deck->VinylStopAccel = 0.04f;
+  case 1: { // Vinyl Brake Short (1 Beat)
+    float durationSec = beatSec * 1.0f;
+    if (durationSec < 0.1f) durationSec = 0.1f;
+    deck->VinylStopAccel = 1.0f / (durationSec * 60.0f);
+    deck->ReleaseFXTimer = durationSec;
     deck->IsMotorOn = false;
     break;
-  case 2: // Vinyl Brake Long
-    deck->VinylStopAccel = 0.006f;
+  }
+  case 2: { // Vinyl Brake Long (4 Beats / 1 Bar)
+    float durationSec = beatSec * 4.0f;
+    if (durationSec < 0.2f) durationSec = 0.2f;
+    deck->VinylStopAccel = 1.0f / (durationSec * 60.0f);
+    deck->ReleaseFXTimer = durationSec;
     deck->IsMotorOn = false;
     break;
-  case 3: // Backspin Short
+  }
+  case 3: { // Backspin Short (2 Beats)
+    float durationSec = beatSec * 2.0f;
+    if (durationSec < 0.2f) durationSec = 0.2f;
     deck->VinylModeEnabled = true;
     deck->IsTouching = true;
-    deck->JogRate = -5.0f;
-    deck->OutlinedRate = deck->JogRate; // Instant kick
-    deck->ReleaseFXType = 2;
+    deck->JogRate = -7.0f;
+    deck->OutlinedRate = deck->JogRate;
+    deck->ReleaseFXType = 2; // Backspin Active mode
+    deck->ReleaseFXTimer = durationSec;
     deck->IsMotorOn = false;
     break;
-  case 4: // Backspin Long
+  }
+  case 4: { // Backspin Long (4 Beats / 1 Bar)
+    float durationSec = beatSec * 4.0f;
+    if (durationSec < 0.4f) durationSec = 0.4f;
     deck->VinylModeEnabled = true;
     deck->IsTouching = true;
-    deck->JogRate = -12.0f;
-    deck->OutlinedRate = deck->JogRate; // Instant kick
-    deck->ReleaseFXType = 2;
+    deck->JogRate = -15.0f;
+    deck->OutlinedRate = deck->JogRate;
+    deck->ReleaseFXType = 2; // Backspin Active mode
+    deck->ReleaseFXTimer = durationSec;
     deck->IsMotorOn = false;
     break;
-  case 5: // Echo Out
-    deck->IsMotorOn = false;
-    deck->VinylStopAccel = 1.0f; // Instant stop
-    deck->ReleaseFXTimer = 4.0f; // Give more time for tail
+  }
+  case 5: { // Echo Out (4 Beats / 1 Bar)
+    float durationSec = beatSec * 4.0f;
+    deck->ReleaseFXTimer = durationSec;
     break;
+  }
   }
 }
 void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch) {
