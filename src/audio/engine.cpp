@@ -272,15 +272,17 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
   }
 
   // Final apply to deck (Safe update)
-  if (deck->PCMBuffer) {
-    void *oldBuf = deck->PCMBuffer;
-    deck->PCMBuffer = NULL; 
-    free(oldBuf);
-  }
+  void *oldBuf = deck->PCMBuffer;
+  deck->PCMBuffer = NULL; 
+  std::this_thread::sleep_for(std::chrono::milliseconds(15)); // Wait for active audio block
 
   deck->PCMBuffer = localPCM;
   deck->TotalSamples = localSamples;
   deck->SampleRate = localRate;
+
+  if (oldBuf) {
+    free(oldBuf);
+  }
 
   deck->Position = 0;
   deck->MT_ReadPos = 0;
@@ -513,9 +515,11 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
         if (deck->IsLooping) {
           double loopLen = deck->LoopEndPos - deck->LoopStartPos;
           if (loopLen > 1.0) {
-            while (deck->MT_ReadPos >= deck->LoopEndPos)
+            int safety = 0;
+            while (deck->MT_ReadPos >= deck->LoopEndPos && ++safety < 10)
               deck->MT_ReadPos -= loopLen;
-            while (deck->MT_ReadPos < deck->LoopStartPos)
+            safety = 0;
+            while (deck->MT_ReadPos < deck->LoopStartPos && ++safety < 10)
               deck->MT_ReadPos += loopLen;
           }
         }
@@ -558,9 +562,11 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
       if (deck->IsLooping) {
         double loopLen = deck->LoopEndPos - deck->LoopStartPos;
         if (loopLen > 1.0) {
-          while (deck->Position >= deck->LoopEndPos)
+          int safety = 0;
+          while (deck->Position >= deck->LoopEndPos && ++safety < 10)
             deck->Position -= loopLen;
-          while (deck->Position < deck->LoopStartPos)
+          safety = 0;
+          while (deck->Position < deck->LoopStartPos && ++safety < 10)
             deck->Position += loopLen;
         }
       }

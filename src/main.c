@@ -1384,6 +1384,21 @@ Log_LogDeviceInfo(gpuModel);
   CO_Register("[Channel2]", "colorfx_value", CO_TYPE_FLOAT,
               &audioEngine->Decks[1].ColorFX.colorValue, -1.0f, 1.0f);
 
+  // --- Channel3 (Deck A Alias) & Channel4 (Deck B Alias) for 4-Deck Controllers ---
+  CO_Register("[Channel3]", "play", CO_TYPE_BOOL, &app->deckA.MidiRequestPlay, 0, 1);
+  CO_Register("[Channel3]", "cue", CO_TYPE_BOOL, &app->deckA.MidiRequestCue, 0, 1);
+  CO_Register("[Channel3]", "rate", CO_TYPE_FLOAT, &app->deckA.TempoPercent, -100.0f, 100.0f);
+  CO_Register("[Channel3]", "volume", CO_TYPE_FLOAT, &audioEngine->Decks[0].Fader, 0, 1.0f);
+  CO_Register("[Channel3]", "jog", CO_TYPE_INT, &app->deckA.JogDelta, -1000, 1000);
+  CO_Register("[Channel3]", "touch", CO_TYPE_BOOL, &app->deckA.IsTouching, 0, 1);
+
+  CO_Register("[Channel4]", "play", CO_TYPE_BOOL, &app->deckB.MidiRequestPlay, 0, 1);
+  CO_Register("[Channel4]", "cue", CO_TYPE_BOOL, &app->deckB.MidiRequestCue, 0, 1);
+  CO_Register("[Channel4]", "rate", CO_TYPE_FLOAT, &app->deckB.TempoPercent, -100.0f, 100.0f);
+  CO_Register("[Channel4]", "volume", CO_TYPE_FLOAT, &audioEngine->Decks[1].Fader, 0, 1.0f);
+  CO_Register("[Channel4]", "jog", CO_TYPE_INT, &app->deckB.JogDelta, -1000, 1000);
+  CO_Register("[Channel4]", "touch", CO_TYPE_BOOL, &app->deckB.IsTouching, 0, 1);
+
   // --- Beat FX ---
   CO_Register("[Master]", "beatfx_select", CO_TYPE_INT,
               &audioEngine->BeatFX.activeFX, 0, 13);
@@ -2058,8 +2073,13 @@ void UpdateDrawFrame(App *app) {
       audioEngine->Decks[0].JogRate = 0.0;
     }
   } else {
-    // Pitch bend release decay
-    audioEngine->Decks[0].JogRate *= 0.80;
+    // Pitch bend release decay (Frame-rate independent scaled by dt)
+    double dt = GetFrameTime();
+    if (dt < 0.001) dt = 0.016667;
+    float dtFactor = (float)(dt / 0.016667);
+    if (dtFactor < 0.1f) dtFactor = 0.1f;
+    if (dtFactor > 5.0f) dtFactor = 5.0f;
+    audioEngine->Decks[0].JogRate *= powf(0.80f, dtFactor);
     if (fabs(audioEngine->Decks[0].JogRate) < 0.05) {
       audioEngine->Decks[0].JogRate = 0.0;
     }
@@ -2097,8 +2117,13 @@ void UpdateDrawFrame(App *app) {
       audioEngine->Decks[1].JogRate = 0.0;
     }
   } else {
-    // Pitch bend release decay
-    audioEngine->Decks[1].JogRate *= 0.80;
+    // Pitch bend release decay (Frame-rate independent scaled by dt)
+    double dt = GetFrameTime();
+    if (dt < 0.001) dt = 0.016667;
+    float dtFactor = (float)(dt / 0.016667);
+    if (dtFactor < 0.1f) dtFactor = 0.1f;
+    if (dtFactor > 5.0f) dtFactor = 5.0f;
+    audioEngine->Decks[1].JogRate *= powf(0.80f, dtFactor);
     if (fabs(audioEngine->Decks[1].JogRate) < 0.05) {
       audioEngine->Decks[1].JogRate = 0.0;
     }

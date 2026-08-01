@@ -165,10 +165,15 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
       s->ActiveTrackCount = s->TagListCount;
       for (int i = 0; i < s->TagListCount; i++) {
         s->TrackPointers[i] = NULL;
-        for (uint32_t j = 0; j < s->DB->TrackCount; j++) {
-          if (s->DB->Tracks[j].ID == s->TagList[i]) {
-            s->TrackPointers[i] = &s->DB->Tracks[j];
-            break;
+        uint32_t tid = s->TagList[i];
+        if (tid > 0 && tid <= s->DB->TrackCount && s->DB->Tracks[tid - 1].ID == tid) {
+          s->TrackPointers[i] = &s->DB->Tracks[tid - 1];
+        } else {
+          for (uint32_t j = 0; j < s->DB->TrackCount; j++) {
+            if (s->DB->Tracks[j].ID == tid) {
+              s->TrackPointers[i] = &s->DB->Tracks[j];
+              break;
+            }
           }
         }
       }
@@ -179,10 +184,14 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
       for (uint32_t i = 0; i < pl->TrackCount; i++) {
         uint32_t tid = pl->TrackIDs[i];
         s->TrackPointers[i] = NULL;
-        for (uint32_t j = 0; j < s->DB->TrackCount; j++) {
-          if (s->DB->Tracks[j].ID == tid) {
-            s->TrackPointers[i] = &s->DB->Tracks[j];
-            break;
+        if (tid > 0 && tid <= s->DB->TrackCount && s->DB->Tracks[tid - 1].ID == tid) {
+          s->TrackPointers[i] = &s->DB->Tracks[tid - 1];
+        } else {
+          for (uint32_t j = 0; j < s->DB->TrackCount; j++) {
+            if (s->DB->Tracks[j].ID == tid) {
+              s->TrackPointers[i] = &s->DB->Tracks[j];
+              break;
+            }
           }
         }
       }
@@ -208,10 +217,14 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
       for (uint32_t i = 0; i < pl->TrackCount; i++) {
         uint32_t tid = pl->TrackIDs[i];
         s->SeratoTrackPointers[i] = NULL;
-        for (uint32_t j = 0; j < s->SeratoDB->TrackCount; j++) {
-          if (s->SeratoDB->Tracks[j].ID == tid) {
-            s->SeratoTrackPointers[i] = &s->SeratoDB->Tracks[j];
-            break;
+        if (tid > 0 && tid <= s->SeratoDB->TrackCount && s->SeratoDB->Tracks[tid - 1].ID == tid) {
+          s->SeratoTrackPointers[i] = &s->SeratoDB->Tracks[tid - 1];
+        } else {
+          for (uint32_t j = 0; j < s->SeratoDB->TrackCount; j++) {
+            if (s->SeratoDB->Tracks[j].ID == tid) {
+              s->SeratoTrackPointers[i] = &s->SeratoDB->Tracks[j];
+              break;
+            }
           }
         }
       }
