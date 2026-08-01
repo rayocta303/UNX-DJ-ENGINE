@@ -138,6 +138,13 @@ void Sync_RequestPhaseSnap(DeckState *follower, DeckState *master, AudioEngine *
     
     // Safety check: Never snap the master deck!
     if (follower->IsMaster || !master->IsMaster) return;
+
+    int deckIdx = (follower->ID == 0) ? 0 : 1;
+    DeckAudioState *audio = &audioEngine->Decks[deckIdx];
+
+    // Pioneer Hardware Spec: Never snap grid position while deck is stopped/paused!
+    // Position grid snapping ONLY occurs when follower deck is actively playing.
+    if (!follower->IsPlaying && !audio->IsMotorOn) return;
     
     // 1. Get current beat distance of the Master
     double masterDist = Quantize_GetBeatDistance(master->LoadedTrack, master->PositionMs);

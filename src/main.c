@@ -1901,6 +1901,12 @@ void UpdateDrawFrame(App *app) {
         bool target = !audio->IsMotorOn;
         DeckAudio_SetPlaying(audio, target);
         ds->IsPlaying = target;
+        if (target && ds->SyncMode == 2 && !ds->IsMaster) {
+          DeckState *otherDeck = (i == 0) ? &app->deckB : &app->deckA;
+          if (otherDeck->IsPlaying && otherDeck->IsMaster) {
+            Sync_RequestPhaseSnap(ds, otherDeck, audioEngine);
+          }
+        }
       }
     }
     lastMidiPlay[i] = ds->MidiRequestPlay;
