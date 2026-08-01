@@ -24,14 +24,11 @@ static int DeckInfo_Update(Component *base) {
     float headerH = S(14.0f);
     float contentY = y + headerH + S(6);
     float statusH = S(22);
-    float utilY = contentY + statusH + S(6);
-    float utilW = (deckInfoW - margin * 2 - S(12)) / 4.0f; // 4 buttons now
-    float utilH = S(14);
     float btnH = S(26);
-    float btnY = y + deckInfoH - btnH - S(6); // More breathing room from bottom
+    float btnY = y + deckInfoH - btnH - S(6);
     float btnW = (deckInfoW - margin * 2 - S(6)) / 2.0f;
 
-    // 1. Eject
+    // 1. Eject Button
     float ejectW = S(20);
     float ejectH = S(9);
     float ejectX = deckInfoW - ejectW - S(3);
@@ -40,6 +37,24 @@ static int DeckInfo_Update(Component *base) {
     
     if (d->State->LoadedTrack != NULL && CheckCollisionPointRec(UIGetMousePosition(), ejectRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         DeckAudio_Unload(&d->Engine->Decks[d->ID]);
+        d->State->IsPlaying = false;
+        d->State->IsCueActive = false;
+        d->State->IsCueHeld = false;
+        d->State->IsTouching = false;
+        d->State->IsLooping = false;
+        d->State->LoopAdjustIn = false;
+        d->State->LoopAdjustOut = false;
+        d->State->JogRate = 0.0f;
+        d->State->JogDelta = 0.0;
+        d->State->Position = 0;
+        d->State->PositionMs = 0;
+        d->State->MainCueMs = 0;
+        d->State->TrackLengthMs = 0;
+        d->State->CurrentBPM = 0.0f;
+        d->State->OriginalBPM = 0.0f;
+        d->State->IsPhaseDrifted = false;
+        d->State->HasSeekRequest = false;
+        d->State->IsMaster = false;
         if (d->State->LoadedTrack) {
             TrackState *t = d->State->LoadedTrack;
             d->State->LoadedTrack = NULL;
@@ -52,30 +67,37 @@ static int DeckInfo_Update(Component *base) {
         d->State->TrackTitle[0] = '\0';
         d->State->ArtistName[0] = '\0';
         d->State->ArtworkPath[0] = '\0';
-        d->State->TrackLengthMs = 0;
-        d->State->PositionMs = 0;
-        d->State->Position = 0;
-        d->State->CurrentBPM = 0;
-        d->State->OriginalBPM = 0;
         strcpy(d->State->TrackKey, "");
     }
 
-    // 2. Utility Buttons
+    // 2. Utility Buttons (2 Rows x 2 Columns Grid)
+    float utilY = contentY + statusH + S(5);
+    float utilGap = S(4.0f);
+    float utilW = (deckInfoW - margin * 2 - utilGap) / 2.0f;
+    float utilH = S(14);
+    float utilY2 = utilY + utilH + S(3.0f);
+
+    // Row 1: Master (Top-Left), Sync (Top-Right)
     Rectangle msRect = { margin, utilY, utilW, utilH };
     if (CheckCollisionPointRec(UIGetMousePosition(), msRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         d->State->IsMaster = true; // Exclusivity handled in main.c loop
     }
 
-    Rectangle syRect = { margin + utilW + S(4), utilY, utilW, utilH };
+    Rectangle syRect = { margin + utilW + utilGap, utilY, utilW, utilH };
     if (CheckCollisionPointRec(UIGetMousePosition(), syRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         d->State->SyncMode = (d->State->SyncMode + 1) % 3;
     }
 
-    Rectangle mtRect = { margin + (utilW + S(4)) * 2, utilY, utilW, utilH };
-    if (CheckCollisionPointRec(UIGetMousePosition(), mtRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) d->State->MasterTempo = !d->State->MasterTempo;
+    // Row 2: MT (Bottom-Left), Vinyl / CDJ (Bottom-Right)
+    Rectangle mtRect = { margin, utilY2, utilW, utilH };
+    if (CheckCollisionPointRec(UIGetMousePosition(), mtRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        d->State->MasterTempo = !d->State->MasterTempo;
+    }
 
-    Rectangle viRect = { margin + (utilW + S(4)) * 3, utilY, utilW, utilH };
-    if (CheckCollisionPointRec(UIGetMousePosition(), viRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) d->State->VinylModeEnabled = !d->State->VinylModeEnabled;
+    Rectangle viRect = { margin + utilW + utilGap, utilY2, utilW, utilH };
+    if (CheckCollisionPointRec(UIGetMousePosition(), viRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        d->State->VinylModeEnabled = !d->State->VinylModeEnabled;
+    }
 
     // 3. Main Controls
     Rectangle cueRect = { margin, btnY, btnW, btnH };
@@ -236,19 +258,22 @@ static void DeckInfo_Draw(Component *base) {
     }
     UIDrawText(barsVal, faceSm, col2X + S(2), contentY + S(11), S(10), d->ID == 0 ? ColorOrange : ColorWhite);
 
-    // --- Row 2: Utility Buttons (Master, Sync, MT, Vinyl) ---
-    float utilY = contentY + statusH + S(6);
-    float utilW = (deckInfoW - margin * 2 - S(12)) / 4.0f;
+    // --- Row 2: Utility Buttons (2 Rows x 2 Columns Grid) ---
+    float utilY = contentY + statusH + S(5);
+    float utilGap = S(4.0f);
+    float utilW = (deckInfoW - margin * 2 - utilGap) / 2.0f;
     float utilH = S(14);
+    float utilY2 = utilY + utilH + S(3.0f);
 
-    // Master
+    // 1. Master (Top-Left)
     Rectangle msRect = { margin, utilY, utilW, utilH };
     DrawRectangleRec(msRect, d->State->IsMaster ? Fade(ColorOrange, 0.3f) : ColorDark1);
     DrawRectangleLinesEx(msRect, S(1), d->State->IsMaster ? ColorOrange : ColorShadow);
-    DrawTextureEx(crownTex, (Vector2){msRect.x + (utilW - S(9))/2.0f, msRect.y + S(2.5f)}, 0.0f, 1.0f, d->State->IsMaster ? ColorOrange : ColorShadow);
+    DrawTextureEx(crownTex, (Vector2){msRect.x + (utilW - S(38))/2.0f, msRect.y + S(2.5f)}, 0.0f, 1.0f, d->State->IsMaster ? ColorOrange : ColorShadow);
+    UIDrawText("MASTER", faceXXS, msRect.x + (utilW - S(38))/2.0f + S(11), msRect.y + S(3.5f), S(7), d->State->IsMaster ? ColorOrange : ColorShadow);
 
-    // Sync
-    Rectangle syRect = { margin + utilW + S(4), utilY, utilW, utilH };
+    // 2. Sync (Top-Right)
+    Rectangle syRect = { margin + utilW + utilGap, utilY, utilW, utilH };
     bool syncActive = d->State->SyncMode > 0;
     bool isBeatSync = d->State->SyncMode == 2;
     bool blink = (d->State->IsPhaseDrifted && ((int)(GetTime() * 4) % 2 == 0));
@@ -258,21 +283,27 @@ static void DeckInfo_Draw(Component *base) {
 
     DrawRectangleRec(syRect, syncActive ? Fade(syncColor, 0.3f) : ColorDark1);
     DrawRectangleLinesEx(syRect, S(1), syncActive ? syncColor : ColorShadow);
-    UIDrawText("SYNC", faceXXS, syRect.x + (utilW - S(20))/2.0f, syRect.y + S(4), S(7), syncActive ? ColorWhite : ColorShadow);
+    const char *syncLbl = (d->State->SyncMode == 2) ? "BEAT SYNC" : ((d->State->SyncMode == 1) ? "BPM SYNC" : "SYNC");
+    Vector2 syncSz = MeasureTextEx(faceXXS, syncLbl, S(7), 1);
+    UIDrawText(syncLbl, faceXXS, syRect.x + (utilW - syncSz.x)/2.0f, syRect.y + S(3.5f), S(7), syncActive ? ColorWhite : ColorShadow);
 
-    // MT
-    Rectangle mtRect = { margin + (utilW + S(4)) * 2, utilY, utilW, utilH };
+    // 3. MT (Bottom-Left)
+    Rectangle mtRect = { margin, utilY2, utilW, utilH };
     DrawRectangleRec(mtRect, d->State->MasterTempo ? Fade(ColorRed, 0.3f) : ColorDark1);
     DrawRectangleLinesEx(mtRect, S(1), d->State->MasterTempo ? ColorRed : ColorShadow);
-    UIDrawText("MT", faceXXS, mtRect.x + (utilW - S(10))/2.0f, mtRect.y + S(4), S(7), d->State->MasterTempo ? ColorWhite : ColorShadow);
+    const char *mtLbl = d->State->MasterTempo ? "MT (ON)" : "MT (OFF)";
+    Vector2 mtSz = MeasureTextEx(faceXXS, mtLbl, S(7), 1);
+    UIDrawText(mtLbl, faceXXS, mtRect.x + (utilW - mtSz.x)/2.0f, mtRect.y + S(3.5f), S(7), d->State->MasterTempo ? ColorWhite : ColorShadow);
 
-    // Vinyl
-    Rectangle viRect = { margin + (utilW + S(4)) * 3, utilY, utilW, utilH };
+    // 4. Vinyl / CDJ Mode (Bottom-Right)
+    Rectangle viRect = { margin + utilW + utilGap, utilY2, utilW, utilH };
     bool vinylOn = d->State->VinylModeEnabled;
     Color viColor = vinylOn ? ColorBlue : ColorRed;
     DrawRectangleRec(viRect, Fade(viColor, 0.3f));
     DrawRectangleLinesEx(viRect, S(1), viColor);
-    UIDrawText(vinylOn ? "VINYL" : "CDJ", faceXXS, viRect.x + (utilW - (vinylOn?S(20):S(14)))/2.0f, viRect.y + S(4), S(7), ColorWhite);
+    const char *viLbl = vinylOn ? "VINYL" : "CDJ";
+    Vector2 viSz = MeasureTextEx(faceXXS, viLbl, S(7), 1);
+    UIDrawText(viLbl, faceXXS, viRect.x + (utilW - viSz.x)/2.0f, viRect.y + S(3.5f), S(7), ColorWhite);
 
     // --- Row 3: Main Controls (Cue, Play) ---
     float btnH = S(26);

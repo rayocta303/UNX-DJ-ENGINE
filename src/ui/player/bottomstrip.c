@@ -1,6 +1,7 @@
 #include "ui/player/bottomstrip.h"
 #include <stddef.h>
 #include <stdio.h>
+#include <math.h>
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
@@ -192,8 +193,10 @@ static void BottomStrip_Draw(Component *base) {
         }
 
         // Trash/Clear
-        DrawRectangle(cx, btnY, trashW - S(2), btnH, b->State->IsFXOn ? ColorBlue : (Color){0x22, 0x22, 0x22, 0xFF});
-        DrawRectangleLines(cx, btnY, trashW - S(2), btnH, ColorDark1);
+        bool isFxBlinking = (fmod(GetTime(), 0.5) < 0.25);
+        Color onBgColor = isFxBlinking ? (Color){0, 140, 255, 255} : (Color){0, 40, 110, 255};
+        DrawRectangle(cx, btnY, trashW - S(2), btnH, b->State->IsFXOn ? onBgColor : (Color){0x22, 0x22, 0x22, 0xFF});
+        DrawRectangleLines(cx, btnY, trashW - S(2), btnH, b->State->IsFXOn ? ColorWhite : ColorDark1);
         DrawCentredText(b->State->IsFXOn ? "ON" : "OFF", faceXXS, cx, trashW - S(2), btnY + S(6.5f), S(7), ColorWhite);
 
         // X-PAD

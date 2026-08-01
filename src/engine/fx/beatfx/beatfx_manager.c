@@ -102,18 +102,12 @@ void BeatFXManager_Process(BeatFXManager* mgr, float* outL, float* outR, float i
     // 0.0 to 0.5: Dry stays at 1.0 (Parallel/Additive)
     // 0.5 to 1.0: Dry fades out (Insert/Crossfade)
     float dryGain = 1.0f;
-    if (mgr->levelDepth > 0.5f) {
+    if (mgr->isFxOn && mgr->levelDepth > 0.5f) {
         dryGain = (1.0f - mgr->levelDepth) * 2.0f;
     }
     
-    // If FX is OFF, we kill the wet signal immediately
-    if (!mgr->isFxOn) {
-        *outL = inL;
-        *outR = inR;
-    } else {
-        *outL = inL * dryGain + wetL;
-        *outR = inR * dryGain + wetR;
-    }
+    *outL = inL * dryGain + wetL;
+    *outR = inR * dryGain + wetR;
 }
 
 void BeatFXManager_ProcessWetOnly(BeatFXManager* mgr, float* wetL, float* wetR, float inL, float inR, float sampleRate) {
@@ -139,9 +133,6 @@ void BeatFXManager_ProcessWetOnly(BeatFXManager* mgr, float* wetL, float* wetR, 
         case BEATFX_TRANS:
             if (mgr->isFxOn) {
                 Trans_Process(&mgr->trans, wetL, wetR, inL, inR, mgr->beatMs, mgr->levelDepth, sampleRate);
-                // Trans is a subtractive effect (gate). It modifies the signal directly.
-                // For WetOnly to work in a parallel sense, it's tricky.
-                // But on DJM, Trans is an Insert.
             }
             break;
         case BEATFX_ROLL:
@@ -151,17 +142,14 @@ void BeatFXManager_ProcessWetOnly(BeatFXManager* mgr, float* wetL, float* wetR, 
             Helix_Process(&mgr->helix, wetL, wetR, inL, inR, mgr->beatMs, mgr->levelDepth, sampleRate, mgr->isFxOn);
             break;
         default:
-            // For effects not yet refactored to Wet-Only, use the standard process and subtract dry
-            // (Wait, better to just refactor them as needed)
             break;
     }
 }
 
 bool BeatFXManager_HasTails(BeatFXManager* mgr, int channelIdx) {
     if (mgr->targetChannel != channelIdx + 1 && mgr->targetChannel != 0) return false;
-    if (!mgr->isFxOn) return false; // Immediate cut if OFF
     
-    // Standard tail-capable effects
+    // Standard tail-capable effects continue outputting tail even when deck playback stops or track ejects
     if (mgr->activeFX == BEATFX_ECHO || mgr->activeFX == BEATFX_REVERB || 
         mgr->activeFX == BEATFX_SPIRAL || mgr->activeFX == BEATFX_DELAY ||
         mgr->activeFX == BEATFX_PINGPONG || mgr->activeFX == BEATFX_ROLL ||

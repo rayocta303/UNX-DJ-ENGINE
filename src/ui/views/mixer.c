@@ -94,10 +94,11 @@ static bool DrawFXButton(const char *label, float x, float y, float w, float h,
   bool hovered =
       CheckCollisionPointRec(UIGetMousePosition(), (Rectangle){x, y, w, h});
   bool pressed = hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-  Color bg = active ? ColorOrange : (hovered ? ColorDark1 : ColorBlack);
-  Color fg = active ? ColorBlack : ColorOrange;
+  bool isFxBlinking = (fmod(GetTime(), 0.5) < 0.25);
+  Color bg = active ? (isFxBlinking ? (Color){0, 140, 255, 255} : (Color){0, 40, 110, 255}) : (hovered ? ColorDark1 : ColorBlack);
+  Color fg = active ? ColorWhite : ColorOrange;
   DrawRectangle(x, y, w, h, bg);
-  DrawRectangleLines(x, y, w, h, ColorOrange);
+  DrawRectangleLines(x, y, w, h, active ? ColorWhite : ColorOrange);
   Font f = UIFonts_GetFace(S(8));
   int fontSize = S(8);
   DrawCentredText(label, f, x, w, y + (h - fontSize) / 2.0f, fontSize, fg);

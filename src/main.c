@@ -670,15 +670,25 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
     else if (padIdx == 3)
       DeckAudio_TriggerReleaseFX(audio, 4); // Spin L
     else if (padIdx >= 4 && padIdx <= 6) {
-      // Echo Out
-      static int ePadIdx[] = {2, 4,
-                              5}; // Indices for 1/2, 1, 2 beats in XPadRatios
+      // Echo Out (1/2, 1, 2 beats)
+      static float eRatios[] = {0.5f, 1.0f, 2.0f};
+      float bpm = (audio->BPM > 10.0f) ? audio->BPM : 120.0f;
+      float beatMs = (60000.0f / bpm) * eRatios[padIdx - 4];
+      
+      if (globalAudioEngine) {
+        globalAudioEngine->BeatFX.targetChannel = deckIdx + 1;
+        BeatFXManager_SetFX(&globalAudioEngine->BeatFX, 1); // 1 = BEATFX_ECHO
+        globalAudioEngine->BeatFX.beatMs = beatMs;
+        globalAudioEngine->BeatFX.levelDepth = 0.85f; // Prominent Echo tail
+        globalAudioEngine->BeatFX.isFxOn = true;
+      }
+      
       a->fxState.SelectedChannel = deckIdx + 1;
       a->fxState.IsFXOn = true;
-      a->fxState.SelectedFX = 1; // ECHO (BEATFX_ECHO)
-      a->fxState.SelectedPad = ePadIdx[padIdx - 4];
-      a->fxState.LevelDepth = 0.2f;
-      DeckAudio_TriggerReleaseFX(audio, 5); // Stop deck
+      a->fxState.SelectedFX = 1; // ECHO
+      a->fxState.LevelDepth = 0.85f;
+
+      DeckAudio_TriggerReleaseFX(audio, 5); // Stop deck playback
     } else if (padIdx == 7) {
       // Mute / Instant Stop
       DeckAudio_Stop(audio);
@@ -1177,7 +1187,7 @@ Log_LogDeviceInfo(gpuModel);
   CO_Register("[Channel1]", "cue", CO_TYPE_BOOL, &app->deckA.MidiRequestCue, 0,
               1);
   CO_Register("[Channel1]", "volume", CO_TYPE_FLOAT,
-              &audioEngine->Decks[0].Trim, 0, 2.0f);
+              &audioEngine->Decks[0].Trim, 0, 1.0f);
   CO_Register("[Channel1]", "filterHigh", CO_TYPE_FLOAT,
               &audioEngine->Decks[0].EqHigh, 0, 1.0f);
   CO_Register("[Channel1]", "filterMid", CO_TYPE_FLOAT,
@@ -1272,7 +1282,7 @@ Log_LogDeviceInfo(gpuModel);
   CO_Register("[Channel2]", "cue", CO_TYPE_BOOL, &app->deckB.MidiRequestCue, 0,
               1);
   CO_Register("[Channel2]", "volume", CO_TYPE_FLOAT,
-              &audioEngine->Decks[1].Trim, 0, 2.0f);
+              &audioEngine->Decks[1].Trim, 0, 1.0f);
   CO_Register("[Channel2]", "filterHigh", CO_TYPE_FLOAT,
               &audioEngine->Decks[1].EqHigh, 0, 1.0f);
   CO_Register("[Channel2]", "filterMid", CO_TYPE_FLOAT,
@@ -1687,10 +1697,14 @@ void UpdateDrawFrame(App *app) {
     app->deckB.TrackLengthMs = (long long)(lenSec * 1000.0);
   }
 
-  // --- Auto Stop at End of Track / Beatgrid ---
+  // --- Auto Stop at End of Track / Beatgrid & Empty Deck Guard ---
   for (int i = 0; i < 2; i++) {
     DeckState *ds = (i == 0) ? &app->deckA : &app->deckB;
-    if (ds->IsPlaying && ds->LoadedTrack) {
+    if (!ds->LoadedTrack) {
+      ds->IsPlaying = false;
+      ds->IsCueActive = false;
+      audioEngine->Decks[i].IsPlaying = false;
+    } else if (ds->IsPlaying) {
       long long endMs = ds->TrackLengthMs;
       if (ds->LoadedTrack->Analysis.BeatGridCount > 0) {
         endMs = (long long)ds->LoadedTrack
@@ -2059,7 +2073,9 @@ void UpdateDrawFrame(App *app) {
       app->deckA.SyncMode = 1;
     }
   }
-  if (app->deckA.JogDelta != 0 || app->deckA.IsTouching) {
+  if (audioEngine->Decks[0].ReleaseFXType == 2) {
+    // Active Backspin: Let engine physics decay JogRate smoothly
+  } else if (app->deckA.JogDelta != 0 || app->deckA.IsTouching) {
     double dt = GetFrameTime();
     if (dt < 0.001)
       dt = 0.016;
@@ -2103,7 +2119,9 @@ void UpdateDrawFrame(App *app) {
       app->deckB.SyncMode = 1;
     }
   }
-  if (app->deckB.JogDelta != 0 || app->deckB.IsTouching) {
+  if (audioEngine->Decks[1].ReleaseFXType == 2) {
+    // Active Backspin: Let engine physics decay JogRate smoothly
+  } else if (app->deckB.JogDelta != 0 || app->deckB.IsTouching) {
     double dt = GetFrameTime();
     if (dt < 0.001)
       dt = 0.016;

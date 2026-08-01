@@ -302,7 +302,8 @@ static void BeatFX_Draw(Component *base) {
     
     b->FXButton = (Rectangle){ x + S(4), cy, btnW, btnH };
 
-    Color btnColor = b->State->IsFXOn ? ColorOrange : ColorDark2;
+    bool isFxBlinking = (fmod(GetTime(), 0.5) < 0.25);
+    Color btnColor = b->State->IsFXOn ? (isFxBlinking ? (Color){0, 140, 255, 255} : (Color){0, 40, 110, 255}) : ColorDark2;
     DrawRectangleRec(b->FXButton, btnColor);
     DrawRectangleLinesEx(b->FXButton, 1, b->State->IsFXOn ? ColorWhite : ColorShadow);
     

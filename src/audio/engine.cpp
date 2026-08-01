@@ -320,11 +320,12 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
   }
 
   if (deck->ReleaseFXType == 2) { // Backspin Active
-    deck->JogRate *= 0.95f;       // decay
+    deck->JogRate *= 0.96f;       // smooth exponential decay
     if (fabs(deck->JogRate) < 0.15) {
       deck->ReleaseFXType = 0;
       deck->IsTouching = false;
-      deck->JogRate = 0;
+      deck->JogRate = 0.0;
+      deck->OutlinedRate = 0.0;
       deck->IsMotorOn = false;
     }
     targetRate = deck->JogRate;
@@ -663,12 +664,16 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     peakR = 1.0f;
   if (peakL > deck->VuMeterL)
     deck->VuMeterL = peakL;
-  else
+  else {
     deck->VuMeterL = deck->VuMeterL * 0.88f + peakL * 0.12f;
+    if (deck->VuMeterL < 0.005f) deck->VuMeterL = 0.0f;
+  }
   if (peakR > deck->VuMeterR)
     deck->VuMeterR = peakR;
-  else
+  else {
     deck->VuMeterR = deck->VuMeterR * 0.88f + peakR * 0.12f;
+    if (deck->VuMeterR < 0.005f) deck->VuMeterR = 0.0f;
+  }
 }
 
 void AudioEngine_SetFXRouting(AudioEngine *engine, FXRoutingMode mode) {
@@ -789,7 +794,14 @@ void DeckAudio_Unload(DeckAudioState *deck) {
 
   deck->IsPlaying = false;
   deck->IsMotorOn = false;
-  deck->OutlinedRate = 0;
+  deck->IsTouching = false;
+  deck->JogRate = 0.0;
+  deck->OutlinedRate = 0.0;
+  deck->LastRate = 0.0;
+  deck->IsLooping = false;
+  deck->SlipActive = false;
+  deck->ReleaseFXType = 0;
+  deck->ReleaseFXTimer = 0.0f;
   if (deck->PCMBuffer) {
     void *ptr = deck->PCMBuffer;
     deck->PCMBuffer = NULL;
@@ -799,6 +811,8 @@ void DeckAudio_Unload(DeckAudioState *deck) {
   deck->Position = 0;
   deck->FilePath[0] = '\0';
   deck->IsLoading = false;
+  deck->VuMeterL = 0.0f;
+  deck->VuMeterR = 0.0f;
 }
 
 void DeckAudio_TriggerReleaseFX(DeckAudioState *deck, int type) {
