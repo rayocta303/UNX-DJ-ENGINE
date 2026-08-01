@@ -472,8 +472,33 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
   }
   lastSR[deckIndex] = engine->OutputSampleRate;
 
+  // Dynamic Anti-Clash Sub-Bass Management & Frequency Balancing
+  float bassScale = 1.0f;
+  if (MAX_DECKS >= 2) {
+    DeckAudioState *d0 = &engine->Decks[0];
+    DeckAudioState *d1 = &engine->Decks[1];
+    
+    // Equal-power effective fader and crossfader weights
+    float fader0 = d0->Fader * d0->Fader;
+    float fader1 = d1->Fader * d1->Fader;
+    float xGain0 = Engine_GetCrossfaderGain(engine->Crossfader, 0);
+    float xGain1 = Engine_GetCrossfaderGain(engine->Crossfader, 1);
+    
+    float w0 = fader0 * xGain0 * d0->EqLow * (d0->IsMotorOn ? 1.0f : 0.0f);
+    float w1 = fader1 * xGain1 * d1->EqLow * (d1->IsMotorOn ? 1.0f : 0.0f);
+    
+    // If BOTH decks are active and sending low-frequency energy simultaneously
+    if (w0 > 0.05f && w1 > 0.05f) {
+      float sumPower = sqrtf(w0 * w0 + w1 * w1);
+      if (deckIndex == 0) bassScale = w0 / (sumPower * fmaxf(w0, 0.001f));
+      else if (deckIndex == 1) bassScale = w1 / (sumPower * fmaxf(w1, 0.001f));
+    }
+  }
+
   float gainL = (deck->EqLow < 0.5f) ? (deck->EqLow * 2.0f)
                                      : (1.0f + (deck->EqLow - 0.5f) * 4.0f);
+  gainL *= bassScale; // Protect sub-bass from clashing when mixing 2 decks
+
   float gainM = (deck->EqMid < 0.5f) ? (deck->EqMid * 2.0f)
                                      : (1.0f + (deck->EqMid - 0.5f) * 4.0f);
   float gainH = (deck->EqHigh < 0.5f) ? (deck->EqHigh * 2.0f)
@@ -583,12 +608,15 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     received = frames;
   }
 
-  // Pre-calculate Ramping Gain (Interpolation) to prevent clicks
+  // Pre-calculate Ramping Gain (Equal-Power Audio Taper Fader Curve)
+  float effectiveFader = deck->Fader * deck->Fader;
+  float effectiveLastFader = deck->LastFader * deck->LastFader;
+
   float startCrossGain =
       Engine_GetCrossfaderGain(engine->LastCrossfader, deckIndex);
   float endCrossGain = Engine_GetCrossfaderGain(engine->Crossfader, deckIndex);
-  float startTotalGain = deck->LastFader * startCrossGain;
-  float endTotalGain = deck->Fader * endCrossGain;
+  float startTotalGain = effectiveLastFader * startCrossGain;
+  float endTotalGain = effectiveFader * endCrossGain;
 
   // Common Post-Processing Loop
   for (int i = 0; i < (int)received; i++) {
