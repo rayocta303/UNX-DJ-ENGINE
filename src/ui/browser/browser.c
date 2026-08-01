@@ -603,6 +603,7 @@ static int Browser_Update(Component *base) {
 
   // MIDI Navigation
   if (s->MidiBrowseDelta != 0) {
+      float itemRowH = S(28.0f);
       if (s->MidiBrowseDelta > 0) {
           for (int i = 0; i < s->MidiBrowseDelta; i++) {
               if (s->CursorPos < 9) s->CursorPos++;
@@ -615,6 +616,8 @@ static int Browser_Update(Component *base) {
           }
       }
       s->MidiBrowseDelta = 0;
+      s->VisualScroll = (float)(s->ScrollOffset * itemRowH);
+      s->ScrollVelocity = 0;
   }
   
   if (s->MidiRequestEnter) {

@@ -34,7 +34,9 @@ bool MIDI_LoadMapping(MidiMapping *map, const char *path) {
 
     char line[512];
     MappingEntry cur = {0};
+    MidiOutputEntry curOut = {0};
     bool inControl = false;
+    bool inOutput = false;
     bool inInfo = false;
     bool inScripts = false;
 
@@ -77,7 +79,7 @@ bool MIDI_LoadMapping(MidiMapping *map, const char *path) {
             inControl = true;
             memset(&cur, 0, sizeof(MappingEntry));
         } else if (strstr(line, "</control>")) {
-            if (map->count < 512) {
+            if (map->count < 2048) {
                 // Apply Translation if needed
                 const MidiTranslation *t = MIDI_GetTranslation(cur.group, cur.key);
                 if (t) {
@@ -104,16 +106,87 @@ bool MIDI_LoadMapping(MidiMapping *map, const char *path) {
                 unsigned int m;
                 sscanf(p, "%*[^0x]0x%x", &m);
                 cur.midino = (uint8_t)m;
-            } else if (strstr(line, "<Script-Binding/>")) {
-                cur.options |= 4; // MIDI_OPT_SCRIPT
-                // For script bindings, the key is the function name
+            } else if (strstr(line, "<Script-Binding") || strstr(line, "<script-binding")) {
+                cur.options |= MIDI_OPT_SCRIPT;
                 strncpy(cur.scriptFunction, cur.key, 127);
-            } else if (strstr(line, "<SelectKnob/>")) {
-                cur.options |= 1; // MIDI_OPT_RELATIVE
-            } else if (strstr(line, "<fourteen-bit-msb/>")) {
-                cur.options |= 8; // 14-bit MSB
-            } else if (strstr(line, "<fourteen-bit-lsb/>")) {
-                cur.options |= 16; // 14-bit LSB
+            } else if (strstr(line, "<SelectKnob") || strstr(line, "<selectknob")) {
+                cur.options |= MIDI_OPT_RELATIVE;
+            } else if (strstr(line, "<fourteen-bit-msb")) {
+                cur.options |= MIDI_OPT_14BIT_MSB;
+            } else if (strstr(line, "<fourteen-bit-lsb")) {
+                cur.options |= MIDI_OPT_14BIT_LSB;
+            } else if (strstr(line, "<invert") || strstr(line, "<Invert")) {
+                cur.options |= MIDI_OPT_INVERT;
+            } else if (strstr(line, "<button") || strstr(line, "<Button")) {
+                cur.options |= MIDI_OPT_BUTTON;
+            } else if (strstr(line, "<switch") || strstr(line, "<Switch")) {
+                cur.options |= MIDI_OPT_SWITCH;
+            } else if (strstr(line, "<rot64inv") || strstr(line, "<Rot64inv")) {
+                cur.options |= MIDI_OPT_ROT64INV;
+            } else if (strstr(line, "<rot64fast") || strstr(line, "<Rot64fast")) {
+                cur.options |= MIDI_OPT_ROT64FAST;
+            } else if (strstr(line, "<rot64") || strstr(line, "<Rot64")) {
+                cur.options |= MIDI_OPT_ROT64;
+            } else if (strstr(line, "<diff") || strstr(line, "<Diff")) {
+                cur.options |= MIDI_OPT_DIFF;
+            } else if (strstr(line, "<hercjogfast") || strstr(line, "<Hercjogfast")) {
+                cur.options |= MIDI_OPT_HERCJOGFAST;
+            } else if (strstr(line, "<hercjog") || strstr(line, "<Hercjog")) {
+                cur.options |= MIDI_OPT_HERCJOG;
+            } else if (strstr(line, "<spread64") || strstr(line, "<Spread64")) {
+                cur.options |= MIDI_OPT_SPREAD64;
+            }
+        }
+
+        if (strstr(line, "<output>")) {
+            inOutput = true;
+            memset(&curOut, 0, sizeof(MidiOutputEntry));
+            curOut.on = 0x7F;
+            curOut.off = 0x00;
+            curOut.minimum = 0.0f;
+            curOut.maximum = 1.0f;
+            curOut.lastSentVal = -1;
+        } else if (strstr(line, "</output>")) {
+            if (map->outputCount < 1024) {
+                const MidiTranslation *t = MIDI_GetTranslation(curOut.group, curOut.key);
+                if (t) {
+                    strncpy(curOut.group, t->unxGroup, 63);
+                    strncpy(curOut.key, t->unxKey, 63);
+                }
+                map->outputs[map->outputCount++] = curOut;
+            }
+            inOutput = false;
+        }
+
+        if (inOutput) {
+            if ((p = strstr(line, "<group>"))) {
+                char temp[128]; strcpy(temp, p); trim_xml_tag(temp);
+                strncpy(curOut.group, temp, 63);
+            } else if ((p = strstr(line, "<key>"))) {
+                char temp[128]; strcpy(temp, p); trim_xml_tag(temp);
+                strncpy(curOut.key, temp, 63);
+            } else if ((p = strstr(line, "<status>"))) {
+                unsigned int s;
+                sscanf(p, "%*[^0x]0x%x", &s);
+                curOut.status = (uint8_t)s;
+            } else if ((p = strstr(line, "<midino>"))) {
+                unsigned int m;
+                sscanf(p, "%*[^0x]0x%x", &m);
+                curOut.midino = (uint8_t)m;
+            } else if ((p = strstr(line, "<on>"))) {
+                unsigned int onVal;
+                sscanf(p, "%*[^0x]0x%x", &onVal);
+                curOut.on = (uint8_t)onVal;
+            } else if ((p = strstr(line, "<off>"))) {
+                unsigned int offVal;
+                sscanf(p, "%*[^0x]0x%x", &offVal);
+                curOut.off = (uint8_t)offVal;
+            } else if ((p = strstr(line, "<minimum>"))) {
+                char temp[128]; strcpy(temp, p); trim_xml_tag(temp);
+                curOut.minimum = (float)atof(temp);
+            } else if ((p = strstr(line, "<maximum>"))) {
+                char temp[128]; strcpy(temp, p); trim_xml_tag(temp);
+                curOut.maximum = (float)atof(temp);
             }
         }
     }
@@ -176,30 +249,35 @@ int MIDI_ListControllers(const char *dir, char outNames[32][64], char outPaths[3
     WIN32_FIND_DATAA findData;
     HANDLE hFind = FindFirstFileA(searchPath, &findData);
     if (hFind == INVALID_HANDLE_VALUE) return 0;
+
     do {
         char fullPath[MAX_PATH];
         snprintf(fullPath, MAX_PATH, "%s/%s", dir, findData.cFileName);
         MidiMapping temp;
         if (MIDI_LoadMapping(&temp, fullPath)) {
-            strncpy(outNames[count], temp.name[0] ? temp.name : findData.cFileName, 63);
-            strncpy(outPaths[count], fullPath, 255);
-            count++;
+            if (count < 32) {
+                strncpy(outNames[count], temp.name, 63);
+                strncpy(outPaths[count], fullPath, 255);
+                count++;
+            }
         }
-    } while (FindNextFileA(hFind, &findData) && count < 32);
+    } while (FindNextFileA(hFind, &findData));
     FindClose(hFind);
 #else
     DIR *d = opendir(dir);
     if (!d) return 0;
     struct dirent *entry;
-    while ((entry = readdir(d)) != NULL && count < 32) {
+    while ((entry = readdir(d)) != NULL) {
         if (strstr(entry->d_name, ".xml")) {
             char fullPath[512];
             snprintf(fullPath, 512, "%s/%s", dir, entry->d_name);
             MidiMapping temp;
             if (MIDI_LoadMapping(&temp, fullPath)) {
-                strncpy(outNames[count], temp.name[0] ? temp.name : entry->d_name, 63);
-                strncpy(outPaths[count], fullPath, 255);
-                count++;
+                if (count < 32) {
+                    strncpy(outNames[count], temp.name, 63);
+                    strncpy(outPaths[count], fullPath, 255);
+                    count++;
+                }
             }
         }
     }
@@ -217,35 +295,80 @@ void MIDI_HandleMapping(MidiMapping *map, uint8_t status, uint8_t midino, float 
 
     for (int i = 0; i < map->count; i++) {
         MappingEntry *e = &map->entries[i];
-        if (e->status == status && e->midino == midino) {
+        bool statusMatch = (e->status == status);
+        float currentNormVal = normalizedValue;
+        uint8_t currentRawVal = rawVal;
+        if (!statusMatch && (status & 0xF0) == 0x80 && (e->status & 0xF0) == 0x90) {
+            if ((e->status & 0x0F) == (status & 0x0F)) {
+                statusMatch = true;
+                currentNormVal = 0.0f;
+                currentRawVal = 0;
+            }
+        }
+        if (statusMatch && e->midino == midino) {
+            printf("[MIDI MAP] Matched 0x%02X:0x%02X -> Group: '%s' Key: '%s'\n", status, midino, e->group, e->key);
             
             // Check if this is a shift/modifier button itself
             if (strstr(e->key, "shift") || strstr(e->key, "Shift")) {
-                map->modifiers[0] = (rawVal > 0);
+                map->modifiers[0] = (currentRawVal > 0);
             }
 
-            if (e->options & 8) { // 14-bit MSB
-                msbStore[ch][midino] = rawVal;
-                uint16_t combined = (rawVal << 7) | lsbStore[ch][midino + 0x20];
-                CO_SetValue(e->group, e->key, (float)combined / 16383.0f);
-            } else if (e->options & 16) { // 14-bit LSB
-                lsbStore[ch][midino] = rawVal;
-                uint16_t combined = (msbStore[ch][midino - 0x20] << 7) | rawVal;
-                CO_SetValue(e->group, e->key, (float)combined / 16383.0f);
-            } else if (e->options & 1) { // MIDI_OPT_RELATIVE
-                int val = (int)rawVal;
-                float delta = (float)(val - 64);
-                
-                // If shift held, maybe boost sensitivity?
-                if (map->modifiers[0]) delta *= 5.0f;
-                
-                CO_AddValue(e->group, e->key, delta);
-            } else if (e->options & 4) { // MIDI_OPT_SCRIPT
-                MIDI_ExecuteScript(map, e->scriptFunction, status, midino, rawVal);
+            // Invert value if <invert/> option specified
+            if (e->options & MIDI_OPT_INVERT) {
+                currentNormVal = 1.0f - currentNormVal;
+                currentRawVal = 127 - currentRawVal;
+            }
+
+            if (e->options & MIDI_OPT_14BIT_MSB) {
+                msbStore[ch][midino] = currentRawVal;
+                int lsbIndex = midino + 0x20;
+                if (lsbIndex < 128) {
+                    uint16_t combined = (currentRawVal << 7) | lsbStore[ch][lsbIndex];
+                    CO_SetValue(e->group, e->key, (float)combined / 16383.0f);
+                }
+            } else if (e->options & MIDI_OPT_14BIT_LSB) {
+                lsbStore[ch][midino] = currentRawVal;
+                int msbIndex = midino - 0x20;
+                if (msbIndex >= 0 && msbIndex < 128) {
+                    uint16_t combined = (msbStore[ch][msbIndex] << 7) | currentRawVal;
+                    CO_SetValue(e->group, e->key, (float)combined / 16383.0f);
+                }
+            } else if (e->options & MIDI_OPT_SCRIPT) {
+                MIDI_ExecuteScript(map, e->scriptFunction, status, midino, currentRawVal);
+            } else if (e->options & MIDI_OPT_SWITCH) {
+                if (currentRawVal > 0) { // Toggle on button press
+                    CO_ToggleValue(e->group, e->key);
+                }
+            } else if (e->options & MIDI_OPT_BUTTON) {
+                CO_SetValue(e->group, e->key, currentRawVal > 0 ? 1.0f : 0.0f);
+            } else if (e->options & (MIDI_OPT_ROT64 | MIDI_OPT_ROT64INV)) {
+                // Exact Mixxx Rot64 / Rot64Inv logic
+                float diff = (float)currentRawVal - 64.0f;
+                if (diff == -1.0f || diff == 1.0f) {
+                    diff /= 16.0f;
+                } else if (diff != 0.0f) {
+                    diff += (diff > 0.0f ? -1.0f : 1.0f);
+                }
+                if (e->options & MIDI_OPT_ROT64INV) diff = -diff;
+                CO_AddValue(e->group, e->key, diff);
+            } else if (e->options & MIDI_OPT_ROT64FAST) {
+                float diff = ((float)currentRawVal - 64.0f) * 1.5f;
+                CO_AddValue(e->group, e->key, diff);
+            } else if (e->options & (MIDI_OPT_DIFF | MIDI_OPT_RELATIVE)) {
+                // Exact Mixxx 7-bit signed two's complement relative logic
+                float diff = (currentRawVal >= 64) ? (float)(currentRawVal - 128) : (float)currentRawVal;
+                if (map->modifiers[0]) diff *= 5.0f;
+                CO_AddValue(e->group, e->key, diff);
+            } else if (e->options & (MIDI_OPT_HERCJOG | MIDI_OPT_HERCJOGFAST)) {
+                float diff = (currentRawVal > 64) ? (float)(currentRawVal - 128) : (float)currentRawVal;
+                if (e->options & MIDI_OPT_HERCJOGFAST) diff *= 3.0f;
+                CO_AddValue(e->group, e->key, diff);
+            } else if (e->options & MIDI_OPT_SPREAD64) {
+                float diff = (float)currentRawVal - 64.0f;
+                CO_AddValue(e->group, e->key, diff);
             } else {
-                // Standard mapping: if shift held, we could look for a secondary behavior
-                // For now, we just pass the value.
-                CO_SetValue(e->group, e->key, normalizedValue);
+                // Standard mapping: pass value
+                CO_SetValue(e->group, e->key, currentNormVal);
             }
         }
     }

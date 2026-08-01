@@ -343,8 +343,23 @@ void OnSettingsValueChanged(void *ctx, int idx) {
   App *a = (App *)ctx;
   if (idx == 8) { // AUDIO DEVICE changed
     UpdateChannelOptions(a, a->settingsState.Items[8].Current - 1);
-  } else if (idx == 17) { // MIDI PRESET changed
-    int presetIdx = a->settingsState.Items[17].Current;
+  } else if (idx == 18) { // CONNECTED MIDI DEVICE changed
+    int devChoice = a->settingsState.Items[18].Current;
+    char devName[128] = "";
+    char autoPresetPath[256] = "";
+    if (devChoice == 0) {
+      MIDI_SelectDevice(&a->midiCtx, 0, devName, autoPresetPath);
+    } else {
+      MIDI_SelectDevice(&a->midiCtx, devChoice - 1, devName, autoPresetPath);
+    }
+    if (autoPresetPath[0] != '\0') {
+      strncpy(a->activeControllerPath, autoPresetPath, 255);
+    }
+    PopulateMidiSettings(a);
+    Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig,
+                  a->fxState, a->activeControllerPath);
+  } else if (idx == 19) { // MIDI MAPPING PRESET changed
+    int presetIdx = a->settingsState.Items[19].Current;
     if (presetIdx < a->midiPresetCount) {
       strncpy(a->activeControllerPath, a->midiPresetPaths[presetIdx], 255);
       MIDI_RefreshMapping(a->activeControllerPath);
@@ -367,23 +382,34 @@ void OnSettingsAction(void *ctx, int idx) {
     a->creditsState.IsActive = true;
   } else if (idx == 18) { // EXIT APPLICATION
     a->showExitConfirm = true;
-  } else if (idx == 20) { // CREATE NEW MAPPING
-    MIDI_CreateTemplate(MIDI_GetGlobalMapping());
-    PopulateMidiSettings(a);
-  } else if (idx == 21) { // SAVE CURRENT AS
-    // For simplicity, we use the current map name or a default
-    MIDI_GetGlobalMapping(); // Refresh without assigning if unused
-    char nameBuf[128];
-    static int saveCounter = 0;
-    snprintf(nameBuf, 128, "Custom_%d", ++saveCounter);
-    if (MIDI_SaveCurrentMapping(nameBuf)) {
-      printf("[MIDI] Mapping saved to controllers/%s.midi.xml\n", nameBuf);
-    }
-    PopulateMidiSettings(a);
   }
 }
 
 void PopulateMidiSettings(App *a) {
+  // --- CONNECTED DEVICE SELECTION ITEM (Index 18) ---
+  char devNames[16][64];
+  int devCount = MIDI_GetDeviceList(devNames);
+
+  strcpy(a->settingsState.Items[18].Label, "CONNECTED DEVICE");
+  a->settingsState.Items[18].Type = SETTING_TYPE_LIST;
+  a->settingsState.Items[18].Category = SETTING_CAT_CONTROLLERS;
+  
+  strcpy(a->settingsState.Items[18].Options[0], "AUTO DETECT");
+  for (int i = 0; i < devCount && (i + 1) < MAX_SETTING_OPTIONS; i++) {
+    strncpy(a->settingsState.Items[18].Options[i + 1], devNames[i], 31);
+  }
+  a->settingsState.Items[18].OptionsCount = devCount + 1;
+  
+  a->settingsState.Items[18].Current = 0;
+  if (a->midiCtx.activeDeviceName[0] != '\0') {
+    for (int i = 0; i < devCount; i++) {
+      if (strstr(devNames[i], a->midiCtx.activeDeviceName) || strstr(a->midiCtx.activeDeviceName, devNames[i])) {
+        a->settingsState.Items[18].Current = i + 1;
+        break;
+      }
+    }
+  }
+
   // --- PRESET SELECTION ITEM (Index 19) ---
   char names[32][64];
   a->midiPresetCount =
@@ -402,48 +428,7 @@ void PopulateMidiSettings(App *a) {
     }
   }
 
-  // --- ACTIONS (20, 21) ---
-  strcpy(a->settingsState.Items[20].Label, "CREATE NEW MAPPING");
-  a->settingsState.Items[20].Type = SETTING_TYPE_ACTION;
-  a->settingsState.Items[20].Category = SETTING_CAT_CONTROLLERS;
-  strcpy(a->settingsState.Items[20].Unit, "RESET");
-
-  strcpy(a->settingsState.Items[21].Label, "SAVE CURRENT MAPPING");
-  a->settingsState.Items[21].Type = SETTING_TYPE_ACTION;
-  a->settingsState.Items[21].Category = SETTING_CAT_CONTROLLERS;
-  strcpy(a->settingsState.Items[21].Unit, "SAVE");
-
-  // --- MAPPING ENTRIES (Starting from Index 22) ---
-  MidiMapping *map = MIDI_GetGlobalMapping();
-  if (!map)
-    return;
-
-  int baseIdx = 22;
-  for (int i = 0; i < map->count && (baseIdx + i) < MAX_SETTINGS_ITEMS; i++) {
-    MappingEntry *e = &map->entries[i];
-    snprintf(a->settingsState.Items[baseIdx + i].Label, 64, "%s %s", e->group,
-             e->key);
-    a->settingsState.Items[baseIdx + i].Type = SETTING_TYPE_ACTION;
-    a->settingsState.Items[baseIdx + i].Category = SETTING_CAT_CONTROLLERS;
-
-    snprintf(a->settingsState.Items[baseIdx + i].Unit, 16, "0x%02X:0x%02X",
-             e->status, e->midino);
-
-    // Store type in Options[0] for display
-    if (e->options & 4)
-      strcpy(a->settingsState.Items[baseIdx + i].Options[0], "SCRIPT");
-    else if (e->options & 1)
-      strcpy(a->settingsState.Items[baseIdx + i].Options[0], "REL");
-    else if (e->options & 8 || e->options & 16)
-      strcpy(a->settingsState.Items[baseIdx + i].Options[0], "14BIT");
-    else
-      strcpy(a->settingsState.Items[baseIdx + i].Options[0], "NORM");
-  }
-
-  int totalCount = baseIdx + map->count;
-  if (totalCount > MAX_SETTINGS_ITEMS)
-    totalCount = MAX_SETTINGS_ITEMS;
-  a->settingsState.ItemsCount = totalCount;
+  a->settingsState.ItemsCount = 20;
 }
 
 static void App_DeactivateAllViews(App *a) {
@@ -1134,6 +1119,13 @@ Log_LogDeviceInfo(gpuModel);
 
   MIDI_Init(&app->midiCtx);
 
+  // MIDI_Init auto-scans connected devices and may overwrite the saved mapping.
+  // Re-apply the user's saved controller preset and re-populate the UI.
+  if (app->activeControllerPath[0] != '\0') {
+    MIDI_RefreshMapping(app->activeControllerPath);
+  }
+  PopulateMidiSettings(app);
+
   int bufMap[] = {128, 256, 512, 1024};
   AudioBackendConfig initialAudioCfg = {
       .DeviceIndex = app->settingsState.Items[8].Current - 1,
@@ -1213,6 +1205,11 @@ Log_LogDeviceInfo(gpuModel);
               0, 1);
   CO_Register("[Channel1]", "master", CO_TYPE_BOOL,
               &app->deckA.MidiRequestMaster, 0, 1);
+  CO_Register("[Channel1]", "tempo_percent", CO_TYPE_FLOAT,
+              &app->deckA.TempoPercent, -100.0f, 100.0f);
+  CO_Register("[Channel1]", "tempo_range", CO_TYPE_INT,
+              &app->deckA.TempoRange, 0, 3);
+
 
   // Loops
   CO_Register("[Channel1]", "loop_in", CO_TYPE_BOOL,
@@ -1221,6 +1218,10 @@ Log_LogDeviceInfo(gpuModel);
               &app->deckA.MidiRequestLoopOut, 0, 1);
   CO_Register("[Channel1]", "loop_exit", CO_TYPE_BOOL,
               &app->deckA.MidiRequestLoopExit, 0, 1);
+  CO_Register("[Channel1]", "loop_adjust_in", CO_TYPE_BOOL,
+              &app->deckA.LoopAdjustIn, 0, 1);
+  CO_Register("[Channel1]", "loop_adjust_out", CO_TYPE_BOOL,
+              &app->deckA.LoopAdjustOut, 0, 1);
   CO_Register("[Channel1]", "loop_halve", CO_TYPE_BOOL,
               &app->deckA.MidiRequestLoopHalve, 0, 1);
   CO_Register("[Channel1]", "loop_double", CO_TYPE_BOOL,
@@ -1299,6 +1300,11 @@ Log_LogDeviceInfo(gpuModel);
               0, 1);
   CO_Register("[Channel2]", "master", CO_TYPE_BOOL,
               &app->deckB.MidiRequestMaster, 0, 1);
+  CO_Register("[Channel2]", "tempo_percent", CO_TYPE_FLOAT,
+              &app->deckB.TempoPercent, -100.0f, 100.0f);
+  CO_Register("[Channel2]", "tempo_range", CO_TYPE_INT,
+              &app->deckB.TempoRange, 0, 3);
+
 
   // Loops
   CO_Register("[Channel2]", "loop_in", CO_TYPE_BOOL,
@@ -1307,6 +1313,10 @@ Log_LogDeviceInfo(gpuModel);
               &app->deckB.MidiRequestLoopOut, 0, 1);
   CO_Register("[Channel2]", "loop_exit", CO_TYPE_BOOL,
               &app->deckB.MidiRequestLoopExit, 0, 1);
+  CO_Register("[Channel2]", "loop_adjust_in", CO_TYPE_BOOL,
+              &app->deckB.LoopAdjustIn, 0, 1);
+  CO_Register("[Channel2]", "loop_adjust_out", CO_TYPE_BOOL,
+              &app->deckB.LoopAdjustOut, 0, 1);
   CO_Register("[Channel2]", "loop_halve", CO_TYPE_BOOL,
               &app->deckB.MidiRequestLoopHalve, 0, 1);
   CO_Register("[Channel2]", "loop_double", CO_TYPE_BOOL,
@@ -1356,6 +1366,10 @@ Log_LogDeviceInfo(gpuModel);
   CO_Register("[Master]", "volume", CO_TYPE_FLOAT, &audioEngine->MasterVolume,
               0, 2.0f);
 
+  // --- Touch & Jog ---
+  CO_Register("[Channel1]", "touch", CO_TYPE_BOOL, &app->deckA.IsTouching, 0, 1);
+  CO_Register("[Channel2]", "touch", CO_TYPE_BOOL, &app->deckB.IsTouching, 0, 1);
+
   // --- Color FX ---
   CO_Register("[Channel1]", "colorfx_select", CO_TYPE_INT,
               &audioEngine->Decks[0].ColorFX.activeFX, 0, 6);
@@ -1381,10 +1395,17 @@ Log_LogDeviceInfo(gpuModel);
               &app->fxState.IsFXOn, 0, 1);
   CO_Register("[Master]", "beatfx_channel", CO_TYPE_INT,
               &audioEngine->BeatFX.targetChannel, 0, 2);
+  CO_Register("[Master]", "beatfx_prev", CO_TYPE_BOOL,
+              &app->fxState.MidiRequestPrevFX, 0, 1);
+  CO_Register("[Master]", "beatfx_next", CO_TYPE_BOOL,
+              &app->fxState.MidiRequestNextFX, 0, 1);
+  CO_Register("[Master]", "beatfx_toggle", CO_TYPE_BOOL,
+              &app->fxState.MidiRequestToggleFX, 0, 1);
+
 
   // --- Library / Browser ---
-  CO_Register("[Library]", "browse", CO_TYPE_FLOAT,
-              &app->browserState.MidiBrowseDelta, -10.0f, 10.0f);
+  CO_Register("[Library]", "browse", CO_TYPE_INT,
+              &app->browserState.MidiBrowseDelta, -10, 10);
   CO_Register("[Library]", "enter", CO_TYPE_BOOL,
               &app->browserState.MidiRequestEnter, 0, 1);
   CO_Register("[Library]", "back", CO_TYPE_BOOL,
@@ -1399,8 +1420,8 @@ Log_LogDeviceInfo(gpuModel);
               &app->browserState.MidiRequestLoadB, 0, 1);
 
   // --- Settings Navigation ---
-  CO_Register("[Settings]", "browse", CO_TYPE_FLOAT,
-              &app->settingsState.MidiBrowseDelta, -10.0f, 10.0f);
+  CO_Register("[Settings]", "browse", CO_TYPE_INT,
+              &app->settingsState.MidiBrowseDelta, -10, 10);
   CO_Register("[Settings]", "enter", CO_TYPE_BOOL,
               &app->settingsState.MidiRequestEnter, 0, 1);
 
@@ -1606,8 +1627,16 @@ void UpdateDrawFrame(App *app) {
   app->deckB.LoadingProgress = audioEngine->Decks[1].LoadingProgress;
   app->deckA.IsLooping = audioEngine->Decks[0].IsLooping;
   app->deckB.IsLooping = audioEngine->Decks[1].IsLooping;
-  if (!app->deckA.IsLooping) app->padState.ActiveLoopIdx[0] = -1;
-  if (!app->deckB.IsLooping) app->padState.ActiveLoopIdx[1] = -1;
+  if (!app->deckA.IsLooping) {
+    app->padState.ActiveLoopIdx[0] = -1;
+    app->deckA.LoopAdjustIn = false;
+    app->deckA.LoopAdjustOut = false;
+  }
+  if (!app->deckB.IsLooping) {
+    app->padState.ActiveLoopIdx[1] = -1;
+    app->deckB.LoopAdjustIn = false;
+    app->deckB.LoopAdjustOut = false;
+  }
 
   if (audioEngine->Decks[0].PCMBuffer) {
     // Position is already frame-based (L+R pair = 1 frame)
@@ -1735,6 +1764,27 @@ void UpdateDrawFrame(App *app) {
                          &app->fxState);
   }
   MIDI_Update(&app->midiCtx, &app->deckA, &app->deckB, audioEngine);
+
+  // Process MIDI Beat FX requests
+  if (app->fxState.MidiRequestPrevFX) {
+      app->fxState.SelectedFX = (app->fxState.SelectedFX + 13) % 14;
+      BeatFXManager_SetFX(&audioEngine->BeatFX, app->fxState.SelectedFX);
+      app->fxState.MidiRequestPrevFX = false;
+  }
+  if (app->fxState.MidiRequestNextFX) {
+      app->fxState.SelectedFX = (app->fxState.SelectedFX + 1) % 14;
+      BeatFXManager_SetFX(&audioEngine->BeatFX, app->fxState.SelectedFX);
+      app->fxState.MidiRequestNextFX = false;
+  }
+  if (app->fxState.MidiRequestToggleFX) {
+      app->fxState.IsFXOn = !app->fxState.IsFXOn;
+      BeatFXManager_SetFXOn(&audioEngine->BeatFX, app->fxState.IsFXOn);
+      app->fxState.MidiRequestToggleFX = false;
+  }
+
+  // Send hardware LED and VU Meter updates via MIDI
+  MIDI_UpdateLEDs(&app->midiCtx, &app->deckA, &app->deckB, audioEngine, app);
+
 
   // --- Global Beat FX Sync ---
   float masterBpm = 120.0f;
@@ -1994,21 +2044,25 @@ void UpdateDrawFrame(App *app) {
       app->deckA.SyncMode = 1;
     }
   }
-  if (app->deckA.IsTouching) {
+  if (app->deckA.JogDelta != 0 || app->deckA.IsTouching) {
     double dt = GetFrameTime();
     if (dt < 0.001)
       dt = 0.016;
-    double srA = (double)audioEngine->Decks[0].SampleRate;
-    if (srA < 8000)
-      srA = 44100.0;
 
-    double framesInFrame = srA * dt;
-    // JogDelta is in 150Hz frames. Convert to PCM frames for comparison.
-    double instantaneousRate =
-        (app->deckA.JogDelta * (srA / 150.0)) / (framesInFrame);
-
-    audioEngine->Decks[0].JogRate = instantaneousRate;
-    app->deckA.JogDelta = 0;
+    if (app->deckA.JogDelta != 0) {
+      double instantaneousRate = app->deckA.JogDelta / (777.77 * dt);
+      app->deckA.JogDelta = 0;
+      audioEngine->Decks[0].JogRate = instantaneousRate;
+    } else if (app->deckA.IsTouching) {
+      // Touch hold (vinyl platter held stationary under hand)
+      audioEngine->Decks[0].JogRate = 0.0;
+    }
+  } else {
+    // Pitch bend release decay
+    audioEngine->Decks[0].JogRate *= 0.80;
+    if (fabs(audioEngine->Decks[0].JogRate) < 0.05) {
+      audioEngine->Decks[0].JogRate = 0.0;
+    }
   }
   audioEngine->Decks[0].VinylModeEnabled = app->deckA.VinylModeEnabled;
   audioEngine->Decks[0].MasterTempoActive = app->deckA.MasterTempo;
@@ -2029,20 +2083,25 @@ void UpdateDrawFrame(App *app) {
       app->deckB.SyncMode = 1;
     }
   }
-  if (app->deckB.IsTouching) {
+  if (app->deckB.JogDelta != 0 || app->deckB.IsTouching) {
     double dt = GetFrameTime();
     if (dt < 0.001)
       dt = 0.016;
-    double srB = (double)audioEngine->Decks[1].SampleRate;
-    if (srB < 8000)
-      srB = 44100.0;
 
-    double framesInFrame = srB * dt;
-    double instantaneousRate =
-        (app->deckB.JogDelta * (srB / 150.0)) / framesInFrame;
-
-    audioEngine->Decks[1].JogRate = instantaneousRate;
-    app->deckB.JogDelta = 0;
+    if (app->deckB.JogDelta != 0) {
+      double instantaneousRate = app->deckB.JogDelta / (777.77 * dt);
+      app->deckB.JogDelta = 0;
+      audioEngine->Decks[1].JogRate = instantaneousRate;
+    } else if (app->deckB.IsTouching) {
+      // Touch hold (vinyl platter held stationary under hand)
+      audioEngine->Decks[1].JogRate = 0.0;
+    }
+  } else {
+    // Pitch bend release decay
+    audioEngine->Decks[1].JogRate *= 0.80;
+    if (fabs(audioEngine->Decks[1].JogRate) < 0.05) {
+      audioEngine->Decks[1].JogRate = 0.0;
+    }
   }
   audioEngine->Decks[1].VinylModeEnabled = app->deckB.VinylModeEnabled;
   audioEngine->Decks[1].MasterTempoActive = app->deckB.MasterTempo;

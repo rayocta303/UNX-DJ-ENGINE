@@ -309,7 +309,7 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
     accel = (deck->VinylModeEnabled) ? 1.0f : 0.4f;
   } else {
     if (deck->IsMotorOn) {
-      targetRate = deck->BaseRate;
+      targetRate = deck->BaseRate + deck->JogRate;
       accel = deck->VinylStartAccel > 0 ? deck->VinylStartAccel : 0.12f;
     } else {
       targetRate = 0.0;

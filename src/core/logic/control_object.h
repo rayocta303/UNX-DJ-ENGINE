@@ -24,6 +24,9 @@ void CO_Register(const char *group, const char *key, COType type, void *ptr, flo
 void* CO_Find(const char *group, const char *key, COType *outType);
 void CO_SetValue(const char *group, const char *key, float normalizedValue);
 void CO_AddValue(const char *group, const char *key, float delta);
+float CO_GetValue(const char *group, const char *key);
+float CO_GetValueNormalized(const char *group, const char *key);
+void CO_ToggleValue(const char *group, const char *key);
 int CO_GetCount();
 ControlObject* CO_GetByIndex(int idx);
 

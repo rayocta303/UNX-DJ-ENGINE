@@ -54,6 +54,13 @@ typedef struct {
   bool IsLearningMidi;
   int LearningItemIdx;
 
+  bool IsEditMappingOpen;
+  int EditMappingItemIdx;
+
+  bool IsMappingListOpen;
+  int MappingListScroll;
+  int MappingListCursorPos;
+
   int MidiBrowseDelta;
   bool MidiRequestEnter;
 } SettingsState;

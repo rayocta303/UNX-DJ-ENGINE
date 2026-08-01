@@ -114,6 +114,8 @@ typedef struct DeckState {
   bool IsCueHeld;
   bool IsCueActive; // For blinking or UI feedback
   bool IsLooping;
+  bool LoopAdjustIn;
+  bool LoopAdjustOut;
 
   // MIDI Interaction Flags
   bool MidiRequestHotCue[8];
@@ -145,4 +147,10 @@ typedef struct BeatFXState {
   float XPadScrubValue; // -1.0 to 1.0 for Reverb LPF/HPF and Flanger Sweep
   bool IsXPadScrubbing; // True when holding the scrub line
   bool Quantize;
+
+  // MIDI request flags
+  bool MidiRequestPrevFX;
+  bool MidiRequestNextFX;
+  bool MidiRequestToggleFX;
 } BeatFXState;
+
