@@ -285,8 +285,68 @@ void Browser_Back(BrowserState *s) {
     s->IsTagList = false;
   } else if (s->BrowseLevel < 3) {
     s->BrowseLevel++;
-    s->CursorPos = s->ScrollOffset = 0;
-    Browser_UpdateActiveTracks(s);
+  }
+}
+
+void Browser_CheckStorageConnection(BrowserState *s) {
+  if (!s || !s->SelectedStorage) return;
+
+  struct stat st;
+  bool isConnected = false;
+
+  if (s->SelectedStorage->Path[0] != '\0') {
+    if (stat(s->SelectedStorage->Path, &st) == 0) {
+      isConnected = true;
+    }
+  }
+
+  if (!isConnected) {
+    char devName[128];
+    snprintf(devName, sizeof(devName), "%s",
+             (s->SelectedStorage->Name[0] != '\0') ? s->SelectedStorage->Name : "USB Device");
+
+    char toastMsg[160];
+    snprintf(toastMsg, sizeof(toastMsg), "USB DISCONNECTED: %s", devName);
+
+    // 1. Alert Toast Notification (Red warning banner)
+    Toast_Show(toastMsg, 4.0f, (Color){240, 50, 50, 255});
+
+    UNX_LOG_WARN("[BROWSER] Storage device disconnected unexpectedly: %s (%s). Resetting browser state.",
+                 devName, s->SelectedStorage->Path);
+
+    // 2. Free memory allocated for this storage DB
+    if (s->DB) {
+      RB_FreeDatabase(s->DB);
+      s->DB = NULL;
+    }
+    if (s->SeratoDB) {
+      Serato_FreeDatabase(s->SeratoDB);
+      s->SeratoDB = NULL;
+    }
+    if (s->TrackPointers) {
+      free(s->TrackPointers);
+      s->TrackPointers = NULL;
+    }
+    if (s->SeratoTrackPointers) {
+      free(s->SeratoTrackPointers);
+      s->SeratoTrackPointers = NULL;
+    }
+
+    // 3. Reset browser state to Source Selection (BrowseLevel = 3)
+    s->SelectedStorage = NULL;
+    s->BrowseLevel = 3;
+    s->CursorPos = 0;
+    s->ScrollOffset = 0;
+    s->VisualScroll = 0.0f;
+    s->ScrollVelocity = 0.0f;
+    s->CurrentPlaylistIdx = -1;
+    s->ActiveTrackCount = 0;
+    s->IsSearching = false;
+    s->SearchQuery[0] = '\0';
+    s->IsTagList = false;
+
+    // 4. Refresh available device list
+    Browser_RefreshStorages(s);
   }
 }
 
@@ -503,6 +563,9 @@ static int Browser_Update(Component *base) {
 
   if (!s->IsActive)
     return 0;
+
+  // Check storage connection and auto-reset state if disconnected
+  Browser_CheckStorageConnection(s);
 
   int loadToDeck = -1;
   int targetIdx = s->ScrollOffset + s->CursorPos;

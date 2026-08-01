@@ -207,3 +207,51 @@ void UIDrawScrollingText(const char* str, Font font, Rectangle rect, float fontS
     
     EndScissorMode();
 }
+
+static char g_toastMessage[128] = {0};
+static float g_toastTimer = 0.0f;
+static float g_toastMaxDuration = 1.0f;
+static Color g_toastColor = {230, 40, 40, 255};
+
+void Toast_Show(const char *message, float durationSec, Color badgeColor) {
+    if (!message) return;
+    strncpy(g_toastMessage, message, sizeof(g_toastMessage) - 1);
+    g_toastMessage[sizeof(g_toastMessage) - 1] = '\0';
+    g_toastTimer = (durationSec > 0.0f) ? durationSec : 3.5f;
+    g_toastMaxDuration = g_toastTimer;
+    g_toastColor = badgeColor;
+}
+
+void Toast_UpdateAndDraw(float dt) {
+    if (g_toastTimer <= 0.0f) return;
+    g_toastTimer -= dt;
+
+    float alpha = 1.0f;
+    if (g_toastTimer < 0.4f) {
+        alpha = g_toastTimer / 0.4f;
+    } else if (g_toastMaxDuration - g_toastTimer < 0.2f) {
+        alpha = (g_toastMaxDuration - g_toastTimer) / 0.2f;
+    }
+
+    Font fBold = UIFonts_GetBoldFace(S(9));
+
+    Vector2 textDim = MeasureTextEx(fBold, g_toastMessage, S(9), 1.0f);
+    float toastW = textDim.x + S(36);
+    if (toastW < S(240)) toastW = S(240);
+    float toastH = S(20);
+    float toastX = (SCREEN_WIDTH - toastW) / 2.0f;
+    float toastY = TOP_BAR_H + S(4);
+
+    Color bgDark = Fade((Color){16, 20, 26, 245}, alpha);
+    Color borderColor = Fade(g_toastColor, alpha);
+    Color textCol = Fade(WHITE, alpha);
+
+    DrawRectangle(toastX, toastY, toastW, toastH, bgDark);
+    DrawRectangleLinesEx((Rectangle){toastX, toastY, toastW, toastH}, 1.0f, borderColor);
+
+    // Left indicator bar
+    DrawRectangle(toastX + S(2), toastY + S(2), S(4), toastH - S(4), borderColor);
+
+    // Alert Message Text
+    UIDrawText(g_toastMessage, fBold, toastX + S(12), toastY + S(4), S(9), textCol);
+}

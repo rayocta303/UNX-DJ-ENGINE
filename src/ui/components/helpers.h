@@ -13,3 +13,5 @@ void UIDrawTextTruncated(const char* str, Font font, float x, float y, float siz
 void UIDrawText(const char* str, Font font, float x, float y, float size, Color clr);
 void UIDrawKnob(float x, float y, float radius, float value, float min, float max, const char* unit, Color color, bool centerZero);
 void UIDrawScrollingText(const char* str, Font font, Rectangle rect, float fontSize, Color clr, float elapsedTime);
+void Toast_Show(const char *message, float durationSec, Color badgeColor);
+void Toast_UpdateAndDraw(float dt);

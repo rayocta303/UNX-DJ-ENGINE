@@ -83,6 +83,7 @@ typedef struct {
 } BrowserState;
 
 void Browser_RefreshStorages(BrowserState *s);
+void Browser_CheckStorageConnection(BrowserState *s);
 void Browser_Back(BrowserState *s);
 
 typedef struct {

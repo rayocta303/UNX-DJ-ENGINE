@@ -2288,7 +2288,7 @@ void UpdateDrawFrame(App *app) {
     app->stripB.base.Update((Component *)&app->stripB);
     app->topbar.base.Update((Component *)&app->topbar);
 
-    // --- Update System Stats (CPU/RAM) every 1s ---
+    // --- Update System Stats (CPU/RAM) & Storage check every 1s ---
     static float statsTimer = 0;
     statsTimer += GetFrameTime();
     if (statsTimer >= 1.0f) {
@@ -2298,6 +2298,9 @@ void UpdateDrawFrame(App *app) {
       app->topbar.BatteryLevel = stats.batteryLevel;
       app->topbar.IsCharging = stats.isCharging;
       statsTimer = 0;
+
+      // Periodically monitor USB storage device connection
+      Browser_CheckStorageConnection(&app->browserState);
     }
 
     // --- Handle Seek Requests from UI (Hot Cues / Scrubbing) ---
@@ -2381,6 +2384,7 @@ void UpdateDrawFrame(App *app) {
     app->stripA.base.Draw((Component *)&app->stripA);
     app->stripB.base.Draw((Component *)&app->stripB);
     app->topbar.base.Draw((Component *)&app->topbar);
+    Toast_UpdateAndDraw(GetFrameTime());
   }
 
   if (app->showExitConfirm) {
