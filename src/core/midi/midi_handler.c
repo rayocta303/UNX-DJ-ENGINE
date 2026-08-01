@@ -1,6 +1,7 @@
 #include "core/midi/midi_handler.h"
 #include "core/midi/midi_mapper.h"
 #include "core/logic/control_object.h"
+#include "ui/components/helpers.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -195,6 +196,13 @@ bool MIDI_SelectDevice(MidiContext *ctx, int deviceIndex, char *outDeviceName, c
     } else {
         printf("[MIDI] Warning: No specific mapping XML matching '%s' found in controllers/.\n", deviceName);
     }
+
+    if (success) {
+        char toastMsg[160];
+        snprintf(toastMsg, sizeof(toastMsg), "MIDI CONNECTED: %s", deviceName);
+        Toast_Show(toastMsg, 3.5f, (Color){40, 200, 80, 255}); // Green Toast
+    }
+
     return success;
 }
 
@@ -235,12 +243,23 @@ bool MIDI_Init(MidiContext *ctx) {
     }
     
     ctx->initialized = true;
+
+    char toastMsg[160];
+    snprintf(toastMsg, sizeof(toastMsg), "MIDI CONNECTED: %s", deviceName);
+    Toast_Show(toastMsg, 3.5f, (Color){40, 200, 80, 255}); // Green Toast
+
     return true;
 }
 
 
 void MIDI_Close(MidiContext *ctx) {
-    if (!ctx->initialized) return;
+    if (!ctx || !ctx->initialized) return;
+
+    char toastMsg[160];
+    snprintf(toastMsg, sizeof(toastMsg), "MIDI DISCONNECTED: %s",
+             ctx->activeDeviceName[0] ? ctx->activeDeviceName : "Controller");
+    Toast_Show(toastMsg, 4.0f, (Color){240, 50, 50, 255}); // Red Alert Toast
+
 #if defined(__linux__) && !defined(__ANDROID__)
 #ifdef HAS_ALSA
     snd_seq_close((snd_seq_t*)seq_handle);
@@ -251,6 +270,40 @@ void MIDI_Close(MidiContext *ctx) {
     // Stub
 #endif
     ctx->initialized = false;
+}
+
+void MIDI_CheckHotplug(MidiContext *ctx) {
+    if (!ctx) return;
+
+    static int lastDevCount = -1;
+    char devNames[16][64];
+    int count = MIDI_GetDeviceList(devNames);
+
+    if (lastDevCount == -1) {
+        lastDevCount = count;
+        return;
+    }
+
+    if (ctx->initialized) {
+        bool found = false;
+        for (int i = 0; i < count; i++) {
+            if (strcmp(devNames[i], ctx->activeDeviceName) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if (!found && count < lastDevCount) {
+            MIDI_Close(ctx);
+            ctx->activeDeviceName[0] = '\0';
+        }
+    } else {
+        if (count > 0 && count > lastDevCount) {
+            char outDev[128];
+            MIDI_SelectDevice(ctx, 0, outDev, NULL);
+        }
+    }
+
+    lastDevCount = count;
 }
 
 void MIDI_Update(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine *engine) {

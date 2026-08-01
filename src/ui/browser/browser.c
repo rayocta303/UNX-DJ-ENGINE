@@ -555,6 +555,58 @@ void Browser_RefreshStorages(BrowserState *s) {
     }
   }
 #endif
+
+  static char s_knownPaths[16][512];
+  static char s_knownNames[16][128];
+  static int s_knownCount = 0;
+  static bool s_hasInitializedStorages = false;
+
+  if (!s_hasInitializedStorages) {
+    s_knownCount = s->StorageCount;
+    for (int i = 0; i < s->StorageCount && i < 16; i++) {
+      strncpy(s_knownPaths[i], s->AvailableStorages[i].Path, 511);
+      strncpy(s_knownNames[i], s->AvailableStorages[i].Name, 127);
+    }
+    s_hasInitializedStorages = true;
+  } else {
+    // Check for NEWLY CONNECTED USB devices
+    for (int i = 0; i < s->StorageCount; i++) {
+      bool isNew = true;
+      for (int k = 0; k < s_knownCount; k++) {
+        if (strcmp(s->AvailableStorages[i].Path, s_knownPaths[k]) == 0) {
+          isNew = false;
+          break;
+        }
+      }
+      if (isNew) {
+        char toastMsg[160];
+        snprintf(toastMsg, sizeof(toastMsg), "USB CONNECTED: %s", s->AvailableStorages[i].Name);
+        Toast_Show(toastMsg, 3.5f, (Color){40, 200, 80, 255}); // Green Toast
+      }
+    }
+
+    // Check for REMOVED / DISCONNECTED USB devices
+    for (int k = 0; k < s_knownCount; k++) {
+      bool isRemoved = true;
+      for (int i = 0; i < s->StorageCount; i++) {
+        if (strcmp(s_knownPaths[k], s->AvailableStorages[i].Path) == 0) {
+          isRemoved = false;
+          break;
+        }
+      }
+      if (isRemoved) {
+        char toastMsg[160];
+        snprintf(toastMsg, sizeof(toastMsg), "USB DISCONNECTED: %s", s_knownNames[k]);
+        Toast_Show(toastMsg, 4.0f, (Color){240, 50, 50, 255}); // Red Toast
+      }
+    }
+
+    s_knownCount = s->StorageCount;
+    for (int i = 0; i < s->StorageCount && i < 16; i++) {
+      strncpy(s_knownPaths[i], s->AvailableStorages[i].Path, 511);
+      strncpy(s_knownNames[i], s->AvailableStorages[i].Name, 127);
+    }
+  }
 }
 
 static int Browser_Update(Component *base) {

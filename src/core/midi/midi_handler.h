@@ -43,6 +43,7 @@ MidiMapping* MIDI_GetGlobalMapping(void);
 void MIDI_RefreshMapping(const char *path);
 bool MIDI_GetLastMessage(uint8_t *status, uint8_t *midino);
 bool MIDI_PeekLastMessage(uint8_t *status, uint8_t *midino);
+void MIDI_CheckHotplug(MidiContext *ctx);
 bool MIDI_SaveCurrentMapping(const char *name);
 
 #endif // MIDI_HANDLER_H

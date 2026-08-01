@@ -2299,8 +2299,10 @@ void UpdateDrawFrame(App *app) {
       app->topbar.IsCharging = stats.isCharging;
       statsTimer = 0;
 
-      // Periodically monitor USB storage device connection
+      // Periodically monitor USB storage device & MIDI Controller connections
       Browser_CheckStorageConnection(&app->browserState);
+      Browser_RefreshStorages(&app->browserState);
+      MIDI_CheckHotplug(&app->midiCtx);
     }
 
     // --- Handle Seek Requests from UI (Hot Cues / Scrubbing) ---
