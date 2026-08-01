@@ -233,6 +233,9 @@ void Toast_UpdateAndDraw(float dt) {
         alpha = (g_toastMaxDuration - g_toastTimer) / 0.2f;
     }
 
+    // Smooth blinking/pulsing oscillation for emergency warning visibility
+    float blinkFactor = (sinf((float)GetTime() * 10.0f) + 1.0f) * 0.5f;
+
     Font fBold = UIFonts_GetBoldFace(S(9));
 
     Vector2 textDim = MeasureTextEx(fBold, g_toastMessage, S(9), 1.0f);
@@ -242,14 +245,23 @@ void Toast_UpdateAndDraw(float dt) {
     float toastX = (SCREEN_WIDTH - toastW) / 2.0f;
     float toastY = TOP_BAR_H + S(4);
 
-    Color bgDark = Fade((Color){16, 20, 26, 245}, alpha);
-    Color borderColor = Fade(g_toastColor, alpha);
+    // Dynamic Blinking background blending
+    Color baseBg = (Color){18, 22, 28, 245};
+    Color alertBg = (Color){
+        (unsigned char)(baseBg.r + (g_toastColor.r - baseBg.r) * 0.45f * blinkFactor),
+        (unsigned char)(baseBg.g + (g_toastColor.g - baseBg.g) * 0.45f * blinkFactor),
+        (unsigned char)(baseBg.b + (g_toastColor.b - baseBg.b) * 0.45f * blinkFactor),
+        245
+    };
+
+    Color finalBg = Fade(alertBg, alpha);
+    Color borderColor = Fade(g_toastColor, alpha * (0.65f + 0.35f * blinkFactor));
     Color textCol = Fade(WHITE, alpha);
 
-    DrawRectangle(toastX, toastY, toastW, toastH, bgDark);
-    DrawRectangleLinesEx((Rectangle){toastX, toastY, toastW, toastH}, 1.0f, borderColor);
+    DrawRectangle(toastX, toastY, toastW, toastH, finalBg);
+    DrawRectangleLinesEx((Rectangle){toastX, toastY, toastW, toastH}, 1.2f, borderColor);
 
-    // Left indicator bar
+    // Left indicator bar (pulses in intensity)
     DrawRectangle(toastX + S(2), toastY + S(2), S(4), toastH - S(4), borderColor);
 
     // Alert Message Text
