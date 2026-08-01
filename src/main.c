@@ -2086,8 +2086,8 @@ void UpdateDrawFrame(App *app) {
       double instantaneousRate = app->deckA.JogDelta / (777.77 * dt);
       app->deckA.JogDelta = 0;
       audioEngine->Decks[0].JogRate = instantaneousRate;
-    } else if (app->deckA.IsTouching) {
-      // Touch hold (vinyl platter held stationary under hand)
+    } else if (app->deckA.IsTouching && app->deckA.VinylModeEnabled) {
+      // Touch hold in Vinyl mode (vinyl platter held stationary under hand)
       audioEngine->Decks[0].JogRate = 0.0;
     }
   } else {
@@ -2098,8 +2098,9 @@ void UpdateDrawFrame(App *app) {
     if (dtFactor < 0.1f) dtFactor = 0.1f;
     if (dtFactor > 5.0f) dtFactor = 5.0f;
     audioEngine->Decks[0].JogRate *= powf(0.80f, dtFactor);
-    if (fabs(audioEngine->Decks[0].JogRate) < 0.05) {
+    if (fabs(audioEngine->Decks[0].JogRate) < 0.05 || !audioEngine->Decks[0].IsMotorOn) {
       audioEngine->Decks[0].JogRate = 0.0;
+      if (!audioEngine->Decks[0].IsMotorOn) audioEngine->Decks[0].OutlinedRate = 0.0;
     }
   }
   audioEngine->Decks[0].VinylModeEnabled = app->deckA.VinylModeEnabled;
@@ -2132,8 +2133,8 @@ void UpdateDrawFrame(App *app) {
       double instantaneousRate = app->deckB.JogDelta / (777.77 * dt);
       app->deckB.JogDelta = 0;
       audioEngine->Decks[1].JogRate = instantaneousRate;
-    } else if (app->deckB.IsTouching) {
-      // Touch hold (vinyl platter held stationary under hand)
+    } else if (app->deckB.IsTouching && app->deckB.VinylModeEnabled) {
+      // Touch hold in Vinyl mode (vinyl platter held stationary under hand)
       audioEngine->Decks[1].JogRate = 0.0;
     }
   } else {
@@ -2144,8 +2145,9 @@ void UpdateDrawFrame(App *app) {
     if (dtFactor < 0.1f) dtFactor = 0.1f;
     if (dtFactor > 5.0f) dtFactor = 5.0f;
     audioEngine->Decks[1].JogRate *= powf(0.80f, dtFactor);
-    if (fabs(audioEngine->Decks[1].JogRate) < 0.05) {
+    if (fabs(audioEngine->Decks[1].JogRate) < 0.05 || !audioEngine->Decks[1].IsMotorOn) {
       audioEngine->Decks[1].JogRate = 0.0;
+      if (!audioEngine->Decks[1].IsMotorOn) audioEngine->Decks[1].OutlinedRate = 0.0;
     }
   }
   audioEngine->Decks[1].VinylModeEnabled = app->deckB.VinylModeEnabled;

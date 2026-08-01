@@ -306,16 +306,22 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
   float accel = 0.08f;
 
   if (deck->IsTouching) {
-    targetRate = (deck->VinylModeEnabled) ? deck->JogRate
-                                          : (deck->BaseRate + deck->JogRate);
-    accel = (deck->VinylModeEnabled) ? 1.0f : 0.4f;
+    if (deck->VinylModeEnabled) {
+      // Vinyl Scratch Mode: Direct 1:1 platter rate lock
+      targetRate = deck->JogRate;
+      accel = 1.0f;
+    } else {
+      // CDJ Pitch Bend Mode: Does not halt motor, shifts pitch relative to BaseRate
+      targetRate = deck->IsMotorOn ? (deck->BaseRate + deck->JogRate) : deck->JogRate;
+      accel = 0.4f;
+    }
   } else {
     if (deck->IsMotorOn) {
       targetRate = deck->BaseRate + deck->JogRate;
       accel = deck->VinylStartAccel > 0 ? deck->VinylStartAccel : 0.12f;
     } else {
-      targetRate = 0.0;
-      accel = deck->VinylStopAccel > 0 ? deck->VinylStopAccel : 0.015f;
+      targetRate = deck->JogRate;
+      accel = (fabs(deck->JogRate) > 0.001) ? 0.2f : 1.0f; // Instant stop when paused and jog stops
     }
   }
 
@@ -947,9 +953,26 @@ void DeckAudio_SetJogRate(DeckAudioState *deck, double rate) {
 void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching) {
   if (deck->ReleaseFXType == 2)
     return; // Protect active backspin
+  
+  bool wasTouching = deck->IsTouching;
   deck->IsTouching = touching;
-  if (!touching)
+  
+  if (!touching) {
     deck->JogRate = deck->OutlinedRate;
+    
+    // Slip Mode Catch-up on touch release!
+    if (wasTouching && deck->SlipActive) {
+      deck->Position = deck->SlipPosition;
+      deck->MT_ReadPos = deck->SlipPosition;
+      deck->SlipActive = false;
+    }
+    
+    // Instant zero lock if deck is paused
+    if (!deck->IsMotorOn && fabs(deck->JogRate) < 0.05) {
+      deck->JogRate = 0.0;
+      deck->OutlinedRate = 0.0;
+    }
+  }
 }
 void DeckAudio_JumpToMs(DeckAudioState *deck, int64_t ms) {
 
