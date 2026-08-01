@@ -147,6 +147,11 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2,
     }
   }
 
+  // Fullscreen Shortcut (Cross-platform Windows/Linux)
+  if (IsKeyPressed(KEY_F11) || ((IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)) && IsKeyPressed(KEY_ENTER))) {
+    ToggleFullscreen();
+  }
+
   // Sync Shortcuts
   if (IsKeyPressed(m->sync1)) {
     d1->SyncMode = (d1->SyncMode + 1) % 3;

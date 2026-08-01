@@ -35,6 +35,7 @@ struct TopBar {
 
   // Internal layout state
   float MarginX;
+  float btnFullX, btnFullW;
   float btnBrowseX, btnBrowseW;
   float btnMixerX, btnMixerW;
   float btnInfoX, btnInfoW;

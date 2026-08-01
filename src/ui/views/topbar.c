@@ -9,6 +9,9 @@ static int TopBar_Update(Component *base) {
   if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
     Vector2 mouse = UIGetMousePosition();
     if (mouse.y < TOP_BAR_H) {
+      if (mouse.x >= t->btnFullX && mouse.x <= t->btnFullX + t->btnFullW) {
+        ToggleFullscreen();
+      }
       if (mouse.x >= t->btnBrowseX &&
           mouse.x <= t->btnBrowseX + t->btnBrowseW) {
         if (t->OnBrowse)
@@ -44,18 +47,51 @@ static void TopBar_Draw(Component *base) {
   Font faceXS = UIFonts_GetFace(S(8));
   Font faceSm = UIFonts_GetFace(S(9));
 
-  // 1. Left (CPU & RAM Usage)
+  float btnH = TOP_BAR_H - S(4);
+  float btnY = S(2);
+
+  // 1. Fullscreen Button (Top-Left corner before CPU/RAM)
+  t->btnFullX = t->MarginX;
+  t->btnFullW = S(16);
+
+  bool isFull = IsWindowFullscreen();
+  DrawRectangle(t->btnFullX, btnY, t->btnFullW, btnH, isFull ? ColorBlue : ColorDark1);
+  DrawRectangleLines(t->btnFullX, btnY, t->btnFullW, btnH, ColorShadow);
+
+  float cx = t->btnFullX + t->btnFullW / 2.0f;
+  float cy = btnY + btnH / 2.0f;
+  float iconS = S(4.0f);
+  Color iconCol = ColorWhite;
+
+  if (isFull) {
+    // Inward arrows / shrink icon
+    DrawLineEx((Vector2){cx - iconS, cy - iconS}, (Vector2){cx - S(1.5f), cy - S(1.5f)}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx + iconS, cy - iconS}, (Vector2){cx + S(1.5f), cy - S(1.5f)}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx - iconS, cy + iconS}, (Vector2){cx - S(1.5f), cy + S(1.5f)}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx + iconS, cy + iconS}, (Vector2){cx + S(1.5f), cy + S(1.5f)}, 1.5f, iconCol);
+  } else {
+    // Outward brackets / expand icon
+    DrawLineEx((Vector2){cx - iconS, cy - iconS}, (Vector2){cx - iconS + S(2.5f), cy - iconS}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx - iconS, cy - iconS}, (Vector2){cx - iconS, cy - iconS + S(2.5f)}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx + iconS, cy - iconS}, (Vector2){cx + iconS - S(2.5f), cy - iconS}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx + iconS, cy - iconS}, (Vector2){cx + iconS, cy - iconS + S(2.5f)}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx - iconS, cy + iconS}, (Vector2){cx - iconS + S(2.5f), cy + iconS}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx - iconS, cy + iconS}, (Vector2){cx - iconS, cy - iconS + S(2.5f)}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx + iconS, cy + iconS}, (Vector2){cx + iconS - S(2.5f), cy + iconS}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx + iconS, cy + iconS}, (Vector2){cx + iconS, cy + iconS - S(2.5f)}, 1.5f, iconCol);
+  }
+
+  // 2. CPU & RAM Usage (Positioned after Fullscreen Button)
+  float textStartX = t->btnFullX + t->btnFullW + S(4);
   char cpuStr[32];
   sprintf(cpuStr, "CPU %d%%", (int)(t->CPUUsage * 100));
-  UIDrawText(cpuStr, faceXS, t->MarginX, S(6), S(8), ColorShadow);
+  UIDrawText(cpuStr, faceXS, textStartX, S(6), S(8), ColorShadow);
 
   char ramStr[32];
   sprintf(ramStr, "RAM %dMB", (int)t->RAMUsage);
-  UIDrawText(ramStr, faceSm, t->MarginX + S(36), S(5), S(9), ColorWhite);
+  UIDrawText(ramStr, faceSm, textStartX + S(36), S(5), S(9), ColorWhite);
 
-  // 2. Center Group
-  float btnH = TOP_BAR_H - S(4);
-  float btnY = S(2);
+  // 3. Center Group
   float btnSpacing = S(8);
 
   t->btnBrowseW = S(72); // Reduced width to fit 5 buttons
