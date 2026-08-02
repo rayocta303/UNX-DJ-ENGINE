@@ -623,25 +623,27 @@ static int Browser_Update(Component *base) {
   int targetIdx = s->ScrollOffset + s->CursorPos;
   bool triggerEnter = false;
 
-  // Dropdown and Search Box Interaction
+  // Layout Variables
   Vector2 mousePos = UIGetMousePosition();
+  float sidebarW = S(40);
+  float rowH = S(28.0f);
+  float listW = SCREEN_WIDTH - sidebarW - S(8);
+  if (s->InfoEnabled) listW = SCREEN_WIDTH - sidebarW - S(160);
+
+  // Dropdown and Search Box Interaction
   if (s->BrowseLevel == 0) {
-    float sidebarW = S(40);
-    float listW = SCREEN_WIDTH - sidebarW - S(8);
-    if (s->InfoEnabled) listW = SCREEN_WIDTH - sidebarW - S(160);
-    
     float sortButtonW = S(65);
     float oskButtonW = S(36);
-    Rectangle sortButtonRect = {sidebarW + listW - sortButtonW, TOP_BAR_H, sortButtonW, S(28.0f)};
-    Rectangle dropdownRect = {sortButtonRect.x, sortButtonRect.y + sortButtonRect.height, sortButtonW, S(28.0f) * 5}; // 5 items
-    Rectangle oskButtonRect = {sidebarW + listW - sortButtonW - oskButtonW - S(4), TOP_BAR_H, oskButtonW, S(28.0f)};
-    Rectangle searchBoxRect = {sidebarW, TOP_BAR_H, listW - sortButtonW - oskButtonW - S(8), S(28.0f)};
+    Rectangle sortButtonRect = {sidebarW + listW - sortButtonW, TOP_BAR_H, sortButtonW, rowH};
+    Rectangle dropdownRect = {sortButtonRect.x, sortButtonRect.y + sortButtonRect.height, sortButtonW, rowH * 5}; // 5 items
+    Rectangle oskButtonRect = {sidebarW + listW - sortButtonW - oskButtonW - S(4), TOP_BAR_H, oskButtonW, rowH};
+    Rectangle searchBoxRect = {sidebarW, TOP_BAR_H, listW - sortButtonW - oskButtonW - S(8), rowH};
 
     // Handle OSK Panel Touch Absorption
     if (s->ShowOSK) {
       float viewH = SCREEN_HEIGHT - DECK_STR_H;
       float oskH = S(210);
-      Rectangle oskPanelRect = {sidebarW, viewH - oskH, SCREEN_WIDTH - sidebarW, oskH};
+      Rectangle oskPanelRect = {0, viewH - oskH, SCREEN_WIDTH, oskH};
       if (CheckCollisionPointRec(mousePos, oskPanelRect)) {
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
           // Touch absorbed by OSK overlay
@@ -831,17 +833,8 @@ static int Browser_Update(Component *base) {
       loadToDeck = 1;
   }
 
-  float sidebarW = S(40);
-  float rowH = S(28.0f);
-  int totalVisible = 10;
-  float listYOffset = TOP_BAR_H;
-  if (s->BrowseLevel == 0) {
-      totalVisible = 9;
-      listYOffset += rowH;
-  }
-  float listW = SCREEN_WIDTH - sidebarW - S(8);
-  if (s->InfoEnabled)
-    listW = SCREEN_WIDTH - sidebarW - S(160);
+  int totalVisible = (s->BrowseLevel == 0) ? 9 : 10;
+  float listYOffset = TOP_BAR_H + ((s->BrowseLevel == 0) ? rowH : 0);
 
   // 1. Sidebar Clicking & Interaction
   for (int i = 0; i < 7; i++) {
@@ -940,16 +933,26 @@ static int Browser_Update(Component *base) {
     }
   }
 
+  // Dynamic totalVisible and maxScroll adjustment for OSK
+  float viewH = SCREEN_HEIGHT - DECK_STR_H;
+  listYOffset = TOP_BAR_H + ((s->BrowseLevel == 0) ? rowH : 0);
+  float listAreaH = viewH - listYOffset;
+  if (s->ShowOSK) listAreaH -= S(210);
+  if (listAreaH < S(50)) listAreaH = S(50);
+  totalVisible = (int)floorf(listAreaH / rowH);
+  if (totalVisible < 1) totalVisible = 1;
+
   // 3. Touch Kinetic Scrolling & Interactive Scrollbar Logic
   if (!s->ShowLoadPopup) {
     float maxScroll = (totalItems - totalVisible) * rowH;
     if (maxScroll < 0) maxScroll = 0;
 
-    float viewH = SCREEN_HEIGHT - DECK_STR_H;
     float sbTrackW = S(28);
     float sbTrackX = SCREEN_WIDTH - sbTrackW;
     float sbTrackY = TOP_BAR_H;
     float sbTrackH = viewH - TOP_BAR_H;
+    if (s->ShowOSK) sbTrackH -= S(210);
+    if (sbTrackH < S(50)) sbTrackH = S(50);
     Rectangle sbRect = {sbTrackX, sbTrackY, sbTrackW, sbTrackH};
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
@@ -1508,11 +1511,10 @@ static int Browser_Update(Component *base) {
 static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   if (!s->ShowOSK) return;
 
-  float sidebarW = S(40);
   float viewH = SCREEN_HEIGHT - DECK_STR_H;
   float oskH = S(210);
-  float oskW = SCREEN_WIDTH - sidebarW;
-  float oskX = sidebarW;
+  float oskW = SCREEN_WIDTH;
+  float oskX = 0.0f;
   float oskY = viewH - oskH;
 
   // Outer Overlay Background
@@ -1943,6 +1945,10 @@ static void Browser_Draw(Component *base) {
     totalItems = s->StorageCount;
 
   float listAreaH = (viewH - listYOffset);
+  if (s->ShowOSK) {
+    listAreaH -= S(210);
+    if (listAreaH < S(50)) listAreaH = S(50);
+  }
   BeginScissorMode((int)listX, (int)listYOffset, (int)listW + S(10), (int)listAreaH);
 
   float pixelOffset = fmodf(s->VisualScroll, rowH);
@@ -2105,6 +2111,8 @@ static void Browser_Draw(Component *base) {
     float sbTrackX = SCREEN_WIDTH - sbTrackW;
     float sbTrackY = TOP_BAR_H;
     float sbTrackH = viewH - TOP_BAR_H;
+    if (s->ShowOSK) sbTrackH -= S(210);
+    if (sbTrackH < S(50)) sbTrackH = S(50);
 
     // Background Track
     DrawRectangle(sbTrackX, sbTrackY, sbTrackW, sbTrackH, (Color){ 20, 20, 20, 180 });
