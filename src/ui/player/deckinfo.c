@@ -269,8 +269,9 @@ static void DeckInfo_Draw(Component *base) {
     Rectangle msRect = { margin, utilY, utilW, utilH };
     DrawRectangleRec(msRect, d->State->IsMaster ? Fade(ColorOrange, 0.3f) : ColorDark1);
     DrawRectangleLinesEx(msRect, S(1), d->State->IsMaster ? ColorOrange : ColorShadow);
-    DrawTextureEx(crownTex, (Vector2){msRect.x + (utilW - S(38))/2.0f, msRect.y + S(2.5f)}, 0.0f, 1.0f, d->State->IsMaster ? ColorOrange : ColorShadow);
-    UIDrawText("MASTER", faceXXS, msRect.x + (utilW - S(38))/2.0f + S(11), msRect.y + S(3.5f), S(7), d->State->IsMaster ? ColorOrange : ColorShadow);
+    const char *msLbl = "MASTER";
+    Vector2 msSz = MeasureTextEx(faceXXS, msLbl, S(7), 1);
+    UIDrawText(msLbl, faceXXS, msRect.x + (utilW - msSz.x)/2.0f, msRect.y + S(3.5f), S(7), d->State->IsMaster ? ColorOrange : ColorShadow);
 
     // 2. Sync (Top-Right)
     Rectangle syRect = { margin + utilW + utilGap, utilY, utilW, utilH };

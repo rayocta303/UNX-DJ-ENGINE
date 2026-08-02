@@ -627,7 +627,8 @@ static int Browser_Update(Component *base) {
   Vector2 mousePos = UIGetMousePosition();
   float sidebarW = S(40);
   float rowH = S(28.0f);
-  float listW = SCREEN_WIDTH - sidebarW - S(8);
+  float sbTrackW = S(14);
+  float listW = SCREEN_WIDTH - sidebarW - sbTrackW - S(4);
   if (s->InfoEnabled) listW = SCREEN_WIDTH - sidebarW - S(160);
 
   // Dropdown and Search Box Interaction
@@ -951,7 +952,6 @@ static int Browser_Update(Component *base) {
     float maxScroll = (totalItems - totalVisible) * rowH;
     if (maxScroll < 0) maxScroll = 0;
 
-    float sbTrackW = S(28);
     float sbTrackX = SCREEN_WIDTH - sbTrackW;
     float sbTrackY = listYOffset;
     float sbTrackH = viewH - listYOffset;
@@ -1071,7 +1071,7 @@ static int Browser_Update(Component *base) {
         }
 
         float loadBtnW = S(45);
-        Rectangle loadBtnRect = {sidebarW + listW - loadBtnW - S(32), ry + S(4), loadBtnW, rowH - S(8)};
+        Rectangle loadBtnRect = {sidebarW + listW - loadBtnW - S(2), ry + S(4), loadBtnW, rowH - S(8)};
         bool isLoadClick = (s->BrowseLevel == 0) && CheckCollisionPointRec(mousePos, loadBtnRect);
 
         if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && !s->IsDragging) {
@@ -1851,7 +1851,8 @@ static void Browser_Draw(Component *base) {
   float rowH = S(28.0f);
   int totalVisible = 10;
   float listX = sidebarW;
-  float listW = SCREEN_WIDTH - sidebarW - S(8);
+  float sbTrackW = S(14);
+  float listW = SCREEN_WIDTH - sidebarW - sbTrackW - S(4);
   if (s->InfoEnabled)
     listW = SCREEN_WIDTH - sidebarW - S(160);
 
@@ -2030,7 +2031,7 @@ static void Browser_Draw(Component *base) {
 
       // LOAD Button
       float loadW = S(45);
-      Rectangle loadRect = {listX + listW - loadW - S(5), ry + S(4), loadW,
+      Rectangle loadRect = {listX + listW - loadW - S(2), ry + S(4), loadW,
                             rowH - S(8)};
       bool hoverLoad = CheckCollisionPointRec(mPos, loadRect);
 
@@ -2073,7 +2074,7 @@ static void Browser_Draw(Component *base) {
     maxItems = s->StorageCount;
 
   if (maxItems > totalVisible) {
-    float sbTrackW = S(28);
+    float sbTrackW = S(14);
     float sbTrackX = SCREEN_WIDTH - sbTrackW;
     float sbTrackY = listYOffset;
     float sbTrackH = viewH - listYOffset;
@@ -2094,7 +2095,7 @@ static void Browser_Draw(Component *base) {
     float handleY = sbTrackY + scrollRatio * (sbTrackH - handleH);
 
     Color handleColor = s->IsScrollbarDragging ? ColorOrange : (s->IsDragging ? ColorWhite : (Color){ 160, 160, 160, 200 });
-    DrawRectangleRounded((Rectangle){ sbTrackX + S(6), handleY, sbTrackW - S(12), handleH }, 0.5f, 4, handleColor);
+    DrawRectangleRounded((Rectangle){ sbTrackX + S(3), handleY, sbTrackW - S(6), handleH }, 0.5f, 4, handleColor);
   }
 
   // Load Deck Popup Modal
