@@ -19,6 +19,7 @@ int WinMIDI_GetDevices(char outNames[16][64]);
 bool WinMIDI_OpenDevice(int devId, char* outDeviceName);
 bool WinMIDI_PopEvent(uint8_t *status, uint8_t *data1, uint8_t *data2);
 bool WinMIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2);
+bool WinMIDI_SendSysEx(const uint8_t *data, uint32_t length);
 void WinMIDI_Close(void);
 #elif defined(__ANDROID__)
 #endif
@@ -38,24 +39,57 @@ void MIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
 }
 
 void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine *engine, void *appPtr) {
-    (void)ctx; (void)engine; (void)appPtr;
+    (void)ctx; (void)appPtr;
     if (!d1 || !d2) return;
 
     static double lastSendTime = 0;
     double now = GetTime();
 
-    // Send SysEx Keep-Alive every 1.5s
+    // 1. Pioneer SysEx Keep-Alive every 1.5 seconds
     static double lastSysEx = 0;
     if (now - lastSysEx > 1.5) {
         lastSysEx = now;
-        // Keep alive signal
+        static const uint8_t PIONEER_SYSEX_KEEPALIVE[12] = {
+            0xF0, 0x00, 0x40, 0x05, 0x00, 0x00, 0x04, 0x05, 0x00, 0x50, 0x02, 0xF7
+        };
+#if defined(_WIN32)
+        WinMIDI_SendSysEx(PIONEER_SYSEX_KEEPALIVE, 12);
+#endif
     }
 
-    // Rate-limit MIDI OUT updates to 30 FPS to avoid MIDI driver buffer overrun
+    // Rate-limit short MIDI OUT updates to ~30 FPS to prevent MIDI driver buffer congestion
     if (now - lastSendTime < 0.033) return;
     lastSendTime = now;
 
-    // Deck A Jog Ring (Channel 1 -> 0xBB, 0x00)
+    // 2. Deck A & B State LEDs
+    DeckState *decks[2] = { d1, d2 };
+    for (int i = 0; i < 2; i++) {
+        uint8_t chStatus = 0x90 + i;
+
+        // Play/Pause LED (Note 0x0B)
+        uint8_t playVal = decks[i]->IsPlaying ? 0x7F : 0x00;
+        MIDI_SendShortMsg(chStatus, 0x0B, playVal);
+
+        // Cue LED (Note 0x0C)
+        uint8_t cueVal = (decks[i]->IsCueActive || !decks[i]->IsPlaying) ? 0x7F : 0x00;
+        MIDI_SendShortMsg(chStatus, 0x0C, cueVal);
+
+        // Vinyl Mode LED (Note 0x0E)
+        uint8_t vinylVal = decks[i]->VinylModeEnabled ? 0x7F : 0x00;
+        MIDI_SendShortMsg(chStatus, 0x0E, vinylVal);
+
+        // VU Meter Level (Status 0xB0 + i, Control 0x02)
+        if (engine) {
+            float vuL = engine->Decks[i].VuMeterL;
+            float vuR = engine->Decks[i].VuMeterR;
+            float rms = (vuL > vuR ? vuL : vuR);
+            uint8_t meterVal = (uint8_t)(rms * 0x76);
+            if (rms >= 1.0f) meterVal += 0x09; // Peak/clip indicator
+            MIDI_SendShortMsg(0xB0 + i, 0x02, meterVal);
+        }
+    }
+
+    // 3. Deck A Jog Ring (Channel 1 -> 0xBB, 0x00)
     uint8_t posA = 0;
     if (d1->LoadAnimTimer > 0.0f) {
         posA = (uint8_t)((1.0f - (d1->LoadAnimTimer / 0.5f)) * 127.0f) % 127;
@@ -64,7 +98,7 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
     }
     MIDI_SendShortMsg(0xBB, 0x00, posA);
 
-    // Deck B Jog Ring (Channel 2 -> 0xBB, 0x01)
+    // 4. Deck B Jog Ring (Channel 2 -> 0xBB, 0x01)
     uint8_t posB = 0;
     if (d2->LoadAnimTimer > 0.0f) {
         posB = (uint8_t)((1.0f - (d2->LoadAnimTimer / 0.5f)) * 127.0f) % 127;
