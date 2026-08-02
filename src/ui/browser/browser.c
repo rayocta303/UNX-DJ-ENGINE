@@ -953,12 +953,8 @@ static int Browser_Update(Component *base) {
 
     float sbTrackW = S(28);
     float sbTrackX = SCREEN_WIDTH - sbTrackW;
-    float sbTrackY = TOP_BAR_H;
-    float sbTrackH = viewH - TOP_BAR_H;
-    if (s->ShowOSK) {
-      sbTrackH -= oskH;
-    }
-    if (sbTrackH < S(50)) sbTrackH = S(50);
+    float sbTrackY = listYOffset;
+    float sbTrackH = viewH - listYOffset;
     Rectangle sbRect = {sbTrackX, sbTrackY, sbTrackW, sbTrackH};
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
@@ -2079,10 +2075,8 @@ static void Browser_Draw(Component *base) {
   if (maxItems > totalVisible) {
     float sbTrackW = S(28);
     float sbTrackX = SCREEN_WIDTH - sbTrackW;
-    float sbTrackY = TOP_BAR_H;
-    float sbTrackH = viewH - TOP_BAR_H;
-    if (s->ShowOSK) sbTrackH -= S(210);
-    if (sbTrackH < S(50)) sbTrackH = S(50);
+    float sbTrackY = listYOffset;
+    float sbTrackH = viewH - listYOffset;
 
     // Background Track
     DrawRectangle(sbTrackX, sbTrackY, sbTrackW, sbTrackH, (Color){ 20, 20, 20, 180 });
