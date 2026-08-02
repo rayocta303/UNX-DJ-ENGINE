@@ -564,6 +564,21 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
       } else {
         // SET HOT CUE AT CURRENT POSITION
         uint32_t currentMs = (uint32_t)ds->PositionMs;
+
+        // Quantize Snap: If Quantize is Enabled, snap marker to nearest beatgrid point
+        if (ds->QuantizeEnabled && ds->LoadedTrack && ds->LoadedTrack->Analysis.BeatGridCount > 0) {
+          int nearestIdx = 0;
+          double minDist = 100000.0;
+          for (int i = 0; i < ds->LoadedTrack->Analysis.BeatGridCount; i++) {
+            double diff = fabs((double)ds->LoadedTrack->Analysis.BeatGrid[i].Time - (double)currentMs);
+            if (diff < minDist) {
+              minDist = diff;
+              nearestIdx = i;
+            }
+          }
+          currentMs = ds->LoadedTrack->Analysis.BeatGrid[nearestIdx].Time;
+        }
+
         if (ds->LoadedTrack->HotCuesCount < 8) {
           static const unsigned char defaultColors[8][3] = {
               {255, 255, 0}, {255, 128, 0}, {255, 0, 255}, {255, 0, 0},
