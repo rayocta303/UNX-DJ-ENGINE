@@ -204,29 +204,25 @@ static void Mixer_Draw(Component *base) {
   UIDrawText("MIXER", UIFonts_GetFace(S(12)), S(15), S(5), S(12), ColorWhite);
 
   // --- LAYOUT CONSTANTS ---
-  float colFXW = S(120);
-  float colMixW = S(320);
+  float colFXW = S(124);
+  float colMixW = S(330);
   float colRightW = S(140);
   
-  float totalW = colFXW + colMixW + colRightW;
-  float panelX = (SCREEN_WIDTH - totalW) / 2.0f;
   float panelY = TOP_BAR_H + S(5);
   float panelH = viewH - TOP_BAR_H - S(10);
 
-  DrawRectangle(panelX, panelY, totalW, panelH, ColorDark3);
-  DrawRectangleLinesEx((Rectangle){panelX, panelY, totalW, panelH}, 1.0f, ColorGray);
-
-  float leftX = panelX;
-  float centerX = panelX + colFXW;
-  float rightX = centerX + colMixW;
+  float leftX = S(6);                                // Pepet kiri layar
+  float rightX = SCREEN_WIDTH - colRightW - S(6);     // Pepet kanan layar
+  float centerX = (SCREEN_WIDTH - colMixW) / 2.0f;    // Centered core mixer
 
   Font fSub = UIFonts_GetFace(S(9));
   Font fTiny = UIFonts_GetFace(S(7));
 
   // =========================================================================
-  // COLUMN 1: SOUND COLOR FX (LEFT)
+  // COLUMN 1: SOUND COLOR FX (FAR LEFT)
   // =========================================================================
-  DrawRectangle(leftX + S(2), panelY + S(2), colFXW - S(4), panelH - S(4), (Color){20, 20, 20, 255});
+  DrawRectangle(leftX, panelY, colFXW, panelH, (Color){20, 20, 20, 255});
+  DrawRectangleLinesEx((Rectangle){leftX, panelY, colFXW, panelH}, 1.0f, ColorDark1);
   float fxY = panelY + S(12);
   DrawCentredText("SOUND COLOR FX", fTiny, leftX, colFXW, fxY, S(7), ColorShadow);
   
@@ -253,7 +249,8 @@ static void Mixer_Draw(Component *base) {
   // =========================================================================
   // COLUMN 2: CORE MIXER (CENTER) - [Fader1 | EQ1 | VU | EQ2 | Fader2]
   // =========================================================================
-  DrawRectangle(centerX + S(2), panelY + S(2), colMixW - S(4), panelH - S(4), (Color){22, 22, 22, 255});
+  DrawRectangle(centerX, panelY, colMixW, panelH, (Color){22, 22, 22, 255});
+  DrawRectangleLinesEx((Rectangle){centerX, panelY, colMixW, panelH}, 1.0f, ColorDark1);
   
   float innerPad = S(10);
   float mixerInnerW = colMixW - (innerPad * 2);
@@ -363,10 +360,11 @@ static void Mixer_Draw(Component *base) {
 
 
   // =========================================================================
-  // COLUMN 3: BEAT FX (RIGHT)
+  // COLUMN 3: BEAT FX (FAR RIGHT)
   // =========================================================================
   BeatFXState *fxs = r->State->FXState;
-  DrawRectangle(rightX + S(2), panelY + S(2), colRightW - S(4), panelH - S(4), (Color){20, 20, 20, 255});
+  DrawRectangle(rightX, panelY, colRightW, panelH, (Color){20, 20, 20, 255});
+  DrawRectangleLinesEx((Rectangle){rightX, panelY, colRightW, panelH}, 1.0f, ColorDark1);
   float masterKnobY = panelY + S(25);
   Mixer_DrawKnob(rightX + colRightW / 2.0f, masterKnobY, S(15), eng->MasterVolume, 0.0f, 2.0f, "MASTER", ColorRed, true);
   HandleKnob(r->State, &eng->MasterVolume, rightX + colRightW / 2.0f, masterKnobY, S(15), 0.0f, 2.0f, true, mousePos, mDown);
