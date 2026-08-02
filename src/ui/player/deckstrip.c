@@ -82,7 +82,7 @@ static int DeckStrip_Update(Component *base) {
   float titleBgH = S(16);
   float midY = y + titleBgH + S(4);
   float lColW = S(40);
-  float bpmBoxW = S(50);
+  float bpmBoxW = S(56);
   float bpmX = x + stripW - bpmBoxW - S(4);
   float tempoX = bpmX - S(64);
 
@@ -295,7 +295,7 @@ static void DeckStrip_Draw(Component *base) {
   UIDrawText(subStr, faceSub, timeX + wM + S(2), timeValY + S(4), S(13),
              ColorPaper);
 
-  float bpmBoxW = S(50);
+  float bpmBoxW = S(56);
   float bpmX = x + stripW - bpmBoxW - S(4);
   float tempoX = bpmX - S(64);
 
@@ -330,10 +330,10 @@ static void DeckStrip_Draw(Component *base) {
   UIDrawText("BPM", faceXXS, bpmX + S(2), bpmBoxY + S(0.5f), S(7), ColorShadow);
 
   if (d->State->IsMaster) {
-    float masterW = S(30);
+    float masterW = S(36);
     float masterX = bpmX + bpmBoxW - masterW - S(1);
     DrawRectangle(masterX, bpmBoxY + S(1), masterW, S(8), ColorOrange);
-    DrawCentredText("MASTER", faceXXS, masterX, masterW, bpmBoxY + S(1), S(7),
+    DrawCentredText("MASTER", faceXXS, masterX, masterW, bpmBoxY + S(0.5f), S(7),
                     ColorBlack);
   }
 
