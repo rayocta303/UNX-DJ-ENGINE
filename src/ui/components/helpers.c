@@ -185,17 +185,23 @@ void UIDrawScrollingText(const char* str, Font font, Rectangle rect, float fontS
         return;
     }
 
-    // If elapsedTime is 0, draw truncated
-    if (elapsedTime <= 0.0f) {
+    // Automatic 3-second pause before scrolling, then repeat cycle
+    float gap = S(30);
+    float totalW = size.x + gap;
+    float speed = S(35); // pixels per second
+    float scrollDuration = totalW / speed;
+    float pauseDuration = 3.0f; // 3 seconds pause
+    float cycleDuration = pauseDuration + scrollDuration;
+    
+    float t = fmodf(elapsedTime, cycleDuration);
+    float activeScrollTime = (t < pauseDuration) ? 0.0f : (t - pauseDuration);
+
+    if (activeScrollTime <= 0.0f) {
         UIDrawTextTruncated(str, font, rect.x, rect.y, fontSize, clr, rect.width);
         return;
     }
 
-    // Scrolling with looping
-    float gap = S(40);
-    float totalW = size.x + gap;
-    float speed = S(40); // pixels per second
-    float offset = fmodf(elapsedTime * speed, totalW);
+    float offset = fmodf(activeScrollTime * speed, totalW);
 
     BeginScissorMode((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height);
     

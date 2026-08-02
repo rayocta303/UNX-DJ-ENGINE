@@ -226,13 +226,15 @@ static void DeckStrip_Draw(Component *base) {
                ColorWhite); // f001 music note
     float maxW = stripW - (mx - x) - S(20);
     Rectangle titleRect = { mx + S(15), y + S(1.5f), maxW, S(16) };
-    bool isHovered = CheckCollisionPointRec(UIGetMousePosition(), titleRect);
-    
-    static float hoverTimer[2] = {0, 0};
-    if (isHovered) hoverTimer[d->ID] += GetFrameTime();
-    else hoverTimer[d->ID] = 0;
+    static float autoTimer[2] = {0, 0};
+    static const TrackState *lastTrack[2] = {NULL, NULL};
+    if (d->State->LoadedTrack != lastTrack[d->ID]) {
+      lastTrack[d->ID] = d->State->LoadedTrack;
+      autoTimer[d->ID] = 0.0f;
+    }
+    autoTimer[d->ID] += GetFrameTime();
 
-    UIDrawScrollingText(title, titleFont, titleRect, S(12.0f), ColorWhite, hoverTimer[d->ID]);
+    UIDrawScrollingText(title, titleFont, titleRect, S(12.0f), ColorWhite, autoTimer[d->ID]);
   } else {
     UIDrawText(title, titleFont, mx, y + S(1.5f), S(12.0f), ColorWhite);
   }
