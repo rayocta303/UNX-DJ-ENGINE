@@ -89,7 +89,7 @@ static int DeckStrip_Update(Component *base) {
   float mx = x + lColW + S(4);
   float mtX = mx;
   float mtY = midY + S(26);
-  float mtW = S(40);
+  float mtW = S(48);
   float mtH = S(9);
 
   float bpmBoxH = S(28);
@@ -107,7 +107,7 @@ static int DeckStrip_Update(Component *base) {
                       mouse.y >= syncY && mouse.y <= syncY + syncH);
 
   // Time Mode Toggle
-  float tx = mtX + S(40) + S(8);
+  float tx = mtX + mtW + S(6);
   bool isHoverTime = (mouse.x >= tx && mouse.x <= tx + S(80) &&
                       mouse.y >= midY && mouse.y <= midY + S(28));
 
@@ -241,7 +241,7 @@ static void DeckStrip_Draw(Component *base) {
 
   float midY = y + titleBgH + S(4);
   float badgeX = mx;
-  float badgeW = S(40);
+  float badgeW = S(48);
 
   DrawRectangleLines(badgeX, midY + S(2), badgeW, S(9), ColorOrange);
   DrawCentredText("A.HOT CUE", faceXXS, badgeX, badgeW, midY + S(2.5f), S(7),
@@ -255,7 +255,7 @@ static void DeckStrip_Draw(Component *base) {
   DrawRectangleLines(badgeX, midY + S(26), badgeW, S(9), mtClr);
   DrawCentredText("MT", faceXXS, badgeX, badgeW, midY + S(26.5f), S(7), mtClr);
 
-  float timeX = mx + badgeW + S(8);
+  float timeX = mx + badgeW + S(6);
   
   // REMAIN / TIME Indicators
   Font elFace = (d->State->TimeMode == 0) ? UIFonts_GetBoldFace(S(7)) : faceXXS;
