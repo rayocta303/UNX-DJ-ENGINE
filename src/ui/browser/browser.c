@@ -641,8 +641,9 @@ static int Browser_Update(Component *base) {
 
     // Handle OSK Panel Touch Absorption
     if (s->ShowOSK) {
+      float viewH = SCREEN_HEIGHT - DECK_STR_H;
       float oskH = S(172);
-      Rectangle oskPanelRect = {0, SCREEN_HEIGHT - oskH, SCREEN_WIDTH, oskH};
+      Rectangle oskPanelRect = {0, viewH - oskH, SCREEN_WIDTH, oskH};
       if (CheckCollisionPointRec(mousePos, oskPanelRect)) {
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
           // Touch absorbed by OSK overlay
@@ -842,6 +843,7 @@ static int Browser_Update(Component *base) {
 
     if (CheckCollisionPointRec(mousePos, boxRect)) {
       if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        s->ShowOSK = false;
         if (i < 4) {
           s->ScrollOffset = 0;
           s->VisualScroll = 0;
@@ -938,7 +940,7 @@ static int Browser_Update(Component *base) {
   float listAreaH = viewH - listYOffset;
   float oskH = S(172);
   if (s->ShowOSK) {
-    listAreaH = (SCREEN_HEIGHT - oskH) - listYOffset;
+    listAreaH -= oskH;
   }
   if (listAreaH < S(50)) listAreaH = S(50);
   totalVisible = (int)floorf(listAreaH / rowH);
@@ -954,7 +956,7 @@ static int Browser_Update(Component *base) {
     float sbTrackY = TOP_BAR_H;
     float sbTrackH = viewH - TOP_BAR_H;
     if (s->ShowOSK) {
-      sbTrackH = (SCREEN_HEIGHT - oskH) - TOP_BAR_H;
+      sbTrackH -= oskH;
     }
     if (sbTrackH < S(50)) sbTrackH = S(50);
     Rectangle sbRect = {sbTrackX, sbTrackY, sbTrackW, sbTrackH};
@@ -1078,6 +1080,7 @@ static int Browser_Update(Component *base) {
 
         if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && !s->IsDragging) {
           if (s->TouchDragAccumulator < S(8.0f) && fabsf(s->ScrollVelocity) < 40.0f) {
+            s->ShowOSK = false; // Auto hide keyboard on list item tap
             if (isLoadClick) {
               s->ShowLoadPopup = true;
               s->PopupTrackIdx = idx;
@@ -1515,10 +1518,11 @@ static int Browser_Update(Component *base) {
 static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   if (!s->ShowOSK) return;
 
+  float viewH = SCREEN_HEIGHT - DECK_STR_H;
   float oskH = S(172);
   float oskW = SCREEN_WIDTH;
   float oskX = 0.0f;
-  float oskY = SCREEN_HEIGHT - oskH;
+  float oskY = viewH - oskH;
 
   // Outer Overlay Background & Sleek Top Accent Line
   DrawRectangle((int)oskX, (int)oskY, (int)oskW, (int)oskH, (Color){ 12, 14, 20, 252 });
@@ -1912,7 +1916,7 @@ static void Browser_Draw(Component *base) {
   float listAreaH = (viewH - listYOffset);
   if (s->ShowOSK) {
     float oskH = S(172);
-    listAreaH = (SCREEN_HEIGHT - oskH) - listYOffset;
+    listAreaH -= oskH;
     if (listAreaH < S(50)) listAreaH = S(50);
   }
   BeginScissorMode((int)listX, (int)listYOffset, (int)listW + S(10), (int)listAreaH);
