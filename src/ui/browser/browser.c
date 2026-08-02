@@ -92,6 +92,106 @@ static void Browser_SwitchStorageByPath(BrowserState *s, const char *path) {
   }
 }
 
+// Camelot Wheel Key Representation and Harmonic Compatibility Parser
+typedef struct {
+    int Number;   // 1 to 12, or 0 if invalid
+    char Letter;  // 'A' (Minor) or 'B' (Major)
+} CamelotKey;
+
+static CamelotKey ParseCamelotKey(const char *rawKey) {
+    CamelotKey ck = {0, 0};
+    if (!rawKey || rawKey[0] == '\0') return ck;
+
+    // 1. Direct Camelot notation check (e.g. "8A", "12B", "08A")
+    int num = 0;
+    char letter = 0;
+    if (sscanf(rawKey, "%d%c", &num, &letter) == 2 && num >= 1 && num <= 12 &&
+        (letter == 'A' || letter == 'a' || letter == 'B' || letter == 'b')) {
+        ck.Number = num;
+        ck.Letter = (letter >= 'a') ? (letter - 32) : letter;
+        return ck;
+    }
+
+    // 2. Musical notation parsing
+    char buf[16];
+    strncpy(buf, rawKey, 15);
+    buf[15] = '\0';
+
+    bool isMinor = false;
+    size_t len = strlen(buf);
+    if (len > 1 && (buf[len - 1] == 'm' || buf[len - 1] == 'M')) {
+        isMinor = true;
+        buf[len - 1] = '\0';
+    }
+
+    if (isMinor) {
+        ck.Letter = 'A';
+        if (strcmp(buf, "Ab") == 0 || strcmp(buf, "G#") == 0) ck.Number = 1;
+        else if (strcmp(buf, "Eb") == 0 || strcmp(buf, "D#") == 0) ck.Number = 2;
+        else if (strcmp(buf, "Bb") == 0 || strcmp(buf, "A#") == 0) ck.Number = 3;
+        else if (strcmp(buf, "F") == 0) ck.Number = 4;
+        else if (strcmp(buf, "C") == 0) ck.Number = 5;
+        else if (strcmp(buf, "G") == 0) ck.Number = 6;
+        else if (strcmp(buf, "D") == 0) ck.Number = 7;
+        else if (strcmp(buf, "A") == 0) ck.Number = 8;
+        else if (strcmp(buf, "E") == 0) ck.Number = 9;
+        else if (strcmp(buf, "B") == 0) ck.Number = 10;
+        else if (strcmp(buf, "F#") == 0 || strcmp(buf, "Gb") == 0) ck.Number = 11;
+        else if (strcmp(buf, "C#") == 0 || strcmp(buf, "Db") == 0) ck.Number = 12;
+    } else {
+        ck.Letter = 'B';
+        if (strcmp(buf, "B") == 0 || strcmp(buf, "Cb") == 0) ck.Number = 1;
+        else if (strcmp(buf, "F#") == 0 || strcmp(buf, "Gb") == 0) ck.Number = 2;
+        else if (strcmp(buf, "Db") == 0 || strcmp(buf, "C#") == 0) ck.Number = 3;
+        else if (strcmp(buf, "Ab") == 0 || strcmp(buf, "G#") == 0) ck.Number = 4;
+        else if (strcmp(buf, "Eb") == 0 || strcmp(buf, "D#") == 0) ck.Number = 5;
+        else if (strcmp(buf, "Bb") == 0 || strcmp(buf, "A#") == 0) ck.Number = 6;
+        else if (strcmp(buf, "F") == 0) ck.Number = 7;
+        else if (strcmp(buf, "C") == 0) ck.Number = 8;
+        else if (strcmp(buf, "G") == 0) ck.Number = 9;
+        else if (strcmp(buf, "D") == 0) ck.Number = 10;
+        else if (strcmp(buf, "A") == 0) ck.Number = 11;
+        else if (strcmp(buf, "E") == 0) ck.Number = 12;
+    }
+
+    return ck;
+}
+
+// Rekordbox / Mixed In Key Traffic Light Harmonic Mixing Match Level
+// 2 = Perfect Harmonic Match (Same key, Relative Major/Minor, +1/-1 Semitone)
+// 1 = Energy Shift / Semi-compatible Match
+// 0 = Incompatible
+static int GetCamelotHarmonicMatchLevel(const char *keyTrackStr, const char *keyMasterStr) {
+    if (!keyTrackStr || !keyMasterStr || keyTrackStr[0] == '\0' || keyMasterStr[0] == '\0') return 0;
+    
+    CamelotKey tKey = ParseCamelotKey(keyTrackStr);
+    CamelotKey mKey = ParseCamelotKey(keyMasterStr);
+
+    if (tKey.Number == 0 || mKey.Number == 0) return 0;
+
+    // 1. Same Key (e.g. 8A & 8A)
+    if (tKey.Number == mKey.Number && tKey.Letter == mKey.Letter) return 2;
+
+    // 2. Relative Major / Minor (e.g. 8A & 8B)
+    if (tKey.Number == mKey.Number && tKey.Letter != mKey.Letter) return 2;
+
+    // 3. +1 Step (Dominant) (e.g. 8A & 9A)
+    int plus1 = (mKey.Number % 12) + 1;
+    if (tKey.Number == plus1 && tKey.Letter == mKey.Letter) return 2;
+
+    // 4. -1 Step (Subdominant) (e.g. 8A & 7A)
+    int minus1 = (mKey.Number == 1) ? 12 : (mKey.Number - 1);
+    if (tKey.Number == minus1 && tKey.Letter == mKey.Letter) return 2;
+
+    // 5. Energy Shift / Semi-compatible Match (+1/-1 Step with letter flip or +2 steps)
+    if (tKey.Number == plus1 && tKey.Letter != mKey.Letter) return 1;
+    if (tKey.Number == minus1 && tKey.Letter != mKey.Letter) return 1;
+    int plus2 = ((mKey.Number + 1) % 12) + 1;
+    if (tKey.Number == plus2 && tKey.Letter == mKey.Letter) return 1;
+
+    return 0;
+}
+
 // Sorter Helpers
 static int CompareTracks_BPM_RB(const void *a, const void *b) {
     RBTrack *ta = *(RBTrack **)a;
@@ -106,7 +206,10 @@ static int CompareTracks_Key_RB(const void *a, const void *b) {
     RBTrack *ta = *(RBTrack **)a;
     RBTrack *tb = *(RBTrack **)b;
     if (!ta || !tb) return 0;
-    return strcmp(ta->Key, tb->Key);
+    CamelotKey ka = ParseCamelotKey(ta->Key);
+    CamelotKey kb = ParseCamelotKey(tb->Key);
+    if (ka.Number != kb.Number) return ka.Number - kb.Number;
+    return ka.Letter - kb.Letter;
 }
 
 static int CompareTracks_BPM_Serato(const void *a, const void *b) {
@@ -122,7 +225,10 @@ static int CompareTracks_Key_Serato(const void *a, const void *b) {
     SeratoTrack *ta = *(SeratoTrack **)a;
     SeratoTrack *tb = *(SeratoTrack **)b;
     if (!ta || !tb) return 0;
-    return strcmp(ta->Key, tb->Key);
+    CamelotKey ka = ParseCamelotKey(ta->Key);
+    CamelotKey kb = ParseCamelotKey(tb->Key);
+    if (ka.Number != kb.Number) return ka.Number - kb.Number;
+    return ka.Letter - kb.Letter;
 }
 static int CompareTracks_Title_RB(const void *a, const void *b) {
     RBTrack *ta = *(RBTrack **)a;
@@ -2097,19 +2203,32 @@ static void Browser_Draw(Component *base) {
     if (s->BrowseLevel == 0 && !s->InfoEnabled) {
       DrawCentredText(bpmText, faceXS, listX + listW - S(110), S(55), ry + S(9), S(11), isCursor ? ColorWhite : ColorShadow);
 
-      // Key Badge
+      // Key Badge with Camelot Wheel Traffic Light Harmonic Matching
       Rectangle keyBadgeRect = { listX + listW - S(52), ry + S(4), S(48), rowH - S(8) };
       
-      bool isKeyMatched = false;
-      if (keyStr && keyStr[0] != '\0') {
-        if (s->DeckA && s->DeckA->TrackKey[0] != '\0' && strcmp(keyStr, s->DeckA->TrackKey) == 0) isKeyMatched = true;
-        if (s->DeckB && s->DeckB->TrackKey[0] != '\0' && strcmp(keyStr, s->DeckB->TrackKey) == 0) isKeyMatched = true;
+      const char *masterKey = NULL;
+      if (s->DeckA && s->DeckA->IsPlaying && s->DeckA->TrackKey[0] != '\0') {
+        masterKey = s->DeckA->TrackKey;
+      } else if (s->DeckB && s->DeckB->IsPlaying && s->DeckB->TrackKey[0] != '\0') {
+        masterKey = s->DeckB->TrackKey;
+      } else if (s->DeckA && s->DeckA->TrackKey[0] != '\0') {
+        masterKey = s->DeckA->TrackKey;
+      } else if (s->DeckB && s->DeckB->TrackKey[0] != '\0') {
+        masterKey = s->DeckB->TrackKey;
       }
 
-      if (isKeyMatched) {
-        DrawRectangleRec(keyBadgeRect, (Color){ 0, 230, 0, 255 }); // Vibrant Green (Reference Image 1)
+      int matchLevel = GetCamelotHarmonicMatchLevel(keyStr, masterKey);
+
+      if (matchLevel == 2) {
+        // Perfect Camelot Harmonic Match (Traffic Light Green)
+        DrawRectangleRec(keyBadgeRect, (Color){ 0, 230, 0, 255 });
+        DrawCentredText(keyStr, faceXS, keyBadgeRect.x, keyBadgeRect.width, keyBadgeRect.y + S(5), S(10), ColorBlack);
+      } else if (matchLevel == 1) {
+        // Energy Shift / Semi-compatible Match (Traffic Light Amber/Yellow)
+        DrawRectangleRec(keyBadgeRect, (Color){ 245, 180, 0, 255 });
         DrawCentredText(keyStr, faceXS, keyBadgeRect.x, keyBadgeRect.width, keyBadgeRect.y + S(5), S(10), ColorBlack);
       } else {
+        // Incompatible key or no master key loaded
         DrawRectangleRec(keyBadgeRect, (Color){ 35, 35, 42, 255 });
         DrawRectangleLinesEx(keyBadgeRect, 1.0f, ColorDark1);
         DrawCentredText(keyStr, faceXS, keyBadgeRect.x, keyBadgeRect.width, keyBadgeRect.y + S(5), S(10), isCursor ? ColorWhite : ColorShadow);
