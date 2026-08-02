@@ -6,35 +6,31 @@
 
 static int TopBar_Update(Component *base) {
   TopBar *t = (TopBar *)base;
-  if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-    Vector2 mouse = UIGetMousePosition();
-    if (mouse.y < TOP_BAR_H) {
-      if (mouse.x >= t->btnFullX && mouse.x <= t->btnFullX + t->btnFullW) {
-        ToggleFullscreen();
-      }
-      if (mouse.x >= t->btnBrowseX &&
-          mouse.x <= t->btnBrowseX + t->btnBrowseW) {
-        if (t->OnBrowse)
-          t->OnBrowse(t->callbackCtx);
-      }
-      if (mouse.x >= t->btnMixerX && mouse.x <= t->btnMixerX + t->btnMixerW) {
-        if (t->OnMixer)
-          t->OnMixer(t->callbackCtx);
-      }
-      if (mouse.x >= t->btnInfoX && mouse.x <= t->btnInfoX + t->btnInfoW) {
-        if (t->OnInfo)
-          t->OnInfo(t->callbackCtx);
-      }
-      if (mouse.x >= t->btnSettingsX &&
-          mouse.x <= t->btnSettingsX + t->btnSettingsW) {
-        if (t->OnSettings)
-          t->OnSettings(t->callbackCtx);
-      }
-      if (mouse.x >= t->btnPadX && mouse.x <= t->btnPadX + t->btnPadW) {
-        if (t->OnPad)
-          t->OnPad(t->callbackCtx);
-      }
-    }
+  float btnH = TOP_BAR_H - S(4);
+  float btnY = S(2);
+
+  if (UICheckClick((Rectangle){ t->btnFullX, btnY, t->btnFullW, btnH })) {
+    ToggleFullscreen();
+  }
+  if (UICheckClick((Rectangle){ t->btnBrowseX, btnY, t->btnBrowseW, btnH })) {
+    if (t->OnBrowse)
+      t->OnBrowse(t->callbackCtx);
+  }
+  if (UICheckClick((Rectangle){ t->btnMixerX, btnY, t->btnMixerW, btnH })) {
+    if (t->OnMixer)
+      t->OnMixer(t->callbackCtx);
+  }
+  if (UICheckClick((Rectangle){ t->btnPadX, btnY, t->btnPadW, btnH })) {
+    if (t->OnPad)
+      t->OnPad(t->callbackCtx);
+  }
+  if (UICheckClick((Rectangle){ t->btnInfoX, btnY, t->btnInfoW, btnH })) {
+    if (t->OnInfo)
+      t->OnInfo(t->callbackCtx);
+  }
+  if (UICheckClick((Rectangle){ t->btnSettingsX, btnY, t->btnSettingsW, btnH })) {
+    if (t->OnSettings)
+      t->OnSettings(t->callbackCtx);
   }
   return 0;
 }

@@ -1603,6 +1603,7 @@ void UpdateDrawFrame(App *app) {
 #endif
 
   Log_Heartbeat((float)GetFPS(), GetFrameTime());
+  UI_UpdateTouchState();
 
   // CPU Throttling / Stall Detection
   float dt = GetFrameTime();

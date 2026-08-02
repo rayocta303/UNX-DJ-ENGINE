@@ -65,3 +65,9 @@ extern float UI_OffsetY;
 extern bool UI_BoldEnabled;
 
 Vector2 UIGetMousePosition(void);
+
+// Touch gesture & click protection helpers
+void UI_UpdateTouchState(void);
+bool UICheckClick(Rectangle rect);
+float UIGetTouchDragDistance(void);
+Vector2 UIGetTouchStartPos(void);

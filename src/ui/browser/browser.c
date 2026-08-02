@@ -842,8 +842,7 @@ static int Browser_Update(Component *base) {
     float boxY = TOP_BAR_H + i * sidebarW;
     Rectangle boxRect = {0, boxY, sidebarW, sidebarW};
 
-    if (CheckCollisionPointRec(mousePos, boxRect)) {
-      if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    if (UICheckClick(boxRect)) {
         s->ShowOSK = false;
         if (i < 4) {
           s->ScrollOffset = 0;
@@ -881,8 +880,8 @@ static int Browser_Update(Component *base) {
             s->BrowseLevel = 0; // Tracks
             Browser_UpdateActiveTracks(s);
             s->CursorPos = s->ScrollOffset = 0;
-        s->VisualScroll = 0;
-        s->ScrollVelocity = 0;
+            s->VisualScroll = 0;
+            s->ScrollVelocity = 0;
           }
         }
       }
@@ -908,7 +907,6 @@ static int Browser_Update(Component *base) {
         }
         s->IsDragging = false;
       }
-    }
   }
 
   // 2. Data State

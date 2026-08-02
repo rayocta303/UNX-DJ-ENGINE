@@ -1,4 +1,5 @@
 #include "ui/components/theme.h"
+#include <math.h>
 
 const Color ColorPaper  = {0xE0, 0xE0, 0xDA, 0xFF};
 const Color ColorShadow = {0xA0, 0xA0, 0x90, 0xFF};
@@ -37,6 +38,41 @@ void UI_UpdateScale(void) {
 Vector2 UIGetMousePosition(void) {
     Vector2 m = GetMousePosition();
     return (Vector2){ m.x - UI_OffsetX, m.y - UI_OffsetY };
+}
+
+static Vector2 g_touchStartPos = { -1.0f, -1.0f };
+static float g_touchDragDistance = 0.0f;
+
+void UI_UpdateTouchState(void) {
+    Vector2 m = UIGetMousePosition();
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        g_touchStartPos = m;
+        g_touchDragDistance = 0.0f;
+    } else if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+        float dx = m.x - g_touchStartPos.x;
+        float dy = m.y - g_touchStartPos.y;
+        float dist = (float)sqrt((double)(dx * dx + dy * dy));
+        if (dist > g_touchDragDistance) {
+            g_touchDragDistance = dist;
+        }
+    }
+}
+
+bool UICheckClick(Rectangle rect) {
+    if (!IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) return false;
+    Vector2 m = UIGetMousePosition();
+    if (g_touchDragDistance >= S(10.0f)) return false;
+    if (!CheckCollisionPointRec(g_touchStartPos, rect)) return false;
+    if (!CheckCollisionPointRec(m, rect)) return false;
+    return true;
+}
+
+float UIGetTouchDragDistance(void) {
+    return g_touchDragDistance;
+}
+
+Vector2 UIGetTouchStartPos(void) {
+    return g_touchStartPos;
 }
 
 float S(float v) {
