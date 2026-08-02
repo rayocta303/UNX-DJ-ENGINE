@@ -88,7 +88,8 @@ typedef struct {
     int OSKMode;          // 0 = QWERTY Letters, 1 = Numbers & Symbols
 
     // Sort functionality
-    int SortMode;         // 0 = Default, 1 = BPM, 2 = Key
+    int SortMode;         // 0 = Default, 1 = BPM, 2 = Key, 3 = Title
+    bool SortAscending;   // true = ASC, false = DESC
     bool ShowSortDropdown;
 } BrowserState;
 

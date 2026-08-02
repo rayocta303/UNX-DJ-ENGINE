@@ -274,6 +274,23 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
           else if (s->SortMode == 4) qsort(s->SeratoTrackPointers, s->ActiveTrackCount, sizeof(SeratoTrack *), CompareTracks_Rating_Serato);
       }
   }
+
+  // Reverse if DESC order
+  if (!s->SortAscending && s->ActiveTrackCount > 1) {
+      if (s->DatabaseType == 0 && s->TrackPointers) {
+          for (int i = 0; i < s->ActiveTrackCount / 2; i++) {
+              RBTrack *tmp = s->TrackPointers[i];
+              s->TrackPointers[i] = s->TrackPointers[s->ActiveTrackCount - 1 - i];
+              s->TrackPointers[s->ActiveTrackCount - 1 - i] = tmp;
+          }
+      } else if (s->DatabaseType == 1 && s->SeratoTrackPointers) {
+          for (int i = 0; i < s->ActiveTrackCount / 2; i++) {
+              SeratoTrack *tmp = s->SeratoTrackPointers[i];
+              s->SeratoTrackPointers[i] = s->SeratoTrackPointers[s->ActiveTrackCount - 1 - i];
+              s->SeratoTrackPointers[s->ActiveTrackCount - 1 - i] = tmp;
+          }
+      }
+  }
 }
 
 void Browser_Back(BrowserState *s) {
@@ -633,12 +650,16 @@ static int Browser_Update(Component *base) {
 
   // Dropdown and Search Box Interaction
   if (s->BrowseLevel == 0) {
-    float sortButtonW = S(65);
     float oskButtonW = S(36);
-    Rectangle sortButtonRect = {sidebarW + listW - sortButtonW, TOP_BAR_H, sortButtonW, rowH};
-    Rectangle dropdownRect = {sortButtonRect.x, sortButtonRect.y + sortButtonRect.height, sortButtonW, rowH * 5}; // 5 items
-    Rectangle oskButtonRect = {sidebarW + listW - sortButtonW - oskButtonW - S(4), TOP_BAR_H, oskButtonW, rowH};
-    Rectangle searchBoxRect = {sidebarW, TOP_BAR_H, listW - sortButtonW - oskButtonW - S(8), rowH};
+    Rectangle searchBoxRect = {sidebarW, TOP_BAR_H, listW - oskButtonW - S(4), rowH};
+    Rectangle oskButtonRect = {sidebarW + listW - oskButtonW, TOP_BAR_H, oskButtonW, rowH};
+
+    // Table Header Column Rectangles (Row 2)
+    float headerH = S(24.0f);
+    float headerY = TOP_BAR_H + rowH;
+    Rectangle headTitleRect = {sidebarW, headerY, listW - S(110), headerH};
+    Rectangle headBpmRect   = {sidebarW + listW - S(110), headerY, S(55), headerH};
+    Rectangle headKeyRect   = {sidebarW + listW - S(55), headerY, S(55), headerH};
 
     // Handle OSK Panel Touch Absorption
     if (s->ShowOSK) {
@@ -652,68 +673,65 @@ static int Browser_Update(Component *base) {
       }
     }
 
-    if (s->ShowSortDropdown) {
-        bool hoverDropdown = CheckCollisionPointRec(mousePos, dropdownRect);
-        bool hoverButton = CheckCollisionPointRec(mousePos, sortButtonRect);
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+      // Handle OSK Button Toggle
+      if (CheckCollisionPointRec(mousePos, oskButtonRect)) {
+        s->ShowOSK = !s->ShowOSK;
+        s->IsSearching = s->ShowOSK;
+        return 0;
+      }
 
-        // 1. Handle Selection on Release
-        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
-            if (hoverDropdown) {
-                int clickedIdx = (mousePos.y - dropdownRect.y) / S(28.0f);
-                if (clickedIdx >= 0 && clickedIdx < 5) {
-                    s->SortMode = clickedIdx;
-                    s->CursorPos = s->ScrollOffset = 0;
+      // Handle Search Box Focus
+      if (CheckCollisionPointRec(mousePos, searchBoxRect)) {
+        s->IsSearching = true;
+        s->ShowOSK = true;
+      } else if (!s->ShowOSK && s->IsSearching) {
+        s->IsSearching = false;
+      }
+
+      // Handle Table Header Column Clicks (Sort ASC / DESC)
+      if (CheckCollisionPointRec(mousePos, headBpmRect)) {
+        if (s->SortMode == 1) {
+          s->SortAscending = !s->SortAscending;
+        } else {
+          s->SortMode = 1; // BPM
+          s->SortAscending = true;
+        }
+        s->CursorPos = s->ScrollOffset = 0;
         s->VisualScroll = 0;
         s->ScrollVelocity = 0;
-                    Browser_UpdateActiveTracks(s);
-                }
-                s->ShowSortDropdown = false;
-            } else if (!hoverButton) {
-                // If they drag out of the menu and release, close it safely
-                s->ShowSortDropdown = false;
-            }
-            
-            // Absorb the release event so the UI underneath doesn't react
-            return 0; 
-        }
-        
-        // 2. Handle Clicks (Press) to close the menu
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-            if (!hoverDropdown) {
-                // Clicked outside or on the button itself -> close menu
-                s->ShowSortDropdown = false; 
-                return 0; // Absorb click so it doesn't interact with tracks underneath
-            }
-            return 0; // Pressed inside the dropdown, absorb it
-        }
-        
-        // Block hovers on underlying elements if the mouse is over the menu
-        if (hoverDropdown || hoverButton) return 0;
-    } 
-    else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        // Handle OSK Button Toggle
-        if (CheckCollisionPointRec(mousePos, oskButtonRect)) {
-            s->ShowOSK = !s->ShowOSK;
-            s->IsSearching = s->ShowOSK;
-            return 0;
-        }
+        Browser_UpdateActiveTracks(s);
+        return 0;
+      }
 
-        // Handle Sort Button (Open Menu)
-        if (CheckCollisionPointRec(mousePos, sortButtonRect)) {
-            s->ShowSortDropdown = true;
-            return 0; // Absorb click
+      if (CheckCollisionPointRec(mousePos, headKeyRect)) {
+        if (s->SortMode == 2) {
+          s->SortAscending = !s->SortAscending;
+        } else {
+          s->SortMode = 2; // Key
+          s->SortAscending = true;
         }
+        s->CursorPos = s->ScrollOffset = 0;
+        s->VisualScroll = 0;
+        s->ScrollVelocity = 0;
+        Browser_UpdateActiveTracks(s);
+        return 0;
+      }
 
-        // Handle Search Box
-        if (CheckCollisionPointRec(mousePos, searchBoxRect)) {
-            s->IsSearching = true;
-            s->ShowOSK = true;
-        } else if (!s->ShowOSK) {
-            // Click outside search box
-            if (s->IsSearching) {
-                s->IsSearching = false;
-            }
+      if (CheckCollisionPointRec(mousePos, headTitleRect)) {
+        if (s->SortMode == 3 || s->SortMode == 0) {
+          s->SortAscending = !s->SortAscending;
+          s->SortMode = 3; // Title
+        } else {
+          s->SortMode = 3; // Title
+          s->SortAscending = true;
         }
+        s->CursorPos = s->ScrollOffset = 0;
+        s->VisualScroll = 0;
+        s->ScrollVelocity = 0;
+        Browser_UpdateActiveTracks(s);
+        return 0;
+      }
     }
   }
 
@@ -935,7 +953,7 @@ static int Browser_Update(Component *base) {
 
   // Dynamic totalVisible and maxScroll adjustment for OSK
   float viewH = SCREEN_HEIGHT - DECK_STR_H;
-  listYOffset = TOP_BAR_H + ((s->BrowseLevel == 0) ? rowH : 0);
+  listYOffset = TOP_BAR_H + ((s->BrowseLevel == 0) ? (rowH + S(24.0f)) : 0);
   float listAreaH = viewH - listYOffset;
   float oskH = S(172);
   if (s->ShowOSK) {
@@ -1068,14 +1086,10 @@ static int Browser_Update(Component *base) {
           }
         }
 
-        float loadBtnW = S(45);
-        Rectangle loadBtnRect = {sidebarW + listW - loadBtnW - S(2), ry + S(4), loadBtnW, rowH - S(8)};
-        bool isLoadClick = (s->BrowseLevel == 0) && CheckCollisionPointRec(mousePos, loadBtnRect);
-
         if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && !s->IsDragging) {
           if (s->TouchDragAccumulator < S(18.0f) && fabsf(s->ScrollVelocity) < 40.0f) {
             s->ShowOSK = false; // Auto hide keyboard on list item tap
-            if (isLoadClick) {
+            if (s->BrowseLevel == 0) {
               s->ShowLoadPopup = true;
               s->PopupTrackIdx = idx;
             } else if (!s->IsTagList) {
@@ -1878,15 +1892,12 @@ static void Browser_Draw(Component *base) {
   if (s->InfoEnabled)
     listW = SCREEN_WIDTH - sidebarW - S(160);
 
-  // Draw Search Box, OSK Button & Sort Button
+  // Draw Search Box, OSK Button & Table Header
   if (s->BrowseLevel == 0) {
-    totalVisible = 9;
-    float sortButtonW = S(65);
+    float headerH = S(24.0f);
     float oskButtonW = S(36);
-    Rectangle searchBoxRect = {listX, listYOffset, listW - sortButtonW - oskButtonW - S(8), rowH};
-    Rectangle oskButtonRect = {listX + listW - sortButtonW - oskButtonW - S(4), listYOffset, oskButtonW, rowH};
-    Rectangle sortButtonRect = {listX + listW - sortButtonW, listYOffset, sortButtonW, rowH};
-    listYOffset += rowH;
+    Rectangle searchBoxRect = {listX, listYOffset, listW - oskButtonW - S(4), rowH};
+    Rectangle oskButtonRect = {listX + listW - oskButtonW, listYOffset, oskButtonW, rowH};
     
     // Draw Search Input
     DrawRectangleRec(searchBoxRect, s->IsSearching ? ColorDark1 : ColorDark2);
@@ -1911,12 +1922,40 @@ static void Browser_Draw(Component *base) {
     DrawRectangleLinesEx(oskButtonRect, 1.0f, s->ShowOSK ? ColorWhite : ColorDark1);
     UIDrawText("\uf11c", faceIcon, oskButtonRect.x + S(11), oskButtonRect.y + S(8), S(12), ColorWhite);
 
-    // Draw Sort Button
-    DrawRectangleRec(sortButtonRect, s->ShowSortDropdown ? ColorDark1 : ColorDark2);
-    DrawRectangleLinesEx(sortButtonRect, 1.0f, ColorDark1);
-    const char* sortLabels[] = {"Default", "BPM", "Key", "Title", "Rating"};
-    UIDrawText(sortLabels[s->SortMode], faceXS, sortButtonRect.x + S(6), sortButtonRect.y + S(9), S(9), ColorWhite);
-    UIDrawText("\uf0d7", faceIcon, sortButtonRect.x + sortButtonW - S(14), sortButtonRect.y + S(10), S(9), ColorShadow);
+    listYOffset += rowH;
+
+    // Draw Table Header Bar (Row 2) - Reference Image 2
+    Rectangle tableHeaderRect = {listX, listYOffset, listW, headerH};
+    DrawRectangleRec(tableHeaderRect, (Color){ 28, 28, 35, 255 });
+    DrawRectangleLinesEx(tableHeaderRect, 1.0f, ColorDark1);
+
+    // Column Dividers
+    DrawLine(listX + listW - S(110), listYOffset, listX + listW - S(110), listYOffset + headerH, ColorDark1);
+    DrawLine(listX + listW - S(55), listYOffset, listX + listW - S(55), listYOffset + headerH, ColorDark1);
+
+    // Column 1: # / TITLE
+    char titleHeaderLabel[32] = "# / TITLE";
+    if (s->SortMode == 3 || s->SortMode == 0) {
+      snprintf(titleHeaderLabel, sizeof(titleHeaderLabel), "# / TITLE %s", s->SortAscending ? "\uf0d8" : "\uf0d7");
+    }
+    UIDrawText(titleHeaderLabel, faceXS, listX + S(6), listYOffset + S(5), S(10), (s->SortMode == 3 || s->SortMode == 0) ? ColorWhite : ColorShadow);
+
+    // Column 2: BPM (Reference Image 2: BPM ▲ / ▼)
+    char bpmHeaderLabel[32] = "BPM";
+    if (s->SortMode == 1) {
+      snprintf(bpmHeaderLabel, sizeof(bpmHeaderLabel), "BPM %s", s->SortAscending ? "\uf0d8" : "\uf0d7");
+    }
+    DrawCentredText(bpmHeaderLabel, faceXS, listX + listW - S(110), S(55), listYOffset + S(5), S(10), (s->SortMode == 1) ? ColorWhite : ColorShadow);
+
+    // Column 3: KEY (Reference Image 2: Key ▲ / ▼)
+    char keyHeaderLabel[32] = "KEY";
+    if (s->SortMode == 2) {
+      snprintf(keyHeaderLabel, sizeof(keyHeaderLabel), "KEY %s", s->SortAscending ? "\uf0d8" : "\uf0d7");
+    }
+    DrawCentredText(keyHeaderLabel, faceXS, listX + listW - S(55), S(55), listYOffset + S(5), S(10), (s->SortMode == 2) ? ColorWhite : ColorShadow);
+
+    listYOffset += headerH;
+    totalVisible = 8;
   }
 
   int totalItems = 0;
@@ -2019,8 +2058,18 @@ static void Browser_Draw(Component *base) {
       DrawRectangle(listX, ry + 1, listW, rowH - 2, ColorDark2);
     }
 
+    // Render Track Index Number (019, 020, 021...) & Musical Note Icon (Reference Image 1)
+    if (s->BrowseLevel == 0) {
+      char numBuf[16];
+      sprintf(numBuf, "%03d", idx + 1);
+      UIDrawText(numBuf, faceXS, listX + S(4), ry + S(9), S(10), isCursor ? ColorWhite : ColorShadow);
+      UIDrawText("\uf001", faceIcon, listX + S(32), ry + S(9), S(9), isCursor ? ColorWhite : ColorShadow);
+    }
+
     float textX = listX + S(36);
-    if (s->BrowseLevel == 3)
+    if (s->BrowseLevel == 0)
+      textX = listX + S(46);
+    else if (s->BrowseLevel == 3)
       textX = listX + S(38);
     else if (s->BrowseLevel > 0)
       textX = listX + S(20);
@@ -2035,7 +2084,7 @@ static void Browser_Draw(Component *base) {
     }
     if (isCursor) s->MarqueeScrollX += GetFrameTime();
 
-    float maxTitleW = listW - (textX - listX) - S(130);
+    float maxTitleW = listW - (textX - listX) - S(115);
     Rectangle titleRect = { textX, textY, maxTitleW, rowH };
     UIDrawScrollingText(title, faceSm, titleRect, S(13), ColorWhite, isCursor ? s->MarqueeScrollX : 0.0f);
 
@@ -2044,23 +2093,27 @@ static void Browser_Draw(Component *base) {
                  isCursor ? ColorWhite : ColorShadow);
     }
 
-    // BPM & Key & LOAD Button
+    // BPM & Key Badge (Reference Image 1 & 2 - NO LOAD BUTTON)
     if (s->BrowseLevel == 0 && !s->InfoEnabled) {
-      UIDrawText(bpmText, faceXS, listX + listW - S(125), ry + S(9), S(10),
-                 isCursor ? ColorWhite : ColorShadow);
-      UIDrawText(keyStr, faceXS, listX + listW - S(85), ry + S(9), S(10),
-                 isCursor ? ColorWhite : ColorShadow);
+      DrawCentredText(bpmText, faceXS, listX + listW - S(110), S(55), ry + S(9), S(11), isCursor ? ColorWhite : ColorShadow);
 
-      // LOAD Button
-      float loadW = S(45);
-      Rectangle loadRect = {listX + listW - loadW - S(2), ry + S(4), loadW,
-                            rowH - S(8)};
-      bool hoverLoad = CheckCollisionPointRec(mPos, loadRect);
+      // Key Badge
+      Rectangle keyBadgeRect = { listX + listW - S(52), ry + S(4), S(48), rowH - S(8) };
+      
+      bool isKeyMatched = false;
+      if (keyStr && keyStr[0] != '\0') {
+        if (s->DeckA && s->DeckA->TrackKey[0] != '\0' && strcmp(keyStr, s->DeckA->TrackKey) == 0) isKeyMatched = true;
+        if (s->DeckB && s->DeckB->TrackKey[0] != '\0' && strcmp(keyStr, s->DeckB->TrackKey) == 0) isKeyMatched = true;
+      }
 
-      DrawRectangleRec(loadRect, hoverLoad ? ColorBlue : ColorDark3);
-      DrawRectangleLinesEx(loadRect, 1.0f, ColorShadow);
-      DrawCentredText("LOAD", faceXS, loadRect.x, loadRect.width,
-                      loadRect.y + S(5), S(10), ColorWhite);
+      if (isKeyMatched) {
+        DrawRectangleRec(keyBadgeRect, (Color){ 0, 230, 0, 255 }); // Vibrant Green (Reference Image 1)
+        DrawCentredText(keyStr, faceXS, keyBadgeRect.x, keyBadgeRect.width, keyBadgeRect.y + S(5), S(10), ColorBlack);
+      } else {
+        DrawRectangleRec(keyBadgeRect, (Color){ 35, 35, 42, 255 });
+        DrawRectangleLinesEx(keyBadgeRect, 1.0f, ColorDark1);
+        DrawCentredText(keyStr, faceXS, keyBadgeRect.x, keyBadgeRect.width, keyBadgeRect.y + S(5), S(10), isCursor ? ColorWhite : ColorShadow);
+      }
     }
 
     // Storage icons
