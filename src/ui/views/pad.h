@@ -18,6 +18,7 @@ typedef struct {
     DeckState *Decks[2];
     PadMode Mode[2];
     int ActiveLoopIdx[2]; // Index of active loop pad, -1 if none
+    bool ShiftActive[2];  // Touch/UI Shift toggle per deck
 } PadState;
 
 typedef struct {

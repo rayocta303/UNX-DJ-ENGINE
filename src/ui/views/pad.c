@@ -36,6 +36,13 @@ static int Pad_Update(Component *base) {
       float panelX = S(8) + d * (panelW + S(8));
       float panelY = TOP_BAR_H + S(8);
 
+      // SHIFT Button hit
+      Rectangle shiftBtn = { panelX + panelW - S(52), panelY + S(2), S(48), S(20) };
+      if (CheckCollisionPointRec(mouse, shiftBtn)) {
+        r->State->ShiftActive[d] = !r->State->ShiftActive[d];
+        return 1;
+      }
+
       // Mode selection hits
       float modeBtnW = (panelW - S(20)) / 6.0f;
       float modeX = panelX + S(10);
@@ -145,8 +152,15 @@ static void Pad_Draw(Component *base) {
 
     char headStr[32];
     sprintf(headStr, "DECK %d PADS", d + 1);
-    DrawCentredText(headStr, faceMd, panelX, panelW, panelY + S(6), S(11),
+    DrawCentredText(headStr, faceMd, panelX + S(10), panelW - S(70), panelY + S(6), S(11),
                     d == 0 ? ColorOrange : ColorBlue);
+
+    // SHIFT Toggle Button
+    bool isShiftActive = r->State->ShiftActive[d] || IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+    Rectangle shiftBtn = { panelX + panelW - S(52), panelY + S(2), S(48), S(20) };
+    DrawRectangleRec(shiftBtn, isShiftActive ? ColorOrange : ColorDark1);
+    DrawRectangleLinesEx(shiftBtn, 1.0f, isShiftActive ? ColorWhite : ColorShadow);
+    DrawCentredText("SHIFT", faceSm, shiftBtn.x, shiftBtn.width, shiftBtn.y + S(5), S(8), isShiftActive ? ColorBlack : ColorWhite);
 
     // Mode Bar
     float modeBarH = S(20);

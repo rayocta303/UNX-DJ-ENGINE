@@ -522,16 +522,83 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
     return;
 
   if (mode == PAD_MODE_HOT_CUE) {
+    bool isShift = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT) || a->padState.ShiftActive[deckIdx];
+    int foundIdx = -1;
     for (int i = 0; i < ds->LoadedTrack->HotCuesCount; i++) {
       if (ds->LoadedTrack->HotCues[i].ID == (unsigned int)(padIdx + 1)) {
-        HotCue hc = ds->LoadedTrack->HotCues[i];
+        foundIdx = i;
+        break;
+      }
+    }
+
+    if (isShift) {
+      // DELETE HOT CUE
+      if (foundIdx >= 0) {
+        for (int j = foundIdx; j < ds->LoadedTrack->HotCuesCount - 1; j++) {
+          ds->LoadedTrack->HotCues[j] = ds->LoadedTrack->HotCues[j + 1];
+        }
+        ds->LoadedTrack->HotCuesCount--;
+
+        // Also remove from Analysis.Cues for real-time waveform updates
+        for (uint32_t c = 0; c < ds->LoadedTrack->Analysis.CueCount; c++) {
+          if (ds->LoadedTrack->Analysis.Cues[c].ID == (uint16_t)(padIdx + 1)) {
+            for (uint32_t j = c; j < ds->LoadedTrack->Analysis.CueCount - 1; j++) {
+              ds->LoadedTrack->Analysis.Cues[j] = ds->LoadedTrack->Analysis.Cues[j + 1];
+            }
+            ds->LoadedTrack->Analysis.CueCount--;
+            break;
+          }
+        }
+        UNX_LOG_INFO("[HOT CUE] Deleted Hot Cue %c (ID %d) on Deck %d", 'A' + padIdx, padIdx + 1, deckIdx + 1);
+      }
+    } else {
+      if (foundIdx >= 0) {
+        // JUMP TO HOT CUE
+        HotCue hc = ds->LoadedTrack->HotCues[foundIdx];
         ds->SeekMs = hc.Start;
         ds->HasSeekRequest = true;
 
         // Start playback immediately without motor ramp
         DeckAudio_ExitLoop(audio);
         DeckAudio_InstantPlay(audio);
-        break;
+      } else {
+        // SET HOT CUE AT CURRENT POSITION
+        uint32_t currentMs = (uint32_t)ds->PositionMs;
+        if (ds->LoadedTrack->HotCuesCount < 8) {
+          static const unsigned char defaultColors[8][3] = {
+              {255, 255, 0}, {255, 128, 0}, {255, 0, 255}, {255, 0, 0},
+              {0, 255, 0},   {0, 204, 0},   {0, 120, 255}, {0, 120, 255}
+          };
+
+          HotCue newHc;
+          memset(&newHc, 0, sizeof(HotCue));
+          newHc.ID = padIdx + 1;
+          newHc.Start = currentMs;
+          newHc.Status = 1; // Enabled
+          newHc.Color[0] = defaultColors[padIdx % 8][0];
+          newHc.Color[1] = defaultColors[padIdx % 8][1];
+          newHc.Color[2] = defaultColors[padIdx % 8][2];
+
+          ds->LoadedTrack->HotCues[ds->LoadedTrack->HotCuesCount++] = newHc;
+
+          // Sync into Analysis.Cues for real-time waveform markers
+          RBCue newRc;
+          memset(&newRc, 0, sizeof(RBCue));
+          newRc.Time = currentMs;
+          newRc.ID = padIdx + 1;
+          newRc.Type = 1; // Memory / HotCue
+          newRc.Status = 1;
+          newRc.Color[0] = newHc.Color[0];
+          newRc.Color[1] = newHc.Color[1];
+          newRc.Color[2] = newHc.Color[2];
+
+          RBCue *nextCues = (RBCue *)realloc(ds->LoadedTrack->Analysis.Cues, sizeof(RBCue) * (ds->LoadedTrack->Analysis.CueCount + 1));
+          if (nextCues) {
+            ds->LoadedTrack->Analysis.Cues = nextCues;
+            ds->LoadedTrack->Analysis.Cues[ds->LoadedTrack->Analysis.CueCount++] = newRc;
+          }
+          UNX_LOG_INFO("[HOT CUE] Created Hot Cue %c (ID %d) at %u ms on Deck %d", 'A' + padIdx, padIdx + 1, currentMs, deckIdx + 1);
+        }
       }
     }
   } else if (mode == PAD_MODE_BEAT_LOOP || mode == PAD_MODE_SLIP_LOOP) {
