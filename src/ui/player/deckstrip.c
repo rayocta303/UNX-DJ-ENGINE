@@ -155,7 +155,7 @@ static int DeckStrip_Update(Component *base) {
     float wh = S(26);
     Rectangle wfmRect = {wx, wy, ww, wh};
 
-    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) && CheckCollisionPointRec(mouse, wfmRect)) {
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && CheckCollisionPointRec(mouse, wfmRect)) {
       if (!uiTouching[d->ID]) {
         uiTouching[d->ID] = true;
         wasPlayingBeforeSeek[d->ID] = d->State->IsPlaying;
