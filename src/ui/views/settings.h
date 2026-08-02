@@ -5,6 +5,7 @@
 
 #define MAX_SETTING_OPTIONS 32
 #define MAX_SETTINGS_ITEMS 512
+#define MIDI_MAPPING_START_IDX 23
 
 typedef enum {
   SETTING_TYPE_LIST,

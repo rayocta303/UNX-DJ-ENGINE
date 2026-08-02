@@ -25,9 +25,12 @@ static void trim_xml_tag(char *str) {
 bool MIDI_LoadMapping(MidiMapping *map, const char *path) {
     map->count = 0;
     map->scriptCount = 0;
+    map->outputCount = 0;
     memset(map->name, 0, sizeof(map->name));
     memset(map->author, 0, sizeof(map->author));
     memset(map->description, 0, sizeof(map->description));
+    memset(map->modifiers, 0, sizeof(map->modifiers));
+    memset(map->lookupTable, -1, sizeof(map->lookupTable));
 
     FILE *f = fopen(path, "r");
     if (!f) return false;
@@ -67,7 +70,7 @@ bool MIDI_LoadMapping(MidiMapping *map, const char *path) {
                 char *start = p + 10;
                 char *end = strchr(start, '\"');
                 if (end && map->scriptCount < 8) {
-                    int len = end - start;
+                    int len = (int)(end - start);
                     strncpy(map->scriptFiles[map->scriptCount], start, len);
                     map->scriptFiles[map->scriptCount][len] = '\0';
                     map->scriptCount++;
@@ -86,7 +89,24 @@ bool MIDI_LoadMapping(MidiMapping *map, const char *path) {
                     strncpy(cur.group, t->unxGroup, 63);
                     strncpy(cur.key, t->unxKey, 63);
                 }
-                map->entries[map->count++] = cur;
+
+                // Bind ControlObject pointer if exists
+                cur.cachedCO = CO_Find(cur.group, cur.key, NULL);
+
+                int idx = map->count;
+                map->entries[idx] = cur;
+                map->count++;
+
+                // Register into direct O(1) lookup table
+                map->lookupTable[cur.status][cur.midino] = idx;
+
+                // Also map NoteOff status (0x80) to NoteOn entry (0x90) for seamless release tracking
+                if ((cur.status & 0xF0) == 0x90) {
+                    uint8_t noteOffStatus = 0x80 | (cur.status & 0x0F);
+                    if (map->lookupTable[noteOffStatus][cur.midino] == -1) {
+                        map->lookupTable[noteOffStatus][cur.midino] = idx;
+                    }
+                }
             }
             inControl = false;
         }
@@ -100,7 +120,7 @@ bool MIDI_LoadMapping(MidiMapping *map, const char *path) {
                 strncpy(cur.key, temp, 63);
             } else if ((p = strstr(line, "<status>"))) {
                 unsigned int s;
-                sscanf(p, "%*[^0x]0x%x", &s); // Flexible hex parsing
+                sscanf(p, "%*[^0x]0x%x", &s);
                 cur.status = (uint8_t)s;
             } else if ((p = strstr(line, "<midino>"))) {
                 unsigned int m;
@@ -196,7 +216,6 @@ bool MIDI_LoadMapping(MidiMapping *map, const char *path) {
 }
 
 bool MIDI_ScanControllers(const char *dir, const char *deviceName, MidiMapping *out) {
-    printf("[MIDI] Scanning %s for device: %s\n", dir, deviceName);
 #if defined(_WIN32)
     char searchPath[MAX_PATH];
     snprintf(searchPath, MAX_PATH, "%s/*.xml", dir);
@@ -209,7 +228,6 @@ bool MIDI_ScanControllers(const char *dir, const char *deviceName, MidiMapping *
         snprintf(fullPath, MAX_PATH, "%s/%s", dir, findData.cFileName);
         MidiMapping temp;
         if (MIDI_LoadMapping(&temp, fullPath)) {
-            // Check if name matches (partial match allowed like Engine)
             if (strstr(deviceName, temp.name) || strstr(temp.name, deviceName)) {
                 *out = temp;
                 FindClose(hFind);
@@ -286,91 +304,83 @@ int MIDI_ListControllers(const char *dir, char outNames[32][64], char outPaths[3
     return count;
 }
 
-static uint8_t msbStore[16][128] = {0}; // status & 0xF, midino
+static uint8_t msbStore[16][128] = {0};
 static uint8_t lsbStore[16][128] = {0};
 
 void MIDI_HandleMapping(MidiMapping *map, uint8_t status, uint8_t midino, float normalizedValue) {
+    if (!map) return;
+    int idx = map->lookupTable[status][midino];
+    if (idx < 0 || idx >= map->count) return;
+
+    MappingEntry *e = &map->entries[idx];
     uint8_t ch = status & 0x0F;
-    uint8_t rawVal = (uint8_t)(normalizedValue * 127.0f);
+    float currentNormVal = normalizedValue;
+    uint8_t currentRawVal = (uint8_t)(normalizedValue * 127.0f);
 
-    for (int i = 0; i < map->count; i++) {
-        MappingEntry *e = &map->entries[i];
-        bool statusMatch = (e->status == status);
-        float currentNormVal = normalizedValue;
-        uint8_t currentRawVal = rawVal;
-        if (!statusMatch && (status & 0xF0) == 0x80 && (e->status & 0xF0) == 0x90) {
-            if ((e->status & 0x0F) == (status & 0x0F)) {
-                statusMatch = true;
-                currentNormVal = 0.0f;
-                currentRawVal = 0;
-            }
+    // NoteOff (0x80) mapped to NoteOn (0x90) entry -> zero velocity release
+    if ((status & 0xF0) == 0x80 && (e->status & 0xF0) == 0x90) {
+        currentNormVal = 0.0f;
+        currentRawVal = 0;
+    }
+
+    // Check if this is a shift/modifier button
+    if (strstr(e->key, "shift") || strstr(e->key, "Shift")) {
+        map->modifiers[0] = (currentRawVal > 0);
+    }
+
+    // Invert option
+    if (e->options & MIDI_OPT_INVERT) {
+        currentNormVal = 1.0f - currentNormVal;
+        currentRawVal = 127 - currentRawVal;
+    }
+
+    if (e->options & MIDI_OPT_14BIT_MSB) {
+        msbStore[ch][midino] = currentRawVal;
+        int lsbIndex = midino + 0x20;
+        if (lsbIndex < 128) {
+            uint16_t combined = (currentRawVal << 7) | lsbStore[ch][lsbIndex];
+            CO_SetValue(e->group, e->key, (float)combined / 16383.0f);
         }
-        if (statusMatch && e->midino == midino) {
-            printf("[MIDI MAP] Matched 0x%02X:0x%02X -> Group: '%s' Key: '%s'\n", status, midino, e->group, e->key);
-            
-            // Check if this is a shift/modifier button itself
-            if (strstr(e->key, "shift") || strstr(e->key, "Shift")) {
-                map->modifiers[0] = (currentRawVal > 0);
-            }
-
-            // Invert value if <invert/> option specified
-            if (e->options & MIDI_OPT_INVERT) {
-                currentNormVal = 1.0f - currentNormVal;
-                currentRawVal = 127 - currentRawVal;
-            }
-
-            if (e->options & MIDI_OPT_14BIT_MSB) {
-                msbStore[ch][midino] = currentRawVal;
-                int lsbIndex = midino + 0x20;
-                if (lsbIndex < 128) {
-                    uint16_t combined = (currentRawVal << 7) | lsbStore[ch][lsbIndex];
-                    CO_SetValue(e->group, e->key, (float)combined / 16383.0f);
-                }
-            } else if (e->options & MIDI_OPT_14BIT_LSB) {
-                lsbStore[ch][midino] = currentRawVal;
-                int msbIndex = midino - 0x20;
-                if (msbIndex >= 0 && msbIndex < 128) {
-                    uint16_t combined = (msbStore[ch][msbIndex] << 7) | currentRawVal;
-                    CO_SetValue(e->group, e->key, (float)combined / 16383.0f);
-                }
-            } else if (e->options & MIDI_OPT_SCRIPT) {
-                MIDI_ExecuteScript(map, e->scriptFunction, status, midino, currentRawVal);
-            } else if (e->options & MIDI_OPT_SWITCH) {
-                if (currentRawVal > 0) { // Toggle on button press
-                    CO_ToggleValue(e->group, e->key);
-                }
-            } else if (e->options & MIDI_OPT_BUTTON) {
-                CO_SetValue(e->group, e->key, currentRawVal > 0 ? 1.0f : 0.0f);
-            } else if (e->options & (MIDI_OPT_ROT64 | MIDI_OPT_ROT64INV)) {
-                // Exact Mixxx Rot64 / Rot64Inv logic
-                float diff = (float)currentRawVal - 64.0f;
-                if (diff == -1.0f || diff == 1.0f) {
-                    diff /= 16.0f;
-                } else if (diff != 0.0f) {
-                    diff += (diff > 0.0f ? -1.0f : 1.0f);
-                }
-                if (e->options & MIDI_OPT_ROT64INV) diff = -diff;
-                CO_AddValue(e->group, e->key, diff);
-            } else if (e->options & MIDI_OPT_ROT64FAST) {
-                float diff = ((float)currentRawVal - 64.0f) * 1.5f;
-                CO_AddValue(e->group, e->key, diff);
-            } else if (e->options & (MIDI_OPT_DIFF | MIDI_OPT_RELATIVE)) {
-                // Exact Mixxx 7-bit signed two's complement relative logic
-                float diff = (currentRawVal >= 64) ? (float)(currentRawVal - 128) : (float)currentRawVal;
-                if (map->modifiers[0]) diff *= 5.0f;
-                CO_AddValue(e->group, e->key, diff);
-            } else if (e->options & (MIDI_OPT_HERCJOG | MIDI_OPT_HERCJOGFAST)) {
-                float diff = (currentRawVal > 64) ? (float)(currentRawVal - 128) : (float)currentRawVal;
-                if (e->options & MIDI_OPT_HERCJOGFAST) diff *= 3.0f;
-                CO_AddValue(e->group, e->key, diff);
-            } else if (e->options & MIDI_OPT_SPREAD64) {
-                float diff = (float)currentRawVal - 64.0f;
-                CO_AddValue(e->group, e->key, diff);
-            } else {
-                // Standard mapping: pass value
-                CO_SetValue(e->group, e->key, currentNormVal);
-            }
+    } else if (e->options & MIDI_OPT_14BIT_LSB) {
+        lsbStore[ch][midino] = currentRawVal;
+        int msbIndex = midino - 0x20;
+        if (msbIndex >= 0 && msbIndex < 128) {
+            uint16_t combined = (msbStore[ch][msbIndex] << 7) | currentRawVal;
+            CO_SetValue(e->group, e->key, (float)combined / 16383.0f);
         }
+    } else if (e->options & MIDI_OPT_SCRIPT) {
+        MIDI_ExecuteScript(map, e->scriptFunction, status, midino, currentRawVal);
+    } else if (e->options & MIDI_OPT_SWITCH) {
+        if (currentRawVal > 0) {
+            CO_ToggleValue(e->group, e->key);
+        }
+    } else if (e->options & MIDI_OPT_BUTTON) {
+        CO_SetValue(e->group, e->key, currentRawVal > 0 ? 1.0f : 0.0f);
+    } else if (e->options & (MIDI_OPT_ROT64 | MIDI_OPT_ROT64INV)) {
+        float diff = (float)currentRawVal - 64.0f;
+        if (diff == -1.0f || diff == 1.0f) {
+            diff /= 16.0f;
+        } else if (diff != 0.0f) {
+            diff += (diff > 0.0f ? -1.0f : 1.0f);
+        }
+        if (e->options & MIDI_OPT_ROT64INV) diff = -diff;
+        CO_AddValue(e->group, e->key, diff);
+    } else if (e->options & MIDI_OPT_ROT64FAST) {
+        float diff = ((float)currentRawVal - 64.0f) * 1.5f;
+        CO_AddValue(e->group, e->key, diff);
+    } else if (e->options & (MIDI_OPT_DIFF | MIDI_OPT_RELATIVE)) {
+        float diff = (currentRawVal >= 64) ? (float)(currentRawVal - 128) : (float)currentRawVal;
+        if (map->modifiers[0]) diff *= 5.0f;
+        CO_AddValue(e->group, e->key, diff);
+    } else if (e->options & (MIDI_OPT_HERCJOG | MIDI_OPT_HERCJOGFAST)) {
+        float diff = (currentRawVal > 64) ? (float)(currentRawVal - 128) : (float)currentRawVal;
+        if (e->options & MIDI_OPT_HERCJOGFAST) diff *= 3.0f;
+        CO_AddValue(e->group, e->key, diff);
+    } else if (e->options & MIDI_OPT_SPREAD64) {
+        float diff = (float)currentRawVal - 64.0f;
+        CO_AddValue(e->group, e->key, diff);
+    } else {
+        CO_SetValue(e->group, e->key, currentNormVal);
     }
 }
 
@@ -416,6 +426,7 @@ bool MIDI_SaveMapping(MidiMapping *map, const char *path) {
 
 void MIDI_CreateTemplate(MidiMapping *out) {
     memset(out, 0, sizeof(MidiMapping));
+    memset(out->lookupTable, -1, sizeof(out->lookupTable));
     strncpy(out->name, "New Custom Mapping", 127);
     strncpy(out->author, "User", 127);
     strncpy(out->description, "Created using UNX MIDI Learn", 255);
@@ -429,6 +440,6 @@ void MIDI_CreateTemplate(MidiMapping *out) {
         e->status = 0x00;
         e->midino = 0x00;
         e->options = 0;
+        e->cachedCO = co;
     }
 }
-

@@ -7,7 +7,8 @@
 typedef enum {
     CO_TYPE_FLOAT,
     CO_TYPE_BOOL,
-    CO_TYPE_INT
+    CO_TYPE_INT,
+    CO_TYPE_DOUBLE
 } COType;
 
 typedef struct {

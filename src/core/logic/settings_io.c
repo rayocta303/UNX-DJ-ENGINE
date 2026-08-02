@@ -47,6 +47,7 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         if (sscanf(strstr(p, "\"start\""), "\"start\": %f", &val) == 1) wfmA->VinylStartMs = val;
         if (sscanf(strstr(p, "\"stop\""), "\"stop\": %f", &val) == 1) wfmA->VinylStopMs = val;
         if (sscanf(strstr(p, "\"lock\""), "\"lock\": %d", &ival) == 1) wfmA->LoadLock = (bool)ival;
+        if (sscanf(strstr(p, "\"rpm\""), "\"rpm\": %f", &val) == 1) wfmA->JogCalibRPM = val;
     }
 
     // Deck B
@@ -58,6 +59,7 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         if (sscanf(strstr(p, "\"start\""), "\"start\": %f", &val) == 1) wfmB->VinylStartMs = val;
         if (sscanf(strstr(p, "\"stop\""), "\"stop\": %f", &val) == 1) wfmB->VinylStopMs = val;
         if (sscanf(strstr(p, "\"lock\""), "\"lock\": %d", &ival) == 1) wfmB->LoadLock = (bool)ival;
+        if (sscanf(strstr(p, "\"rpm\""), "\"rpm\": %f", &val) == 1) wfmB->JogCalibRPM = val;
     }
 
     // Audio
@@ -70,6 +72,7 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         if (sscanf(strstr(p, "\"sr\""), "\"sr\": %d", &ival) == 1) audio->SampleRate = ival;
         if (sscanf(strstr(p, "\"buf\""), "\"buf\": %d", &ival) == 1) audio->BufferSizeFrames = ival;
         if (sscanf(strstr(p, "\"bitdepth\""), "\"bitdepth\": %d", &ival) == 1) audio->PCMBitDepth = ival;
+        if (sscanf(strstr(p, "\"xfader\""), "\"xfader\": %d", &ival) == 1) audio->CrossfaderCurve = ival;
     }
     // Beat FX
     if ((p = strstr(json, "\"beatfx\""))) {
@@ -88,12 +91,14 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     wfmA->Style = WAVEFORM_STYLE_RGB;
     wfmA->GainLow = 0.4f; wfmA->GainMid = 0.4f; wfmA->GainHigh = 0.4f;
     wfmA->VinylStartMs = 500.0f; wfmA->VinylStopMs = 1200.0f; wfmA->LoadLock = true;
+    wfmA->JogCalibRPM = 33.3f;
     *wfmB = *wfmA;
     
     audio->DeviceIndex = -1;
     audio->MasterOutL = 0; audio->MasterOutR = 1;
     audio->CueOutL = 2; audio->CueOutR = 3;
     audio->SampleRate = 48000; audio->BufferSizeFrames = 256; audio->PCMBitDepth = 16;
+    audio->CrossfaderCurve = 0; // Smooth (Default)
     
     fx->SelectedFX = 0;
     fx->SelectedPad = 4; // 1 Beat
@@ -205,12 +210,12 @@ void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendCon
     if (!f) return;
 
     fprintf(f, "{\n");
-    fprintf(f, "  \"wfmA\": { \"style\": %d, \"low\": %.2f, \"mid\": %.2f, \"high\": %.2f, \"start\": %.1f, \"stop\": %.1f, \"lock\": %d },\n", 
-            wfmA.Style, wfmA.GainLow, wfmA.GainMid, wfmA.GainHigh, wfmA.VinylStartMs, wfmA.VinylStopMs, wfmA.LoadLock ? 1 : 0);
-    fprintf(f, "  \"wfmB\": { \"style\": %d, \"low\": %.2f, \"mid\": %.2f, \"high\": %.2f, \"start\": %.1f, \"stop\": %.1f, \"lock\": %d },\n", 
-            wfmB.Style, wfmB.GainLow, wfmB.GainMid, wfmB.GainHigh, wfmB.VinylStartMs, wfmB.VinylStopMs, wfmB.LoadLock ? 1 : 0);
-    fprintf(f, "  \"audio\": { \"devIdx\": %d, \"mastL\": %d, \"mastR\": %d, \"cueL\": %d, \"cueR\": %d, \"sr\": %d, \"buf\": %d, \"bitdepth\": %d },\n",
-            audio.DeviceIndex, audio.MasterOutL, audio.MasterOutR, audio.CueOutL, audio.CueOutR, audio.SampleRate, audio.BufferSizeFrames, audio.PCMBitDepth);
+    fprintf(f, "  \"wfmA\": { \"style\": %d, \"low\": %.2f, \"mid\": %.2f, \"high\": %.2f, \"start\": %.1f, \"stop\": %.1f, \"lock\": %d, \"rpm\": %.1f },\n", 
+            wfmA.Style, wfmA.GainLow, wfmA.GainMid, wfmA.GainHigh, wfmA.VinylStartMs, wfmA.VinylStopMs, wfmA.LoadLock ? 1 : 0, wfmA.JogCalibRPM);
+    fprintf(f, "  \"wfmB\": { \"style\": %d, \"low\": %.2f, \"mid\": %.2f, \"high\": %.2f, \"start\": %.1f, \"stop\": %.1f, \"lock\": %d, \"rpm\": %.1f },\n", 
+            wfmB.Style, wfmB.GainLow, wfmB.GainMid, wfmB.GainHigh, wfmB.VinylStartMs, wfmB.VinylStopMs, wfmB.LoadLock ? 1 : 0, wfmB.JogCalibRPM);
+    fprintf(f, "  \"audio\": { \"devIdx\": %d, \"mastL\": %d, \"mastR\": %d, \"cueL\": %d, \"cueR\": %d, \"sr\": %d, \"buf\": %d, \"bitdepth\": %d, \"xfader\": %d },\n",
+            audio.DeviceIndex, audio.MasterOutL, audio.MasterOutR, audio.CueOutL, audio.CueOutR, audio.SampleRate, audio.BufferSizeFrames, audio.PCMBitDepth, audio.CrossfaderCurve);
     fprintf(f, "  \"beatfx\": { \"fx\": %d, \"pad\": %d, \"ch\": %d, \"depth\": %.2f, \"q\": %d, \"tab\": %d },\n",
             fx.SelectedFX, fx.SelectedPad, fx.SelectedChannel, fx.LevelDepth, fx.Quantize ? 1 : 0, fx.ShowBeatFXTab ? 1 : 0);
     fprintf(f, "  \"controllers\": { \"path\": \"%s\" }\n", controllerPath ? controllerPath : "");

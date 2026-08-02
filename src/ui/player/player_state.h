@@ -31,6 +31,7 @@ typedef struct {
   float VinylStartMs;
   float VinylStopMs;
   bool LoadLock;
+  float JogCalibRPM;
 } WaveformSettings;
 
 typedef struct TrackState {

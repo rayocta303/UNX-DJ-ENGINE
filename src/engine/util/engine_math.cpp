@@ -69,18 +69,38 @@ float EngineLR4_Process(EngineLR4* filter, float in) {
     return out;
 }
 
-float Engine_GetCrossfaderGain(float crossfader, int deckIdx) {
-    // Constant power curve: gain = cos(x * PI/2)
+float Engine_GetCrossfaderGain(float crossfader, int deckIdx, int curveMode) {
     // crossfader is -1.0 (Left/DeckA) to 1.0 (Right/DeckB)
-    if (deckIdx == 0) { // Deck A
-        float x = (crossfader + 1.0f) * 0.5f; // -1->0, 1->1
-        if (x < 0.0f) x = 0.0f;
-        if (x > 1.0f) x = 1.0f;
-        return cosf(x * (float)M_PI * 0.5f);
-    } else { // Deck B
-        float x = (1.0f - crossfader) * 0.5f; // 1->0, -1->1
-        if (x < 0.0f) x = 0.0f;
-        if (x > 1.0f) x = 1.0f;
-        return cosf(x * (float)M_PI * 0.5f);
+    if (curveMode == 2) { 
+        // CUTTING / SCRATCH MODE
+        // Instant full volume on active deck until fader is pushed to the extreme edge (>0.92 / <-0.92)
+        float cutThreshold = 0.92f;
+        if (deckIdx == 0) { // Deck A: 100% until pushed right past threshold
+            return (crossfader > cutThreshold) ? 0.0f : 1.0f;
+        } else { // Deck B: 100% until pushed left past threshold
+            return (crossfader < -cutThreshold) ? 0.0f : 1.0f;
+        }
+    } else if (curveMode == 1) {
+        // LINEAR MODE
+        if (deckIdx == 0) { // Deck A
+            float g = (1.0f - crossfader) * 0.5f;
+            return (g < 0.0f) ? 0.0f : ((g > 1.0f) ? 1.0f : g);
+        } else { // Deck B
+            float g = (crossfader + 1.0f) * 0.5f;
+            return (g < 0.0f) ? 0.0f : ((g > 1.0f) ? 1.0f : g);
+        }
+    } else { 
+        // SMOOTH / CONSTANT POWER MODE (Default 0)
+        if (deckIdx == 0) { // Deck A
+            float x = (crossfader + 1.0f) * 0.5f; // -1->0, 1->1
+            if (x < 0.0f) x = 0.0f;
+            if (x > 1.0f) x = 1.0f;
+            return cosf(x * (float)M_PI * 0.5f);
+        } else { // Deck B
+            float x = (1.0f - crossfader) * 0.5f; // 1->0, -1->1
+            if (x < 0.0f) x = 0.0f;
+            if (x > 1.0f) x = 1.0f;
+            return cosf(x * (float)M_PI * 0.5f);
+        }
     }
 }

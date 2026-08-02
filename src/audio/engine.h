@@ -123,6 +123,7 @@ typedef struct AudioEngine {
   BeatFXManager BeatFX;
   float Crossfader;          // -1.0 (Deck A) to 1.0 (Deck B)
   float LastCrossfader;      // ramping gain
+  int CrossfaderCurve;       // 0=Smooth, 1=Linear, 2=Cutting
   float MasterVolume;        // 0.0 to 1.0
   uint32_t OutputSampleRate; // Actual hardware sample rate
   FXRoutingMode RoutingMode;
@@ -136,7 +137,7 @@ void AudioEngine_SetPCMBitDepth(AudioEngine *engine, int bitDepth);
 void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames);
 void AudioEngine_SetFXRouting(AudioEngine *engine, FXRoutingMode mode);
 
-void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath);
+bool DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath);
 void DeckAudio_LoadTrackAsync(DeckAudioState *deck, const char *filePath);
 void DeckAudio_Play(DeckAudioState *deck);
 void DeckAudio_Stop(DeckAudioState *deck);

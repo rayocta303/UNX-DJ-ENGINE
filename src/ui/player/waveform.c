@@ -128,12 +128,16 @@ static int Waveform_Update(Component *base) {
   }
 
 
+  static bool isMouseTouchingWaveform[2] = {false, false};
+  int dId = (r->State->ID >= 0 && r->State->ID < 2) ? r->State->ID : 0;
+
   if (inWaveform && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
     r->State->IsTouching = true;
+    isMouseTouchingWaveform[dId] = true;
     r->lastMouseX = mouse.x;
   }
 
-  if (r->State->IsTouching) {
+  if (isMouseTouchingWaveform[dId]) {
     if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
       float dx = mouse.x - r->lastMouseX;
       r->lastMouseX = mouse.x;
@@ -148,10 +152,10 @@ static int Waveform_Update(Component *base) {
         r->State->JogDelta += (double)moveHF;
       } else {
         // CDJ Nudge logic (Pitch bend)
-        // Scaling 1.0 is too sensitive for nudge, let's use a factor
         r->State->JogDelta += (double)(moveHF * 0.5);
       }
     } else {
+      isMouseTouchingWaveform[dId] = false;
       r->State->IsTouching = false;
     }
   }

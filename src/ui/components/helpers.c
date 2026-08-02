@@ -228,6 +228,10 @@ void Toast_Show(const char *message, float durationSec, Color badgeColor) {
     g_toastColor = badgeColor;
 }
 
+void Toast_ShowError(const char *message) {
+    Toast_Show(message, 3.5f, (Color){230, 45, 45, 255});
+}
+
 void Toast_UpdateAndDraw(float dt) {
     if (g_toastTimer <= 0.0f) return;
     g_toastTimer -= dt;

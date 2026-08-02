@@ -41,16 +41,16 @@ void CO_SetValue(const char *group, const char *key, float normalizedValue) {
             
             if (co->type == CO_TYPE_FLOAT) {
                 *((float*)co->ptr) = realVal;
+            } else if (co->type == CO_TYPE_DOUBLE) {
+                *((double*)co->ptr) = (double)realVal;
             } else if (co->type == CO_TYPE_BOOL) {
                 *((bool*)co->ptr) = (normalizedValue > 0.5f);
             } else if (co->type == CO_TYPE_INT) {
                 *((int*)co->ptr) = (int)realVal;
             }
-            printf("[CO SET] Group: '%s' Key: '%s' -> Value: %.3f\n", group, key, realVal);
             return;
         }
     }
-    printf("[CO MISS] Unregistered CO Group: '%s' Key: '%s'\n", group, key);
 }
 
 void CO_AddValue(const char *group, const char *key, float delta) {
@@ -59,6 +59,8 @@ void CO_AddValue(const char *group, const char *key, float delta) {
             ControlObject *co = &registry[i];
             if (co->type == CO_TYPE_FLOAT) {
                 *((float*)co->ptr) += delta;
+            } else if (co->type == CO_TYPE_DOUBLE) {
+                *((double*)co->ptr) += (double)delta;
             } else if (co->type == CO_TYPE_INT) {
                 *((int*)co->ptr) += (int)delta;
             }
@@ -73,6 +75,8 @@ float CO_GetValue(const char *group, const char *key) {
             ControlObject *co = &registry[i];
             if (co->type == CO_TYPE_FLOAT) {
                 return *((float*)co->ptr);
+            } else if (co->type == CO_TYPE_DOUBLE) {
+                return (float)(*((double*)co->ptr));
             } else if (co->type == CO_TYPE_BOOL) {
                 return *((bool*)co->ptr) ? 1.0f : 0.0f;
             } else if (co->type == CO_TYPE_INT) {
@@ -109,6 +113,9 @@ void CO_ToggleValue(const char *group, const char *key) {
             } else if (co->type == CO_TYPE_FLOAT) {
                 float *p = (float*)co->ptr;
                 *p = (*p > 0.5f) ? 0.0f : 1.0f;
+            } else if (co->type == CO_TYPE_DOUBLE) {
+                double *p = (double*)co->ptr;
+                *p = (*p > 0.5) ? 0.0 : 1.0;
             } else if (co->type == CO_TYPE_INT) {
                 int *p = (int*)co->ptr;
                 *p = (*p > 0) ? 0 : 1;

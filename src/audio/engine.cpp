@@ -17,6 +17,8 @@
 #include <chrono>
 #include <thread>
 
+extern "C" void Toast_ShowError(const char *message);
+
 #define DRWAV_API static
 #define DRWAV_PRIVATE static
 #define DR_WAV_IMPLEMENTATION
@@ -91,6 +93,7 @@ void AudioEngine_Init(AudioEngine *engine, uint32_t outputSampleRate) {
   BeatFXManager_Init(&engine->BeatFX);
   engine->Crossfader = 0.0f;
   engine->LastCrossfader = 0.0f;
+  engine->CrossfaderCurve = 0;
 
   UNX_LOG_INFO("=== AUDIO ENGINE SPECIFICS ===");
   UNX_LOG_INFO("Sample Rate : %u Hz", engine->OutputSampleRate);
@@ -137,7 +140,7 @@ void AudioEngine_Destroy(AudioEngine *engine) {
   }
 }
 
-void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
+bool DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
   uint32_t myID = deck->LastLoadID;
   
   if (!filePath || strlen(filePath) == 0) {
@@ -147,7 +150,7 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
       deck->TotalSamples = 0;
       free(oldBuf);
     }
-    return;
+    return false;
   }
 
   // Decode into local variables first to prevent race conditions during long decoding
@@ -265,10 +268,33 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
     }
   }
 
+  // Check decoding success
+  if (!localPCM || localSamples == 0) {
+    UNX_LOG_WARN("[ENGINE] Failed to decode track format or file unreadable: %s", filePath);
+    Toast_ShowError("UNSUPPORTED TRACK FORMAT");
+    return false;
+  }
+
+  // Check sample rate against engine output sample rate
+  uint32_t targetSR = (deck->OutputSampleRate > 0) ? deck->OutputSampleRate : 44100;
+  if (localRate != targetSR) {
+    UNX_LOG_WARN("[ENGINE] Unsupported sample rate: %u Hz (Target: %u Hz) - %s",
+                 localRate, targetSR, filePath);
+    char toastMsg[128];
+    snprintf(toastMsg, sizeof(toastMsg), "UNSUPPORTED TRACK (SAMPLE RATE %u Hz)", localRate);
+    Toast_ShowError(toastMsg);
+
+    if (localPCM) {
+      free(localPCM);
+      localPCM = NULL;
+    }
+    return false;
+  }
+
   // Check if a newer load request has arrived during decoding
   if (myID != deck->LastLoadID) {
     if (localPCM) free(localPCM);
-    return;
+    return false;
   }
 
   // Final apply to deck (Safe update)
@@ -298,6 +324,7 @@ void DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
   }
   strncpy(deck->FilePath, filePath, 511);
   deck->FilePath[511] = '\0';
+  return true;
 }
 
 static void ProcessDeckPhysics(DeckAudioState *deck) {
@@ -482,8 +509,8 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     // Equal-power effective fader and crossfader weights
     float fader0 = d0->Fader * d0->Fader;
     float fader1 = d1->Fader * d1->Fader;
-    float xGain0 = Engine_GetCrossfaderGain(engine->Crossfader, 0);
-    float xGain1 = Engine_GetCrossfaderGain(engine->Crossfader, 1);
+    float xGain0 = Engine_GetCrossfaderGain(engine->Crossfader, 0, engine->CrossfaderCurve);
+    float xGain1 = Engine_GetCrossfaderGain(engine->Crossfader, 1, engine->CrossfaderCurve);
     
     float w0 = fader0 * xGain0 * d0->EqLow * (d0->IsMotorOn ? 1.0f : 0.0f);
     float w1 = fader1 * xGain1 * d1->EqLow * (d1->IsMotorOn ? 1.0f : 0.0f);
@@ -614,8 +641,8 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
   float effectiveLastFader = deck->LastFader * deck->LastFader;
 
   float startCrossGain =
-      Engine_GetCrossfaderGain(engine->LastCrossfader, deckIndex);
-  float endCrossGain = Engine_GetCrossfaderGain(engine->Crossfader, deckIndex);
+      Engine_GetCrossfaderGain(engine->LastCrossfader, deckIndex, engine->CrossfaderCurve);
+  float endCrossGain = Engine_GetCrossfaderGain(engine->Crossfader, deckIndex, engine->CrossfaderCurve);
   float startTotalGain = effectiveLastFader * startCrossGain;
   float endTotalGain = effectiveFader * endCrossGain;
 

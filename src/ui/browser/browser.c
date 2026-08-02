@@ -1369,7 +1369,10 @@ static int Browser_Update(Component *base) {
               relPath++;
             snprintf(fullPath, sizeof(fullPath), "%s/%s",
                      s->SelectedStorage->Path, relPath);
-            DeckAudio_LoadTrackAsync(&s->AudioPlugin->Decks[loadToDeck], fullPath);
+            if (!DeckAudio_LoadTrack(&s->AudioPlugin->Decks[loadToDeck], fullPath)) {
+              s->ShowLoadPopup = false;
+              return 0;
+            }
           }
 
           struct DeckState *targetDeck = loadToDeck == 0 ? s->DeckA : s->DeckB;
@@ -1538,7 +1541,10 @@ static int Browser_Update(Component *base) {
               relPath++;
             snprintf(fullPath, sizeof(fullPath), "%s/%s",
                      s->SelectedStorage->Path, relPath);
-            DeckAudio_LoadTrack(&s->AudioPlugin->Decks[loadToDeck], fullPath);
+            if (!DeckAudio_LoadTrack(&s->AudioPlugin->Decks[loadToDeck], fullPath)) {
+              s->ShowLoadPopup = false;
+              return 0;
+            }
           }
 
           struct DeckState *targetDeck = loadToDeck == 0 ? s->DeckA : s->DeckB;

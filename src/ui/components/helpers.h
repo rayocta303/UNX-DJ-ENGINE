@@ -14,4 +14,5 @@ void UIDrawText(const char* str, Font font, float x, float y, float size, Color 
 void UIDrawKnob(float x, float y, float radius, float value, float min, float max, const char* unit, Color color, bool centerZero);
 void UIDrawScrollingText(const char* str, Font font, Rectangle rect, float fontSize, Color clr, float elapsedTime);
 void Toast_Show(const char *message, float durationSec, Color badgeColor);
+void Toast_ShowError(const char *message);
 void Toast_UpdateAndDraw(float dt);

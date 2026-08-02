@@ -74,8 +74,8 @@ static int Settings_Update(Component *base) {
       if (MIDI_GetLastMessage(&status, &midino)) {
           int idx = r->State->LearningItemIdx;
           MidiMapping *map = MIDI_GetGlobalMapping();
-          // Mappings start at index 22 in PopulateMidiSettings
-          int mapIdx = idx - 22;
+          // Mappings start at index MIDI_MAPPING_START_IDX in PopulateMidiSettings
+          int mapIdx = idx - MIDI_MAPPING_START_IDX;
           if (mapIdx >= 0 && mapIdx < map->count) {
               map->entries[mapIdx].status = status;
               map->entries[mapIdx].midino = midino;
@@ -93,7 +93,7 @@ static int Settings_Update(Component *base) {
   if (r->State->IsEditMappingOpen) {
       SettingItem *item = &r->State->Items[r->State->EditMappingItemIdx];
       MidiMapping *map = MIDI_GetGlobalMapping();
-      int mapIdx = r->State->EditMappingItemIdx - 22;
+      int mapIdx = r->State->EditMappingItemIdx - MIDI_MAPPING_START_IDX;
 
       float winH = SCREEN_HEIGHT - DECK_STR_H;
       float winW = SCREEN_WIDTH;
@@ -269,7 +269,7 @@ static int Settings_Update(Component *base) {
   for (int i = 0; i < r->State->ItemsCount; i++) {
     if (r->State->Items[i].Category == (SettingCategory)r->State->SelectedTab) {
       if (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) {
-          if (i == 18 || i == 19) {
+          if (strcmp(r->State->Items[i].Label, "CONNECTED DEVICE") == 0 || strcmp(r->State->Items[i].Label, "MAPPING PRESET") == 0) {
               filteredIndices[filteredCount++] = i;
           }
       } else {
@@ -303,22 +303,61 @@ static int Settings_Update(Component *base) {
     }
   }
 
-  // Mouse Wheel Scroll
+  // Calculate hovered item row
+  Vector2 mousePos = UIGetMousePosition();
+  float tabH = S(28.0f);
+  float rowH = (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) ? S(38.0f) : S(32.0f);
+  float listY = TOP_BAR_H + tabH;
+  float viewH = SCREEN_HEIGHT - DECK_STR_H;
+  float bottomH = S(46.0f);
+  float divY = viewH - bottomH;
+  int visibleRows = (int)((divY - listY) / rowH);
+
+  int hoveredItemIdx = -1;
+  if (mousePos.y >= listY && mousePos.y < divY) {
+      int rowIdx = (int)((mousePos.y - listY) / rowH);
+      if (rowIdx >= 0 && rowIdx < visibleRows) {
+          int idx_f = r->State->Scroll + rowIdx;
+          if (idx_f < filteredCount) {
+              hoveredItemIdx = filteredIndices[idx_f];
+          }
+      }
+  }
+
+  // Mouse Wheel & Click & Drag Knob Controls
   float wheel = GetMouseWheelMove();
   if (wheel != 0) {
-      if (wheel > 0) {
-          if (r->State->Scroll > 0) r->State->Scroll--;
+      if (hoveredItemIdx >= 0 && r->State->Items[hoveredItemIdx].Type == SETTING_TYPE_KNOB) {
+          SettingItem *kItem = &r->State->Items[hoveredItemIdx];
+          float step = (kItem->Step > 0) ? kItem->Step : (kItem->Max - kItem->Min) / 50.0f;
+          if (step < 1.0f && (kItem->Max - kItem->Min) > 50.0f) step = 10.0f;
+          kItem->Value += (wheel > 0 ? step : -step);
+          if (kItem->Value < kItem->Min) kItem->Value = kItem->Min;
+          if (kItem->Value > kItem->Max) kItem->Value = kItem->Max;
+          if (r->OnApply) r->OnApply(r->callbackCtx);
       } else {
-          float viewH = SCREEN_HEIGHT - DECK_STR_H;
-          float tabH = S(28.0f);
-          float rowH = (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) ? S(38.0f) : S(32.0f);
-          float bottomH = S(46.0f);
-          float listY = TOP_BAR_H + tabH;
-          if (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) listY += S(20);
-          int visibleRows = (int)((viewH - listY - bottomH) / rowH);
-          
-          if (r->State->Scroll + visibleRows < filteredCount) {
-              r->State->Scroll++;
+          if (wheel > 0) {
+              if (r->State->Scroll > 0) r->State->Scroll--;
+          } else {
+              if (r->State->Scroll + visibleRows < filteredCount) {
+                  r->State->Scroll++;
+              }
+          }
+      }
+  }
+
+  if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+      Vector2 mouseDelta = GetMouseDelta();
+      if (hoveredItemIdx >= 0 && r->State->Items[hoveredItemIdx].Type == SETTING_TYPE_KNOB) {
+          if (fabsf(mouseDelta.x) > 0.001f || fabsf(mouseDelta.y) > 0.001f) {
+              SettingItem *kItem = &r->State->Items[hoveredItemIdx];
+              float deltaVal = (mouseDelta.x - mouseDelta.y);
+              float range = (kItem->Max - kItem->Min);
+              float sensitivity = (range > 100.0f) ? (range / 150.0f) : (range / 80.0f);
+              kItem->Value += deltaVal * sensitivity;
+              if (kItem->Value < kItem->Min) kItem->Value = kItem->Min;
+              if (kItem->Value > kItem->Max) kItem->Value = kItem->Max;
+              if (r->OnApply) r->OnApply(r->callbackCtx);
           }
       }
   }
@@ -383,7 +422,7 @@ static int Settings_Update(Component *base) {
         r->State->CursorPos = i; 
         
         SettingItem *clickedItem = &r->State->Items[idx];
-        if (clickedItem->Category == SETTING_CAT_CONTROLLERS && idx >= 22) {
+        if (clickedItem->Category == SETTING_CAT_CONTROLLERS && idx >= MIDI_MAPPING_START_IDX) {
             r->State->IsEditMappingOpen = true;
             r->State->EditMappingItemIdx = idx;
             return 1;
@@ -490,7 +529,7 @@ static int Settings_Update(Component *base) {
       }
     } else if (item->Type == SETTING_TYPE_ACTION) {
       if (IsKeyPressed(KEY_ENTER)) {
-        if (item->Category == SETTING_CAT_CONTROLLERS && idx >= 22) {
+        if (item->Category == SETTING_CAT_CONTROLLERS && idx >= MIDI_MAPPING_START_IDX) {
             r->State->IsEditMappingOpen = true;
             r->State->EditMappingItemIdx = idx;
         } else if (idx == 20) {
@@ -576,7 +615,7 @@ static void Settings_Draw(Component *base) {
   for (int i = 0; i < r->State->ItemsCount; i++) {
     if (r->State->Items[i].Category == (SettingCategory)r->State->SelectedTab) {
       if (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) {
-          if (i == 18 || i == 19) {
+          if (strcmp(r->State->Items[i].Label, "CONNECTED DEVICE") == 0 || strcmp(r->State->Items[i].Label, "MAPPING PRESET") == 0) {
               filteredIndices[filteredCount++] = i;
           }
       } else {
@@ -661,7 +700,7 @@ static void Settings_Draw(Component *base) {
     } else if (item->Type == SETTING_TYPE_ACTION) {
       if (item->Category == SETTING_CAT_CONTROLLERS) {
           // Table Layout for Controllers with column lines
-          if (idx >= 22) { // Mapping entries
+          if (idx >= MIDI_MAPPING_START_IDX) { // Mapping entries
               // Column Dividers
               DrawLine(SCREEN_WIDTH - S(160), ry + S(2), SCREEN_WIDTH - S(160), ry + rowH - S(2), ColorGray);
               DrawLine(SCREEN_WIDTH - S(75), ry + S(2), SCREEN_WIDTH - S(75), ry + rowH - S(2), ColorGray);
@@ -724,7 +763,7 @@ static void Settings_Draw(Component *base) {
   if (selectedItem) {
       if (selectedItem->Category == SETTING_CAT_CONTROLLERS) {
           int actualIdx = filteredIndices[idx_f];
-          if (actualIdx >= 22) {
+          if (actualIdx >= MIDI_MAPPING_START_IDX) {
               const char *mapType = (selectedItem->OptionsCount > 0) ? selectedItem->Options[0] : "UNKNOWN";
               const char *mapAddress = (selectedItem->Unit[0] != '\0') ? selectedItem->Unit : "UNMAPPED";
               snprintf(detailBuf, sizeof(detailBuf), "Selected Target: %s  |  MIDI Address: %s  |  Type: %s", 
@@ -858,7 +897,7 @@ static void Settings_Draw(Component *base) {
       // Gather all mapping items
       int mapIndices[MAX_SETTINGS_ITEMS];
       int mapCount = 0;
-      for (int i = 22; i < r->State->ItemsCount; i++) {
+      for (int i = MIDI_MAPPING_START_IDX; i < r->State->ItemsCount; i++) {
           if (r->State->Items[i].Category == SETTING_CAT_CONTROLLERS) {
               mapIndices[mapCount++] = i;
           }

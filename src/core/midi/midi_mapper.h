@@ -26,6 +26,7 @@ typedef struct {
     uint8_t midino;
     uint32_t options;
     char scriptFunction[128]; // For Script-Binding
+    void *cachedCO;           // Pointer to ControlObject for fast O(1) access
 } MappingEntry;
 
 typedef struct {
@@ -46,11 +47,12 @@ typedef struct {
     char description[256];
     char scriptFiles[8][128];
     int scriptCount;
-    bool modifiers[16]; // Modifier states (e.g. Shift, DeckLayer)
-    MappingEntry entries[2048]; // Increased capacity for full DDJ-FLX6 mapping
+    bool modifiers[16];        // Modifier states (e.g. Shift, DeckLayer)
+    MappingEntry entries[2048]; // Capacity for full controller mapping
     int count;
     MidiOutputEntry outputs[1024];
     int outputCount;
+    int lookupTable[256][128]; // O(1) fast lookup table [status][midino] -> index in entries
 } MidiMapping;
 
 bool MIDI_LoadMapping(MidiMapping *map, const char *path);
@@ -60,4 +62,4 @@ void MIDI_HandleMapping(MidiMapping *map, uint8_t status, uint8_t midino, float 
 bool MIDI_SaveMapping(MidiMapping *map, const char *path);
 void MIDI_CreateTemplate(MidiMapping *out);
 
-#endif
+#endif // MIDI_MAPPER_H

@@ -24,6 +24,7 @@ typedef struct {
     int SampleRate;       // 44100, 48000, etc.
     int BufferSizeFrames; // 128, 256, 512, 1024
     int PCMBitDepth;      // 16 or 24
+    int CrossfaderCurve;  // 0=Smooth, 1=Linear, 2=Cutting
 } AudioBackendConfig;
 
 typedef void (*AudioBackendCallback)(float* buffer, unsigned int frames);
