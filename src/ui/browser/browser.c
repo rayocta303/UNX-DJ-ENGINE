@@ -1454,7 +1454,31 @@ static int Browser_Update(Component *base) {
             if (newTrack) {
               memset(newTrack, 0, sizeof(TrackState));
 
-              // Copy cues from Serato metadata
+              // Copy cues to Analysis.Cues for waveform and dynamic editing sync
+              newTrack->Analysis.CueCount = t->CueCount;
+              if (newTrack->Analysis.CueCount > 0 && t->Cues != NULL) {
+                newTrack->Analysis.Cues = (RBCue*)malloc(sizeof(RBCue) * newTrack->Analysis.CueCount);
+                if (newTrack->Analysis.Cues) {
+                  memcpy(newTrack->Analysis.Cues, t->Cues, sizeof(RBCue) * newTrack->Analysis.CueCount);
+                }
+              }
+
+              // Synthesize BeatGrid from BPM if not present so Quantize Snap works on Serato tracks
+              if (newTrack->Analysis.BeatGridCount == 0 && targetDeck->OriginalBPM > 30.0f) {
+                double beatMs = 60000.0 / (double)targetDeck->OriginalBPM;
+                uint32_t totalBeats = (uint32_t)(3600000.0 / beatMs); // 1 hour of beats
+                newTrack->Analysis.BeatGrid = (RBBeat*)malloc(sizeof(RBBeat) * totalBeats);
+                if (newTrack->Analysis.BeatGrid) {
+                  newTrack->Analysis.BeatGridCount = totalBeats;
+                  for (uint32_t b = 0; b < totalBeats; b++) {
+                    newTrack->Analysis.BeatGrid[b].Time = (uint32_t)(b * beatMs);
+                    newTrack->Analysis.BeatGrid[b].BPM = (uint16_t)(targetDeck->OriginalBPM * 100.0f);
+                    newTrack->Analysis.BeatGrid[b].BeatNumber = (b % 4) + 1;
+                  }
+                }
+              }
+
+              // Copy cues from Serato metadata to HotCues array
               for (uint32_t i = 0; i < t->CueCount && i < 32; i++) {
                 if (t->Cues[i].ID >= 1 && t->Cues[i].ID <= 8) {
                   newTrack->HotCues[newTrack->HotCuesCount].ID = t->Cues[i].ID;
