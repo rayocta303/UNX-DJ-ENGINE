@@ -1517,6 +1517,7 @@ static int Browser_Update(Component *base) {
                                            : (newTrack->Analysis.BeatGridCount > 0
                                                   ? newTrack->Analysis.BeatGrid[0].Time
                                                   : 0);
+              targetDeck->LoadAnimTimer = 0.5f;
               DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck],
                                  (uint32_t)targetDeck->PositionMs);
           }
@@ -1632,6 +1633,7 @@ static int Browser_Update(Component *base) {
               }
               targetDeck->PositionMs =
                   (newTrack->CuesCount > 0) ? newTrack->Cues[0].Start : 0;
+              targetDeck->LoadAnimTimer = 0.5f;
               DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck],
                                  (uint32_t)targetDeck->PositionMs);
             }

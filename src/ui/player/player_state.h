@@ -88,6 +88,8 @@ typedef struct DeckState {
   bool IsPlaying;
   float JogRate;
   double JogDelta; // Pending jog/touch movement from UI (half-frames)
+  float LoadAnimTimer; // >0 when track load animation is active (seconds)
+  float JogPointerAngle; // Platter/jog pointer rotation angle (degrees)
   
   TrackState *LoadedTrack;
 

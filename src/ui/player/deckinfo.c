@@ -214,6 +214,30 @@ static void DeckInfo_Draw(Component *base) {
     float ejectY = y + (headerH - ejectH) / 2.0f;
     Rectangle ejectRect = { ejectX, ejectY, ejectW, ejectH };
 
+    // Visual Jog Platter Spinner & Load Animation Widget
+    float jogCX = deckInfoW / 2.0f;
+    float jogCY = y + headerH / 2.0f;
+    float jogR = S(5.5f);
+
+    // Platter background & outer ring
+    Color jogRingColor = d->State->IsTouching ? ColorRed : (d->ID == 0 ? ColorBlue : ColorOrange);
+    DrawCircle((int)jogCX, (int)jogCY, jogR, (Color){15, 18, 24, 255});
+    DrawCircleLines((int)jogCX, (int)jogCY, jogR, Fade(jogRingColor, 0.6f));
+
+    // Load Track Chaser Glow
+    if (d->State->LoadAnimTimer > 0.0f) {
+        float chaserAngle = d->State->JogPointerAngle;
+        DrawCircleSectorLines((Vector2){jogCX, jogCY}, jogR + S(1.5f), chaserAngle - 60.0f, chaserAngle, 8, ColorBlue);
+        DrawCircleSectorLines((Vector2){jogCX, jogCY}, jogR + S(1.0f), chaserAngle - 30.0f, chaserAngle, 8, ColorWhite);
+    }
+
+    // Rotating Pointer Needle
+    float pRad = (d->State->JogPointerAngle - 90.0f) * (3.14159265f / 180.0f);
+    Vector2 pStart = { jogCX + cosf(pRad) * S(1.5f), jogCY + sinf(pRad) * S(1.5f) };
+    Vector2 pEnd = { jogCX + cosf(pRad) * (jogR - S(0.5f)), jogCY + sinf(pRad) * (jogR - S(0.5f)) };
+    Color ptrColor = d->State->IsTouching ? ColorRed : (d->State->LoadAnimTimer > 0.0f ? ColorWhite : (d->State->IsPlaying ? ColorGreen : ColorWhite));
+    DrawLineEx(pStart, pEnd, S(1.2f), ptrColor);
+
     if (d->State->LoadedTrack != NULL) {
         bool hoverEject = CheckCollisionPointRec(UIGetMousePosition(), ejectRect);
         

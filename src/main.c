@@ -2275,6 +2275,36 @@ void UpdateDrawFrame(App *app) {
     }
   }
 
+  // Update Jog Pointer Angle & Load Track Animation Timers
+  float frameDt = GetFrameTime();
+  if (frameDt < 0.0001f) frameDt = 0.016667f;
+
+  // Deck A Animation Update
+  if (app->deckA.LoadAnimTimer > 0.0f) {
+      app->deckA.LoadAnimTimer -= frameDt;
+      if (app->deckA.LoadAnimTimer < 0.0f) app->deckA.LoadAnimTimer = 0.0f;
+      app->deckA.JogPointerAngle += frameDt * 1440.0f; // Fast spin load animation
+  } else if (app->deckA.IsPlaying || fabs(audioEngine->Decks[0].JogRate) > 0.01) {
+      float rpmA = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? app->deckA.Waveform.JogCalibRPM : 33.3333f;
+      float speedA = 1.0f + (app->deckA.TempoPercent / 100.0f) + (float)audioEngine->Decks[0].JogRate;
+      app->deckA.JogPointerAngle += frameDt * (rpmA / 60.0f) * 360.0f * speedA;
+  }
+  app->deckA.JogPointerAngle = fmodf(app->deckA.JogPointerAngle, 360.0f);
+  if (app->deckA.JogPointerAngle < 0.0f) app->deckA.JogPointerAngle += 360.0f;
+
+  // Deck B Animation Update
+  if (app->deckB.LoadAnimTimer > 0.0f) {
+      app->deckB.LoadAnimTimer -= frameDt;
+      if (app->deckB.LoadAnimTimer < 0.0f) app->deckB.LoadAnimTimer = 0.0f;
+      app->deckB.JogPointerAngle += frameDt * 1440.0f; // Fast spin load animation
+  } else if (app->deckB.IsPlaying || fabs(audioEngine->Decks[1].JogRate) > 0.01) {
+      float rpmB = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? app->deckB.Waveform.JogCalibRPM : 33.3333f;
+      float speedB = 1.0f + (app->deckB.TempoPercent / 100.0f) + (float)audioEngine->Decks[1].JogRate;
+      app->deckB.JogPointerAngle += frameDt * (rpmB / 60.0f) * 360.0f * speedB;
+  }
+  app->deckB.JogPointerAngle = fmodf(app->deckB.JogPointerAngle, 360.0f);
+  if (app->deckB.JogPointerAngle < 0.0f) app->deckB.JogPointerAngle += 360.0f;
+
   // Apply Vinyl Start/Stop Physics
   for (int i = 0; i < 2; i++) {
     DeckState *ds = (i == 0) ? &app->deckA : &app->deckB;

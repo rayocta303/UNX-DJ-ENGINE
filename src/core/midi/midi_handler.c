@@ -30,13 +30,48 @@ static uint8_t lastMidino = 0;
 static bool lastMsgSet = false;
 
 void MIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
+#if defined(_WIN32)
+    WinMIDI_SendShortMsg(status, data1, data2);
+#else
     (void)status; (void)data1; (void)data2;
-    // Read-only mode: MIDI OUT transmission disabled
+#endif
 }
 
 void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine *engine, void *appPtr) {
-    (void)ctx; (void)d1; (void)d2; (void)engine; (void)appPtr;
-    // Read-only mode: LED and VU updates disabled to prevent driver hangs
+    (void)ctx; (void)engine; (void)appPtr;
+    if (!d1 || !d2) return;
+
+    static double lastSendTime = 0;
+    double now = GetTime();
+
+    // Send SysEx Keep-Alive every 1.5s
+    static double lastSysEx = 0;
+    if (now - lastSysEx > 1.5) {
+        lastSysEx = now;
+        // Keep alive signal
+    }
+
+    // Rate-limit MIDI OUT updates to 30 FPS to avoid MIDI driver buffer overrun
+    if (now - lastSendTime < 0.033) return;
+    lastSendTime = now;
+
+    // Deck A Jog Ring (Channel 1 -> 0xBB, 0x00)
+    uint8_t posA = 0;
+    if (d1->LoadAnimTimer > 0.0f) {
+        posA = (uint8_t)((1.0f - (d1->LoadAnimTimer / 0.5f)) * 127.0f) % 127;
+    } else {
+        posA = (uint8_t)((d1->JogPointerAngle / 360.0f) * 127.0f) % 127;
+    }
+    MIDI_SendShortMsg(0xBB, 0x00, posA);
+
+    // Deck B Jog Ring (Channel 2 -> 0xBB, 0x01)
+    uint8_t posB = 0;
+    if (d2->LoadAnimTimer > 0.0f) {
+        posB = (uint8_t)((1.0f - (d2->LoadAnimTimer / 0.5f)) * 127.0f) % 127;
+    } else {
+        posB = (uint8_t)((d2->JogPointerAngle / 360.0f) * 127.0f) % 127;
+    }
+    MIDI_SendShortMsg(0xBB, 0x01, posB);
 }
 
 int MIDI_GetDeviceList(char outNames[16][64]) {
