@@ -62,6 +62,7 @@ void BeatFXManager_Init(BeatFXManager* mgr);
 void BeatFXManager_Free(BeatFXManager* mgr);
 void BeatFXManager_SetFX(BeatFXManager* mgr, BeatFXType type);
 void BeatFXManager_SetFXOn(BeatFXManager* mgr, bool on);
+void BeatFXManager_AdjustTimeMultiplier(BeatFXManager* mgr, float factor);
 void BeatFXManager_Reset(BeatFXManager* mgr);
 void BeatFXManager_Process(BeatFXManager* mgr, float* outL, float* outR, float inL, float inR, float sampleRate);
 void BeatFXManager_ProcessWetOnly(BeatFXManager* mgr, float* wetL, float* wetR, float inL, float inR, float sampleRate);

@@ -658,10 +658,9 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     float highR = EngineLR4_Process(&deck->EqHighStateR, r);
     r = (lowR * gainL) + (r - lowR - highR) * gainM + (highR * gainH);
 
-    // Trim & Color FX
+    // Trim
     l *= deck->Trim;
     r *= deck->Trim;
-    ColorFXManager_Process(&deck->ColorFX, &l, &r, l, r, fs);
 
     // Cue (Pre-Fader)
     if (deck->IsCueActive) {
@@ -687,6 +686,9 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
         startTotalGain + (endTotalGain - startTotalGain) * t;
     float sendL = l * currentTotalGain;
     float sendR = r * currentTotalGain;
+
+    // Color FX (Post-Fader routing so delay/space tails persist when fader is down)
+    ColorFXManager_Process(&deck->ColorFX, &sendL, &sendR, sendL, sendR, fs);
 
     float dryL = sendL * deck->DryGain;
     float dryR = sendR * deck->DryGain;

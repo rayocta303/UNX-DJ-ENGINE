@@ -125,6 +125,8 @@ typedef struct AudioEngine {
   float LastCrossfader;      // ramping gain
   int CrossfaderCurve;       // 0=Smooth, 1=Linear, 2=Cutting
   float MasterVolume;        // 0.0 to 1.0
+  float HeadphoneVolume;     // 0.0 to 1.0
+  float HeadphoneMix;        // 0.0 (Cue) to 1.0 (Master)
   uint32_t OutputSampleRate; // Actual hardware sample rate
   FXRoutingMode RoutingMode;
   float MasterVuL;

@@ -1308,7 +1308,7 @@ Log_LogDeviceInfo(gpuModel);
   CO_Register("[Channel1]", "filterLow", CO_TYPE_FLOAT,
               &audioEngine->Decks[0].EqLow, 0, 1.0f);
   CO_Register("[Channel1]", "cue_default", CO_TYPE_BOOL,
-              &audioEngine->Decks[0].IsCueActive, 0, 1);
+              &app->deckA.MidiRequestCue, 0, 1);
   CO_Register("[Channel1]", "pfl", CO_TYPE_BOOL,
               &audioEngine->Decks[0].IsCueActive, 0, 1);
   CO_Register("[Channel1]", "fader", CO_TYPE_FLOAT,
@@ -1327,7 +1327,11 @@ Log_LogDeviceInfo(gpuModel);
               &app->deckA.QuantizeEnabled, 0, 1);
   CO_Register("[Channel1]", "sync", CO_TYPE_BOOL, &app->deckA.MidiRequestSync,
               0, 1);
+  CO_Register("[Channel1]", "sync_enabled", CO_TYPE_BOOL, &app->deckA.MidiRequestSync,
+              0, 1);
   CO_Register("[Channel1]", "master", CO_TYPE_BOOL,
+              &app->deckA.MidiRequestMaster, 0, 1);
+  CO_Register("[Channel1]", "sync_leader", CO_TYPE_BOOL,
               &app->deckA.MidiRequestMaster, 0, 1);
   CO_Register("[Channel1]", "tempo_percent", CO_TYPE_FLOAT,
               &app->deckA.TempoPercent, -100.0f, 100.0f);
@@ -1404,7 +1408,7 @@ Log_LogDeviceInfo(gpuModel);
   CO_Register("[Channel2]", "filterLow", CO_TYPE_FLOAT,
               &audioEngine->Decks[1].EqLow, 0, 1.0f);
   CO_Register("[Channel2]", "cue_default", CO_TYPE_BOOL,
-              &audioEngine->Decks[1].IsCueActive, 0, 1);
+              &app->deckB.MidiRequestCue, 0, 1);
   CO_Register("[Channel2]", "pfl", CO_TYPE_BOOL,
               &audioEngine->Decks[1].IsCueActive, 0, 1);
   CO_Register("[Channel2]", "fader", CO_TYPE_FLOAT,
@@ -1423,7 +1427,11 @@ Log_LogDeviceInfo(gpuModel);
               &app->deckB.QuantizeEnabled, 0, 1);
   CO_Register("[Channel2]", "sync", CO_TYPE_BOOL, &app->deckB.MidiRequestSync,
               0, 1);
+  CO_Register("[Channel2]", "sync_enabled", CO_TYPE_BOOL, &app->deckB.MidiRequestSync,
+              0, 1);
   CO_Register("[Channel2]", "master", CO_TYPE_BOOL,
+              &app->deckB.MidiRequestMaster, 0, 1);
+  CO_Register("[Channel2]", "sync_leader", CO_TYPE_BOOL,
               &app->deckB.MidiRequestMaster, 0, 1);
   CO_Register("[Channel2]", "tempo_percent", CO_TYPE_FLOAT,
               &app->deckB.TempoPercent, -100.0f, 100.0f);
@@ -1490,6 +1498,10 @@ Log_LogDeviceInfo(gpuModel);
               -1.0f, 1.0f);
   CO_Register("[Master]", "volume", CO_TYPE_FLOAT, &audioEngine->MasterVolume,
               0, 2.0f);
+  CO_Register("[Master]", "headphone_volume", CO_TYPE_FLOAT, &audioEngine->HeadphoneVolume,
+              0, 2.0f);
+  CO_Register("[Master]", "headphone_mix", CO_TYPE_FLOAT, &audioEngine->HeadphoneMix,
+              0, 1.0f);
 
   // --- Touch & Jog ---
   CO_Register("[Channel1]", "touch", CO_TYPE_BOOL, &app->deckA.IsTouching, 0, 1);
@@ -1512,6 +1524,12 @@ Log_LogDeviceInfo(gpuModel);
   // --- Channel3 (Deck A Alias) & Channel4 (Deck B Alias) for 4-Deck Controllers ---
   CO_Register("[Channel3]", "play", CO_TYPE_BOOL, &app->deckA.MidiRequestPlay, 0, 1);
   CO_Register("[Channel3]", "cue", CO_TYPE_BOOL, &app->deckA.MidiRequestCue, 0, 1);
+  CO_Register("[Channel3]", "cue_default", CO_TYPE_BOOL, &app->deckA.MidiRequestCue, 0, 1);
+  CO_Register("[Channel3]", "pfl", CO_TYPE_BOOL, &audioEngine->Decks[0].IsCueActive, 0, 1);
+  CO_Register("[Channel3]", "sync", CO_TYPE_BOOL, &app->deckA.MidiRequestSync, 0, 1);
+  CO_Register("[Channel3]", "sync_enabled", CO_TYPE_BOOL, &app->deckA.MidiRequestSync, 0, 1);
+  CO_Register("[Channel3]", "master", CO_TYPE_BOOL, &app->deckA.MidiRequestMaster, 0, 1);
+  CO_Register("[Channel3]", "sync_leader", CO_TYPE_BOOL, &app->deckA.MidiRequestMaster, 0, 1);
   CO_Register("[Channel3]", "rate", CO_TYPE_FLOAT, &app->deckA.TempoPercent, -100.0f, 100.0f);
   CO_Register("[Channel3]", "volume", CO_TYPE_FLOAT, &audioEngine->Decks[0].Fader, 0, 1.0f);
   CO_Register("[Channel3]", "jog", CO_TYPE_DOUBLE, &app->deckA.JogDelta, -1000, 1000);
@@ -1519,6 +1537,12 @@ Log_LogDeviceInfo(gpuModel);
 
   CO_Register("[Channel4]", "play", CO_TYPE_BOOL, &app->deckB.MidiRequestPlay, 0, 1);
   CO_Register("[Channel4]", "cue", CO_TYPE_BOOL, &app->deckB.MidiRequestCue, 0, 1);
+  CO_Register("[Channel4]", "cue_default", CO_TYPE_BOOL, &app->deckB.MidiRequestCue, 0, 1);
+  CO_Register("[Channel4]", "pfl", CO_TYPE_BOOL, &audioEngine->Decks[1].IsCueActive, 0, 1);
+  CO_Register("[Channel4]", "sync", CO_TYPE_BOOL, &app->deckB.MidiRequestSync, 0, 1);
+  CO_Register("[Channel4]", "sync_enabled", CO_TYPE_BOOL, &app->deckB.MidiRequestSync, 0, 1);
+  CO_Register("[Channel4]", "master", CO_TYPE_BOOL, &app->deckB.MidiRequestMaster, 0, 1);
+  CO_Register("[Channel4]", "sync_leader", CO_TYPE_BOOL, &app->deckB.MidiRequestMaster, 0, 1);
   CO_Register("[Channel4]", "rate", CO_TYPE_FLOAT, &app->deckB.TempoPercent, -100.0f, 100.0f);
   CO_Register("[Channel4]", "volume", CO_TYPE_FLOAT, &audioEngine->Decks[1].Fader, 0, 1.0f);
   CO_Register("[Channel4]", "jog", CO_TYPE_DOUBLE, &app->deckB.JogDelta, -1000, 1000);
@@ -1534,13 +1558,29 @@ Log_LogDeviceInfo(gpuModel);
   CO_Register("[Master]", "beatfx_on", CO_TYPE_BOOL,
               &app->fxState.IsFXOn, 0, 1);
   CO_Register("[Master]", "beatfx_channel", CO_TYPE_INT,
-              &audioEngine->BeatFX.targetChannel, 0, 2);
+              &audioEngine->BeatFX.targetChannel, 0, 4);
   CO_Register("[Master]", "beatfx_prev", CO_TYPE_BOOL,
               &app->fxState.MidiRequestPrevFX, 0, 1);
   CO_Register("[Master]", "beatfx_next", CO_TYPE_BOOL,
               &app->fxState.MidiRequestNextFX, 0, 1);
   CO_Register("[Master]", "beatfx_toggle", CO_TYPE_BOOL,
               &app->fxState.MidiRequestToggleFX, 0, 1);
+  CO_Register("[Master]", "beatfx_ch1", CO_TYPE_BOOL,
+              &app->fxState.MidiRequestCh1, 0, 1);
+  CO_Register("[Master]", "beatfx_ch2", CO_TYPE_BOOL,
+              &app->fxState.MidiRequestCh2, 0, 1);
+  CO_Register("[Master]", "beatfx_ch3", CO_TYPE_BOOL,
+              &app->fxState.MidiRequestCh3, 0, 1);
+  CO_Register("[Master]", "beatfx_ch4", CO_TYPE_BOOL,
+              &app->fxState.MidiRequestCh4, 0, 1);
+  CO_Register("[Master]", "beatfx_chmaster", CO_TYPE_BOOL,
+              &app->fxState.MidiRequestChMaster, 0, 1);
+  CO_Register("[Master]", "beatfx_beat_left", CO_TYPE_BOOL,
+              &app->fxState.MidiRequestBeatLeft, 0, 1);
+  CO_Register("[Master]", "beatfx_beat_right", CO_TYPE_BOOL,
+              &app->fxState.MidiRequestBeatRight, 0, 1);
+  CO_Register("[Master]", "beatfx_tap", CO_TYPE_BOOL,
+              &app->fxState.MidiRequestTap, 0, 1);
 
 
   // --- Library / Browser ---
@@ -1926,6 +1966,38 @@ void UpdateDrawFrame(App *app) {
       BeatFXManager_SetFXOn(&audioEngine->BeatFX, app->fxState.IsFXOn);
       app->fxState.MidiRequestToggleFX = false;
   }
+  if (app->fxState.MidiRequestCh1) {
+      audioEngine->BeatFX.targetChannel = 0;
+      app->fxState.MidiRequestCh1 = false;
+  }
+  if (app->fxState.MidiRequestCh2) {
+      audioEngine->BeatFX.targetChannel = 1;
+      app->fxState.MidiRequestCh2 = false;
+  }
+  if (app->fxState.MidiRequestCh3) {
+      audioEngine->BeatFX.targetChannel = 0;
+      app->fxState.MidiRequestCh3 = false;
+  }
+  if (app->fxState.MidiRequestCh4) {
+      audioEngine->BeatFX.targetChannel = 1;
+      app->fxState.MidiRequestCh4 = false;
+  }
+  if (app->fxState.MidiRequestChMaster) {
+      audioEngine->BeatFX.targetChannel = 2;
+      app->fxState.MidiRequestChMaster = false;
+  }
+  if (app->fxState.MidiRequestBeatLeft) {
+      BeatFXManager_AdjustTimeMultiplier(&audioEngine->BeatFX, 0.5f);
+      app->fxState.MidiRequestBeatLeft = false;
+  }
+  if (app->fxState.MidiRequestBeatRight) {
+      BeatFXManager_AdjustTimeMultiplier(&audioEngine->BeatFX, 2.0f);
+      app->fxState.MidiRequestBeatRight = false;
+  }
+  if (app->fxState.MidiRequestTap) {
+      BeatFXManager_AdjustTimeMultiplier(&audioEngine->BeatFX, 1.0f);
+      app->fxState.MidiRequestTap = false;
+  }
 
   // Send hardware LED and VU Meter updates via MIDI
   MIDI_UpdateLEDs(&app->midiCtx, &app->deckA, &app->deckB, audioEngine, app);
@@ -2117,6 +2189,22 @@ void UpdateDrawFrame(App *app) {
     if (ds->MidiRequestLoopExit) {
       DeckAudio_ExitLoop(audio);
       ds->MidiRequestLoopExit = false;
+    }
+    if (ds->MidiRequestLoopHalve) {
+      if (audio->IsLooping) {
+        double len = audio->LoopEndPos - audio->LoopStartPos;
+        if (len > 4410.0) {
+          DeckAudio_SetLoop(audio, true, audio->LoopStartPos, audio->LoopStartPos + len / 2.0);
+        }
+      }
+      ds->MidiRequestLoopHalve = false;
+    }
+    if (ds->MidiRequestLoopDouble) {
+      if (audio->IsLooping) {
+        double len = audio->LoopEndPos - audio->LoopStartPos;
+        DeckAudio_SetLoop(audio, true, audio->LoopStartPos, audio->LoopStartPos + len * 2.0);
+      }
+      ds->MidiRequestLoopDouble = false;
     }
 
     // Pitch Bend

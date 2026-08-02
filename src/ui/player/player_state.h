@@ -155,5 +155,13 @@ typedef struct BeatFXState {
   bool MidiRequestPrevFX;
   bool MidiRequestNextFX;
   bool MidiRequestToggleFX;
+  bool MidiRequestCh1;
+  bool MidiRequestCh2;
+  bool MidiRequestCh3;
+  bool MidiRequestCh4;
+  bool MidiRequestChMaster;
+  bool MidiRequestBeatLeft;
+  bool MidiRequestBeatRight;
+  bool MidiRequestTap;
 } BeatFXState;
 

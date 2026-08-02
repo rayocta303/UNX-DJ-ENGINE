@@ -59,6 +59,17 @@ void BeatFXManager_SetFXOn(BeatFXManager* mgr, bool on) {
     mgr->isFxOn = on;
 }
 
+void BeatFXManager_AdjustTimeMultiplier(BeatFXManager* mgr, float factor) {
+    if (!mgr) return;
+    if (factor == 1.0f) {
+        mgr->beatMs = 500.0f; // Default 1 beat at 120 bpm
+    } else {
+        mgr->beatMs *= factor;
+        if (mgr->beatMs < 10.0f) mgr->beatMs = 10.0f;
+        if (mgr->beatMs > 4000.0f) mgr->beatMs = 4000.0f;
+    }
+}
+
 void BeatFXManager_Reset(BeatFXManager* mgr) {
     // Clear all delay-based effects to ensure a clean start
     DelayLine_Clear(&mgr->delay.delayL);

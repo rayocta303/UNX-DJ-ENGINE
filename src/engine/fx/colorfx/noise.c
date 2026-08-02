@@ -10,7 +10,7 @@ void Noise_Free(ColorFX_Noise* fx) {
 }
 
 void Noise_Process(ColorFX_Noise* fx, float* outL, float* outR, float inL, float inR, float colorVal, float sampleRate) {
-    if (colorVal == 0.0f) {
+    if (colorVal == 0.0f || fabsf(colorVal) < 0.05f) {
         *outL = inL; *outR = inR; return;
     }
 

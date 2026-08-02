@@ -350,7 +350,12 @@ void MIDI_HandleMapping(MidiMapping *map, uint8_t status, uint8_t midino, float 
         }
     } else if (e->options & MIDI_OPT_SCRIPT) {
         MIDI_ExecuteScript(map, e->scriptFunction, status, midino, currentRawVal);
-    } else if (e->options & MIDI_OPT_SWITCH) {
+    } else if ((e->options & MIDI_OPT_SWITCH) ||
+               strcmp(e->key, "pfl") == 0 ||
+               strcmp(e->key, "master_tempo") == 0 ||
+               strcmp(e->key, "quantize") == 0 ||
+               strcmp(e->key, "vinyl_mode") == 0 ||
+               strcmp(e->key, "slip") == 0) {
         if (currentRawVal > 0) {
             CO_ToggleValue(e->group, e->key);
         }

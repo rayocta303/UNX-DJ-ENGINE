@@ -1,5 +1,6 @@
 #include "colorfx_manager.h"
 #include <string.h>
+#include <math.h>
 
 void ColorFXManager_Init(ColorFXManager* mgr) {
     mgr->activeFX = COLORFX_NONE; // Default to OFF
@@ -33,7 +34,7 @@ void ColorFXManager_SetFX(ColorFXManager* mgr, ColorFXType type) {
 }
 
 void ColorFXManager_Process(ColorFXManager* mgr, float* outL, float* outR, float inL, float inR, float sampleRate) {
-    if (mgr->colorValue == 0.0f || mgr->activeFX == COLORFX_NONE) {
+    if (fabsf(mgr->colorValue) < 0.05f || mgr->activeFX == COLORFX_NONE) {
         *outL = inL;
         *outR = inR;
         return;
