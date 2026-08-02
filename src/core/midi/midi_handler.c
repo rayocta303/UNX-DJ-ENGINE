@@ -57,26 +57,41 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
 #endif
     }
 
-    // Rate-limit short MIDI OUT updates to ~30 FPS to prevent MIDI driver buffer congestion
+    // Rate-limit short MIDI OUT updates to ~30 FPS to prevent driver congestion
     if (now - lastSendTime < 0.033) return;
     lastSendTime = now;
 
-    // 2. Deck A & B State LEDs
+    static uint8_t lastPlay[2] = { 255, 255 };
+    static uint8_t lastCue[2]  = { 255, 255 };
+    static uint8_t lastVinyl[2]= { 255, 255 };
+    static uint8_t lastVu[2]   = { 255, 255 };
+    static uint8_t lastJog[2]  = { 255, 255 };
+
+    // 2. Deck A & B State LEDs (Play, Cue, Vinyl, VU Meter)
     DeckState *decks[2] = { d1, d2 };
     for (int i = 0; i < 2; i++) {
         uint8_t chStatus = 0x90 + i;
 
         // Play/Pause LED (Note 0x0B)
         uint8_t playVal = decks[i]->IsPlaying ? 0x7F : 0x00;
-        MIDI_SendShortMsg(chStatus, 0x0B, playVal);
+        if (playVal != lastPlay[i]) {
+            MIDI_SendShortMsg(chStatus, 0x0B, playVal);
+            lastPlay[i] = playVal;
+        }
 
         // Cue LED (Note 0x0C)
         uint8_t cueVal = (decks[i]->IsCueActive || !decks[i]->IsPlaying) ? 0x7F : 0x00;
-        MIDI_SendShortMsg(chStatus, 0x0C, cueVal);
+        if (cueVal != lastCue[i]) {
+            MIDI_SendShortMsg(chStatus, 0x0C, cueVal);
+            lastCue[i] = cueVal;
+        }
 
         // Vinyl Mode LED (Note 0x0E)
         uint8_t vinylVal = decks[i]->VinylModeEnabled ? 0x7F : 0x00;
-        MIDI_SendShortMsg(chStatus, 0x0E, vinylVal);
+        if (vinylVal != lastVinyl[i]) {
+            MIDI_SendShortMsg(chStatus, 0x0E, vinylVal);
+            lastVinyl[i] = vinylVal;
+        }
 
         // VU Meter Level (Status 0xB0 + i, Control 0x02)
         if (engine) {
@@ -85,27 +100,36 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
             float rms = (vuL > vuR ? vuL : vuR);
             uint8_t meterVal = (uint8_t)(rms * 0x76);
             if (rms >= 1.0f) meterVal += 0x09; // Peak/clip indicator
-            MIDI_SendShortMsg(0xB0 + i, 0x02, meterVal);
+            if (meterVal != lastVu[i]) {
+                MIDI_SendShortMsg(0xB0 + i, 0x02, meterVal);
+                lastVu[i] = meterVal;
+            }
         }
     }
 
-    // 3. Deck A Jog Ring (Channel 1 -> 0xBB, 0x00)
+    // 3. Deck A Jog Ring (Status 0xBB, Note 0x00, Pioneer 72-segment range 0..71 / 0x00..0x47)
     uint8_t posA = 0;
     if (d1->LoadAnimTimer > 0.0f) {
-        posA = (uint8_t)((1.0f - (d1->LoadAnimTimer / 0.5f)) * 127.0f) % 127;
+        posA = (uint8_t)((1.0f - (d1->LoadAnimTimer / 0.5f)) * 71.0f) % 72;
     } else {
-        posA = (uint8_t)((d1->JogPointerAngle / 360.0f) * 127.0f) % 127;
+        posA = (uint8_t)((d1->JogPointerAngle / 360.0f) * 71.0f) % 72;
     }
-    MIDI_SendShortMsg(0xBB, 0x00, posA);
+    if (posA != lastJog[0]) {
+        MIDI_SendShortMsg(0xBB, 0x00, posA);
+        lastJog[0] = posA;
+    }
 
-    // 4. Deck B Jog Ring (Channel 2 -> 0xBB, 0x01)
+    // 4. Deck B Jog Ring (Status 0xBB, Note 0x01, Pioneer 72-segment range 0..71 / 0x00..0x47)
     uint8_t posB = 0;
     if (d2->LoadAnimTimer > 0.0f) {
-        posB = (uint8_t)((1.0f - (d2->LoadAnimTimer / 0.5f)) * 127.0f) % 127;
+        posB = (uint8_t)((1.0f - (d2->LoadAnimTimer / 0.5f)) * 71.0f) % 72;
     } else {
-        posB = (uint8_t)((d2->JogPointerAngle / 360.0f) * 127.0f) % 127;
+        posB = (uint8_t)((d2->JogPointerAngle / 360.0f) * 71.0f) % 72;
     }
-    MIDI_SendShortMsg(0xBB, 0x01, posB);
+    if (posB != lastJog[1]) {
+        MIDI_SendShortMsg(0xBB, 0x01, posB);
+        lastJog[1] = posB;
+    }
 }
 
 int MIDI_GetDeviceList(char outNames[16][64]) {
