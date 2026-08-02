@@ -922,54 +922,94 @@ static int Browser_Update(Component *base) {
     }
   }
 
-  // 3. Smooth Scrolling & Momentum Logic
+  // 3. Touch Kinetic Scrolling & Interactive Scrollbar Logic
   if (!s->ShowLoadPopup) {
     float maxScroll = (totalItems - totalVisible) * rowH;
     if (maxScroll < 0) maxScroll = 0;
 
-    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-      Vector2 delta = GetMouseDelta();
-      s->TouchDragAccumulator += fabsf(delta.y) + fabsf(delta.x);
-      
-      if (!s->IsDragging && s->TouchDragAccumulator > S(15.0f)) {
-        s->IsDragging = true;
-      }
+    float viewH = SCREEN_HEIGHT - DECK_STR_H;
+    float sbTrackW = S(28);
+    float sbTrackX = SCREEN_WIDTH - sbTrackW;
+    float sbTrackY = TOP_BAR_H;
+    float sbTrackH = viewH - TOP_BAR_H;
+    Rectangle sbRect = {sbTrackX, sbTrackY, sbTrackW, sbTrackH};
 
-      if (s->IsDragging) {
-        float resistance = 1.0f;
-        if (s->VisualScroll < 0 && delta.y > 0) resistance = 0.4f;
-        if (s->VisualScroll > maxScroll && delta.y < 0) resistance = 0.4f;
-        
-        s->VisualScroll -= delta.y * resistance;
-        s->ScrollVelocity = (-delta.y * resistance) / GetFrameTime();
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+      s->TouchDragAccumulator = 0.0f;
+      s->TouchVelocityY = 0.0f;
+      s->LastTouchY = mousePos.y;
+
+      if (CheckCollisionPointRec(mousePos, sbRect)) {
+        s->IsScrollbarDragging = true;
+        s->IsDragging = false;
+      } else {
+        s->IsScrollbarDragging = false;
+      }
+    }
+
+    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+      if (s->IsScrollbarDragging) {
+        float ratio = (mousePos.y - sbTrackY) / sbTrackH;
+        if (ratio < 0.0f) ratio = 0.0f;
+        if (ratio > 1.0f) ratio = 1.0f;
+        s->VisualScroll = ratio * maxScroll;
+        s->ScrollVelocity = 0.0f;
+      } else {
+        float frameTime = GetFrameTime();
+        if (frameTime < 0.001f) frameTime = 0.016f;
+        float dy = mousePos.y - s->LastTouchY;
+        s->LastTouchY = mousePos.y;
+        s->TouchDragAccumulator += fabsf(dy);
+
+        if (!s->IsDragging && s->TouchDragAccumulator > S(8.0f)) {
+          s->IsDragging = true;
+        }
+
+        if (s->IsDragging) {
+          float resistance = 1.0f;
+          if (s->VisualScroll < 0 && dy > 0) resistance = 0.3f;
+          if (s->VisualScroll > maxScroll && dy < 0) resistance = 0.3f;
+
+          s->VisualScroll -= dy * resistance;
+          float instantVel = (-dy * resistance) / frameTime;
+          s->TouchVelocityY = s->TouchVelocityY * 0.3f + instantVel * 0.7f;
+        }
       }
     } else {
-        // Apply Inertia
-        s->VisualScroll += s->ScrollVelocity * GetFrameTime();
-        s->ScrollVelocity *= 0.94f; // Friction
-        if (fabsf(s->ScrollVelocity) < 1.0f) s->ScrollVelocity = 0;
+      // Kinetic Inertia Decay (Smooth Flick)
+      s->VisualScroll += s->ScrollVelocity * GetFrameTime();
+      s->ScrollVelocity *= 0.95f; // Friction
+      if (fabsf(s->ScrollVelocity) < 5.0f) s->ScrollVelocity = 0.0f;
 
-        // Bungee return (Smooth spring)
-        float springK = 10.0f; 
-        if (s->VisualScroll < 0) {
-            s->VisualScroll -= s->VisualScroll * springK * GetFrameTime();
-            if (fabsf(s->VisualScroll) < 0.5f) s->VisualScroll = 0;
-        }
-        if (s->VisualScroll > maxScroll) {
-            float diff = s->VisualScroll - maxScroll;
-            s->VisualScroll -= diff * springK * GetFrameTime();
-            if (fabsf(s->VisualScroll - maxScroll) < 0.5f) s->VisualScroll = maxScroll;
-        }
+      // Elastic Bungee Return (Spring-back)
+      float springK = 14.0f; 
+      if (s->VisualScroll < 0) {
+        s->VisualScroll -= s->VisualScroll * springK * GetFrameTime();
+        if (fabsf(s->VisualScroll) < 0.5f) s->VisualScroll = 0.0f;
+      }
+      if (s->VisualScroll > maxScroll) {
+        float diff = s->VisualScroll - maxScroll;
+        s->VisualScroll -= diff * springK * GetFrameTime();
+        if (fabsf(s->VisualScroll - maxScroll) < 0.5f) s->VisualScroll = maxScroll;
+      }
     }
 
-    // Wheel Scroll (Smooth)
+    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+      if (s->IsDragging && fabsf(s->TouchVelocityY) > 60.0f) {
+        s->ScrollVelocity = s->TouchVelocityY; // Apply touch flick velocity
+      }
+      s->IsDragging = false;
+      s->IsScrollbarDragging = false;
+    }
+
+    // Wheel Scroll
     float wheelMove = GetMouseWheelMove();
     if (wheelMove != 0) {
-        s->VisualScroll -= wheelMove * rowH * 3.0f;
-        s->ScrollVelocity = 0; 
+      s->VisualScroll -= wheelMove * rowH * 3.0f;
+      s->ScrollVelocity = 0.0f; 
     }
 
-    // Constraints for interaction safety (Higher limit to allow bungee)
+    // Constraints for interaction safety
     if (s->VisualScroll < -S(120)) s->VisualScroll = -S(120);
     if (s->VisualScroll > maxScroll + S(120)) s->VisualScroll = maxScroll + S(120);
 
@@ -981,23 +1021,21 @@ static int Browser_Update(Component *base) {
     if (s->ScrollOffset > maxOffset) s->ScrollOffset = maxOffset;
   }
 
-  // 3. List Item Interaction
-  if (!s->ShowLoadPopup) {
+  // 3. List Item Interaction (Tap & Load trigger)
+  if (!s->ShowLoadPopup && !s->IsScrollbarDragging) {
     float pixelOffset = fmodf(s->VisualScroll, rowH);
     for (int i = 0; i < totalVisible + 1; i++) {
       int idx = s->ScrollOffset + i;
       if (idx < 0 || idx >= totalItems) continue;
 
       float ry = listYOffset - pixelOffset + i * rowH;
-      Rectangle itemRect = {sidebarW, ry, listW, rowH};
+      Rectangle itemRect = {sidebarW, ry, listW - S(28), rowH};
 
       // Visually within the list clip area
       if (ry < listYOffset - S(10) || ry > SCREEN_HEIGHT - DECK_STR_H - S(5)) continue;
 
       if (CheckCollisionPointRec(mousePos, itemRect)) {
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-          s->TouchDragAccumulator = 0;
-          s->IsDragging = false; 
           s->DraggingIdx = idx;
           if (s->BrowseLevel == 1) s->DraggingType = 1; 
           else if (s->BrowseLevel == 0) s->DraggingType = 0;
@@ -1010,11 +1048,11 @@ static int Browser_Update(Component *base) {
         }
 
         float loadBtnW = S(45);
-        Rectangle loadBtnRect = {sidebarW + listW - loadBtnW - S(5), ry + S(4), loadBtnW, rowH - S(8)};
+        Rectangle loadBtnRect = {sidebarW + listW - loadBtnW - S(32), ry + S(4), loadBtnW, rowH - S(8)};
         bool isLoadClick = (s->BrowseLevel == 0) && CheckCollisionPointRec(mousePos, loadBtnRect);
 
         if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && !s->IsDragging) {
-          if (fabsf(s->TouchDragAccumulator) < S(10.0f)) {
+          if (s->TouchDragAccumulator < S(8.0f) && fabsf(s->ScrollVelocity) < 40.0f) {
             if (isLoadClick) {
               s->ShowLoadPopup = true;
               s->PopupTrackIdx = idx;
@@ -1766,7 +1804,7 @@ static void Browser_Draw(Component *base) {
   }
   EndScissorMode();
 
-  // Scrollbar
+  // Modern Touch-Friendly Scrollbar
   int maxItems = 0;
   if (s->BrowseLevel == 0)
     maxItems = s->ActiveTrackCount;
@@ -1780,8 +1818,30 @@ static void Browser_Draw(Component *base) {
   else if (s->BrowseLevel == 3)
     maxItems = s->StorageCount;
 
-  DrawScrollbar(SCREEN_WIDTH - S(4), TOP_BAR_H, S(2), viewH - TOP_BAR_H,
-                maxItems, s->ScrollOffset, totalVisible);
+  if (maxItems > totalVisible) {
+    float sbTrackW = S(28);
+    float sbTrackX = SCREEN_WIDTH - sbTrackW;
+    float sbTrackY = TOP_BAR_H;
+    float sbTrackH = viewH - TOP_BAR_H;
+
+    // Background Track
+    DrawRectangle(sbTrackX, sbTrackY, sbTrackW, sbTrackH, (Color){ 20, 20, 20, 180 });
+    DrawLine(sbTrackX, sbTrackY, sbTrackX, sbTrackY + sbTrackH, ColorDark1);
+
+    // Calculate handle height and Y position
+    float maxScroll = (maxItems - totalVisible) * rowH;
+    float handleH = (sbTrackH * totalVisible) / (float)maxItems;
+    if (handleH < S(35)) handleH = S(35);
+    if (handleH > sbTrackH) handleH = sbTrackH;
+
+    float scrollRatio = (maxScroll > 0) ? (s->VisualScroll / maxScroll) : 0.0f;
+    if (scrollRatio < 0.0f) scrollRatio = 0.0f;
+    if (scrollRatio > 1.0f) scrollRatio = 1.0f;
+    float handleY = sbTrackY + scrollRatio * (sbTrackH - handleH);
+
+    Color handleColor = s->IsScrollbarDragging ? ColorOrange : (s->IsDragging ? ColorWhite : (Color){ 160, 160, 160, 200 });
+    DrawRectangleRounded((Rectangle){ sbTrackX + S(6), handleY, sbTrackW - S(12), handleH }, 0.5f, 4, handleColor);
+  }
 
   // Load Deck Popup Modal
   if (s->ShowLoadPopup) {

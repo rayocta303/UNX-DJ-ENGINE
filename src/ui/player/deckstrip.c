@@ -96,7 +96,7 @@ static int DeckStrip_Update(Component *base) {
   float syncY = midY + bpmBoxH + S(2);
   float syncH = S(12);
 
-  Vector2 mouse = GetMousePosition();
+  Vector2 mouse = UIGetMousePosition();
   bool isHoverTempoArea = (mouse.x >= tempoX && mouse.x <= bpmX + bpmBoxW &&
                            mouse.y >= midY && mouse.y <= midY + S(28));
   bool isHoverMT = (mouse.x >= mtX && mouse.x <= mtX + mtW && mouse.y >= mtY &&
@@ -147,7 +147,8 @@ static int DeckStrip_Update(Component *base) {
 
   // Handle Seeks via waveform touch
   static bool uiTouching[2] = {false, false};
-  if (d->State->LoadedTrack != NULL) {
+  static bool wasPlayingBeforeSeek[2] = {false, false};
+  if (d->State->LoadedTrack != NULL && d->State->TrackLengthMs > 0) {
     float wx = x + lColW + S(4);
     float ww = stripW - lColW - S(8);
     float wy = y + DECK_STR_H - S(30);
@@ -155,19 +156,29 @@ static int DeckStrip_Update(Component *base) {
     Rectangle wfmRect = {wx, wy, ww, wh};
 
     if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) && CheckCollisionPointRec(mouse, wfmRect)) {
-      uiTouching[d->ID] = true;
+      if (!uiTouching[d->ID]) {
+        uiTouching[d->ID] = true;
+        wasPlayingBeforeSeek[d->ID] = d->State->IsPlaying;
+        d->State->IsPlaying = false; // Mute/pause playback while dragging
+      }
     }
 
     if (uiTouching[d->ID]) {
       if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-        d->State->IsTouching = true; // Bypass MT
         float ratio = (mouse.x - wx) / ww;
-        if (ratio < 0) ratio = 0; if (ratio > 1) ratio = 1;
-        d->State->SeekMs = (long long)(ratio * d->State->TrackLengthMs);
+        if (ratio < 0.0f) ratio = 0.0f;
+        if (ratio > 1.0f) ratio = 1.0f;
+        long long targetMs = (long long)(ratio * (double)d->State->TrackLengthMs);
+        d->State->SeekMs = targetMs;
+        d->State->PositionMs = targetMs; // Real-time 1:1 UI pointer position sync during drag
         d->State->HasSeekRequest = true;
       } else {
-        d->State->IsTouching = false;
         uiTouching[d->ID] = false;
+        if (wasPlayingBeforeSeek[d->ID]) {
+          d->State->IsPlaying = true;
+          d->State->SeekMs = d->State->PositionMs;
+          d->State->HasSeekRequest = true; // Resume playback on touch release
+        }
       }
     }
   }
@@ -214,7 +225,7 @@ static void DeckStrip_Draw(Component *base) {
                ColorWhite); // f001 music note
     float maxW = stripW - (mx - x) - S(20);
     Rectangle titleRect = { mx + S(12), y + S(2), maxW, S(16) };
-    bool isHovered = CheckCollisionPointRec(GetMousePosition(), titleRect);
+    bool isHovered = CheckCollisionPointRec(UIGetMousePosition(), titleRect);
     
     static float hoverTimer[2] = {0, 0};
     if (isHovered) hoverTimer[d->ID] += GetFrameTime();
@@ -436,37 +447,73 @@ static void DeckStrip_Draw(Component *base) {
 
         float rL = 0, rM = 0, rH = 0;
         Color col = ColorBlue;
+        float halfH = wh * 0.5f;
 
-        // 1. DATA EXTRACTION based on renderType (PWV2, PWV4, PWV7)
+        // 1. DATA EXTRACTION & NORMALIZATION based on renderType (PWV2, PWV4, PWV7)
         if (renderType == 3) {
-           // PWV7: 3-Band data [Mid, High, Low]
+           // PWV7: 3-Band data [Mid, High, Low] (values 0..255)
            Get3BandPeak(renderData, totalFrames, p0, p1, &rL, &rM, &rH);
+           rL = (rL / 255.0f) * halfH * gLow * 1.8f;
+           rM = (rM / 255.0f) * halfH * gMid * 1.8f;
+           rH = (rH / 255.0f) * halfH * gHigh * 1.8f;
         } else if (renderType == 2) {
-           // PWV4: RGB data (2 bytes)
-           int h = PWV4_Decode(renderData, (int64_t)floor(p0 + 0.5), totalFrames, &col);
-           float baseH = (h / 31.0f) * 255.0f;
-           // Derive pseudo 3-band for style 3BAND
-           if (col.r > col.b && col.r > col.g) { rL = baseH * 0.4f; rM = baseH * 0.9f; rH = baseH * 0.2f; }
-           else if (col.b > col.r && col.b > col.g) { rL = baseH * 0.95f; rM = baseH * 0.6f; rH = baseH * 0.1f; }
-           else { rL = baseH * 0.8f; rM = baseH * 0.8f; rH = baseH * 0.6f; }
-           rL *= 0.5f; rM *= 0.5f; rH *= 0.5f; // Scale down for simulation
+           // PWV4: RGB data (2 bytes per frame)
+           int maxH = 0;
+           Color maxCol = {0, 0, 0, 255};
+           int startF = (int)floor(p0);
+           int endF = (int)ceil(p1);
+           if (startF < 0) startF = 0;
+           if (endF >= totalFrames) endF = totalFrames - 1;
+           if (endF < startF) endF = startF;
+
+           for (int f = startF; f <= endF; f++) {
+             Color tmpCol;
+             int h = PWV4_Decode(renderData, f, totalFrames, &tmpCol);
+             if (h > maxH) {
+               maxH = h;
+               maxCol = tmpCol;
+             }
+           }
+           col = maxCol;
+           float baseH = (maxH / 31.0f) * halfH;
+           rL = baseH * ((float)col.r / 255.0f) * gLow * 1.8f;
+           rM = baseH * ((float)col.g / 255.0f) * gMid * 1.8f;
+           rH = baseH * ((float)col.b / 255.0f) * gHigh * 1.8f;
         } else {
-           // PWV2: Blue data (1 byte)
-           int h = PWV2_Decode(renderData[(int)p0], &col);
-           float baseH = (h / 31.0f) * 255.0f;
-           rL = baseH * 0.95f; rM = baseH * 0.6f; rH = baseH * 0.1f;
+           // PWV2: Blue data (1 byte per frame)
+           int maxH = 0;
+           Color maxCol = {0, 0, 0, 255};
+           int startF = (int)floor(p0);
+           int endF = (int)ceil(p1);
+           if (startF < 0) startF = 0;
+           if (endF >= totalFrames) endF = totalFrames - 1;
+           if (endF < startF) endF = startF;
+
+           for (int f = startF; f <= endF; f++) {
+             Color tmpCol;
+             int h = PWV2_Decode(renderData[f], &tmpCol);
+             if (h > maxH) {
+               maxH = h;
+               maxCol = tmpCol;
+             }
+           }
+           col = maxCol;
+           float baseH = (maxH / 31.0f) * halfH;
+           if (col.r > col.b && col.r > col.g) {
+             rL = baseH * 0.4f * gLow * 1.8f; rM = baseH * 0.9f * gMid * 1.8f; rH = baseH * 0.2f * gHigh * 1.8f;
+           } else if (col.b > col.r && col.b > col.g) {
+             rL = baseH * 0.95f * gLow * 1.8f; rM = baseH * 0.6f * gMid * 1.8f; rH = baseH * 0.1f * gHigh * 1.8f;
+           } else {
+             rL = baseH * 0.8f * gLow * 1.8f; rM = baseH * 0.8f * gMid * 1.8f; rH = baseH * 0.6f * gHigh * 1.8f;
+           }
         }
 
         // 2. STYLE APPLICATION (Apply Gains & Final Colors)
         if (style == WAVEFORM_STYLE_3BAND) {
           // Render as 3 discrete layers
-          rL = (rL / 255.0f) * wh * 0.5f * gLow * 2.0f;
-          rM = (rM / 255.0f) * wh * 0.5f * gMid * 2.0f;
-          rH = (rH / 255.0f) * wh * 0.5f * gHigh * 2.0f;
-          
-          if (rL > wh * 0.5f) rL = wh * 0.5f;
-          if (rM > wh * 0.5f) rM = wh * 0.5f;
-          if (rH > wh * 0.5f) rH = wh * 0.5f;
+          if (rL > halfH) rL = halfH;
+          if (rM > halfH) rM = halfH;
+          if (rH > halfH) rH = halfH;
 
           float pLo = smLo;
           float pMi = smMi;
@@ -477,7 +524,6 @@ static void DeckStrip_Draw(Component *base) {
           smHi = rH;
 
           // Boost and Clamp for visibility
-          float halfH = wh * 0.5f;
           if (smLo > halfH) smLo = halfH;
           if (smMi > halfH) smMi = halfH;
           if (smHi > halfH) smHi = halfH;
@@ -524,7 +570,7 @@ static void DeckStrip_Draw(Component *base) {
              } else finalCol = ColorBlue;
           }
           
-          if (hVal > wh * 0.5f) hVal = wh * 0.5f;
+          if (hVal > halfH) hVal = halfH;
           float pVal = smLo; smLo = pVal + (hVal - pVal) * ((hVal > pVal) ? ATK : REL);
           
           Color finalC = played ? Fade(finalCol, 0.4f) : finalCol;

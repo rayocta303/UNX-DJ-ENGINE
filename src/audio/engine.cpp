@@ -305,20 +305,15 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
   double targetRate = 0.0;
   float accel = 0.08f;
 
-  if (deck->IsTouching) {
-    if (deck->VinylModeEnabled) {
-      // Vinyl Scratch Mode: Direct 1:1 platter rate lock
-      targetRate = deck->JogRate;
-      accel = 1.0f;
-    } else {
-      // CDJ Pitch Bend Mode: Does not halt motor, shifts pitch relative to BaseRate
-      targetRate = deck->IsMotorOn ? (deck->BaseRate + deck->JogRate) : deck->JogRate;
-      accel = 0.4f;
-    }
+  if (deck->IsTouching && deck->VinylModeEnabled) {
+    // Vinyl Scratch Mode: Direct 1:1 platter rate lock
+    targetRate = deck->JogRate;
+    accel = 1.0f;
   } else {
+    // CDJ Pitch Bend Mode or Normal Motor Playback
     if (deck->IsMotorOn) {
       targetRate = deck->BaseRate + deck->JogRate;
-      accel = deck->VinylStartAccel > 0 ? deck->VinylStartAccel : 0.12f;
+      accel = (deck->IsTouching && !deck->VinylModeEnabled) ? 0.4f : (deck->VinylStartAccel > 0 ? deck->VinylStartAccel : 0.12f);
     } else {
       targetRate = deck->JogRate;
       accel = (fabs(deck->JogRate) > 0.001) ? 0.2f : 1.0f; // Instant stop when paused and jog stops
@@ -706,23 +701,21 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
 
   deck->LastFader = deck->Fader; // Update for next block
   deck->LastRate = targetRate;
-  // VU Meter Ballistics
-  float peakL = maxL * 1.6f;
-  float peakR = maxR * 1.6f;
-  if (peakL > 1.0f)
-    peakL = 1.0f;
-  if (peakR > 1.0f)
-    peakR = 1.0f;
-  if (peakL > deck->VuMeterL)
+  // VU Meter Ballistics (Smooth PPM decay curve)
+  float peakL = maxL * 1.5f;
+  float peakR = maxR * 1.5f;
+  if (peakL > 1.0f) peakL = 1.0f;
+  if (peakR > 1.0f) peakR = 1.0f;
+  if (peakL > deck->VuMeterL) {
     deck->VuMeterL = peakL;
-  else {
-    deck->VuMeterL = deck->VuMeterL * 0.88f + peakL * 0.12f;
+  } else {
+    deck->VuMeterL = deck->VuMeterL * 0.94f + peakL * 0.06f;
     if (deck->VuMeterL < 0.005f) deck->VuMeterL = 0.0f;
   }
-  if (peakR > deck->VuMeterR)
+  if (peakR > deck->VuMeterR) {
     deck->VuMeterR = peakR;
-  else {
-    deck->VuMeterR = deck->VuMeterR * 0.88f + peakR * 0.12f;
+  } else {
+    deck->VuMeterR = deck->VuMeterR * 0.94f + peakR * 0.06f;
     if (deck->VuMeterR < 0.005f) deck->VuMeterR = 0.0f;
   }
 }
@@ -791,21 +784,23 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
     outBuffer[s * 4 + 3] = fmaxf(-1.0f, fminf(1.0f, cueMix[s * 2 + 1]));
   }
 
-  // Master VU Ballistics
+  // Master VU Ballistics (Smooth PPM decay curve)
   float pML = mPeakL * 1.4f;
   float pMR = mPeakR * 1.4f;
-  if (pML > 1.0f)
-    pML = 1.0f;
-  if (pMR > 1.0f)
-    pMR = 1.0f;
-  if (pML > engine->MasterVuL)
+  if (pML > 1.0f) pML = 1.0f;
+  if (pMR > 1.0f) pMR = 1.0f;
+  if (pML > engine->MasterVuL) {
     engine->MasterVuL = pML;
-  else
-    engine->MasterVuL = engine->MasterVuL * 0.88f + pML * 0.12f;
-  if (pMR > engine->MasterVuR)
+  } else {
+    engine->MasterVuL = engine->MasterVuL * 0.94f + pML * 0.06f;
+    if (engine->MasterVuL < 0.005f) engine->MasterVuL = 0.0f;
+  }
+  if (pMR > engine->MasterVuR) {
     engine->MasterVuR = pMR;
-  else
-    engine->MasterVuR = engine->MasterVuR * 0.88f + pMR * 0.12f;
+  } else {
+    engine->MasterVuR = engine->MasterVuR * 0.94f + pMR * 0.06f;
+    if (engine->MasterVuR < 0.005f) engine->MasterVuR = 0.0f;
+  }
   engine->LastCrossfader = engine->Crossfader;
 
   auto endTime = std::chrono::high_resolution_clock::now();
@@ -958,8 +953,6 @@ void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching) {
   deck->IsTouching = touching;
   
   if (!touching) {
-    deck->JogRate = deck->OutlinedRate;
-    
     // Slip Mode Catch-up on touch release!
     if (wasTouching && deck->SlipActive) {
       deck->Position = deck->SlipPosition;

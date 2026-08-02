@@ -2066,6 +2066,15 @@ void UpdateDrawFrame(App *app) {
   app->deckB.CurrentBPM = app->deckB.OriginalBPM * realPitchB;
 
   // --- Sync UI Jog/Modes back to Audio Engine ---
+  // Sync state flags first so physics processing has up-to-date deck flags
+  audioEngine->Decks[0].VinylModeEnabled = app->deckA.VinylModeEnabled;
+  audioEngine->Decks[0].MasterTempoActive = app->deckA.MasterTempo;
+  audioEngine->Decks[0].BPM = app->deckA.CurrentBPM;
+
+  audioEngine->Decks[1].VinylModeEnabled = app->deckB.VinylModeEnabled;
+  audioEngine->Decks[1].MasterTempoActive = app->deckB.MasterTempo;
+  audioEngine->Decks[1].BPM = app->deckB.CurrentBPM;
+
   // Deck A
   if (app->deckA.IsTouching != audioEngine->Decks[0].IsTouching) {
     bool released = !app->deckA.IsTouching && audioEngine->Decks[0].IsTouching;
@@ -2075,23 +2084,20 @@ void UpdateDrawFrame(App *app) {
     if (released && app->deckA.SyncMode == 2 && !app->deckA.IsMaster) {
       Sync_RequestPhaseSnap(&app->deckA, &app->deckB, audioEngine);
     }
-
-    // Immediately switch to BPM sync on touch if was in BEAT sync
-    if (app->deckA.IsTouching && app->deckA.SyncMode == 2) {
-      app->deckA.SyncMode = 1;
-    }
   }
+
   if (audioEngine->Decks[0].ReleaseFXType == 2) {
     // Active Backspin: Let engine physics decay JogRate smoothly
-  } else if (app->deckA.JogDelta != 0 || app->deckA.IsTouching) {
+  } else if (app->deckA.JogDelta != 0 || (app->deckA.IsTouching && app->deckA.VinylModeEnabled)) {
     double dt = GetFrameTime();
     if (dt < 0.001)
       dt = 0.016;
 
     if (app->deckA.JogDelta != 0) {
-      double instantaneousRate = app->deckA.JogDelta / (777.77 * dt);
+      double rawRate = app->deckA.JogDelta / (777.77 * dt);
       app->deckA.JogDelta = 0;
-      audioEngine->Decks[0].JogRate = instantaneousRate;
+      // Exponential Moving Average filter to smooth MIDI packet jitter
+      audioEngine->Decks[0].JogRate = audioEngine->Decks[0].JogRate * 0.25 + rawRate * 0.75;
     } else if (app->deckA.IsTouching && app->deckA.VinylModeEnabled) {
       // Touch hold in Vinyl mode (vinyl platter held stationary under hand)
       audioEngine->Decks[0].JogRate = 0.0;
@@ -2103,15 +2109,12 @@ void UpdateDrawFrame(App *app) {
     float dtFactor = (float)(dt / 0.016667);
     if (dtFactor < 0.1f) dtFactor = 0.1f;
     if (dtFactor > 5.0f) dtFactor = 5.0f;
-    audioEngine->Decks[0].JogRate *= powf(0.80f, dtFactor);
-    if (fabs(audioEngine->Decks[0].JogRate) < 0.05 || !audioEngine->Decks[0].IsMotorOn) {
+    audioEngine->Decks[0].JogRate *= powf(0.92f, dtFactor);
+    if (fabs(audioEngine->Decks[0].JogRate) < 0.01 || !audioEngine->Decks[0].IsMotorOn) {
       audioEngine->Decks[0].JogRate = 0.0;
       if (!audioEngine->Decks[0].IsMotorOn) audioEngine->Decks[0].OutlinedRate = 0.0;
     }
   }
-  audioEngine->Decks[0].VinylModeEnabled = app->deckA.VinylModeEnabled;
-  audioEngine->Decks[0].MasterTempoActive = app->deckA.MasterTempo;
-  audioEngine->Decks[0].BPM = app->deckA.CurrentBPM;
 
   // Deck B
   if (app->deckB.IsTouching != audioEngine->Decks[1].IsTouching) {
@@ -2122,23 +2125,20 @@ void UpdateDrawFrame(App *app) {
     if (released && app->deckB.SyncMode == 2 && !app->deckB.IsMaster) {
       Sync_RequestPhaseSnap(&app->deckB, &app->deckA, audioEngine);
     }
-
-    // Immediately switch to BPM sync on touch if was in BEAT sync
-    if (app->deckB.IsTouching && app->deckB.SyncMode == 2) {
-      app->deckB.SyncMode = 1;
-    }
   }
+
   if (audioEngine->Decks[1].ReleaseFXType == 2) {
     // Active Backspin: Let engine physics decay JogRate smoothly
-  } else if (app->deckB.JogDelta != 0 || app->deckB.IsTouching) {
+  } else if (app->deckB.JogDelta != 0 || (app->deckB.IsTouching && app->deckB.VinylModeEnabled)) {
     double dt = GetFrameTime();
     if (dt < 0.001)
       dt = 0.016;
 
     if (app->deckB.JogDelta != 0) {
-      double instantaneousRate = app->deckB.JogDelta / (777.77 * dt);
+      double rawRate = app->deckB.JogDelta / (777.77 * dt);
       app->deckB.JogDelta = 0;
-      audioEngine->Decks[1].JogRate = instantaneousRate;
+      // Exponential Moving Average filter to smooth MIDI packet jitter
+      audioEngine->Decks[1].JogRate = audioEngine->Decks[1].JogRate * 0.25 + rawRate * 0.75;
     } else if (app->deckB.IsTouching && app->deckB.VinylModeEnabled) {
       // Touch hold in Vinyl mode (vinyl platter held stationary under hand)
       audioEngine->Decks[1].JogRate = 0.0;
@@ -2150,15 +2150,12 @@ void UpdateDrawFrame(App *app) {
     float dtFactor = (float)(dt / 0.016667);
     if (dtFactor < 0.1f) dtFactor = 0.1f;
     if (dtFactor > 5.0f) dtFactor = 5.0f;
-    audioEngine->Decks[1].JogRate *= powf(0.80f, dtFactor);
-    if (fabs(audioEngine->Decks[1].JogRate) < 0.05 || !audioEngine->Decks[1].IsMotorOn) {
+    audioEngine->Decks[1].JogRate *= powf(0.92f, dtFactor);
+    if (fabs(audioEngine->Decks[1].JogRate) < 0.01 || !audioEngine->Decks[1].IsMotorOn) {
       audioEngine->Decks[1].JogRate = 0.0;
       if (!audioEngine->Decks[1].IsMotorOn) audioEngine->Decks[1].OutlinedRate = 0.0;
     }
   }
-  audioEngine->Decks[1].VinylModeEnabled = app->deckB.VinylModeEnabled;
-  audioEngine->Decks[1].MasterTempoActive = app->deckB.MasterTempo;
-  audioEngine->Decks[1].BPM = app->deckB.CurrentBPM;
 
   // Apply Vinyl Start/Stop Physics
   for (int i = 0; i < 2; i++) {
@@ -2309,12 +2306,14 @@ void UpdateDrawFrame(App *app) {
     if (app->deckA.HasSeekRequest) {
       DeckAudio_JumpToMs(&audioEngine->Decks[0], app->deckA.SeekMs);
       if (app->deckA.IsPlaying) DeckAudio_InstantPlay(&audioEngine->Decks[0]);
+      else DeckAudio_InstantStop(&audioEngine->Decks[0]);
       app->deckA.HasSeekRequest = false;
       app->padState.ActiveLoopIdx[0] = -1;
     }
     if (app->deckB.HasSeekRequest) {
       DeckAudio_JumpToMs(&audioEngine->Decks[1], app->deckB.SeekMs);
       if (app->deckB.IsPlaying) DeckAudio_InstantPlay(&audioEngine->Decks[1]);
+      else DeckAudio_InstantStop(&audioEngine->Decks[1]);
       app->deckB.HasSeekRequest = false;
       app->padState.ActiveLoopIdx[1] = -1;
     }

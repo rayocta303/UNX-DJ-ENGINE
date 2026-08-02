@@ -326,7 +326,9 @@ static void Mixer_Draw(Component *base) {
 
     // --- CHANNEL VU ---
     float cvuX = (i == 0) ? (fcx + fW/2 + S(6)) : (fcx - fW/2 - S(10)); // Increased spacing
-    DrawVertVU(cvuX, fy, S(4), fH, fmaxf(d->VuMeterL, d->VuMeterR));
+    float rawPeak = fmaxf(d->VuMeterL, d->VuMeterR);
+    float chanVu = (d->Fader > 0.01f) ? (rawPeak * d->Fader) : (d->IsCueActive ? rawPeak : rawPeak * d->Fader);
+    DrawVertVU(cvuX, fy, S(4), fH, chanVu);
 
     // --- CFX (COLOR) KNOB (Below Fader) ---
     float colorY = fy + fH + S(22);

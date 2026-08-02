@@ -58,6 +58,13 @@ typedef struct {
     bool ShowLoadPopup;
     int PopupTrackIdx;
 
+    // Touch kinetic & Scrollbar interaction
+    float LastTouchY;
+    float TouchVelocityY;
+    bool IsScrollbarDragging;
+    float ScrollbarDragStartY;
+    float ScrollbarDragStartScroll;
+
     // Animation for Marquee and Smooth Scrolling
     float MarqueeScrollX;
     double LastAnimTime;

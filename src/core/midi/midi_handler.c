@@ -72,16 +72,39 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
     // --- VU Meters ---
     float level1 = 0.0f, level2 = 0.0f, masterLevel = 0.0f;
     if (engine) {
-        if (engine->Decks[0].IsPlaying && engine->Decks[0].Trim > 0.01f) {
-            level1 = engine->Decks[0].Trim * (engine->Decks[0].Fader);
-            if (level1 > 1.0f) level1 = 1.0f;
+        float p1 = fmaxf(engine->Decks[0].VuMeterL, engine->Decks[0].VuMeterR);
+        float p2 = fmaxf(engine->Decks[1].VuMeterL, engine->Decks[1].VuMeterR);
+
+        float fader1 = engine->Decks[0].Fader;
+        float fader2 = engine->Decks[1].Fader;
+
+        if (fader1 > 0.01f) {
+            level1 = p1 * fader1;
+        } else if (engine->Decks[0].IsCueActive) {
+            level1 = p1; // Show gain stage level during headphones cueing
+        } else {
+            level1 = p1 * fader1;
         }
-        if (engine->Decks[1].IsPlaying && engine->Decks[1].Trim > 0.01f) {
-            level2 = engine->Decks[1].Trim * (engine->Decks[1].Fader);
-            if (level2 > 1.0f) level2 = 1.0f;
+
+        if (fader2 > 0.01f) {
+            level2 = p2 * fader2;
+        } else if (engine->Decks[1].IsCueActive) {
+            level2 = p2;
+        } else {
+            level2 = p2 * fader2;
         }
-        masterLevel = (level1 > level2 ? level1 : level2) * engine->MasterVolume;
+
+        if (level1 > 1.0f) level1 = 1.0f;
+        if (level2 > 1.0f) level2 = 1.0f;
+
+        masterLevel = fmaxf(engine->MasterVuL, engine->MasterVuR);
         if (masterLevel > 1.0f) masterLevel = 1.0f;
+
+        // Register in ControlObjects for Mixxx XML mappings
+        CO_SetValue("[Channel1]", "VuMeter", level1);
+        CO_SetValue("[Channel2]", "VuMeter", level2);
+        CO_SetValue("[Master]", "VuMeterL", engine->MasterVuL);
+        CO_SetValue("[Master]", "VuMeterR", engine->MasterVuR);
     }
 
     // Send VU Meter CCs for Channel 1..4 & Master
