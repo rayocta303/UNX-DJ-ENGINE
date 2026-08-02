@@ -6,29 +6,27 @@
 
 static int TopBar_Update(Component *base) {
   TopBar *t = (TopBar *)base;
-  float btnH = TOP_BAR_H - S(4);
-  float btnY = S(2);
 
-  if (UICheckClick((Rectangle){ t->btnFullX, btnY, t->btnFullW, btnH })) {
+  if (UICheckClick((Rectangle){ 0, 0, t->btnFullX + t->btnFullW + S(4), TOP_BAR_H })) {
     ToggleFullscreen();
   }
-  if (UICheckClick((Rectangle){ t->btnBrowseX, btnY, t->btnBrowseW, btnH })) {
+  if (UICheckClick((Rectangle){ t->btnBrowseX - S(3), 0, t->btnBrowseW + S(6), TOP_BAR_H })) {
     if (t->OnBrowse)
       t->OnBrowse(t->callbackCtx);
   }
-  if (UICheckClick((Rectangle){ t->btnMixerX, btnY, t->btnMixerW, btnH })) {
+  if (UICheckClick((Rectangle){ t->btnMixerX - S(3), 0, t->btnMixerW + S(6), TOP_BAR_H })) {
     if (t->OnMixer)
       t->OnMixer(t->callbackCtx);
   }
-  if (UICheckClick((Rectangle){ t->btnPadX, btnY, t->btnPadW, btnH })) {
+  if (UICheckClick((Rectangle){ t->btnPadX - S(3), 0, t->btnPadW + S(6), TOP_BAR_H })) {
     if (t->OnPad)
       t->OnPad(t->callbackCtx);
   }
-  if (UICheckClick((Rectangle){ t->btnInfoX, btnY, t->btnInfoW, btnH })) {
+  if (UICheckClick((Rectangle){ t->btnInfoX - S(3), 0, t->btnInfoW + S(6), TOP_BAR_H })) {
     if (t->OnInfo)
       t->OnInfo(t->callbackCtx);
   }
-  if (UICheckClick((Rectangle){ t->btnSettingsX, btnY, t->btnSettingsW, btnH })) {
+  if (UICheckClick((Rectangle){ t->btnSettingsX - S(3), 0, t->btnSettingsW + S(6), TOP_BAR_H })) {
     if (t->OnSettings)
       t->OnSettings(t->callbackCtx);
   }
@@ -41,14 +39,14 @@ static void TopBar_Draw(Component *base) {
   DrawLine(0, TOP_BAR_H, SCREEN_WIDTH, TOP_BAR_H, ColorDark1);
 
   Font faceXS = UIFonts_GetFace(S(8));
-  Font faceSm = UIFonts_GetFace(S(9));
+  Font faceSm = UIFonts_GetFace(S(9.5f));
 
   float btnH = TOP_BAR_H - S(4);
   float btnY = S(2);
 
   // 1. Fullscreen Button (Top-Left corner before CPU/RAM)
   t->btnFullX = t->MarginX;
-  t->btnFullW = S(16);
+  t->btnFullW = S(22);
 
   bool isFull = IsWindowFullscreen();
   DrawRectangle(t->btnFullX, btnY, t->btnFullW, btnH, isFull ? ColorBlue : ColorDark1);
@@ -56,41 +54,41 @@ static void TopBar_Draw(Component *base) {
 
   float cx = t->btnFullX + t->btnFullW / 2.0f;
   float cy = btnY + btnH / 2.0f;
-  float iconS = S(4.0f);
+  float iconS = S(5.0f);
   Color iconCol = ColorWhite;
 
   if (isFull) {
     // Inward arrows / shrink icon
-    DrawLineEx((Vector2){cx - iconS, cy - iconS}, (Vector2){cx - S(1.5f), cy - S(1.5f)}, 1.5f, iconCol);
-    DrawLineEx((Vector2){cx + iconS, cy - iconS}, (Vector2){cx + S(1.5f), cy - S(1.5f)}, 1.5f, iconCol);
-    DrawLineEx((Vector2){cx - iconS, cy + iconS}, (Vector2){cx - S(1.5f), cy + S(1.5f)}, 1.5f, iconCol);
-    DrawLineEx((Vector2){cx + iconS, cy + iconS}, (Vector2){cx + S(1.5f), cy + S(1.5f)}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx - iconS, cy - iconS}, (Vector2){cx - S(2.0f), cy - S(2.0f)}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx + iconS, cy - iconS}, (Vector2){cx + S(2.0f), cy - S(2.0f)}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx - iconS, cy + iconS}, (Vector2){cx - S(2.0f), cy + S(2.0f)}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx + iconS, cy + iconS}, (Vector2){cx + S(2.0f), cy + S(2.0f)}, 1.5f, iconCol);
   } else {
     // Outward brackets / expand icon
-    DrawLineEx((Vector2){cx - iconS, cy - iconS}, (Vector2){cx - iconS + S(2.5f), cy - iconS}, 1.5f, iconCol);
-    DrawLineEx((Vector2){cx - iconS, cy - iconS}, (Vector2){cx - iconS, cy - iconS + S(2.5f)}, 1.5f, iconCol);
-    DrawLineEx((Vector2){cx + iconS, cy - iconS}, (Vector2){cx + iconS - S(2.5f), cy - iconS}, 1.5f, iconCol);
-    DrawLineEx((Vector2){cx + iconS, cy - iconS}, (Vector2){cx + iconS, cy - iconS + S(2.5f)}, 1.5f, iconCol);
-    DrawLineEx((Vector2){cx - iconS, cy + iconS}, (Vector2){cx - iconS + S(2.5f), cy + iconS}, 1.5f, iconCol);
-    DrawLineEx((Vector2){cx - iconS, cy + iconS}, (Vector2){cx - iconS, cy - iconS + S(2.5f)}, 1.5f, iconCol);
-    DrawLineEx((Vector2){cx + iconS, cy + iconS}, (Vector2){cx + iconS - S(2.5f), cy + iconS}, 1.5f, iconCol);
-    DrawLineEx((Vector2){cx + iconS, cy + iconS}, (Vector2){cx + iconS, cy + iconS - S(2.5f)}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx - iconS, cy - iconS}, (Vector2){cx - iconS + S(3.0f), cy - iconS}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx - iconS, cy - iconS}, (Vector2){cx - iconS, cy - iconS + S(3.0f)}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx + iconS, cy - iconS}, (Vector2){cx + iconS - S(3.0f), cy - iconS}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx + iconS, cy - iconS}, (Vector2){cx + iconS, cy - iconS + S(3.0f)}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx - iconS, cy + iconS}, (Vector2){cx - iconS + S(3.0f), cy + iconS}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx - iconS, cy + iconS}, (Vector2){cx - iconS, cy + iconS - S(3.0f)}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx + iconS, cy + iconS}, (Vector2){cx + iconS - S(3.0f), cy + iconS}, 1.5f, iconCol);
+    DrawLineEx((Vector2){cx + iconS, cy + iconS}, (Vector2){cx + iconS, cy + iconS - S(3.0f)}, 1.5f, iconCol);
   }
 
   // 2. CPU & RAM Usage (Positioned after Fullscreen Button)
   float textStartX = t->btnFullX + t->btnFullW + S(4);
   char cpuStr[32];
   sprintf(cpuStr, "CPU %d%%", (int)(t->CPUUsage * 100));
-  UIDrawText(cpuStr, faceXS, textStartX, S(6), S(8), ColorShadow);
+  UIDrawText(cpuStr, faceXS, textStartX, (TOP_BAR_H - S(16)) / 2.0f, S(8), ColorShadow);
 
   char ramStr[32];
   sprintf(ramStr, "RAM %dMB", (int)t->RAMUsage);
-  UIDrawText(ramStr, faceSm, textStartX + S(36), S(5), S(9), ColorWhite);
+  UIDrawText(ramStr, faceSm, textStartX + S(38), (TOP_BAR_H - S(10)) / 2.0f, S(9.5f), ColorWhite);
 
   // 3. Center Group
-  float btnSpacing = S(8);
+  float btnSpacing = S(6);
 
-  t->btnBrowseW = S(72); // Reduced width to fit 5 buttons
+  t->btnBrowseW = S(80); // Enlarged button width for touch accuracy
   t->btnMixerW = t->btnBrowseW;
   t->btnInfoW = t->btnBrowseW;
   t->btnSettingsW = t->btnBrowseW;
@@ -105,53 +103,54 @@ static void TopBar_Draw(Component *base) {
   t->btnInfoX = t->btnPadX + t->btnPadW + btnSpacing;
   t->btnSettingsX = t->btnInfoX + t->btnInfoW + btnSpacing;
 
-  Font faceBold = UIFonts_GetBoldFace(S(9));
+  Font faceBold = UIFonts_GetBoldFace(S(10.5f));
+  float textY = btnY + (btnH - S(10.5f)) / 2.0f - S(1.0f);
 
   // Draw BROWSE
   DrawRectangle(t->btnBrowseX, btnY, t->btnBrowseW, btnH,
                 t->ActiveScreen == ScreenBrowser ? ColorBlue : ColorDark1);
   DrawRectangleLines(t->btnBrowseX, btnY, t->btnBrowseW, btnH, ColorShadow);
-  DrawCentredText("BROWSE", faceBold, t->btnBrowseX, t->btnBrowseW, btnY + S(2.5f), S(9), ColorWhite);
+  DrawCentredText("BROWSE", faceBold, t->btnBrowseX, t->btnBrowseW, textY, S(10.5f), ColorWhite);
 
   // Draw MIXER
   DrawRectangle(t->btnMixerX, btnY, t->btnMixerW, btnH,
                 t->ActiveScreen == ScreenMixer ? ColorBlue : ColorDark1);
   DrawRectangleLines(t->btnMixerX, btnY, t->btnMixerW, btnH, ColorShadow);
-  DrawCentredText("MIXER", faceBold, t->btnMixerX, t->btnMixerW, btnY + S(2.5f), S(9), ColorWhite);
+  DrawCentredText("MIXER", faceBold, t->btnMixerX, t->btnMixerW, textY, S(10.5f), ColorWhite);
 
   // Draw PAD
   DrawRectangle(t->btnPadX, btnY, t->btnPadW, btnH,
                 t->ActiveScreen == ScreenPad ? ColorBlue : ColorDark1);
   DrawRectangleLines(t->btnPadX, btnY, t->btnPadW, btnH, ColorShadow);
-  DrawCentredText("PAD", faceBold, t->btnPadX, t->btnPadW, btnY + S(2.5f), S(9), ColorWhite);
+  DrawCentredText("PAD", faceBold, t->btnPadX, t->btnPadW, textY, S(10.5f), ColorWhite);
 
   // Draw INFO
   DrawRectangle(t->btnInfoX, btnY, t->btnInfoW, btnH,
                 t->ActiveScreen == ScreenInfo ? ColorBlue : ColorDark1);
   DrawRectangleLines(t->btnInfoX, btnY, t->btnInfoW, btnH, ColorShadow);
-  DrawCentredText("INFO", faceBold, t->btnInfoX, t->btnInfoW, btnY + S(2.5f), S(9), ColorWhite);
+  DrawCentredText("INFO", faceBold, t->btnInfoX, t->btnInfoW, textY, S(10.5f), ColorWhite);
 
   // Draw MENU
   DrawRectangle(t->btnSettingsX, btnY, t->btnSettingsW, btnH,
                 t->ActiveScreen == ScreenSettings ? ColorBlue : ColorDark1);
   DrawRectangleLines(t->btnSettingsX, btnY, t->btnSettingsW, btnH, ColorShadow);
-  DrawCentredText("MENU", faceBold, t->btnSettingsX, t->btnSettingsW, btnY + S(2.5f), S(9), ColorWhite);
+  DrawCentredText("MENU", faceBold, t->btnSettingsX, t->btnSettingsW, textY, S(10.5f), ColorWhite);
 
   // 3. Right Status & Battery
-  float batW = S(20);
-  float batH = S(9);
+  float batW = S(22);
+  float batH = S(11);
   float batX = SCREEN_WIDTH - t->MarginX - batW - S(15);
-  float batY = (TOP_BAR_H - batH) / 2;
+  float batY = (TOP_BAR_H - batH) / 2.0f;
 
   char batPctStr[16];
   sprintf(batPctStr, "%d%%", (int)(t->BatteryLevel * 100));
-  float tw = MeasureTextEx(faceSm, batPctStr, S(9), 1.0f).x;
+  float tw = MeasureTextEx(faceSm, batPctStr, S(9.5f), 1.0f).x;
   float pctX = batX - tw - S(5);
-  UIDrawText(batPctStr, faceSm, pctX, S(5), S(9), ColorWhite);
+  UIDrawText(batPctStr, faceSm, pctX, (TOP_BAR_H - S(9.5f)) / 2.0f, S(9.5f), ColorWhite);
 
   DrawRectangle(batX, batY, batW, batH, ColorDark3);
   DrawRectangleLines(batX, batY, batW, batH, ColorShadow);
-  DrawRectangle(batX + batW, batY + S(2.5f), S(1.5f), S(4), ColorShadow);
+  DrawRectangle(batX + batW, batY + S(3.0f), S(2.0f), S(5.0f), ColorShadow);
 
   if (t->BatteryLevel > 0) {
     float gap = 1.5f;
@@ -175,11 +174,11 @@ static void TopBar_Draw(Component *base) {
 
     // Charging indicator (Bolt icon or "+" sign)
     if (t->IsCharging) {
-        UIDrawText("+", faceXS, batX + batW + S(4), batY, S(8), ColorYellow);
+        UIDrawText("+", faceXS, batX + batW + S(4), batY, S(9), ColorYellow);
     }
   }
 
-  UIDrawText("LINK   MIDI", faceSm, pctX - S(68), S(5), S(9), ColorWhite);
+  UIDrawText("LINK   MIDI", faceSm, pctX - S(72), (TOP_BAR_H - S(9.5f)) / 2.0f, S(9.5f), ColorWhite);
 }
 
 void TopBar_Init(TopBar *t) {

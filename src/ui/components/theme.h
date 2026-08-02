@@ -19,7 +19,7 @@
 #define STATIC_WFM_H    30
 
 // Layout zones (tuned for 640x400 to match reference)
-#define TOP_BAR_H       S(20.0f)
+#define TOP_BAR_H       S(26.0f)
 #define SIDE_PANEL_W    S(110.0f)
 #define BEAT_FX_W       SIDE_PANEL_W
 #define BEAT_FX_X       (SCREEN_WIDTH - SIDE_PANEL_W)
