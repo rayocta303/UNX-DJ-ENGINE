@@ -80,9 +80,12 @@ typedef struct {
     bool MidiRequestLoadA;
     bool MidiRequestLoadB;
 
-    // Search functionality
+    // Search & On-Screen Keyboard (OSK) functionality
     char SearchQuery[64];
     bool IsSearching;
+    bool ShowOSK;
+    bool OSKShiftActive;
+    int OSKMode;          // 0 = QWERTY Letters, 1 = Numbers & Symbols
 
     // Sort functionality
     int SortMode;         // 0 = Default, 1 = BPM, 2 = Key

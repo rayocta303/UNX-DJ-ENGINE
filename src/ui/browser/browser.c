@@ -630,10 +630,24 @@ static int Browser_Update(Component *base) {
     float listW = SCREEN_WIDTH - sidebarW - S(8);
     if (s->InfoEnabled) listW = SCREEN_WIDTH - sidebarW - S(160);
     
-    float sortButtonW = S(80);
+    float sortButtonW = S(65);
+    float oskButtonW = S(36);
     Rectangle sortButtonRect = {sidebarW + listW - sortButtonW, TOP_BAR_H, sortButtonW, S(28.0f)};
     Rectangle dropdownRect = {sortButtonRect.x, sortButtonRect.y + sortButtonRect.height, sortButtonW, S(28.0f) * 5}; // 5 items
-    Rectangle searchBoxRect = {sidebarW, TOP_BAR_H, listW - sortButtonW - S(4), S(28.0f)};
+    Rectangle oskButtonRect = {sidebarW + listW - sortButtonW - oskButtonW - S(4), TOP_BAR_H, oskButtonW, S(28.0f)};
+    Rectangle searchBoxRect = {sidebarW, TOP_BAR_H, listW - sortButtonW - oskButtonW - S(8), S(28.0f)};
+
+    // Handle OSK Panel Touch Absorption
+    if (s->ShowOSK) {
+      float viewH = SCREEN_HEIGHT - DECK_STR_H;
+      float oskH = S(210);
+      Rectangle oskPanelRect = {sidebarW, viewH - oskH, SCREEN_WIDTH - sidebarW, oskH};
+      if (CheckCollisionPointRec(mousePos, oskPanelRect)) {
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+          // Touch absorbed by OSK overlay
+        }
+      }
+    }
 
     if (s->ShowSortDropdown) {
         bool hoverDropdown = CheckCollisionPointRec(mousePos, dropdownRect);
@@ -674,6 +688,13 @@ static int Browser_Update(Component *base) {
         if (hoverDropdown || hoverButton) return 0;
     } 
     else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        // Handle OSK Button Toggle
+        if (CheckCollisionPointRec(mousePos, oskButtonRect)) {
+            s->ShowOSK = !s->ShowOSK;
+            s->IsSearching = s->ShowOSK;
+            return 0;
+        }
+
         // Handle Sort Button (Open Menu)
         if (CheckCollisionPointRec(mousePos, sortButtonRect)) {
             s->ShowSortDropdown = true;
@@ -682,15 +703,12 @@ static int Browser_Update(Component *base) {
 
         // Handle Search Box
         if (CheckCollisionPointRec(mousePos, searchBoxRect)) {
-            if (!s->IsSearching) {
-                s->IsSearching = true;
-                System_ShowKeyboard(true);
-            }
-        } else {
+            s->IsSearching = true;
+            s->ShowOSK = true;
+        } else if (!s->ShowOSK) {
             // Click outside search box
             if (s->IsSearching) {
                 s->IsSearching = false;
-                System_ShowKeyboard(false);
             }
         }
     }
@@ -1486,6 +1504,261 @@ static int Browser_Update(Component *base) {
   return 0;
 }
 
+// On-Screen Keyboard (OSK) Touch Rendering & Interaction
+static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
+  if (!s->ShowOSK) return;
+
+  float sidebarW = S(40);
+  float viewH = SCREEN_HEIGHT - DECK_STR_H;
+  float oskH = S(210);
+  float oskW = SCREEN_WIDTH - sidebarW;
+  float oskX = sidebarW;
+  float oskY = viewH - oskH;
+
+  // Outer Overlay Background
+  DrawRectangle((int)oskX, (int)oskY, (int)oskW, (int)oskH, (Color){ 14, 16, 22, 248 });
+  DrawRectangleLinesEx((Rectangle){ oskX, oskY, oskW, oskH }, 1.5f, ColorBlue);
+
+  // Header Title & Search Preview
+  DrawRectangle((int)oskX, (int)oskY, (int)oskW, (int)S(32), (Color){ 22, 26, 38, 255 });
+  DrawLine((int)oskX, (int)(oskY + S(32)), (int)(oskX + oskW), (int)(oskY + S(32)), ColorDark1);
+
+  Font faceXS = UIFonts_GetFace(S(9));
+  Font faceSm = UIFonts_GetFace(S(12));
+  Font faceMd = UIFonts_GetFace(S(14));
+  Font faceIcon = UIFonts_GetIcon(S(6));
+
+  // Icon + "SEARCH"
+  UIDrawText("\uf11c", faceIcon, oskX + S(10), oskY + S(10), S(12), ColorOrange);
+  UIDrawText("SEARCH", faceSm, oskX + S(28), oskY + S(9), S(12), ColorOrange);
+
+  // Current Search Query Box in Header
+  float previewW = oskW - S(160);
+  Rectangle prevRect = { oskX + S(85), oskY + S(4), previewW, S(24) };
+  DrawRectangleRec(prevRect, ColorBlack);
+  DrawRectangleLinesEx(prevRect, 1.0f, ColorDark1);
+
+  char searchDisplay[128];
+  if (strlen(s->SearchQuery) > 0) {
+      snprintf(searchDisplay, sizeof(searchDisplay), "%s", s->SearchQuery);
+  } else {
+      snprintf(searchDisplay, sizeof(searchDisplay), "Type to search tracks...");
+  }
+  if ((int)(GetTime() * 2) % 2 == 0) {
+      strncat(searchDisplay, "|", sizeof(searchDisplay) - strlen(searchDisplay) - 1);
+  }
+  UIDrawText(searchDisplay, faceXS, prevRect.x + S(6), prevRect.y + S(6), S(11), strlen(s->SearchQuery) > 0 ? ColorWhite : ColorShadow);
+
+  // Close Button on top-right of Header
+  Rectangle closeBtn = { oskX + oskW - S(60), oskY + S(4), S(52), S(24) };
+  bool hoverClose = CheckCollisionPointRec(mPos, closeBtn);
+  DrawRectangleRec(closeBtn, hoverClose ? ColorRed : ColorDark2);
+  DrawRectangleLinesEx(closeBtn, 1.0f, ColorShadow);
+  DrawCentredText("HIDE", faceXS, closeBtn.x, closeBtn.width, closeBtn.y + S(7), S(10), ColorWhite);
+
+  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverClose) {
+      s->ShowOSK = false;
+      s->IsSearching = (strlen(s->SearchQuery) > 0);
+      return;
+  }
+
+  // Key Definitions
+  const char *row1_letters = "QWERTYUIOP";
+  const char *row1_symbols = "1234567890";
+  
+  const char *row2_letters = "ASDFGHJKL";
+  const char *row2_symbols = "-/:;()$&@\"";
+  
+  const char *row3_letters = "ZXCVBNM";
+  const char *row3_symbols = ".,?!'#%*";
+
+  float startY = oskY + S(38);
+  float keyH = S(36);
+  float gap = S(4);
+  float availW = oskW - S(16);
+
+  // ROW 1 (10 Keys)
+  int count1 = 10;
+  float kw1 = (availW - (count1 - 1) * gap) / (float)count1;
+  for (int i = 0; i < count1; i++) {
+      char ch = (s->OSKMode == 0) ? row1_letters[i] : row1_symbols[i];
+      if (s->OSKMode == 0 && !s->OSKShiftActive) ch = (char)tolower((unsigned char)ch);
+
+      Rectangle kRect = { oskX + S(8) + i * (kw1 + gap), startY, kw1, keyH };
+      bool isHover = CheckCollisionPointRec(mPos, kRect);
+      DrawRectangleRec(kRect, isHover ? ColorBlue : ColorDark2);
+      DrawRectangleLinesEx(kRect, 1.0f, isHover ? ColorWhite : ColorDark1);
+
+      char label[2] = { ch, '\0' };
+      DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(10), S(14), ColorWhite);
+
+      if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && isHover) {
+          if (strlen(s->SearchQuery) < 63) {
+              int len = strlen(s->SearchQuery);
+              s->SearchQuery[len] = ch;
+              s->SearchQuery[len + 1] = '\0';
+              s->CursorPos = s->ScrollOffset = 0;
+              s->VisualScroll = 0;
+              Browser_UpdateActiveTracks(s);
+          }
+      }
+  }
+
+  // ROW 2 (9-10 Keys)
+  float startY2 = startY + keyH + gap;
+  int count2 = (s->OSKMode == 0) ? 9 : 10;
+  float kw2 = (availW - (count2 - 1) * gap) / (float)count2;
+  float offset2 = (s->OSKMode == 0) ? (kw2 * 0.5f) : 0;
+
+  for (int i = 0; i < count2; i++) {
+      char ch = (s->OSKMode == 0) ? row2_letters[i] : row2_symbols[i];
+      if (s->OSKMode == 0 && !s->OSKShiftActive) ch = (char)tolower((unsigned char)ch);
+
+      Rectangle kRect = { oskX + S(8) + offset2 + i * (kw2 + gap), startY2, kw2, keyH };
+      bool isHover = CheckCollisionPointRec(mPos, kRect);
+      DrawRectangleRec(kRect, isHover ? ColorBlue : ColorDark2);
+      DrawRectangleLinesEx(kRect, 1.0f, isHover ? ColorWhite : ColorDark1);
+
+      char label[2] = { ch, '\0' };
+      DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(10), S(14), ColorWhite);
+
+      if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && isHover) {
+          if (strlen(s->SearchQuery) < 63) {
+              int len = strlen(s->SearchQuery);
+              s->SearchQuery[len] = ch;
+              s->SearchQuery[len + 1] = '\0';
+              s->CursorPos = s->ScrollOffset = 0;
+              s->VisualScroll = 0;
+              Browser_UpdateActiveTracks(s);
+          }
+      }
+  }
+
+  // ROW 3: SHIFT | KEYS | BKSP
+  float startY3 = startY2 + keyH + gap;
+  float kwShift = S(50);
+  float kwBksp = S(55);
+  int count3 = (s->OSKMode == 0) ? 7 : 8;
+  float middleAvailW = availW - kwShift - kwBksp - 2 * gap;
+  float kw3 = (middleAvailW - (count3 - 1) * gap) / (float)count3;
+
+  // SHIFT KEY
+  Rectangle shiftRect = { oskX + S(8), startY3, kwShift, keyH };
+  bool hoverShift = CheckCollisionPointRec(mPos, shiftRect);
+  Color shiftBg = s->OSKShiftActive ? ColorOrange : (hoverShift ? ColorBlue : ColorDark2);
+  DrawRectangleRec(shiftRect, shiftBg);
+  DrawRectangleLinesEx(shiftRect, 1.0f, ColorDark1);
+  DrawCentredText("SHIFT", faceXS, shiftRect.x, shiftRect.width, shiftRect.y + S(12), S(10), ColorWhite);
+
+  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverShift) {
+      s->OSKShiftActive = !s->OSKShiftActive;
+  }
+
+  // ROW 3 LETTERS / SYMBOLS
+  for (int i = 0; i < count3; i++) {
+      char ch = (s->OSKMode == 0) ? row3_letters[i] : row3_symbols[i];
+      if (s->OSKMode == 0 && !s->OSKShiftActive) ch = (char)tolower((unsigned char)ch);
+
+      Rectangle kRect = { oskX + S(8) + kwShift + gap + i * (kw3 + gap), startY3, kw3, keyH };
+      bool isHover = CheckCollisionPointRec(mPos, kRect);
+      DrawRectangleRec(kRect, isHover ? ColorBlue : ColorDark2);
+      DrawRectangleLinesEx(kRect, 1.0f, isHover ? ColorWhite : ColorDark1);
+
+      char label[2] = { ch, '\0' };
+      DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(10), S(14), ColorWhite);
+
+      if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && isHover) {
+          if (strlen(s->SearchQuery) < 63) {
+              int len = strlen(s->SearchQuery);
+              s->SearchQuery[len] = ch;
+              s->SearchQuery[len + 1] = '\0';
+              s->CursorPos = s->ScrollOffset = 0;
+              s->VisualScroll = 0;
+              Browser_UpdateActiveTracks(s);
+          }
+      }
+  }
+
+  // BKSP KEY
+  Rectangle bkspRect = { oskX + S(8) + oskW - S(16) - kwBksp, startY3, kwBksp, keyH };
+  bool hoverBksp = CheckCollisionPointRec(mPos, bkspRect);
+  DrawRectangleRec(bkspRect, hoverBksp ? ColorRed : ColorDark2);
+  DrawRectangleLinesEx(bkspRect, 1.0f, ColorDark1);
+  DrawCentredText("BKSP", faceXS, bkspRect.x, bkspRect.width, bkspRect.y + S(12), S(10), ColorWhite);
+
+  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverBksp) {
+      int len = strlen(s->SearchQuery);
+      if (len > 0) {
+          s->SearchQuery[len - 1] = '\0';
+          s->CursorPos = s->ScrollOffset = 0;
+          s->VisualScroll = 0;
+          Browser_UpdateActiveTracks(s);
+      }
+  }
+
+  // ROW 4: ?123/ABC | SPACE | CLEAR | SEARCH
+  float startY4 = startY3 + keyH + gap;
+  float kwMode = S(65);
+  float kwClear = S(65);
+  float kwSearch = S(80);
+  float kwSpace = availW - kwMode - kwClear - kwSearch - 3 * gap;
+
+  // MODE KEY (?123 / ABC)
+  Rectangle modeRect = { oskX + S(8), startY4, kwMode, keyH };
+  bool hoverMode = CheckCollisionPointRec(mPos, modeRect);
+  DrawRectangleRec(modeRect, hoverMode ? ColorBlue : ColorDark2);
+  DrawRectangleLinesEx(modeRect, 1.0f, ColorDark1);
+  DrawCentredText((s->OSKMode == 0) ? "?123" : "ABC", faceSm, modeRect.x, modeRect.width, modeRect.y + S(11), S(12), ColorOrange);
+
+  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverMode) {
+      s->OSKMode = (s->OSKMode == 0) ? 1 : 0;
+  }
+
+  // SPACE BAR
+  Rectangle spaceRect = { oskX + S(8) + kwMode + gap, startY4, kwSpace, keyH };
+  bool hoverSpace = CheckCollisionPointRec(mPos, spaceRect);
+  DrawRectangleRec(spaceRect, hoverSpace ? ColorBlue : ColorDark2);
+  DrawRectangleLinesEx(spaceRect, 1.0f, ColorDark1);
+  DrawCentredText("SPACE", faceXS, spaceRect.x, spaceRect.width, spaceRect.y + S(12), S(10), ColorShadow);
+
+  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverSpace) {
+      if (strlen(s->SearchQuery) < 63) {
+          int len = strlen(s->SearchQuery);
+          s->SearchQuery[len] = ' ';
+          s->SearchQuery[len + 1] = '\0';
+          s->CursorPos = s->ScrollOffset = 0;
+          s->VisualScroll = 0;
+          Browser_UpdateActiveTracks(s);
+      }
+  }
+
+  // CLEAR KEY
+  Rectangle clearRect = { spaceRect.x + kwSpace + gap, startY4, kwClear, keyH };
+  bool hoverClear = CheckCollisionPointRec(mPos, clearRect);
+  DrawRectangleRec(clearRect, hoverClear ? ColorRed : ColorDark2);
+  DrawRectangleLinesEx(clearRect, 1.0f, ColorDark1);
+  DrawCentredText("CLEAR", faceXS, clearRect.x, clearRect.width, clearRect.y + S(12), S(10), ColorWhite);
+
+  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverClear) {
+      s->SearchQuery[0] = '\0';
+      s->CursorPos = s->ScrollOffset = 0;
+      s->VisualScroll = 0;
+      Browser_UpdateActiveTracks(s);
+  }
+
+  // SEARCH / DONE KEY
+  Rectangle searchBtnRect = { clearRect.x + kwClear + gap, startY4, kwSearch, keyH };
+  bool hoverSearch = CheckCollisionPointRec(mPos, searchBtnRect);
+  DrawRectangleRec(searchBtnRect, hoverSearch ? ColorOrange : ColorBlue);
+  DrawRectangleLinesEx(searchBtnRect, 1.0f, ColorWhite);
+  DrawCentredText("SEARCH", faceSm, searchBtnRect.x, searchBtnRect.width, searchBtnRect.y + S(11), S(12), ColorWhite);
+
+  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverSearch) {
+      s->ShowOSK = false;
+      s->IsSearching = (strlen(s->SearchQuery) > 0);
+  }
+}
+
 static void Browser_Draw(Component *base) {
   BrowserRenderer *r = (BrowserRenderer *)base;
   BrowserState *s = r->State;
@@ -1615,11 +1888,13 @@ static void Browser_Draw(Component *base) {
   if (s->InfoEnabled)
     listW = SCREEN_WIDTH - sidebarW - S(160);
 
-  // Draw Search Box & Sort Button
+  // Draw Search Box, OSK Button & Sort Button
   if (s->BrowseLevel == 0) {
     totalVisible = 9;
-    float sortButtonW = S(80);
-    Rectangle searchBoxRect = {listX, listYOffset, listW - sortButtonW - S(4), rowH};
+    float sortButtonW = S(65);
+    float oskButtonW = S(36);
+    Rectangle searchBoxRect = {listX, listYOffset, listW - sortButtonW - oskButtonW - S(8), rowH};
+    Rectangle oskButtonRect = {listX + listW - sortButtonW - oskButtonW - S(4), listYOffset, oskButtonW, rowH};
     Rectangle sortButtonRect = {listX + listW - sortButtonW, listYOffset, sortButtonW, rowH};
     listYOffset += rowH;
     
@@ -1639,12 +1914,19 @@ static void Browser_Draw(Component *base) {
     UIDrawText("\uf002", faceIcon, searchBoxRect.x + S(8), searchBoxRect.y + S(8), S(12), s->IsSearching ? ColorWhite : ColorShadow);
     UIDrawText(displayQuery, faceXS, searchBoxRect.x + S(30), searchBoxRect.y + S(9), S(10), s->IsSearching ? ColorWhite : ColorShadow);
 
+    // Draw OSK Button (Keyboard Icon)
+    bool isOskHover = CheckCollisionPointRec(mPos, oskButtonRect);
+    Color oskBg = (s->ShowOSK || isOskHover) ? ColorBlue : ColorDark2;
+    DrawRectangleRec(oskButtonRect, oskBg);
+    DrawRectangleLinesEx(oskButtonRect, 1.0f, s->ShowOSK ? ColorWhite : ColorDark1);
+    UIDrawText("\uf11c", faceIcon, oskButtonRect.x + S(11), oskButtonRect.y + S(8), S(12), ColorWhite);
+
     // Draw Sort Button
     DrawRectangleRec(sortButtonRect, s->ShowSortDropdown ? ColorDark1 : ColorDark2);
     DrawRectangleLinesEx(sortButtonRect, 1.0f, ColorDark1);
-    const char* sortLabels[] = {"Default", "BPM", "Key", "Title", "Rating"}; // Added 2 labels
-    UIDrawText(sortLabels[s->SortMode], faceXS, sortButtonRect.x + S(8), sortButtonRect.y + S(9), S(10), ColorWhite);
-    UIDrawText("\uf0d7", faceIcon, sortButtonRect.x + sortButtonW - S(18), sortButtonRect.y + S(10), S(10), ColorShadow); // Chevrons
+    const char* sortLabels[] = {"Default", "BPM", "Key", "Title", "Rating"};
+    UIDrawText(sortLabels[s->SortMode], faceXS, sortButtonRect.x + S(6), sortButtonRect.y + S(9), S(9), ColorWhite);
+    UIDrawText("\uf0d7", faceIcon, sortButtonRect.x + sortButtonW - S(14), sortButtonRect.y + S(10), S(9), ColorShadow);
   }
 
   int totalItems = 0;
@@ -1929,6 +2211,9 @@ static void Browser_Draw(Component *base) {
         UIDrawText(sortLabelsList[i], faceXS, itemRect.x + S(10), itemRect.y + S(9), S(10), hover ? ColorWhite : ColorShadow);
     }
   }
+
+  // Render On-Screen Keyboard (OSK) Overlay on top
+  Browser_DrawOSK(s, mPos);
 }
 
 void BrowserRenderer_Init(BrowserRenderer *r, BrowserState *state) {
