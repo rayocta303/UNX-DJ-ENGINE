@@ -641,9 +641,8 @@ static int Browser_Update(Component *base) {
 
     // Handle OSK Panel Touch Absorption
     if (s->ShowOSK) {
-      float viewH = SCREEN_HEIGHT - DECK_STR_H;
-      float oskH = S(210);
-      Rectangle oskPanelRect = {0, viewH - oskH, SCREEN_WIDTH, oskH};
+      float oskH = S(172);
+      Rectangle oskPanelRect = {0, SCREEN_HEIGHT - oskH, SCREEN_WIDTH, oskH};
       if (CheckCollisionPointRec(mousePos, oskPanelRect)) {
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
           // Touch absorbed by OSK overlay
@@ -937,7 +936,10 @@ static int Browser_Update(Component *base) {
   float viewH = SCREEN_HEIGHT - DECK_STR_H;
   listYOffset = TOP_BAR_H + ((s->BrowseLevel == 0) ? rowH : 0);
   float listAreaH = viewH - listYOffset;
-  if (s->ShowOSK) listAreaH -= S(210);
+  float oskH = S(172);
+  if (s->ShowOSK) {
+    listAreaH = (SCREEN_HEIGHT - oskH) - listYOffset;
+  }
   if (listAreaH < S(50)) listAreaH = S(50);
   totalVisible = (int)floorf(listAreaH / rowH);
   if (totalVisible < 1) totalVisible = 1;
@@ -951,7 +953,9 @@ static int Browser_Update(Component *base) {
     float sbTrackX = SCREEN_WIDTH - sbTrackW;
     float sbTrackY = TOP_BAR_H;
     float sbTrackH = viewH - TOP_BAR_H;
-    if (s->ShowOSK) sbTrackH -= S(210);
+    if (s->ShowOSK) {
+      sbTrackH = (SCREEN_HEIGHT - oskH) - TOP_BAR_H;
+    }
     if (sbTrackH < S(50)) sbTrackH = S(50);
     Rectangle sbRect = {sbTrackX, sbTrackY, sbTrackW, sbTrackH};
 
@@ -1511,58 +1515,18 @@ static int Browser_Update(Component *base) {
 static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   if (!s->ShowOSK) return;
 
-  float viewH = SCREEN_HEIGHT - DECK_STR_H;
-  float oskH = S(210);
+  float oskH = S(172);
   float oskW = SCREEN_WIDTH;
   float oskX = 0.0f;
-  float oskY = viewH - oskH;
+  float oskY = SCREEN_HEIGHT - oskH;
 
-  // Outer Overlay Background
-  DrawRectangle((int)oskX, (int)oskY, (int)oskW, (int)oskH, (Color){ 14, 16, 22, 248 });
-  DrawRectangleLinesEx((Rectangle){ oskX, oskY, oskW, oskH }, 1.5f, ColorBlue);
-
-  // Header Title & Search Preview
-  DrawRectangle((int)oskX, (int)oskY, (int)oskW, (int)S(32), (Color){ 22, 26, 38, 255 });
-  DrawLine((int)oskX, (int)(oskY + S(32)), (int)(oskX + oskW), (int)(oskY + S(32)), ColorDark1);
+  // Outer Overlay Background & Sleek Top Accent Line
+  DrawRectangle((int)oskX, (int)oskY, (int)oskW, (int)oskH, (Color){ 12, 14, 20, 252 });
+  DrawRectangle((int)oskX, (int)oskY, (int)oskW, (int)S(2), ColorBlue);
 
   Font faceXS = UIFonts_GetFace(S(9));
   Font faceSm = UIFonts_GetFace(S(12));
   Font faceMd = UIFonts_GetFace(S(14));
-  Font faceIcon = UIFonts_GetIcon(S(6));
-
-  // Icon + "SEARCH"
-  UIDrawText("\uf11c", faceIcon, oskX + S(10), oskY + S(10), S(12), ColorOrange);
-  UIDrawText("SEARCH", faceSm, oskX + S(28), oskY + S(9), S(12), ColorOrange);
-
-  // Current Search Query Box in Header
-  float previewW = oskW - S(160);
-  Rectangle prevRect = { oskX + S(85), oskY + S(4), previewW, S(24) };
-  DrawRectangleRec(prevRect, ColorBlack);
-  DrawRectangleLinesEx(prevRect, 1.0f, ColorDark1);
-
-  char searchDisplay[128];
-  if (strlen(s->SearchQuery) > 0) {
-      snprintf(searchDisplay, sizeof(searchDisplay), "%s", s->SearchQuery);
-  } else {
-      snprintf(searchDisplay, sizeof(searchDisplay), "Type to search tracks...");
-  }
-  if ((int)(GetTime() * 2) % 2 == 0) {
-      strncat(searchDisplay, "|", sizeof(searchDisplay) - strlen(searchDisplay) - 1);
-  }
-  UIDrawText(searchDisplay, faceXS, prevRect.x + S(6), prevRect.y + S(6), S(11), strlen(s->SearchQuery) > 0 ? ColorWhite : ColorShadow);
-
-  // Close Button on top-right of Header
-  Rectangle closeBtn = { oskX + oskW - S(60), oskY + S(4), S(52), S(24) };
-  bool hoverClose = CheckCollisionPointRec(mPos, closeBtn);
-  DrawRectangleRec(closeBtn, hoverClose ? ColorRed : ColorDark2);
-  DrawRectangleLinesEx(closeBtn, 1.0f, ColorShadow);
-  DrawCentredText("HIDE", faceXS, closeBtn.x, closeBtn.width, closeBtn.y + S(7), S(10), ColorWhite);
-
-  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverClose) {
-      s->ShowOSK = false;
-      s->IsSearching = (strlen(s->SearchQuery) > 0);
-      return;
-  }
 
   // Key Definitions
   const char *row1_letters = "QWERTYUIOP";
@@ -1574,10 +1538,11 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   const char *row3_letters = "ZXCVBNM";
   const char *row3_symbols = ".,?!'#%*";
 
-  float startY = oskY + S(38);
+  float startY = oskY + S(8);
   float keyH = S(36);
   float gap = S(4);
-  float availW = oskW - S(16);
+  float padX = S(8);
+  float availW = oskW - 2 * padX;
 
   // ROW 1 (10 Keys)
   int count1 = 10;
@@ -1586,13 +1551,13 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
       char ch = (s->OSKMode == 0) ? row1_letters[i] : row1_symbols[i];
       if (s->OSKMode == 0 && !s->OSKShiftActive) ch = (char)tolower((unsigned char)ch);
 
-      Rectangle kRect = { oskX + S(8) + i * (kw1 + gap), startY, kw1, keyH };
+      Rectangle kRect = { oskX + padX + i * (kw1 + gap), startY, kw1, keyH };
       bool isHover = CheckCollisionPointRec(mPos, kRect);
       DrawRectangleRec(kRect, isHover ? ColorBlue : ColorDark2);
       DrawRectangleLinesEx(kRect, 1.0f, isHover ? ColorWhite : ColorDark1);
 
       char label[2] = { ch, '\0' };
-      DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(10), S(14), ColorWhite);
+      DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14), ColorWhite);
 
       if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && isHover) {
           if (strlen(s->SearchQuery) < 63) {
@@ -1606,23 +1571,23 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
       }
   }
 
-  // ROW 2 (9-10 Keys)
+  // ROW 2 (9 Keys for Letters, 10 for Symbols)
   float startY2 = startY + keyH + gap;
   int count2 = (s->OSKMode == 0) ? 9 : 10;
-  float kw2 = (availW - (count2 - 1) * gap) / (float)count2;
-  float offset2 = (s->OSKMode == 0) ? (kw2 * 0.5f) : 0;
+  float kw2 = (s->OSKMode == 0) ? kw1 : ((availW - (count2 - 1) * gap) / (float)count2);
+  float offset2 = (s->OSKMode == 0) ? ((availW - (9 * kw1 + 8 * gap)) / 2.0f) : 0;
 
   for (int i = 0; i < count2; i++) {
       char ch = (s->OSKMode == 0) ? row2_letters[i] : row2_symbols[i];
       if (s->OSKMode == 0 && !s->OSKShiftActive) ch = (char)tolower((unsigned char)ch);
 
-      Rectangle kRect = { oskX + S(8) + offset2 + i * (kw2 + gap), startY2, kw2, keyH };
+      Rectangle kRect = { oskX + padX + offset2 + i * (kw2 + gap), startY2, kw2, keyH };
       bool isHover = CheckCollisionPointRec(mPos, kRect);
       DrawRectangleRec(kRect, isHover ? ColorBlue : ColorDark2);
       DrawRectangleLinesEx(kRect, 1.0f, isHover ? ColorWhite : ColorDark1);
 
       char label[2] = { ch, '\0' };
-      DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(10), S(14), ColorWhite);
+      DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14), ColorWhite);
 
       if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && isHover) {
           if (strlen(s->SearchQuery) < 63) {
@@ -1636,20 +1601,20 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
       }
   }
 
-  // ROW 3: SHIFT | KEYS | BKSP
+  // ROW 3: SHIFT | 7-8 KEYS | BKSP
   float startY3 = startY2 + keyH + gap;
-  float kwShift = S(50);
-  float kwBksp = S(55);
   int count3 = (s->OSKMode == 0) ? 7 : 8;
-  float middleAvailW = availW - kwShift - kwBksp - 2 * gap;
-  float kw3 = (middleAvailW - (count3 - 1) * gap) / (float)count3;
+  float kw3 = kw1;
+  float kwShift = (availW - (count3 * kw3 + (count3 + 1) * gap)) / 2.0f;
+  if (kwShift < S(40)) kwShift = S(40);
+  float kwBksp = kwShift;
 
   // SHIFT KEY
-  Rectangle shiftRect = { oskX + S(8), startY3, kwShift, keyH };
+  Rectangle shiftRect = { oskX + padX, startY3, kwShift, keyH };
   bool hoverShift = CheckCollisionPointRec(mPos, shiftRect);
   Color shiftBg = s->OSKShiftActive ? ColorOrange : (hoverShift ? ColorBlue : ColorDark2);
   DrawRectangleRec(shiftRect, shiftBg);
-  DrawRectangleLinesEx(shiftRect, 1.0f, ColorDark1);
+  DrawRectangleLinesEx(shiftRect, 1.0f, s->OSKShiftActive ? ColorWhite : ColorDark1);
   DrawCentredText("SHIFT", faceXS, shiftRect.x, shiftRect.width, shiftRect.y + S(12), S(10), ColorWhite);
 
   if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverShift) {
@@ -1661,13 +1626,13 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
       char ch = (s->OSKMode == 0) ? row3_letters[i] : row3_symbols[i];
       if (s->OSKMode == 0 && !s->OSKShiftActive) ch = (char)tolower((unsigned char)ch);
 
-      Rectangle kRect = { oskX + S(8) + kwShift + gap + i * (kw3 + gap), startY3, kw3, keyH };
+      Rectangle kRect = { oskX + padX + kwShift + gap + i * (kw3 + gap), startY3, kw3, keyH };
       bool isHover = CheckCollisionPointRec(mPos, kRect);
       DrawRectangleRec(kRect, isHover ? ColorBlue : ColorDark2);
       DrawRectangleLinesEx(kRect, 1.0f, isHover ? ColorWhite : ColorDark1);
 
       char label[2] = { ch, '\0' };
-      DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(10), S(14), ColorWhite);
+      DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14), ColorWhite);
 
       if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && isHover) {
           if (strlen(s->SearchQuery) < 63) {
@@ -1682,10 +1647,10 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   }
 
   // BKSP KEY
-  Rectangle bkspRect = { oskX + S(8) + oskW - S(16) - kwBksp, startY3, kwBksp, keyH };
+  Rectangle bkspRect = { oskX + padX + availW - kwBksp, startY3, kwBksp, keyH };
   bool hoverBksp = CheckCollisionPointRec(mPos, bkspRect);
   DrawRectangleRec(bkspRect, hoverBksp ? ColorRed : ColorDark2);
-  DrawRectangleLinesEx(bkspRect, 1.0f, ColorDark1);
+  DrawRectangleLinesEx(bkspRect, 1.0f, hoverBksp ? ColorWhite : ColorDark1);
   DrawCentredText("BKSP", faceXS, bkspRect.x, bkspRect.width, bkspRect.y + S(12), S(10), ColorWhite);
 
   if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverBksp) {
@@ -1698,15 +1663,15 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
       }
   }
 
-  // ROW 4: ?123/ABC | SPACE | CLEAR | SEARCH
+  // ROW 4: ?123/ABC | SPACE | CLEAR | HIDE
   float startY4 = startY3 + keyH + gap;
   float kwMode = S(65);
   float kwClear = S(65);
-  float kwSearch = S(80);
-  float kwSpace = availW - kwMode - kwClear - kwSearch - 3 * gap;
+  float kwHide = S(80);
+  float kwSpace = availW - kwMode - kwClear - kwHide - 3 * gap;
 
   // MODE KEY (?123 / ABC)
-  Rectangle modeRect = { oskX + S(8), startY4, kwMode, keyH };
+  Rectangle modeRect = { oskX + padX, startY4, kwMode, keyH };
   bool hoverMode = CheckCollisionPointRec(mPos, modeRect);
   DrawRectangleRec(modeRect, hoverMode ? ColorBlue : ColorDark2);
   DrawRectangleLinesEx(modeRect, 1.0f, ColorDark1);
@@ -1717,7 +1682,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   }
 
   // SPACE BAR
-  Rectangle spaceRect = { oskX + S(8) + kwMode + gap, startY4, kwSpace, keyH };
+  Rectangle spaceRect = { oskX + padX + kwMode + gap, startY4, kwSpace, keyH };
   bool hoverSpace = CheckCollisionPointRec(mPos, spaceRect);
   DrawRectangleRec(spaceRect, hoverSpace ? ColorBlue : ColorDark2);
   DrawRectangleLinesEx(spaceRect, 1.0f, ColorDark1);
@@ -1748,14 +1713,14 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
       Browser_UpdateActiveTracks(s);
   }
 
-  // SEARCH / DONE KEY
-  Rectangle searchBtnRect = { clearRect.x + kwClear + gap, startY4, kwSearch, keyH };
-  bool hoverSearch = CheckCollisionPointRec(mPos, searchBtnRect);
-  DrawRectangleRec(searchBtnRect, hoverSearch ? ColorOrange : ColorBlue);
-  DrawRectangleLinesEx(searchBtnRect, 1.0f, ColorWhite);
-  DrawCentredText("SEARCH", faceSm, searchBtnRect.x, searchBtnRect.width, searchBtnRect.y + S(11), S(12), ColorWhite);
+  // HIDE KEY
+  Rectangle hideBtnRect = { clearRect.x + kwClear + gap, startY4, kwHide, keyH };
+  bool hoverHide = CheckCollisionPointRec(mPos, hideBtnRect);
+  DrawRectangleRec(hideBtnRect, hoverHide ? ColorOrange : ColorBlue);
+  DrawRectangleLinesEx(hideBtnRect, 1.0f, ColorWhite);
+  DrawCentredText("HIDE", faceSm, hideBtnRect.x, hideBtnRect.width, hideBtnRect.y + S(11), S(12), ColorWhite);
 
-  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverSearch) {
+  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverHide) {
       s->ShowOSK = false;
       s->IsSearching = (strlen(s->SearchQuery) > 0);
   }
@@ -1946,7 +1911,8 @@ static void Browser_Draw(Component *base) {
 
   float listAreaH = (viewH - listYOffset);
   if (s->ShowOSK) {
-    listAreaH -= S(210);
+    float oskH = S(172);
+    listAreaH = (SCREEN_HEIGHT - oskH) - listYOffset;
     if (listAreaH < S(50)) listAreaH = S(50);
   }
   BeginScissorMode((int)listX, (int)listYOffset, (int)listW + S(10), (int)listAreaH);
