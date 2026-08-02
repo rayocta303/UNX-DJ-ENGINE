@@ -88,9 +88,9 @@ static int DeckStrip_Update(Component *base) {
 
   float mx = x + lColW + S(4);
   float mtX = mx;
-  float mtY = midY + S(26);
+  float mtY = midY + S(29);
   float mtW = S(48);
-  float mtH = S(9);
+  float mtH = S(12);
 
   float bpmBoxH = S(28);
   float syncY = midY + bpmBoxH + S(2);
@@ -242,18 +242,19 @@ static void DeckStrip_Draw(Component *base) {
   float midY = y + titleBgH + S(4);
   float badgeX = mx;
   float badgeW = S(48);
+  float badgeH = S(12);
 
-  DrawRectangleLines(badgeX, midY + S(2), badgeW, S(9), ColorOrange);
-  DrawCentredText("A.HOT CUE", faceXXS, badgeX, badgeW, midY + S(2.5f), S(7),
+  DrawRectangleLines(badgeX, midY + S(1), badgeW, badgeH, ColorOrange);
+  DrawCentredText("A.HOT CUE", faceXXS, badgeX, badgeW, midY + S(3.0f), S(7),
                   ColorOrange);
 
-  DrawRectangleLines(badgeX, midY + S(14), badgeW, S(9), ColorShadow);
-  DrawCentredText("AUTO CUE", faceXXS, badgeX, badgeW, midY + S(14.5f), S(7),
+  DrawRectangleLines(badgeX, midY + S(15), badgeW, badgeH, ColorShadow);
+  DrawCentredText("AUTO CUE", faceXXS, badgeX, badgeW, midY + S(17.0f), S(7),
                   ColorPaper);
 
   Color mtClr = d->State->MasterTempo ? ColorRed : ColorShadow;
-  DrawRectangleLines(badgeX, midY + S(26), badgeW, S(9), mtClr);
-  DrawCentredText("MT", faceXXS, badgeX, badgeW, midY + S(26.5f), S(7), mtClr);
+  DrawRectangleLines(badgeX, midY + S(29), badgeW, badgeH, mtClr);
+  DrawCentredText("MT", faceXXS, badgeX, badgeW, midY + S(31.0f), S(7), mtClr);
 
   float timeX = mx + badgeW + S(6);
   
