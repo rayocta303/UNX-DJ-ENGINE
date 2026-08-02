@@ -67,8 +67,41 @@ Ketika lagu berhasil di-*load* ke Deck (misalnya melalui tombol `LOAD A` atau `L
 
 ---
 
-## 4. Rencana Integrasi ke Engine XDJ-UNX-C
+## 4. Formatan Alamat & Handling VU Meter LED
 
-1. Tambahkan fungsi `MIDI_UpdateJogLeds(AudioEngine *engine)` pada `midi_handler.c` yang dipanggil setiap frame (~60 FPS).
-2. Tambahkan variabel `float TrackLoadAnimTimer[4]` pada state deck untuk menangani animasi *spin/sweep* jogwheel selama 300ms setiap kali event `loadA` / `loadB` dipicu.
-3. Kirimkan `PIONEER_SYSEX_KEEPALIVE` secara berkala via backend WinMIDI output.
+Pioneer DDJ-FLX6 mengendalikan lampu indikator **Channel Level Meter (VU Meter)** secara terpisah untuk setiap deck melalui sinyal MIDI Control Change (CC):
+
+### Sinyal MIDI Channel VU Meter:
+- **Status Byte**: `0xB0 + deckIdx`
+  - Deck 1 (Channel 1): `0xB0`
+  - Deck 2 (Channel 2): `0xB1`
+  - Deck 3 (Channel 3): `0xB2`
+  - Deck 4 (Channel 4): `0xB3`
+- **Data 1 (Control Number)**: `0x02` (Level Meter Indicator CC)
+- **Data 2 (Value / Peak Level)**:
+  - Range Normal: `0x00` s/d `0x76` (0 - 118 out of 127) -> Pemetaan linier ampitudo audio RMS (`0.0f` s/d `1.0f`).
+  - Clip/Peak Indicator (LED Merah atas): Tambahkan `0x09` ke nilai (sehingga mencapai `0x7F` / 127) saat sinyal audio terdeteksi *clipping* (`peakLevel >= 1.0f`).
+
+### Rumus Kalkulasi VU Meter:
+
+```c
+// amplitudeRMS: 0.0f s/d 1.0f
+uint8_t meterVal = (uint8_t)(amplitudeRMS * 0x76); // Scale 0..118
+
+// Jika audio mengalami clipping / peak, aktifkan LED merah (Peak indicator)
+if (isPeakIndicatorActive) {
+    meterVal += 0x09; // Nilai menjadi 127 (0x7F)
+}
+
+// Send MIDI Short Message ke Channel Deck yang bersangkutan
+MIDI_SendShortMsg(0xB0 + deckIdx, 0x02, meterVal);
+```
+
+---
+
+## 5. Rencana Integrasi ke Engine XDJ-UNX-C
+
+1. Tambahkan fungsi `MIDI_UpdateOutputLeds(AudioEngine *engine)` pada `midi_handler.c` yang dipanggil setiap frame (~60 FPS).
+2. Kalkulasikan nilai VU Meter dari buffer output audio per deck dan kirim pesan CC `0xB0 + deckIdx`, `0x02`, `val`.
+3. Tambahkan variabel `float TrackLoadAnimTimer[4]` pada state deck untuk menangani animasi *spin/sweep* jogwheel selama 300ms setiap kali event `loadA` / `loadB` dipicu.
+4. Kirimkan `PIONEER_SYSEX_KEEPALIVE` secara berkala via backend WinMIDI output.
