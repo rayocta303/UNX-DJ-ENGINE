@@ -60,10 +60,8 @@ void UI_UpdateTouchState(void) {
 
 bool UICheckClick(Rectangle rect) {
     if (!IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) return false;
-    Vector2 m = UIGetMousePosition();
-    if (g_touchDragDistance >= S(10.0f)) return false;
+    if (g_touchDragDistance >= S(22.0f)) return false;
     if (!CheckCollisionPointRec(g_touchStartPos, rect)) return false;
-    if (!CheckCollisionPointRec(m, rect)) return false;
     return true;
 }
 

@@ -99,29 +99,24 @@ static int DeckStrip_Update(Component *base) {
   Vector2 mouse = UIGetMousePosition();
   bool isHoverTempoArea = (mouse.x >= tempoX && mouse.x <= bpmX + bpmBoxW &&
                            mouse.y >= midY && mouse.y <= midY + S(28));
-  bool isHoverMT = (mouse.x >= mtX && mouse.x <= mtX + mtW && mouse.y >= mtY &&
-                    mouse.y <= mtY + mtH);
-  bool isHoverQuantize = (mouse.x >= x && mouse.x <= x + lColW &&
-                          mouse.y >= y + S(68) && mouse.y <= y + S(88));
-  bool isHoverSync = (mouse.x >= bpmX && mouse.x <= bpmX + bpmBoxW &&
-                      mouse.y >= syncY && mouse.y <= syncY + syncH);
 
   // Time Mode Toggle
   float tx = mtX + mtW + S(6);
-  bool isHoverTime = (mouse.x >= tx && mouse.x <= tx + S(80) &&
-                      mouse.y >= midY && mouse.y <= midY + S(28));
 
-  if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-    if (isHoverQuantize)
-      d->State->QuantizeEnabled = !d->State->QuantizeEnabled;
-    if (isHoverMT)
-      d->State->MasterTempo = !d->State->MasterTempo;
-    if (isHoverSync)
-      d->State->SyncMode = (d->State->SyncMode + 1) % 3;
-    if (isHoverTime)
-      d->State->TimeMode = (d->State->TimeMode + 1) % 2;
-    if (isHoverTempoArea)
-      d->State->TempoRange = (d->State->TempoRange + 1) % 4;
+  if (UICheckClick((Rectangle){ x, y + S(68), lColW, S(20) })) {
+    d->State->QuantizeEnabled = !d->State->QuantizeEnabled;
+  }
+  if (UICheckClick((Rectangle){ mtX, mtY, mtW, mtH })) {
+    d->State->MasterTempo = !d->State->MasterTempo;
+  }
+  if (UICheckClick((Rectangle){ bpmX, syncY, bpmBoxW, syncH })) {
+    d->State->SyncMode = (d->State->SyncMode + 1) % 3;
+  }
+  if (UICheckClick((Rectangle){ tx, midY, S(80), S(28) })) {
+    d->State->TimeMode = (d->State->TimeMode + 1) % 2;
+  }
+  if (UICheckClick((Rectangle){ tempoX, midY, S(64), S(28) })) {
+    d->State->TempoRange = (d->State->TempoRange + 1) % 4;
   }
 
   // Mouse Wheel for Tempo

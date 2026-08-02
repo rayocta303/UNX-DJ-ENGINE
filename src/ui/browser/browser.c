@@ -982,7 +982,7 @@ static int Browser_Update(Component *base) {
         s->LastTouchY = mousePos.y;
         s->TouchDragAccumulator += fabsf(dy);
 
-        if (!s->IsDragging && s->TouchDragAccumulator > S(8.0f)) {
+        if (!s->IsDragging && s->TouchDragAccumulator > S(18.0f)) {
           s->IsDragging = true;
         }
 
@@ -1073,7 +1073,7 @@ static int Browser_Update(Component *base) {
         bool isLoadClick = (s->BrowseLevel == 0) && CheckCollisionPointRec(mousePos, loadBtnRect);
 
         if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && !s->IsDragging) {
-          if (s->TouchDragAccumulator < S(8.0f) && fabsf(s->ScrollVelocity) < 40.0f) {
+          if (s->TouchDragAccumulator < S(18.0f) && fabsf(s->ScrollVelocity) < 40.0f) {
             s->ShowOSK = false; // Auto hide keyboard on list item tap
             if (isLoadClick) {
               s->ShowLoadPopup = true;
