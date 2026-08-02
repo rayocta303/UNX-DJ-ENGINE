@@ -201,7 +201,6 @@ static void DeckStrip_Draw(Component *base) {
   drawLeftBadgeColumn(d, x, y, DECK_STR_H);
 
   Font faceXXS = UIFonts_GetFace(S(7));
-  Font faceSm = UIFonts_GetFace(S(9));
   Font faceMd = UIFonts_GetFace(S(11));
   Font faceLg = UIFonts_GetFace(S(18));
   Font faceSub = UIFonts_GetFace(S(13));
@@ -216,24 +215,26 @@ static void DeckStrip_Draw(Component *base) {
   DrawRectangle(lColX + lColW, y, stripW - lColW, titleBgH,
                 (Color){0x10, 0x10, 0x10, 0xFF});
 
+  Font titleFont = UIFonts_GetBoldFace(S(12.0f));
+  Font iconFace = UIFonts_GetIcon(S(11.0f));
+
   char title[150] = "No Track";
   if (d->State->TrackTitle[0] != '\0') {
     strncpy(title, d->State->TrackTitle, sizeof(title) - 1);
 
-    Font iconFace = UIFonts_GetIcon(S(9));
-    UIDrawText("\xef\x80\x81", iconFace, mx, y + S(2), S(9),
+    UIDrawText("\xef\x80\x81", iconFace, mx, y + S(2.5f), S(11),
                ColorWhite); // f001 music note
     float maxW = stripW - (mx - x) - S(20);
-    Rectangle titleRect = { mx + S(12), y + S(2), maxW, S(16) };
+    Rectangle titleRect = { mx + S(15), y + S(1.5f), maxW, S(16) };
     bool isHovered = CheckCollisionPointRec(UIGetMousePosition(), titleRect);
     
     static float hoverTimer[2] = {0, 0};
     if (isHovered) hoverTimer[d->ID] += GetFrameTime();
     else hoverTimer[d->ID] = 0;
 
-    UIDrawScrollingText(title, faceSm, titleRect, S(9), ColorWhite, hoverTimer[d->ID]);
+    UIDrawScrollingText(title, titleFont, titleRect, S(12.0f), ColorWhite, hoverTimer[d->ID]);
   } else {
-    UIDrawText(title, faceSm, mx, y + S(2), S(9), ColorWhite);
+    UIDrawText(title, titleFont, mx, y + S(1.5f), S(12.0f), ColorWhite);
   }
 
   float midY = y + titleBgH + S(4);
