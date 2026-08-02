@@ -88,16 +88,24 @@ static void Info_Draw(Component *base) {
     float infoX = contentX + artSize + S(15);
     float textY = panelY + S(18);
 
+    static float infoTimer[2] = {0, 0};
+    static char lastTrackTitle[2][256] = {{0}, {0}};
+    if (strcmp(trk->Title, lastTrackTitle[i]) != 0) {
+      strncpy(lastTrackTitle[i], trk->Title, sizeof(lastTrackTitle[i]) - 1);
+      infoTimer[i] = 0.0f;
+    }
+    infoTimer[i] += GetFrameTime();
+
     if (trk->Title[0] == '\0') {
       UIDrawText("NO TRACK LOADED", faceXL, infoX, textY + S(8), S(18),
                  ColorShadow);
     } else {
-      char tTitle[128], tArtist[128];
-      truncateStr(trk->Title, tTitle, 50);
-      truncateStr(trk->Artist, tArtist, 60);
+      float titleW = panelW - (infoX - panelX) - S(10);
+      Rectangle titleRect = { infoX, textY, titleW, S(20) };
+      Rectangle artistRect = { infoX, textY + S(22), titleW, S(16) };
 
-      UIDrawText(tTitle, faceXL, infoX, textY, S(18), ColorWhite);
-      UIDrawText(tArtist, faceLg, infoX, textY + S(22), S(14), ColorOrange);
+      UIDrawScrollingText(trk->Title, faceXL, titleRect, S(18), ColorWhite, infoTimer[i]);
+      UIDrawScrollingText(trk->Artist[0] ? trk->Artist : "Unknown Artist", faceLg, artistRect, S(14), ColorOrange, infoTimer[i]);
 
       // Metadata Grid
       float gridY = panelY + S(64);
@@ -132,10 +140,8 @@ static void Info_Draw(Component *base) {
       float c2X = infoX + colW;
       UIDrawText("\uf51f", iconSm, c2X, gridY + S(2), S(10), ColorShadow);
       UIDrawText("ALBUM", faceXXS, c2X + S(15), gridY, S(7), ColorShadow);
-      char tAlbum[64];
-      truncateStr(trk->Album, tAlbum, 30);
-      UIDrawText(tAlbum[0] ? tAlbum : "---", faceMd, c2X + S(15), gridY + S(8),
-                 S(10), ColorWhite);
+      Rectangle albumRect = { c2X + S(15), gridY + S(8), colW - S(20), S(12) };
+      UIDrawScrollingText(trk->Album[0] ? trk->Album : "---", faceMd, albumRect, S(10), ColorWhite, infoTimer[i]);
 
       UIDrawText("\uf133", iconSm, c2X, gridY + rowStep + S(2), S(10),
                  ColorShadow);
@@ -153,19 +159,15 @@ static void Info_Draw(Component *base) {
                  ColorShadow);
       UIDrawText("GENRE", faceXXS, c2X + S(15), gridY + rowStep * 2, S(7),
                  ColorShadow);
-      char tGenre[64];
-      truncateStr(trk->Genre, tGenre, 30);
-      UIDrawText(tGenre[0] ? tGenre : "---", faceMd, c2X + S(15),
-                 gridY + rowStep * 2 + S(8), S(10), ColorWhite);
+      Rectangle genreRect = { c2X + S(15), gridY + rowStep * 2 + S(8), colW - S(20), S(12) };
+      UIDrawScrollingText(trk->Genre[0] ? trk->Genre : "---", faceMd, genreRect, S(10), ColorWhite, infoTimer[i]);
 
       // Column 3
       float c3X = infoX + colW * 2;
       UIDrawText("\uf001", iconSm, c3X, gridY + S(2), S(10), ColorShadow);
       UIDrawText("LABEL", faceXXS, c3X + S(15), gridY, S(7), ColorShadow);
-      char tLabel[64];
-      truncateStr(trk->Label, tLabel, 30);
-      UIDrawText(tLabel[0] ? tLabel : "---", faceMd, c3X + S(15), gridY + S(8),
-                 S(10), ColorWhite);
+      Rectangle labelRect = { c3X + S(15), gridY + S(8), colW - S(20), S(12) };
+      UIDrawScrollingText(trk->Label[0] ? trk->Label : "---", faceMd, labelRect, S(10), ColorWhite, infoTimer[i]);
 
       UIDrawText("\uf005", iconSm, c3X, gridY + rowStep + S(2), S(10),
                  ColorShadow);
@@ -193,16 +195,14 @@ static void Info_Draw(Component *base) {
       if (trk->Remixer[0]) {
         UIDrawText("\uf001", iconSm, c1X, gridY + rowStep * 3 + S(2), S(10), ColorShadow);
         UIDrawText("REMIXER", faceXXS, c1X + S(15), gridY + rowStep * 3, S(7), ColorShadow);
-        char tRemix[64];
-        truncateStr(trk->Remixer, tRemix, 30);
-        UIDrawText(tRemix, faceMd, c1X + S(15), gridY + rowStep * 3 + S(8), S(10), ColorWhite);
+        Rectangle remixRect = { c1X + S(15), gridY + rowStep * 3 + S(8), colW - S(20), S(12) };
+        UIDrawScrollingText(trk->Remixer, faceMd, remixRect, S(10), ColorWhite, infoTimer[i]);
       }
       if (trk->MixName[0]) {
         UIDrawText("\uf001", iconSm, c2X, gridY + rowStep * 3 + S(2), S(10), ColorShadow);
         UIDrawText("MIX", faceXXS, c2X + S(15), gridY + rowStep * 3, S(7), ColorShadow);
-        char tMix[64];
-        truncateStr(trk->MixName, tMix, 30);
-        UIDrawText(tMix, faceMd, c2X + S(15), gridY + rowStep * 3 + S(8), S(10), ColorWhite);
+        Rectangle mixRect = { c2X + S(15), gridY + rowStep * 3 + S(8), colW - S(20), S(12) };
+        UIDrawScrollingText(trk->MixName, faceMd, mixRect, S(10), ColorWhite, infoTimer[i]);
       }
 
       // Comment
@@ -212,10 +212,8 @@ static void Info_Draw(Component *base) {
                       ColorDark1);
         UIDrawText("COMMENT:", faceXXS, infoX + S(5), commY + S(3.5f), S(7),
                    ColorShadow);
-        char tComm[128];
-        truncateStr(trk->Comment, tComm, 85);
-        UIDrawText(tComm, faceXXS, infoX + S(50), commY + S(3.5f), S(7),
-                   ColorWhite);
+        Rectangle commRect = { infoX + S(50), commY + S(3.5f), panelW - (infoX - panelX) - S(60), S(12) };
+        UIDrawScrollingText(trk->Comment, faceXXS, commRect, S(7), ColorWhite, infoTimer[i]);
       }
 
       // Path
