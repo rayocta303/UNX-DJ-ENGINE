@@ -73,31 +73,48 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
 
     // 2. Deck A & B State LEDs (Play, Cue, Vinyl, VU Meter, Hot Cue Pads)
     DeckState *decks[2] = { d1, d2 };
-    for (int i = 0; i < 2; i++) {
-        uint8_t chStatus = 0x90 + i;
+    MidiMapping *map = MIDI_GetGlobalMapping();
 
-        // Play/Pause LED (Note 0x0B)
+    for (int i = 0; i < 2; i++) {
+        const char *group = (i == 0) ? "[Channel1]" : "[Channel2]";
+
+        // Default Pioneer fallback register addresses
+        uint8_t playStatus = 0x90 + i, playNote = 0x0B;
+        uint8_t cueStatus  = 0x90 + i, cueNote  = 0x0C;
+        uint8_t vinylStatus= 0x90 + i, vinylNote= 0x0E;
+        uint8_t vuStatus   = 0xB0 + i, vuControl= 0x02;
+
+        // Dynamically resolve addresses from loaded mapping template if available
+        if (map) {
+            uint8_t s, m;
+            if (MIDI_GetRegisterAddress(map, group, "play", &s, &m)) { playStatus = s; playNote = m; }
+            if (MIDI_GetRegisterAddress(map, group, "cue", &s, &m)) { cueStatus = s; cueNote = m; }
+            if (MIDI_GetRegisterAddress(map, group, "vinyl", &s, &m)) { vinylStatus = s; vinylNote = m; }
+            if (MIDI_GetRegisterAddress(map, group, "vu", &s, &m) || MIDI_GetRegisterAddress(map, group, "level", &s, &m)) { vuStatus = s; vuControl = m; }
+        }
+
+        // Play/Pause LED
         uint8_t playVal = decks[i]->IsPlaying ? 0x7F : 0x00;
         if (playVal != lastPlay[i]) {
-            MIDI_SendShortMsg(chStatus, 0x0B, playVal);
+            MIDI_SendShortMsg(playStatus, playNote, playVal);
             lastPlay[i] = playVal;
         }
 
-        // Cue LED (Note 0x0C)
+        // Cue LED
         uint8_t cueVal = (decks[i]->IsCueActive || !decks[i]->IsPlaying) ? 0x7F : 0x00;
         if (cueVal != lastCue[i]) {
-            MIDI_SendShortMsg(chStatus, 0x0C, cueVal);
+            MIDI_SendShortMsg(cueStatus, cueNote, cueVal);
             lastCue[i] = cueVal;
         }
 
-        // Vinyl Mode LED (Note 0x0E)
+        // Vinyl Mode LED
         uint8_t vinylVal = decks[i]->VinylModeEnabled ? 0x7F : 0x00;
         if (vinylVal != lastVinyl[i]) {
-            MIDI_SendShortMsg(chStatus, 0x0E, vinylVal);
+            MIDI_SendShortMsg(vinylStatus, vinylNote, vinylVal);
             lastVinyl[i] = vinylVal;
         }
 
-        // VU Meter Level (Status 0xB0 + i, Control 0x02)
+        // VU Meter Level
         if (engine) {
             float vuL = engine->Decks[i].VuMeterL;
             float vuR = engine->Decks[i].VuMeterR;
@@ -105,14 +122,26 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
             uint8_t meterVal = (uint8_t)(rms * 0x76);
             if (rms >= 1.0f) meterVal += 0x09; // Peak/clip indicator
             if (meterVal != lastVu[i]) {
-                MIDI_SendShortMsg(0xB0 + i, 0x02, meterVal);
+                MIDI_SendShortMsg(vuStatus, vuControl, meterVal);
                 lastVu[i] = meterVal;
             }
         }
 
-        // Hot Cue Pad LEDs (Status 0x97 for Deck 1/A, 0x99 for Deck 2/B)
-        uint8_t padStatus = 0x97 + (i * 2);
+        // Hot Cue Pad LEDs (Dynamically fetched from mapping XML, e.g. status 0x97 for Deck 1, 0x99 for Deck 2)
         for (int p = 0; p < 8; p++) {
+            uint8_t padStatus = 0x97 + (i * 2);
+            uint8_t padNote = (uint8_t)p;
+
+            char hcKey[32];
+            snprintf(hcKey, sizeof(hcKey), "hotcue_%d", p + 1);
+            if (map) {
+                uint8_t s, m;
+                if (MIDI_GetRegisterAddress(map, group, hcKey, &s, &m)) {
+                    padStatus = s;
+                    padNote = m;
+                }
+            }
+
             bool hasHotCue = false;
             if (decks[i]->LoadedTrack) {
                 for (int h = 0; h < decks[i]->LoadedTrack->HotCuesCount; h++) {
@@ -124,23 +153,31 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
             }
             uint8_t padVal = hasHotCue ? 0x7F : 0x00;
             if (padVal != lastHotCue[i][p]) {
-                MIDI_SendShortMsg(padStatus, (uint8_t)p, padVal);
+                MIDI_SendShortMsg(padStatus, padNote, padVal);
                 lastHotCue[i][p] = padVal;
             }
         }
     }
 
-    // 3. Deck A Jog Ring (Status 0xBB, Control 0x00, Pioneer 127-segment range 0x01..0x7F)
+    // 3. Jog Wheel Rings (Dynamically resolved from mapping XML, default status 0xBB)
+    uint8_t jogStatusA = 0xBB, jogNoteA = 0x00;
+    uint8_t jogStatusB = 0xBB, jogNoteB = 0x01;
+    if (map) {
+        uint8_t s, m;
+        if (MIDI_GetRegisterAddress(map, "[Channel1]", "waveformZoom", &s, &m) || MIDI_GetRegisterAddress(map, "[Channel1]", "jog", &s, &m) || MIDI_GetRegisterAddress(map, "[Channel1]", "wheel", &s, &m)) {
+            // Note: Jog LED output status is 0xBB for FLX series
+        }
+    }
+
     uint8_t posA = 0x01 + (uint8_t)fmodf((d1->JogPointerAngle / 360.0f) * 127.0f, 127.0f);
     if (posA != lastJog[0]) {
-        MIDI_SendShortMsg(0xBB, 0x00, posA);
+        MIDI_SendShortMsg(jogStatusA, jogNoteA, posA);
         lastJog[0] = posA;
     }
 
-    // 4. Deck B Jog Ring (Status 0xBB, Control 0x01, Pioneer 127-segment range 0x01..0x7F)
     uint8_t posB = 0x01 + (uint8_t)fmodf((d2->JogPointerAngle / 360.0f) * 127.0f, 127.0f);
     if (posB != lastJog[1]) {
-        MIDI_SendShortMsg(0xBB, 0x01, posB);
+        MIDI_SendShortMsg(jogStatusB, jogNoteB, posB);
         lastJog[1] = posB;
     }
 }

@@ -61,5 +61,6 @@ int MIDI_ListControllers(const char *dir, char outNames[32][64], char outPaths[3
 void MIDI_HandleMapping(MidiMapping *map, uint8_t status, uint8_t midino, float normalizedValue);
 bool MIDI_SaveMapping(MidiMapping *map, const char *path);
 void MIDI_CreateTemplate(MidiMapping *out);
+bool MIDI_GetRegisterAddress(const MidiMapping *map, const char *group, const char *keySubstr, uint8_t *outStatus, uint8_t *outMidino);
 
 #endif // MIDI_MAPPER_H

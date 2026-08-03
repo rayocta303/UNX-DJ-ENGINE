@@ -442,9 +442,37 @@ void MIDI_CreateTemplate(MidiMapping *out) {
         MappingEntry *e = &out->entries[out->count++];
         strncpy(e->group, co->group, 63);
         strncpy(e->key, co->key, 63);
-        e->status = 0x00;
-        e->midino = 0x00;
-        e->options = 0;
         e->cachedCO = co;
     }
+}
+
+bool MIDI_GetRegisterAddress(const MidiMapping *map, const char *group, const char *keySubstr, uint8_t *outStatus, uint8_t *outMidino) {
+    if (!map || !keySubstr) return false;
+
+    // 1. Check in <control> entries
+    for (int i = 0; i < map->count; i++) {
+        if (group && group[0] != '\0' && strstr(map->entries[i].group, group) == NULL) {
+            continue;
+        }
+        if (strstr(map->entries[i].key, keySubstr) != NULL ||
+            strstr(map->entries[i].scriptFunction, keySubstr) != NULL) {
+            if (outStatus) *outStatus = map->entries[i].status;
+            if (outMidino) *outMidino = map->entries[i].midino;
+            return true;
+        }
+    }
+
+    // 2. Check in <output> entries
+    for (int i = 0; i < map->outputCount; i++) {
+        if (group && group[0] != '\0' && strstr(map->outputs[i].group, group) == NULL) {
+            continue;
+        }
+        if (strstr(map->outputs[i].key, keySubstr) != NULL) {
+            if (outStatus) *outStatus = map->outputs[i].status;
+            if (outMidino) *outMidino = map->outputs[i].midino;
+            return true;
+        }
+    }
+
+    return false;
 }
