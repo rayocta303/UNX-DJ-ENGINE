@@ -57,8 +57,8 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
 #endif
     }
 
-    // Rate-limit short MIDI OUT updates to ~30 FPS to prevent driver congestion
-    if (now - lastSendTime < 0.033) return;
+    // Rate-limit short MIDI OUT updates to ~60 FPS (0.016s) for smooth LED spinner animation
+    if (now - lastSendTime < 0.016) return;
     lastSendTime = now;
 
     static uint8_t lastPlay[2] = { 255, 255 };
@@ -107,25 +107,15 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
         }
     }
 
-    // 3. Deck A Jog Ring (Status 0xBB, Note 0x00, Pioneer 72-segment range 0..71 / 0x00..0x47)
-    uint8_t posA = 0;
-    if (d1->LoadAnimTimer > 0.0f) {
-        posA = (uint8_t)((1.0f - (d1->LoadAnimTimer / 0.5f)) * 71.0f) % 72;
-    } else {
-        posA = (uint8_t)((d1->JogPointerAngle / 360.0f) * 71.0f) % 72;
-    }
+    // 3. Deck A Jog Ring (Status 0xBB, Control 0x00, Pioneer 127-segment range 0x01..0x7F)
+    uint8_t posA = 0x01 + (uint8_t)fmodf((d1->JogPointerAngle / 360.0f) * 127.0f, 127.0f);
     if (posA != lastJog[0]) {
         MIDI_SendShortMsg(0xBB, 0x00, posA);
         lastJog[0] = posA;
     }
 
-    // 4. Deck B Jog Ring (Status 0xBB, Note 0x01, Pioneer 72-segment range 0..71 / 0x00..0x47)
-    uint8_t posB = 0;
-    if (d2->LoadAnimTimer > 0.0f) {
-        posB = (uint8_t)((1.0f - (d2->LoadAnimTimer / 0.5f)) * 71.0f) % 72;
-    } else {
-        posB = (uint8_t)((d2->JogPointerAngle / 360.0f) * 71.0f) % 72;
-    }
+    // 4. Deck B Jog Ring (Status 0xBB, Control 0x01, Pioneer 127-segment range 0x01..0x7F)
+    uint8_t posB = 0x01 + (uint8_t)fmodf((d2->JogPointerAngle / 360.0f) * 127.0f, 127.0f);
     if (posB != lastJog[1]) {
         MIDI_SendShortMsg(0xBB, 0x01, posB);
         lastJog[1] = posB;
