@@ -66,8 +66,12 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
     static uint8_t lastVinyl[2]= { 255, 255 };
     static uint8_t lastVu[2]   = { 255, 255 };
     static uint8_t lastJog[2]  = { 255, 255 };
+    static uint8_t lastHotCue[2][8] = {
+        {255, 255, 255, 255, 255, 255, 255, 255},
+        {255, 255, 255, 255, 255, 255, 255, 255}
+    };
 
-    // 2. Deck A & B State LEDs (Play, Cue, Vinyl, VU Meter)
+    // 2. Deck A & B State LEDs (Play, Cue, Vinyl, VU Meter, Hot Cue Pads)
     DeckState *decks[2] = { d1, d2 };
     for (int i = 0; i < 2; i++) {
         uint8_t chStatus = 0x90 + i;
@@ -103,6 +107,25 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
             if (meterVal != lastVu[i]) {
                 MIDI_SendShortMsg(0xB0 + i, 0x02, meterVal);
                 lastVu[i] = meterVal;
+            }
+        }
+
+        // Hot Cue Pad LEDs (Status 0x97 for Deck 1/A, 0x99 for Deck 2/B)
+        uint8_t padStatus = 0x97 + (i * 2);
+        for (int p = 0; p < 8; p++) {
+            bool hasHotCue = false;
+            if (decks[i]->LoadedTrack) {
+                for (int h = 0; h < decks[i]->LoadedTrack->HotCuesCount; h++) {
+                    if (decks[i]->LoadedTrack->HotCues[h].ID == (unsigned int)(p + 1)) {
+                        hasHotCue = true;
+                        break;
+                    }
+                }
+            }
+            uint8_t padVal = hasHotCue ? 0x7F : 0x00;
+            if (padVal != lastHotCue[i][p]) {
+                MIDI_SendShortMsg(padStatus, (uint8_t)p, padVal);
+                lastHotCue[i][p] = padVal;
             }
         }
     }
