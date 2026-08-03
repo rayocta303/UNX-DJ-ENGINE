@@ -1,0 +1,7 @@
+{
+  "wfmA": { "style": 1, "low": 0.40, "mid": 0.40, "high": 0.40, "start": 500.0, "stop": 1200.0, "lock": 1 },
+  "wfmB": { "style": 1, "low": 0.40, "mid": 0.40, "high": 0.40, "start": 500.0, "stop": 1200.0, "lock": 1 },
+  "audio": { "devIdx": -1, "mastL": 0, "mastR": 1, "cueL": 2, "cueR": 3, "sr": 48000, "buf": 256, "bitdepth": 0 },
+  "beatfx": { "fx": 0, "pad": 4, "ch": 0, "depth": 0.50, "q": 1, "tab": 0 },
+  "controllers": { "path": "" }
+}

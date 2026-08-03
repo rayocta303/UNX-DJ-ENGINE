@@ -1,6 +1,7 @@
 #include "ui/browser/browser.h"
 #include "core/memory_guard.h"
 #include "core/logger.h"
+#include "core/logic/control_object.h"
 #include "audio/engine.h"
 #include "rlgl.h"
 #include "ui/components/fonts.h"
@@ -876,21 +877,30 @@ static int Browser_Update(Component *base) {
 
   // MIDI Navigation
   if (s->MidiBrowseDelta != 0) {
-      float itemRowH = S(28.0f);
-      if (s->MidiBrowseDelta > 0) {
-          for (int i = 0; i < s->MidiBrowseDelta; i++) {
-              if (s->CursorPos < 9) s->CursorPos++;
-              else s->ScrollOffset++;
-          }
+      bool isShift = (CO_GetValue("[Channel1]", "shift") > 0.5f) ||
+                     (CO_GetValue("[Channel2]", "shift") > 0.5f) ||
+                     (CO_GetValue("[Channel3]", "shift") > 0.5f) ||
+                     (CO_GetValue("[Channel4]", "shift") > 0.5f);
+      if (isShift) {
+          CO_AddValue("[Master]", "waveform_zoom_step", (float)s->MidiBrowseDelta);
+          s->MidiBrowseDelta = 0;
       } else {
-          for (int i = 0; i < -s->MidiBrowseDelta; i++) {
-              if (s->CursorPos > 0) s->CursorPos--;
-              else if (s->ScrollOffset > 0) s->ScrollOffset--;
+          float itemRowH = S(28.0f);
+          if (s->MidiBrowseDelta > 0) {
+              for (int i = 0; i < s->MidiBrowseDelta; i++) {
+                  if (s->CursorPos < 9) s->CursorPos++;
+                  else s->ScrollOffset++;
+              }
+          } else {
+              for (int i = 0; i < -s->MidiBrowseDelta; i++) {
+                  if (s->CursorPos > 0) s->CursorPos--;
+                  else if (s->ScrollOffset > 0) s->ScrollOffset--;
+              }
           }
+          s->MidiBrowseDelta = 0;
+          s->VisualScroll = (float)(s->ScrollOffset * itemRowH);
+          s->ScrollVelocity = 0;
       }
-      s->MidiBrowseDelta = 0;
-      s->VisualScroll = (float)(s->ScrollOffset * itemRowH);
-      s->ScrollVelocity = 0;
   }
   
   if (s->MidiRequestEnter) {
@@ -1058,7 +1068,7 @@ static int Browser_Update(Component *base) {
   }
 
   // Dynamic totalVisible and maxScroll adjustment for OSK
-  float viewH = SCREEN_HEIGHT - DECK_STR_H;
+  float viewH = SCREEN_HEIGHT - DECK_STR_H - S(6.0f);
   listYOffset = TOP_BAR_H + ((s->BrowseLevel == 0) ? (rowH + S(24.0f)) : 0);
   float listAreaH = viewH - listYOffset;
   float oskH = S(172);
@@ -1883,7 +1893,7 @@ static void Browser_Draw(Component *base) {
   if (!s->IsActive)
     return;
 
-  float viewH = SCREEN_HEIGHT - DECK_STR_H;
+  float viewH = SCREEN_HEIGHT - DECK_STR_H - S(6.0f);
   DrawRectangle(0, 0, SCREEN_WIDTH, viewH, ColorBlack);
 
   // Sidebar
@@ -2069,7 +2079,8 @@ static void Browser_Draw(Component *base) {
     DrawCentredText(keyHeaderLabel, faceXS, listX + listW - S(55), S(55), listYOffset + S(5), S(10), (s->SortMode == 2) ? ColorWhite : ColorShadow);
 
     listYOffset += headerH;
-    totalVisible = 8;
+    totalVisible = (int)floorf((viewH - listYOffset) / rowH);
+    if (totalVisible < 1) totalVisible = 1;
   }
 
   int totalItems = 0;

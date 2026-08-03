@@ -12,6 +12,26 @@
         </scriptfiles>
         <controls>
             <control>
+                <group>[Library]</group>
+                <key>back</key>
+                <description>BROWSER BACK BUTTON</description>
+                <status>0x96</status>
+                <midino>0x65</midino>
+                <options>
+                    <normal/>
+                </options>
+            </control>
+            <control>
+                <group>[App]</group>
+                <key>browser_toggle</key>
+                <description>BROWSER VIEW TOGGLE BUTTON</description>
+                <status>0x96</status>
+                <midino>0x7A</midino>
+                <options>
+                    <normal/>
+                </options>
+            </control>
+            <control>
                 <group>[Channel1]</group>
                 <key>hotcue_1_activate</key>
                 <description>PAD 1 (DECK1) HOT CUE MODE - press - set hotcue</description>

@@ -26,6 +26,7 @@ static const int NUM_ZOOM_LEVELS = sizeof(ZOOM_LEVELS) / sizeof(ZOOM_LEVELS[0]);
 
 void WaveformRenderer_Init(WaveformRenderer *r, int id, DeckState *state,
                            DeckState *otherDeck);
+void Waveform_AdjustZoom(DeckState *ds, int direction);
 
 // Waveform decoding utilities for shared use
 typedef struct {

@@ -14,6 +14,7 @@
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
 #include "ui/player/player.h"
+#include "ui/player/waveform.h"
 #include "ui/views/about.h"
 #include "ui/views/credits.h"
 #include "ui/views/debug_ios.h"
@@ -126,6 +127,9 @@ typedef struct {
   bool MidiRequestInfo;
   bool MidiRequestMixer;
   bool MidiRequestBrowser;
+  int MidiWaveformZoomStep;
+  bool MidiWaveformZoomIn;
+  bool MidiWaveformZoomOut;
 
   char midiPresetPaths[32][256];
   int midiPresetCount;
@@ -1614,6 +1618,12 @@ Log_LogDeviceInfo(gpuModel);
               1);
   CO_Register("[App]", "browser_toggle", CO_TYPE_BOOL, &app->MidiRequestBrowser,
               0, 1);
+  CO_Register("[Master]", "waveform_zoom_step", CO_TYPE_INT,
+              &app->MidiWaveformZoomStep, -10, 10);
+  CO_Register("[Master]", "waveform_zoom_in", CO_TYPE_BOOL,
+              &app->MidiWaveformZoomIn, 0, 1);
+  CO_Register("[Master]", "waveform_zoom_out", CO_TYPE_BOOL,
+              &app->MidiWaveformZoomOut, 0, 1);
 
   globalAudioEngine = audioEngine;
 
@@ -2049,6 +2059,15 @@ void UpdateDrawFrame(App *app) {
     TopBar_OnBrowse(app);
     app->MidiRequestBrowser = false;
   }
+  if (app->browserState.MidiRequestEnter) {
+    if (app->screen != ScreenBrowser) {
+      TopBar_OnBrowse(app);
+      app->browserState.MidiRequestEnter = false;
+    } else if (app->browserState.BrowseLevel == 0 && !app->browserState.ShowLoadPopup) {
+      TopBar_OnBrowse(app);
+      app->browserState.MidiRequestEnter = false;
+    }
+  }
   if (app->MidiRequestSettings) {
     TopBar_OnSettings(app);
     app->MidiRequestSettings = false;
@@ -2060,6 +2079,31 @@ void UpdateDrawFrame(App *app) {
   if (app->MidiRequestMixer) {
     TopBar_OnMixer(app);
     app->MidiRequestMixer = false;
+  }
+  if (app->MidiWaveformZoomStep != 0) {
+    int steps = app->MidiWaveformZoomStep;
+    app->MidiWaveformZoomStep = 0;
+    if (steps > 0) {
+      for (int i = 0; i < steps; i++) {
+        Waveform_AdjustZoom(&app->deckA, 1);
+        Waveform_AdjustZoom(&app->deckB, 1);
+      }
+    } else {
+      for (int i = 0; i < -steps; i++) {
+        Waveform_AdjustZoom(&app->deckA, -1);
+        Waveform_AdjustZoom(&app->deckB, -1);
+      }
+    }
+  }
+  if (app->MidiWaveformZoomIn) {
+    Waveform_AdjustZoom(&app->deckA, 1);
+    Waveform_AdjustZoom(&app->deckB, 1);
+    app->MidiWaveformZoomIn = false;
+  }
+  if (app->MidiWaveformZoomOut) {
+    Waveform_AdjustZoom(&app->deckA, -1);
+    Waveform_AdjustZoom(&app->deckB, -1);
+    app->MidiWaveformZoomOut = false;
   }
 
   // Handle Library Up/Down requests

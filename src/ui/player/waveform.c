@@ -12,6 +12,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 // (Local GetCurrentBeat removed, now using Quantize_GetCurrentBeat from quantize.h)
+void Waveform_AdjustZoom(DeckState *ds, int direction) {
+  if (!ds) return;
+  int currentIndex = 0;
+  float minDiff = 99999.0f;
+  for (int i = 0; i < NUM_ZOOM_LEVELS; i++) {
+    float diff = fabsf(ds->ZoomScale - ZOOM_LEVELS[i]);
+    if (diff < minDiff) {
+      minDiff = diff;
+      currentIndex = i;
+    }
+  }
+  currentIndex += direction;
+  if (currentIndex < 0) currentIndex = 0;
+  int maxZoomIndex = NUM_ZOOM_LEVELS - 1;
+  if (MemoryGuard_GetLevel() >= MEM_MODE_ECO) {
+    maxZoomIndex = (NUM_ZOOM_LEVELS / 2) + 1;
+  }
+  if (currentIndex > maxZoomIndex) currentIndex = maxZoomIndex;
+  ds->ZoomScale = ZOOM_LEVELS[currentIndex];
+}
+
 static int Waveform_Update(Component *base) {
   WaveformRenderer *r = (WaveformRenderer *)base;
 
