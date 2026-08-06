@@ -150,7 +150,7 @@ static int DeckStrip_Update(Component *base) {
     float wh = S(26);
     Rectangle wfmRect = {wx, wy, ww, wh};
 
-    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && CheckCollisionPointRec(mouse, wfmRect)) {
+    if (UI_IsPressed() && CheckCollisionPointRec(mouse, wfmRect)) {
       if (!uiTouching[d->ID]) {
         uiTouching[d->ID] = true;
         wasPlayingBeforeSeek[d->ID] = d->State->IsPlaying;
@@ -159,7 +159,7 @@ static int DeckStrip_Update(Component *base) {
     }
 
     if (uiTouching[d->ID]) {
-      if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+      if (UI_IsDown()) {
         float ratio = (mouse.x - wx) / ww;
         if (ratio < 0.0f) ratio = 0.0f;
         if (ratio > 1.0f) ratio = 1.0f;

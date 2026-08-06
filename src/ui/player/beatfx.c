@@ -44,7 +44,7 @@ static int BeatFX_Update(Component *base) {
     }
 
     if (b->State->FXDropdownOpen) {
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (UI_IsPressed()) {
             float dy = fxSelectY + S(18);
             for (int i = 0; i < ALL_FX_COUNT; i++) {
                 Rectangle optRect = { x + S(4), dy, w - S(8), S(14) };
@@ -58,7 +58,7 @@ static int BeatFX_Update(Component *base) {
             b->State->FXDropdownOpen = false;
         }
     } else if (b->State->ChannelDropdownOpen) {
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (UI_IsPressed()) {
             float dy = cy + S(14);
             for (int i = 0; i < 3; i++) {
                 Rectangle optRect = { x + S(4), dy, w - S(8), S(14) };
@@ -72,7 +72,7 @@ static int BeatFX_Update(Component *base) {
             b->State->ChannelDropdownOpen = false;
         }
     } else {
-        if (fxHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (fxHovered && UI_IsPressed()) {
             b->State->FXDropdownOpen = true;
         }
     
@@ -86,7 +86,7 @@ static int BeatFX_Update(Component *base) {
                 if (b->AudioPlugin) b->AudioPlugin->BeatFX.targetChannel = next;
             }
             
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            if (UI_IsPressed()) {
                 b->State->ChannelDropdownOpen = true;
             }
         }
@@ -96,11 +96,11 @@ static int BeatFX_Update(Component *base) {
     float containerY = cy + S(20);
     float rowH = S(56) / 4.0f;
     Rectangle qRect = { x + S(4), containerY + 3 * rowH, w - S(8), rowH };
-    if (CheckCollisionPointRec(mouse, qRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    if (CheckCollisionPointRec(mouse, qRect) && UI_IsPressed()) {
         b->State->Quantize = !b->State->Quantize;
     }
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    if (UI_IsPressed()) {
         if (CheckCollisionPointRec(mouse, b->FXButton)) {
             b->State->IsFXOn = !b->State->IsFXOn;
         }
@@ -112,7 +112,7 @@ static int BeatFX_Update(Component *base) {
     Rectangle statusTab = { x + S(4), tabY, tabW, S(14) };
     Rectangle beatFxTab = { x + S(6) + tabW, tabY, tabW, S(14) };
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    if (UI_IsPressed()) {
         if (CheckCollisionPointRec(mouse, statusTab)) {
             b->State->ShowBeatFXTab = false;
         } else if (CheckCollisionPointRec(mouse, beatFxTab)) {
@@ -126,7 +126,7 @@ static int BeatFX_Update(Component *base) {
     Rectangle minusRect = { x + S(4), plusMinusY, halfB, S(14) };
     Rectangle plusRect = { x + S(8) + halfB, plusMinusY, halfB, S(14) };
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    if (UI_IsPressed()) {
         int zoomDelta = 0;
         if (CheckCollisionPointRec(mouse, minusRect)) zoomDelta = 1;  // Zoom OUT (Show more track)
         if (CheckCollisionPointRec(mouse, plusRect)) zoomDelta = -1; // Zoom IN (Show more detail)

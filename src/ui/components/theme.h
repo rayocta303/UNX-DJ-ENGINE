@@ -71,3 +71,7 @@ void UI_UpdateTouchState(void);
 bool UICheckClick(Rectangle rect);
 float UIGetTouchDragDistance(void);
 Vector2 UIGetTouchStartPos(void);
+
+bool UI_IsPressed(void);
+bool UI_IsDown(void);
+bool UI_IsReleased(void);

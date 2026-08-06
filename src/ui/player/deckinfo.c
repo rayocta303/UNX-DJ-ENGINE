@@ -35,7 +35,7 @@ static int DeckInfo_Update(Component *base) {
     float ejectY = y + (headerH - ejectH) / 2.0f;
     Rectangle ejectRect = { ejectX, ejectY, ejectW, ejectH };
     
-    if (d->State->LoadedTrack != NULL && CheckCollisionPointRec(UIGetMousePosition(), ejectRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    if (d->State->LoadedTrack != NULL && CheckCollisionPointRec(UIGetMousePosition(), ejectRect) && UI_IsPressed()) {
         DeckAudio_Unload(&d->Engine->Decks[d->ID]);
         d->State->IsPlaying = false;
         d->State->IsCueActive = false;
@@ -79,23 +79,23 @@ static int DeckInfo_Update(Component *base) {
 
     // Row 1: Master (Top-Left), Sync (Top-Right)
     Rectangle msRect = { margin, utilY, utilW, utilH };
-    if (CheckCollisionPointRec(UIGetMousePosition(), msRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    if (CheckCollisionPointRec(UIGetMousePosition(), msRect) && UI_IsPressed()) {
         d->State->IsMaster = true; // Exclusivity handled in main.c loop
     }
 
     Rectangle syRect = { margin + utilW + utilGap, utilY, utilW, utilH };
-    if (CheckCollisionPointRec(UIGetMousePosition(), syRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    if (CheckCollisionPointRec(UIGetMousePosition(), syRect) && UI_IsPressed()) {
         d->State->SyncMode = (d->State->SyncMode + 1) % 3;
     }
 
     // Row 2: MT (Bottom-Left), Vinyl / CDJ (Bottom-Right)
     Rectangle mtRect = { margin, utilY2, utilW, utilH };
-    if (CheckCollisionPointRec(UIGetMousePosition(), mtRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    if (CheckCollisionPointRec(UIGetMousePosition(), mtRect) && UI_IsPressed()) {
         d->State->MasterTempo = !d->State->MasterTempo;
     }
 
     Rectangle viRect = { margin + utilW + utilGap, utilY2, utilW, utilH };
-    if (CheckCollisionPointRec(UIGetMousePosition(), viRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    if (CheckCollisionPointRec(UIGetMousePosition(), viRect) && UI_IsPressed()) {
         d->State->VinylModeEnabled = !d->State->VinylModeEnabled;
     }
 
@@ -103,7 +103,7 @@ static int DeckInfo_Update(Component *base) {
     Rectangle cueRect = { margin, btnY, btnW, btnH };
     
     if (CheckCollisionPointRec(UIGetMousePosition(), cueRect)) {
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (UI_IsPressed()) {
             if (d->State->IsPlaying) {
                 // While playing: Instant stop and jump back to cue
                 DeckAudio_InstantStop(&d->Engine->Decks[d->ID]);
@@ -132,7 +132,7 @@ static int DeckInfo_Update(Component *base) {
         }
     }
     
-    if (d->State->IsCueHeld && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+    if (d->State->IsCueHeld && UI_IsReleased()) {
         // When releasing a held CUE: Instant stop and return to cue point
         DeckAudio_InstantStop(&d->Engine->Decks[d->ID]);
         DeckAudio_ExitLoop(&d->Engine->Decks[d->ID]);
@@ -143,7 +143,7 @@ static int DeckInfo_Update(Component *base) {
     }
 
     Rectangle playRect = { margin + btnW + S(6), btnY, btnW, btnH };
-    if (CheckCollisionPointRec(UIGetMousePosition(), playRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    if (CheckCollisionPointRec(UIGetMousePosition(), playRect) && UI_IsPressed()) {
         if (d->State->IsCueHeld) {
             // CUE + PLAY interlock: keep playing after CUE is released
             d->State->IsCueHeld = false;

@@ -12,7 +12,7 @@ static int BottomStrip_Update(Component *base) {
     float barY = TOP_BAR_H + WAVE_AREA_H;
     float halfW = SCREEN_WIDTH / 2.0f;
 
-    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+    if (UI_IsReleased()) {
         if (mouse.y >= barY && mouse.y <= barY + S(12)) {
             b->State->ShowBeatFXTab = !b->State->ShowBeatFXTab;
             return 1;
@@ -65,7 +65,7 @@ static int BottomStrip_Update(Component *base) {
         }
     }
 
-    if (b->State->ShowBeatFXTab && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+    if (b->State->ShowBeatFXTab && UI_IsDown()) {
         float btnY = barY + S(13);
         float btnH = S(23);
         float cx = halfW + S(2);

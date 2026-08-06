@@ -43,12 +43,42 @@ Vector2 UIGetMousePosition(void) {
 static Vector2 g_touchStartPos = { -1.0f, -1.0f };
 static float g_touchDragDistance = 0.0f;
 
+#if defined(PLATFORM_DRM) || (defined(__linux__) && !defined(__ANDROID__))
+extern bool Evdev_IsTouchDown(void);
+extern bool Evdev_IsTouchPressed(void);
+extern bool Evdev_IsTouchReleased(void);
+#endif
+
+bool UI_IsPressed(void) {
+    bool pressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON) || IsGestureDetected(GESTURE_TAP);
+#if defined(PLATFORM_DRM) || (defined(__linux__) && !defined(__ANDROID__))
+    if (Evdev_IsTouchPressed()) pressed = true;
+#endif
+    return pressed;
+}
+
+bool UI_IsDown(void) {
+    bool down = IsMouseButtonDown(MOUSE_LEFT_BUTTON) || GetTouchPointCount() > 0;
+#if defined(PLATFORM_DRM) || (defined(__linux__) && !defined(__ANDROID__))
+    if (Evdev_IsTouchDown()) down = true;
+#endif
+    return down;
+}
+
+bool UI_IsReleased(void) {
+    bool released = IsMouseButtonReleased(MOUSE_LEFT_BUTTON) || IsGestureDetected(GESTURE_TAP);
+#if defined(PLATFORM_DRM) || (defined(__linux__) && !defined(__ANDROID__))
+    if (Evdev_IsTouchReleased()) released = true;
+#endif
+    return released;
+}
+
 void UI_UpdateTouchState(void) {
     Vector2 m = UIGetMousePosition();
-    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    if (UI_IsPressed()) {
         g_touchStartPos = m;
         g_touchDragDistance = 0.0f;
-    } else if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+    } else if (UI_IsDown()) {
         float dx = m.x - g_touchStartPos.x;
         float dy = m.y - g_touchStartPos.y;
         float dist = (float)sqrt((double)(dx * dx + dy * dy));
@@ -59,9 +89,12 @@ void UI_UpdateTouchState(void) {
 }
 
 bool UICheckClick(Rectangle rect) {
-    if (!IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) return false;
+    if (!UI_IsReleased()) return false;
     if (g_touchDragDistance >= S(22.0f)) return false;
-    if (!CheckCollisionPointRec(g_touchStartPos, rect)) return false;
+    if (!CheckCollisionPointRec(g_touchStartPos, rect) && !CheckCollisionPointRec(UIGetMousePosition(), rect)) return false;
+    
+    // Consume click so no subsequent check or frame re-fires
+    g_touchDragDistance = 999.0f;
     return true;
 }
 

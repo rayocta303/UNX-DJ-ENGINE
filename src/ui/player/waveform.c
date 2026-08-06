@@ -26,9 +26,6 @@ void Waveform_AdjustZoom(DeckState *ds, int direction) {
   currentIndex += direction;
   if (currentIndex < 0) currentIndex = 0;
   int maxZoomIndex = NUM_ZOOM_LEVELS - 1;
-  if (MemoryGuard_GetLevel() >= MEM_MODE_ECO) {
-    maxZoomIndex = (NUM_ZOOM_LEVELS / 2) + 1;
-  }
   if (currentIndex > maxZoomIndex) currentIndex = maxZoomIndex;
   ds->ZoomScale = ZOOM_LEVELS[currentIndex];
 }
@@ -136,10 +133,6 @@ static int Waveform_Update(Component *base) {
       if (currentIndex < 0) currentIndex = 0;
       
       int maxZoomIndex = NUM_ZOOM_LEVELS - 1;
-      // ECO MODE: Limit maximum zoom out to prevent heavy rendering
-      if (MemoryGuard_GetLevel() >= MEM_MODE_ECO) {
-          maxZoomIndex = (NUM_ZOOM_LEVELS / 2) + 1; // Limit to mid-zoom
-      }
       if (currentIndex > maxZoomIndex) currentIndex = maxZoomIndex;
 
       r->State->ZoomScale = ZOOM_LEVELS[currentIndex];
@@ -152,14 +145,14 @@ static int Waveform_Update(Component *base) {
   static bool isMouseTouchingWaveform[2] = {false, false};
   int dId = (r->State->ID >= 0 && r->State->ID < 2) ? r->State->ID : 0;
 
-  if (inWaveform && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+  if (inWaveform && UI_IsPressed()) {
     r->State->IsTouching = true;
     isMouseTouchingWaveform[dId] = true;
     r->lastMouseX = mouse.x;
   }
 
   if (isMouseTouchingWaveform[dId]) {
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+    if (UI_IsDown()) {
       float dx = mouse.x - r->lastMouseX;
       r->lastMouseX = mouse.x;
 
@@ -537,10 +530,7 @@ static void Waveform_Draw(Component *base) {
   float distRight = wfRight - centerX;
   float maxVisibleDist = (distLeft > distRight) ? distLeft : distRight;
   
-  // ECO MODE: Reduce viewport width if memory is low
   MemoryLevel mem = MemoryGuard_GetLevel();
-  if (mem == MEM_MODE_ECO) maxVisibleDist *= 0.8f;
-  else if (mem >= MEM_MODE_LITE) maxVisibleDist *= 0.5f;
 
   double halfVisibleFrames = (maxVisibleDist + 10.0f) * framesPerPixel;
   

@@ -9,6 +9,9 @@
 #include "input/keyboard.h"
 #include "raylib.h"
 #include "rlgl.h"
+#if defined(GRAPHICS_API_OPENGL_ES2) || defined(PLATFORM_DESKTOP)
+#include <GLES2/gl2.h>
+#endif
 #include "ui/browser/browser.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
@@ -305,49 +308,44 @@ void UpdateChannelOptions(App *a, int deviceIdx) {
     channels = devs[deviceIdx].NativeChannels;
   }
 
-  // Common init for channel items
-  strcpy(a->settingsState.Items[9].Label, "MASTER LEFT");
-  a->settingsState.Items[9].Type = SETTING_TYPE_LIST;
-  strcpy(a->settingsState.Items[10].Label, "MASTER RIGHT");
+  // Common init for channel items (Items 10..13)
+  strcpy(a->settingsState.Items[10].Label, "MASTER LEFT");
   a->settingsState.Items[10].Type = SETTING_TYPE_LIST;
-  strcpy(a->settingsState.Items[11].Label, "CUE LEFT");
+  strcpy(a->settingsState.Items[11].Label, "MASTER RIGHT");
   a->settingsState.Items[11].Type = SETTING_TYPE_LIST;
-  strcpy(a->settingsState.Items[12].Label, "CUE RIGHT");
+  strcpy(a->settingsState.Items[12].Label, "CUE LEFT");
   a->settingsState.Items[12].Type = SETTING_TYPE_LIST;
+  strcpy(a->settingsState.Items[13].Label, "CUE RIGHT");
+  a->settingsState.Items[13].Type = SETTING_TYPE_LIST;
 
-  a->settingsState.Items[9].Category = SETTING_CAT_AUDIO;
   a->settingsState.Items[10].Category = SETTING_CAT_AUDIO;
   a->settingsState.Items[11].Category = SETTING_CAT_AUDIO;
   a->settingsState.Items[12].Category = SETTING_CAT_AUDIO;
+  a->settingsState.Items[13].Category = SETTING_CAT_AUDIO;
 
   // Master L/R: CH 1..N
-  a->settingsState.Items[9].OptionsCount = channels;
   a->settingsState.Items[10].OptionsCount = channels;
+  a->settingsState.Items[11].OptionsCount = channels;
   for (int i = 0; i < channels && i < MAX_SETTING_OPTIONS; i++) {
-    sprintf(a->settingsState.Items[9].Options[i], "CH %d", i + 1);
     sprintf(a->settingsState.Items[10].Options[i], "CH %d", i + 1);
+    sprintf(a->settingsState.Items[11].Options[i], "CH %d", i + 1);
   }
 
   // Cue L/R: Blank, CH 1..N
-  a->settingsState.Items[11].OptionsCount = channels + 1;
   a->settingsState.Items[12].OptionsCount = channels + 1;
-  strcpy(a->settingsState.Items[11].Options[0], "Blank");
+  a->settingsState.Items[13].OptionsCount = channels + 1;
   strcpy(a->settingsState.Items[12].Options[0], "Blank");
+  strcpy(a->settingsState.Items[13].Options[0], "Blank");
   for (int i = 0; i < channels && (i + 1) < MAX_SETTING_OPTIONS; i++) {
-    sprintf(a->settingsState.Items[11].Options[i + 1], "CH %d", i + 1);
     sprintf(a->settingsState.Items[12].Options[i + 1], "CH %d", i + 1);
+    sprintf(a->settingsState.Items[13].Options[i + 1], "CH %d", i + 1);
   }
 
   // Auto-Select defaults
-  // Auto-Select defaults: Start with 2-channel mirrored setup (CH 1/2 for
-  // Master and Cue) to prevent errors on fresh settings, even if more channels
-  // are available.
-  a->settingsState.Items[9].Current = 0; // Master L -> CH1
-  a->settingsState.Items[10].Current =
-      (channels > 1) ? 1 : 0; // Master R -> CH2
-
-  a->settingsState.Items[11].Current = 1; // Cue L -> CH 1 (Index 0 is Blank)
-  a->settingsState.Items[12].Current = (channels > 1) ? 2 : 1; // Cue R -> CH 2
+  a->settingsState.Items[10].Current = 0; // Master L -> CH1
+  a->settingsState.Items[11].Current = (channels > 1) ? 1 : 0; // Master R -> CH2
+  a->settingsState.Items[12].Current = 1; // Cue L -> CH 1 (Index 0 is Blank)
+  a->settingsState.Items[13].Current = (channels > 1) ? 2 : 1; // Cue R -> CH 2
 }
 
 void OnSettingsValueChanged(void *ctx, int idx) {
@@ -456,7 +454,13 @@ static void App_DeactivateAllViews(App *a) {
   a->browserState.IsSearching = false;
 }
 
+static double g_lastTopBarSwitchTime = 0.0;
+
 void TopBar_OnBrowse(void *ctx) {
+  double now = GetTime();
+  if (now - g_lastTopBarSwitchTime < 0.30) return;
+  g_lastTopBarSwitchTime = now;
+
   App *a = (App *)ctx;
   if (a->screen == ScreenBrowser) {
     a->screen = ScreenPlayer;
@@ -469,6 +473,10 @@ void TopBar_OnBrowse(void *ctx) {
 }
 
 void TopBar_OnMixer(void *ctx) {
+  double now = GetTime();
+  if (now - g_lastTopBarSwitchTime < 0.30) return;
+  g_lastTopBarSwitchTime = now;
+
   App *a = (App *)ctx;
   if (a->screen == ScreenMixer) {
     a->screen = ScreenPlayer;
@@ -482,6 +490,10 @@ void TopBar_OnMixer(void *ctx) {
 }
 
 void TopBar_OnInfo(void *ctx) {
+  double now = GetTime();
+  if (now - g_lastTopBarSwitchTime < 0.30) return;
+  g_lastTopBarSwitchTime = now;
+
   App *a = (App *)ctx;
   if (a->screen == ScreenInfo) {
     a->screen = ScreenPlayer;
@@ -514,6 +526,10 @@ void TopBar_OnInfo(void *ctx) {
 }
 
 void TopBar_OnPad(void *ctx) {
+  double now = GetTime();
+  if (now - g_lastTopBarSwitchTime < 0.30) return;
+  g_lastTopBarSwitchTime = now;
+
   App *a = (App *)ctx;
   if (a->screen == ScreenPad) {
     a->screen = ScreenPlayer;
@@ -811,6 +827,10 @@ void OnPadRelease(void *ctx, int deckIdx, int padIdx) {
 }
 
 void TopBar_OnSettings(void *ctx) {
+  double now = GetTime();
+  if (now - g_lastTopBarSwitchTime < 0.30) return;
+  g_lastTopBarSwitchTime = now;
+
   App *a = (App *)ctx;
   if (a->screen == ScreenSettings) {
     a->screen = ScreenPlayer;
@@ -1108,6 +1128,208 @@ void App_Init(App *a) {
   PopulateMidiSettings(a);
 }
 
+#if defined(PLATFORM_DRM) || (defined(__linux__) && !defined(__ANDROID__))
+#include <linux/input.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <sys/ioctl.h>
+
+#define MAX_EVDEV_DEVS 16
+
+typedef struct {
+    int fd;
+    char path[64];
+    char name[128];
+    bool isTouch;
+    int maxX;
+    int maxY;
+} EvdevDev;
+
+static EvdevDev g_evDevs[MAX_EVDEV_DEVS];
+static int g_evDevCount = 0;
+
+static int g_rawTouchX = -1;
+static int g_rawTouchY = -1;
+static bool g_rawTouchDown = false;
+static bool g_touchPressedEvent = false;
+static bool g_touchReleasedEvent = false;
+
+static bool g_evdevKeys[512] = { false };
+static bool g_evdevKeysPressed[512] = { false };
+static bool g_evdevKeysReleased[512] = { false };
+
+static int EvdevToRaylibKey(int code) {
+    switch (code) {
+        case 1:   return KEY_ESCAPE;
+        case 2:   return KEY_ONE;
+        case 3:   return KEY_TWO;
+        case 4:   return KEY_THREE;
+        case 5:   return KEY_FOUR;
+        case 6:   return KEY_FIVE;
+        case 7:   return KEY_SIX;
+        case 8:   return KEY_SEVEN;
+        case 9:   return KEY_EIGHT;
+        case 10:  return KEY_NINE;
+        case 11:  return KEY_ZERO;
+        case 14:  return KEY_BACKSPACE;
+        case 15:  return KEY_TAB;
+        case 28:  return KEY_ENTER;
+        case 29:  return KEY_LEFT_CONTROL;
+        case 42:  return KEY_LEFT_SHIFT;
+        case 56:  return KEY_LEFT_ALT;
+        case 57:  return KEY_SPACE;
+        case 103: return KEY_UP;
+        case 105: return KEY_LEFT;
+        case 106: return KEY_RIGHT;
+        case 108: return KEY_DOWN;
+        case 30: return KEY_A; case 48: return KEY_B; case 46: return KEY_C;
+        case 32: return KEY_D; case 18: return KEY_E; case 33: return KEY_F;
+        case 34: return KEY_G; case 35: return KEY_H; case 23: return KEY_I;
+        case 36: return KEY_J; case 37: return KEY_K; case 38: return KEY_L;
+        case 50: return KEY_M; case 49: return KEY_N; case 24: return KEY_O;
+        case 25: return KEY_P; case 16: return KEY_Q; case 19: return KEY_R;
+        case 31: return KEY_S; case 20: return KEY_T; case 22: return KEY_U;
+        case 47: return KEY_V; case 17: return KEY_W; case 45: return KEY_X;
+        case 21: return KEY_Y; case 44: return KEY_Z;
+        default: return 0;
+    }
+}
+
+static void* EvdevInput_Thread(void* arg) {
+    (void)arg;
+    for (int i = 0; i < 16; i++) {
+        char devPath[64];
+        snprintf(devPath, sizeof(devPath), "/dev/input/event%d", i);
+        int fd = open(devPath, O_RDONLY | O_NONBLOCK);
+        if (fd < 0) continue;
+
+        char name[128] = "Unknown Device";
+        ioctl(fd, EVIOCGNAME(sizeof(name)), name);
+
+        struct input_absinfo absX, absY;
+        bool isTouch = false;
+        int maxX = 2048, maxY = 2048;
+
+        if (ioctl(fd, EVIOCGABS(ABS_X), &absX) >= 0 && ioctl(fd, EVIOCGABS(ABS_Y), &absY) >= 0) {
+            if (absX.maximum > 0 && absY.maximum > 0) {
+                isTouch = true;
+                maxX = absX.maximum;
+                maxY = absY.maximum;
+            }
+        }
+
+        if (g_evDevCount < MAX_EVDEV_DEVS) {
+            g_evDevs[g_evDevCount].fd = fd;
+            strncpy(g_evDevs[g_evDevCount].path, devPath, 63);
+            strncpy(g_evDevs[g_evDevCount].name, name, 127);
+            g_evDevs[g_evDevCount].isTouch = isTouch;
+            g_evDevs[g_evDevCount].maxX = maxX;
+            g_evDevs[g_evDevCount].maxY = maxY;
+            printf("[EVDEV] Listening: %s (%s) [Touch: %s]\n", devPath, name, isTouch ? "YES" : "NO");
+            UNX_LOG_INFO("[EVDEV] Listening: %s (%s) [Touch: %s]", devPath, name, isTouch ? "YES" : "NO");
+            g_evDevCount++;
+        } else {
+            close(fd);
+        }
+    }
+
+    if (g_evDevCount == 0) return NULL;
+
+    struct input_event ev[32];
+    while (1) {
+        bool hadEvent = false;
+        for (int d = 0; d < g_evDevCount; d++) {
+            ssize_t bytes = read(g_evDevs[d].fd, ev, sizeof(ev));
+            if (bytes <= 0) continue;
+            hadEvent = true;
+
+            int count = (int)(bytes / sizeof(struct input_event));
+            for (int k = 0; k < count; k++) {
+                if (ev[k].type == EV_ABS) {
+                    if (ev[k].code == ABS_X || ev[k].code == ABS_MT_POSITION_X) {
+                        g_rawTouchX = (ev[k].value * 1024) / g_evDevs[d].maxX;
+                    } else if (ev[k].code == ABS_Y || ev[k].code == ABS_MT_POSITION_Y) {
+                        g_rawTouchY = (ev[k].value * 600) / g_evDevs[d].maxY;
+                    }
+                } else if (ev[k].type == EV_KEY) {
+                    if (ev[k].code == BTN_TOUCH || ev[k].code == BTN_LEFT) {
+                        bool down = (ev[k].value > 0);
+                        if (down && !g_rawTouchDown) {
+                            g_touchPressedEvent = true;
+                        } else if (!down && g_rawTouchDown) {
+                            g_touchReleasedEvent = true;
+                        }
+                        g_rawTouchDown = down;
+                    } else {
+                        int rKey = EvdevToRaylibKey(ev[k].code);
+                        if (rKey > 0 && rKey < 512) {
+                            if (ev[k].value == 1) {
+                                g_evdevKeys[rKey] = true;
+                                g_evdevKeysPressed[rKey] = true;
+                            } else if (ev[k].value == 0) {
+                                g_evdevKeys[rKey] = false;
+                                g_evdevKeysReleased[rKey] = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (!hadEvent) {
+            usleep(4000);
+        }
+    }
+    return NULL;
+}
+
+static void EvdevTouch_Init(void) {
+    pthread_t threadId;
+    pthread_create(&threadId, NULL, EvdevInput_Thread, NULL);
+    pthread_detach(threadId);
+}
+
+static bool g_touchPressedThisFrame = false;
+static bool g_touchReleasedThisFrame = false;
+
+static void EvdevTouch_Update(void) {
+    if (g_rawTouchX >= 0 && g_rawTouchY >= 0) {
+        SetMousePosition(g_rawTouchX, g_rawTouchY);
+    }
+    g_touchPressedThisFrame = g_touchPressedEvent;
+    g_touchReleasedThisFrame = g_touchReleasedEvent;
+    g_touchPressedEvent = false;
+    g_touchReleasedEvent = false;
+}
+
+bool Evdev_IsTouchDown(void) {
+    return g_rawTouchDown;
+}
+
+bool Evdev_IsTouchPressed(void) {
+    return g_touchPressedThisFrame;
+}
+
+bool Evdev_IsTouchReleased(void) {
+    return g_touchReleasedThisFrame;
+}
+
+bool Evdev_IsKeyPressed(int key) {
+    if (key > 0 && key < 512 && g_evdevKeysPressed[key]) {
+        g_evdevKeysPressed[key] = false;
+        return true;
+    }
+    return false;
+}
+
+bool Evdev_IsKeyDown(int key) {
+    if (key > 0 && key < 512) {
+        return g_evdevKeys[key];
+    }
+    return false;
+}
+#endif
+
 #if defined(PLATFORM_IOS)
 int raylib_main(int argc, char *argv[]) {
 #else
@@ -1142,7 +1364,29 @@ int main(void) {
 #endif
 
 #if defined(PLATFORM_DRM)
-  // ... (DRM logic omitted for brevity in replace)
+  Log_Init();
+  SetTraceLogLevel(LOG_WARNING);
+  printf("[MAIN] Platform: LINUX DRM/KMS\n");
+  UNX_LOG_INFO("[MAIN] Platform: LINUX DRM/KMS Mode");
+  InitWindow(1024, 600, APP_NAME);
+  int monitor = GetCurrentMonitor();
+  int monWidth = GetMonitorWidth(monitor);
+  int monHeight = GetMonitorHeight(monitor);
+  if (monWidth > 0 && monHeight > 0) {
+    SetWindowSize(monWidth, monHeight);
+  }
+  if (IsWindowReady()) {
+    printf("[MAIN] InitWindow SUCCESS (DRM). Size: %dx%d\n", GetScreenWidth(), GetScreenHeight());
+    UNX_LOG_INFO("[DRM] InitWindow SUCCESS. Size: %dx%d", GetScreenWidth(), GetScreenHeight());
+  } else {
+    printf("[MAIN] InitWindow FAILED (DRM)!\n");
+    UNX_LOG_ERR("[DRM] InitWindow FAILED!");
+  }
+  SetTargetFPS(60);
+  Log_RegisterCrashHandlers();
+  const char* gpuModel = (const char*)glGetString(0x1F01);
+  Log_LogDeviceInfo(gpuModel);
+  EvdevTouch_Init();
 #elif defined(__ANDROID__)
   UNX_LOG_INFO("[MAIN] Platform: ANDROID. Attempting InitWindow...");
   int w = GetScreenWidth();
@@ -1163,25 +1407,35 @@ int main(void) {
 // Desktop (X11, Wayland, Windows)
 Log_Init(); 
 printf("[MAIN] Platform: DESKTOP (X11/Wayland/Windows)\n");
+
+#if defined(_WIN32) || defined(__CYGWIN__)
+// Windows: Standard decorated windowed mode (1280x720 default)
 SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
+InitWindow(1280, 720, APP_NAME);
+#else
+// Linux / Armbian: Fullscreen undecorated matching monitor size
+SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_UNDECORATED);
+InitWindow(1024, 600, APP_NAME);
+int monitor = GetCurrentMonitor();
+int monWidth = GetMonitorWidth(monitor);
+int monHeight = GetMonitorHeight(monitor);
 
-// Start in windowed mode (e.g., 1280x720) like Windows version
-int winWidth = 1280;
-int winHeight = 720;
-
-printf("[MAIN] Initializing Window (%dx%d)...\n", winWidth, winHeight);
-InitWindow(winWidth, winHeight, APP_NAME);
+if (monWidth > 0 && monHeight > 0) {
+    SetWindowSize(monWidth, monHeight);
+    SetWindowPosition(0, 0);
+}
+#endif
 
 if (IsWindowReady()) {
   printf("[MAIN] InitWindow SUCCESS. Window size: %dx%d\n", GetScreenWidth(),
          GetScreenHeight());
-  UNX_LOG_INFO("[DESKTOP] InitWindow SUCCESS.");
+  UNX_LOG_INFO("[DESKTOP] InitWindow SUCCESS. Size: %dx%d", GetScreenWidth(), GetScreenHeight());
 } else {
   printf("[MAIN] InitWindow FAILED!\n");
   UNX_LOG_ERR("[DESKTOP] InitWindow FAILED!");
 }
 
-SetWindowMinSize(REF_WIDTH, REF_HEIGHT);
+SetWindowMinSize(320, 240);
 SetTargetFPS(60);
 Log_RegisterCrashHandlers();
 const char* gpuModel = (const char*)glGetString(0x1F01); // GL_RENDERER
@@ -2609,7 +2863,11 @@ void UpdateDrawFrame(App *app) {
   rlPushMatrix();
   rlTranslatef(UI_OffsetX, UI_OffsetY, 0);
 
-  // Update memory state once per frame
+  // Update UI touch state & memory state once per frame
+#if defined(PLATFORM_DRM) || (defined(__linux__) && !defined(__ANDROID__))
+  EvdevTouch_Update();
+#endif
+  UI_UpdateTouchState();
   MemoryGuard_Update();
 
   // High-level Screen Router
@@ -2710,7 +2968,7 @@ void UpdateDrawFrame(App *app) {
     DrawCentredText("YES", fMd, px + pw - S(90), btnW, py + S(68), S(11),
                     ColorWhite);
 
-    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+    if (UI_IsReleased()) {
       if (noHover)
         app->showExitConfirm = false;
       if (yesHover) {

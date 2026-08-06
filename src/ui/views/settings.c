@@ -34,7 +34,7 @@ static int Settings_Update(Component *base) {
       // Scroll handling for dropdown
       Vector2 mouseReq = GetMouseDelta();
       r->State->DropdownScroll -= GetMouseWheelMove() * S(30.0f);
-      if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse, dropRect)) {
+      if (UI_IsDown()) {
           r->State->DropdownScroll -= mouseReq.y;
       }
       
@@ -43,7 +43,7 @@ static int Settings_Update(Component *base) {
       if (r->State->DropdownScroll < 0) r->State->DropdownScroll = 0;
       if (r->State->DropdownScroll > maxScroll) r->State->DropdownScroll = maxScroll;
       
-      if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+      if (UI_IsReleased()) {
           if (!CheckCollisionPointRec(mouse, dropRect)) {
               r->State->IsDropdownOpen = false;
           } else {
@@ -108,7 +108,7 @@ static int Settings_Update(Component *base) {
       Rectangle btn3 = { modalX + S(15), modalY + S(140), S(135), S(24) };
       Rectangle btn4 = { modalX + S(170), modalY + S(140), S(135), S(24) };
 
-      if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+      if (UI_IsReleased()) {
           Vector2 mousePos = UIGetMousePosition();
           if (CheckCollisionPointRec(mousePos, btn1)) {
               r->State->IsLearningMidi = true;
@@ -165,7 +165,7 @@ static int Settings_Update(Component *base) {
       int visibleRows = (int)((divY - listY) / rowH);
 
       // Mouse click list item inside mapping list sub-window
-      if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+      if (UI_IsReleased()) {
           Vector2 mousePos = UIGetMousePosition();
           
           // Back Button at the bottom
@@ -278,7 +278,7 @@ static int Settings_Update(Component *base) {
     }
   }
 
-  if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+  if (UI_IsDown()) {
     Vector2 delta = GetMouseDelta();
     r->State->TouchDragAccumulator += delta.y;
     
@@ -346,7 +346,7 @@ static int Settings_Update(Component *base) {
       }
   }
 
-  if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+  if (UI_IsDown()) {
       Vector2 mouseDelta = GetMouseDelta();
       if (hoveredItemIdx >= 0 && r->State->Items[hoveredItemIdx].Type == SETTING_TYPE_KNOB) {
           if (fabsf(mouseDelta.x) > 0.001f || fabsf(mouseDelta.y) > 0.001f) {
@@ -362,11 +362,11 @@ static int Settings_Update(Component *base) {
       }
   }
 
-  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+  if (UI_IsPressed()) {
       r->State->TouchDragAccumulator = 0;
   }
 
-  if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+  if (UI_IsReleased()) {
     Vector2 mouse = UIGetMousePosition();
     float viewH = SCREEN_HEIGHT - DECK_STR_H;
     float bottomH = S(46.0f);

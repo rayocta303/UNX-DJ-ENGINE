@@ -256,6 +256,8 @@ static int CompareTracks_Title_Serato(const void *a, const void *b) {
 }
 
 static int CompareTracks_Rating_Serato(const void *a, const void *b) {
+    (void)a;
+    (void)b;
     // SeratoTrack struct currently lacks a Rating field in the DB v2 parser.
     // Retain original order.
     return 0;
@@ -586,11 +588,18 @@ void Browser_RefreshStorages(BrowserState *s) {
   extern const char *ios_get_documents_path(const char *filename);
   const char *scanDirs[] = {"DOCUMENTS_DIR", "/var/mobile/Media",
                             "/storage",      "/mnt",
-                            "/media",        "/run/media"};
-  int scanDirCount = 6;
+                            "/media",        "/run/media",
+                            "/media/root",   "/run/media/root"};
+  int scanDirCount = 8;
 #else
-  const char *scanDirs[] = {"/storage", "/mnt", "/media", "/run/media"};
-  int scanDirCount = 4;
+  const char *scanDirs[] = {"/storage", "/mnt", "/media", "/run/media", "/media/root", "/run/media/root"};
+  int scanDirCount = 6;
+#endif
+
+#if defined(__linux__) && !defined(__ANDROID__)
+  system("mkdir -p /media/usb1 /media/usb2 /media/usb3 2>/dev/null; "
+         "mount /dev/sda1 /media/usb1 2>/dev/null || mount /dev/sda /media/usb1 2>/dev/null || true; "
+         "mount /dev/sdb1 /media/usb2 2>/dev/null || mount /dev/sdb /media/usb2 2>/dev/null || true;");
 #endif
 
   for (int i = 0; i < scanDirCount; i++) {
@@ -648,10 +657,14 @@ void Browser_RefreshStorages(BrowserState *s) {
           bool hasRB = false;
           bool hasSerato = false;
 
-          snprintf(dbPath, sizeof(dbPath), "%s/PIONEER/rekordbox/export.pdb",
-                   fullPath);
-          if (stat(dbPath, &st) == 0)
-            hasRB = true;
+          snprintf(dbPath, sizeof(dbPath), "%s/PIONEER/rekordbox/export.pdb", fullPath);
+          if (stat(dbPath, &st) == 0) hasRB = true;
+          snprintf(dbPath, sizeof(dbPath), "%s/PIONEER/Rekordbox/export.pdb", fullPath);
+          if (stat(dbPath, &st) == 0) hasRB = true;
+          snprintf(dbPath, sizeof(dbPath), "%s/PIONEER/REKORDBOX/export.pdb", fullPath);
+          if (stat(dbPath, &st) == 0) hasRB = true;
+          snprintf(dbPath, sizeof(dbPath), "%s/pioneer/rekordbox/export.pdb", fullPath);
+          if (stat(dbPath, &st) == 0) hasRB = true;
 
           snprintf(dbPath, sizeof(dbPath), "%s/_Serato_/database V2", fullPath);
           if (stat(dbPath, &st) == 0)
@@ -774,13 +787,13 @@ static int Browser_Update(Component *base) {
       float oskH = S(172);
       Rectangle oskPanelRect = {0, viewH - oskH, SCREEN_WIDTH, oskH};
       if (CheckCollisionPointRec(mousePos, oskPanelRect)) {
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (UI_IsPressed()) {
           // Touch absorbed by OSK overlay
         }
       }
     }
 
-    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    if (UI_IsPressed()) {
       // Handle OSK Button Toggle
       if (CheckCollisionPointRec(mousePos, oskButtonRect)) {
         s->ShowOSK = !s->ShowOSK;
@@ -928,7 +941,7 @@ static int Browser_Update(Component *base) {
   // triggers
   bool wasPopupOpen = s->ShowLoadPopup;
   if (wasPopupOpen) {
-    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+    if (UI_IsReleased()) {
       float pw = S(240);
       float ph = S(120);
       float viewH = SCREEN_HEIGHT - DECK_STR_H;
@@ -1021,7 +1034,7 @@ static int Browser_Update(Component *base) {
       }
 
       // Handle Dropping into Bank
-      if (s->IsDragging && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+      if (s->IsDragging && UI_IsReleased()) {
         if (i >= 4) {
           int bankIdx = i - 4;
           if (s->DraggingType == 1) { // Only playlists can be banked
@@ -1089,7 +1102,7 @@ static int Browser_Update(Component *base) {
     float sbTrackH = viewH - listYOffset;
     Rectangle sbRect = {sbTrackX, sbTrackY, sbTrackW, sbTrackH};
 
-    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    if (UI_IsPressed()) {
       s->TouchDragAccumulator = 0.0f;
       s->TouchVelocityY = 0.0f;
       s->LastTouchY = mousePos.y;
@@ -1102,7 +1115,7 @@ static int Browser_Update(Component *base) {
       }
     }
 
-    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+    if (UI_IsDown()) {
       if (s->IsScrollbarDragging) {
         float ratio = (mousePos.y - sbTrackY) / sbTrackH;
         if (ratio < 0.0f) ratio = 0.0f;
@@ -1116,11 +1129,11 @@ static int Browser_Update(Component *base) {
         s->LastTouchY = mousePos.y;
         s->TouchDragAccumulator += fabsf(dy);
 
-        if (!s->IsDragging && s->TouchDragAccumulator > S(18.0f)) {
+        if (!s->IsDragging && s->TouchDragAccumulator > S(4.0f)) {
           s->IsDragging = true;
         }
 
-        if (s->IsDragging) {
+        if (s->IsDragging || s->TouchDragAccumulator > S(2.0f)) {
           float resistance = 1.0f;
           if (s->VisualScroll < 0 && dy > 0) resistance = 0.3f;
           if (s->VisualScroll > maxScroll && dy < 0) resistance = 0.3f;
@@ -1149,7 +1162,7 @@ static int Browser_Update(Component *base) {
       }
     }
 
-    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+    if (UI_IsReleased()) {
       if (s->IsDragging && fabsf(s->TouchVelocityY) > 60.0f) {
         s->ScrollVelocity = s->TouchVelocityY; // Apply touch flick velocity
       }
@@ -1190,7 +1203,7 @@ static int Browser_Update(Component *base) {
       if (ry < listYOffset - S(10) || ry > SCREEN_HEIGHT - DECK_STR_H - S(5)) continue;
 
       if (CheckCollisionPointRec(mousePos, itemRect)) {
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (UI_IsPressed()) {
           s->DraggingIdx = idx;
           if (s->BrowseLevel == 1) s->DraggingType = 1; 
           else if (s->BrowseLevel == 0) s->DraggingType = 0;
@@ -1202,8 +1215,8 @@ static int Browser_Update(Component *base) {
           }
         }
 
-        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && !s->IsDragging) {
-          if (s->TouchDragAccumulator < S(18.0f) && fabsf(s->ScrollVelocity) < 40.0f) {
+        if (UI_IsReleased() && !s->IsDragging) {
+          if (s->TouchDragAccumulator < S(6.0f) && fabsf(s->ScrollVelocity) < 40.0f) {
             s->ShowOSK = false; // Auto hide keyboard on list item tap
             if (s->BrowseLevel == 0) {
               s->ShowLoadPopup = true;
@@ -1217,7 +1230,7 @@ static int Browser_Update(Component *base) {
     }
   }
 
-  if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+  if (UI_IsReleased())
     s->IsDragging = false;
 
   // 4. Keyboard Navigation (Sync with VisualScroll)
@@ -1719,7 +1732,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
       char label[2] = { ch, '\0' };
       DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14), ColorWhite);
 
-      if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && isHover) {
+      if (UI_IsPressed() && isHover) {
           if (strlen(s->SearchQuery) < 63) {
               int len = strlen(s->SearchQuery);
               s->SearchQuery[len] = ch;
@@ -1749,7 +1762,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
       char label[2] = { ch, '\0' };
       DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14), ColorWhite);
 
-      if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && isHover) {
+      if (UI_IsPressed() && isHover) {
           if (strlen(s->SearchQuery) < 63) {
               int len = strlen(s->SearchQuery);
               s->SearchQuery[len] = ch;
@@ -1777,7 +1790,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(shiftRect, 1.0f, s->OSKShiftActive ? ColorWhite : ColorDark1);
   DrawCentredText("SHIFT", faceXS, shiftRect.x, shiftRect.width, shiftRect.y + S(12), S(10), ColorWhite);
 
-  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverShift) {
+  if (UI_IsPressed() && hoverShift) {
       s->OSKShiftActive = !s->OSKShiftActive;
   }
 
@@ -1794,7 +1807,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
       char label[2] = { ch, '\0' };
       DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14), ColorWhite);
 
-      if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && isHover) {
+      if (UI_IsPressed() && isHover) {
           if (strlen(s->SearchQuery) < 63) {
               int len = strlen(s->SearchQuery);
               s->SearchQuery[len] = ch;
@@ -1813,7 +1826,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(bkspRect, 1.0f, hoverBksp ? ColorWhite : ColorDark1);
   DrawCentredText("BKSP", faceXS, bkspRect.x, bkspRect.width, bkspRect.y + S(12), S(10), ColorWhite);
 
-  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverBksp) {
+  if (UI_IsPressed() && hoverBksp) {
       int len = strlen(s->SearchQuery);
       if (len > 0) {
           s->SearchQuery[len - 1] = '\0';
@@ -1837,7 +1850,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(modeRect, 1.0f, ColorDark1);
   DrawCentredText((s->OSKMode == 0) ? "?123" : "ABC", faceSm, modeRect.x, modeRect.width, modeRect.y + S(11), S(12), ColorOrange);
 
-  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverMode) {
+  if (UI_IsPressed() && hoverMode) {
       s->OSKMode = (s->OSKMode == 0) ? 1 : 0;
   }
 
@@ -1848,7 +1861,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(spaceRect, 1.0f, ColorDark1);
   DrawCentredText("SPACE", faceXS, spaceRect.x, spaceRect.width, spaceRect.y + S(12), S(10), ColorShadow);
 
-  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverSpace) {
+  if (UI_IsPressed() && hoverSpace) {
       if (strlen(s->SearchQuery) < 63) {
           int len = strlen(s->SearchQuery);
           s->SearchQuery[len] = ' ';
@@ -1866,7 +1879,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(clearRect, 1.0f, ColorDark1);
   DrawCentredText("CLEAR", faceXS, clearRect.x, clearRect.width, clearRect.y + S(12), S(10), ColorWhite);
 
-  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverClear) {
+  if (UI_IsPressed() && hoverClear) {
       s->SearchQuery[0] = '\0';
       s->CursorPos = s->ScrollOffset = 0;
       s->VisualScroll = 0;
@@ -1880,7 +1893,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(hideBtnRect, 1.0f, ColorWhite);
   DrawCentredText("HIDE", faceSm, hideBtnRect.x, hideBtnRect.width, hideBtnRect.y + S(11), S(12), ColorWhite);
 
-  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverHide) {
+  if (UI_IsPressed() && hoverHide) {
       s->ShowOSK = false;
       s->IsSearching = (strlen(s->SearchQuery) > 0);
   }

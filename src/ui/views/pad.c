@@ -17,9 +17,9 @@ static int Pad_Update(Component *base) {
   static int pressedDeck = -1;
 
   Vector2 mouse = UIGetMousePosition();
-  bool isDown = IsMouseButtonDown(MOUSE_LEFT_BUTTON);
-  bool isPressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
-  bool isReleased = IsMouseButtonReleased(MOUSE_LEFT_BUTTON);
+  bool isDown = UI_IsDown();
+  bool isPressed = UI_IsPressed();
+  bool isReleased = UI_IsReleased();
 
   float availableH = SCREEN_HEIGHT - TOP_BAR_H - DECK_STR_H;
   float panelW = (SCREEN_WIDTH - S(24)) / 2.0f;
@@ -78,8 +78,8 @@ static int Pad_Update(Component *base) {
           if (pressedPad != i || pressedDeck != d) {
             PadMode mode = r->State->Mode[d];
 
-            // Dragging only for Loop modes
-            if (isPressed || mode == PAD_MODE_BEAT_LOOP ||
+            // Immediate press trigger for touch & mouse on initial touch down
+            if (isPressed || pressedPad == -1 || mode == PAD_MODE_BEAT_LOOP ||
                 mode == PAD_MODE_SLIP_LOOP) {
               // Avoid releasing if we are dragging in Slip Loop mode to prevent
               // resets
@@ -310,8 +310,8 @@ static void Pad_Draw(Component *base) {
       UIDrawText(lbl, faceLg, px + S(6), py + S(4), S(13),
                  hasData ? padColor : ColorShadow);
 
-      if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) &&
-          CheckCollisionPointRec(GetMousePosition(), rect)) {
+      if (UI_IsDown() &&
+          CheckCollisionPointRec(UIGetMousePosition(), rect)) {
         DrawRectangleRec(rect, Fade(ColorWhite, 0.3f));
       }
     }

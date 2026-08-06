@@ -93,7 +93,7 @@ static bool DrawFXButton(const char *label, float x, float y, float w, float h,
                          bool active) {
   bool hovered =
       CheckCollisionPointRec(UIGetMousePosition(), (Rectangle){x, y, w, h});
-  bool pressed = hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+  bool pressed = hovered && UI_IsPressed();
   bool isFxBlinking = (fmod(GetTime(), 0.5) < 0.25);
   Color bg = active ? (isFxBlinking ? (Color){0, 140, 255, 255} : (Color){0, 40, 110, 255}) : (hovered ? ColorDark1 : ColorBlack);
   Color fg = active ? ColorWhite : ColorOrange;
@@ -161,7 +161,7 @@ static void HandleKnob(MixerState *state, float *val, float cx, float cy, float 
     if (*val > max) *val = max;
   }
 
-  if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && hovered) {
+  if (UI_IsPressed() && hovered) {
     static float lastClickTime = 0;
     if (GetTime() - lastClickTime < 0.3) {
       *val = centerZero ? (min + (max - min) / 2.0f) : min;
@@ -191,7 +191,7 @@ static void Mixer_Draw(Component *base) {
 
   AudioEngine *eng = r->State->AudioPlugin;
   Vector2 mousePos = UIGetMousePosition();
-  bool mDown = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+  bool mDown = UI_IsDown();
 
   float viewH = SCREEN_HEIGHT - DECK_STR_H;
   DrawRectangle(0, 0, SCREEN_WIDTH, viewH, ColorBGUtil);
@@ -285,7 +285,7 @@ static void Mixer_Draw(Component *base) {
 
     Font iconFont = UIFonts_GetIcon(S(12));
     UIDrawText("\xef\x80\xa5", iconFont, fcx - S(6), cueBtnY + S(4), S(12), d->IsCueActive ? ColorOrange : ColorShadow);
-    if (CheckCollisionPointRec(mousePos, (Rectangle){cueBtnX, cueBtnY, cueBtnSize, cueBtnSize}) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    if (CheckCollisionPointRec(mousePos, (Rectangle){cueBtnX, cueBtnY, cueBtnSize, cueBtnSize}) && UI_IsPressed()) {
         d->IsCueActive = !d->IsCueActive;
     }
     
@@ -376,7 +376,7 @@ static void Mixer_Draw(Component *base) {
   float bSelectorY = bfxY + S(12);
   DrawRectangle(rightX + S(10), bSelectorY, colRightW - S(20), S(18), ColorBlack);
   DrawCentredText(bfxNames[fxs->SelectedFX % 14], fSub, rightX, colRightW, bSelectorY + S(4), S(9), ColorWhite);
-  if (CheckCollisionPointRec(mousePos, (Rectangle){rightX + S(10), bSelectorY, colRightW - S(20), S(18)}) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+  if (CheckCollisionPointRec(mousePos, (Rectangle){rightX + S(10), bSelectorY, colRightW - S(20), S(18)}) && UI_IsPressed()) {
       fxs->SelectedFX = (fxs->SelectedFX + 1) % 14;
       BeatFXManager_SetFX(&eng->BeatFX, fxs->SelectedFX);
   }
