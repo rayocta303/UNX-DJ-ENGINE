@@ -10,6 +10,7 @@ extern "C" {
 
 #include "engine/fx/beatfx/beatfx_manager.h"
 #include "engine/fx/colorfx/colorfx_manager.h"
+#include "audio/asrc_resampler.h"
 
 #define SAMPLE_RATE 44100
 #define CHANNELS 2
@@ -115,6 +116,10 @@ typedef struct DeckAudioState {
   float ReleaseFXTimer; 
   float DryGain;              // 0.0 to 1.0 (smooth dry volume fade for Release FX Echo)
   bool ReleaseFXEchoActive;   // True while Release FX Echo is held down
+  // ASRC (Asynchronous Sample Rate Converter) State
+  ASRCResampler ASRC;
+  double ASRCRatio;
+
   uint32_t LastLoadID; // Track latest load request ID for task cancellation
 } DeckAudioState;
 

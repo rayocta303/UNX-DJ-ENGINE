@@ -1,4 +1,5 @@
 #include "audio/engine.h"
+#include "audio/asrc_resampler.h"
 #include "SoundTouch.h"
 #include "engine/util/engine_math.h"
 #include <algorithm>
@@ -88,6 +89,9 @@ void AudioEngine_Init(AudioEngine *engine, uint32_t outputSampleRate) {
     st->setSetting(SETTING_OVERLAP_MS, 8); // Standard overlap for smoothness
     deck->SoundTouchHandle = (void *)st;
     deck->OutputSampleRate = engine->OutputSampleRate;
+    deck->SampleRate = engine->OutputSampleRate;
+    ASRCResampler_Init(&deck->ASRC, engine->OutputSampleRate, engine->OutputSampleRate);
+    deck->ASRCRatio = 1.0;
   }
 
   BeatFXManager_Init(&engine->BeatFX);
@@ -99,6 +103,7 @@ void AudioEngine_Init(AudioEngine *engine, uint32_t outputSampleRate) {
   UNX_LOG_INFO("Sample Rate : %u Hz", engine->OutputSampleRate);
   UNX_LOG_INFO("Channels    : %d", CHANNELS);
   UNX_LOG_INFO("API         : Raylib Audio (Internal)");
+  UNX_LOG_INFO("ASRC Engine : Active (Polyphase Bandlimited Sinc Interpolator)");
   UNX_LOG_INFO("=== END AUDIO ENGINE SPECIFICS ===");
 }
 
@@ -112,6 +117,9 @@ void AudioEngine_SetOutputSampleRate(AudioEngine *engine, uint32_t sampleRate) {
           ->setSampleRate(sampleRate);
     }
     engine->Decks[i].OutputSampleRate = sampleRate;
+    uint32_t srcRate = engine->Decks[i].SampleRate > 0 ? engine->Decks[i].SampleRate : sampleRate;
+    ASRCResampler_SetRates(&engine->Decks[i].ASRC, (double)srcRate, (double)sampleRate);
+    engine->Decks[i].ASRCRatio = (double)srcRate / (double)sampleRate;
   }
 }
 
@@ -275,21 +283,14 @@ bool DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
     return false;
   }
 
-  // Check sample rate against engine output sample rate
+  // Configure ASRC (Asynchronous Sample Rate Conversion) for seamless multi-rate support
   uint32_t targetSR = (deck->OutputSampleRate > 0) ? deck->OutputSampleRate : 44100;
-  if (localRate != targetSR) {
-    UNX_LOG_WARN("[ENGINE] Unsupported sample rate: %u Hz (Target: %u Hz) - %s",
-                 localRate, targetSR, filePath);
-    char toastMsg[128];
-    snprintf(toastMsg, sizeof(toastMsg), "UNSUPPORTED TRACK (SAMPLE RATE %u Hz)", localRate);
-    Toast_ShowError(toastMsg);
+  ASRCResampler_SetRates(&deck->ASRC, (double)localRate, (double)targetSR);
+  deck->ASRCRatio = (double)localRate / (double)targetSR;
+  ASRCResampler_Reset(&deck->ASRC);
 
-    if (localPCM) {
-      free(localPCM);
-      localPCM = NULL;
-    }
-    return false;
-  }
+  UNX_LOG_INFO("[AUDIO] [ASRC] Track Loaded: %s | File Rate: %u Hz -> Interface Rate: %u Hz (Ratio: %.5f, ASRC Active: %s)",
+               filePath, localRate, targetSR, deck->ASRCRatio, deck->ASRC.active ? "YES" : "NO");
 
   // Check if a newer load request has arrived during decoding
   if (myID != deck->LastLoadID) {
@@ -397,9 +398,14 @@ static inline void AudioEngine_GetSampleDirect(void *buffer, int i, int bitDepth
   *r = SampleToFloat(buffer, i * 2 + 1, bitDepth);
 }
 
-static inline void AudioEngine_GetSample(void *buffer, double pos, int bitDepth,
+static inline void AudioEngine_GetSample(DeckAudioState *deck, void *buffer, double pos, int bitDepth,
                                          uint32_t totalSamples, float *l,
                                          float *r) {
+  if (deck && deck->ASRC.active) {
+    ASRCResampler_GetSample(&deck->ASRC, buffer, pos, bitDepth, totalSamples, l, r);
+    return;
+  }
+
   if (pos < 2.0) {
     *l = 0;
     *r = 0;
@@ -562,7 +568,7 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     while (st->numSamples() < (uint32_t)frames && maxIterations-- > 0) {
       float inBuf[512 * 2];
       for (int j = 0; j < 512; j++) {
-        AudioEngine_GetSample(pcm, deck->MT_ReadPos, deck->BitDepth,
+        AudioEngine_GetSample(deck, pcm, deck->MT_ReadPos, deck->BitDepth,
                               deck->TotalSamples, &inBuf[j * 2],
                               &inBuf[j * 2 + 1]);
         deck->MT_ReadPos += (targetRate > 0) ? 1.0 : -1.0;
@@ -596,7 +602,7 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     double rateDelta = (targetRate - currentRate) / (double)frames;
     for (int i = 0; i < frames; i++) {
       currentRate += rateDelta;
-      AudioEngine_GetSample(pcm, deck->Position, deck->BitDepth,
+      AudioEngine_GetSample(deck, pcm, deck->Position, deck->BitDepth,
                             deck->TotalSamples, &outBuf[i * 2],
                             &outBuf[i * 2 + 1]);
       deck->Position += currentRate * (double)sampleRateRatio;

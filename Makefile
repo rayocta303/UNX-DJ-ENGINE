@@ -77,6 +77,7 @@ SRC_CXX = lib/kaitai/kaitai/kaitaistream.cpp \
           src/library/serato_reader.cpp \
           src/engine/util/engine_math.cpp \
           src/audio/engine.cpp \
+          src/audio/asrc_resampler.cpp \
           $(wildcard lib/soundtouch/*.cpp)
 
 OBJ = $(SRC_C:.c=.o) $(SRC_CXX:.cpp=.o)
