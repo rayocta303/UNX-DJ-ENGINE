@@ -14,6 +14,8 @@
 static void* seq_handle = NULL;
 static int in_port = -1;
 static int out_port = -1;
+static int dest_client = -1;
+static int dest_port = -1;
 
 static void LinuxMIDI_AutoConnectPorts(char *outDetectedName) {
 #ifdef HAS_ALSA
@@ -50,6 +52,8 @@ static void LinuxMIDI_AutoConnectPorts(char *outDetectedName) {
             if ((caps & (SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE)) != 0) {
                 if (out_port >= 0) {
                     snd_seq_connect_to(seq, out_port, client, port);
+                    dest_client = client;
+                    dest_port = port;
                 }
             }
         }
@@ -84,9 +88,15 @@ void MIDI_SendSysEx(const uint8_t *data, uint32_t length) {
         snd_seq_event_t ev;
         snd_seq_ev_clear(&ev);
         snd_seq_ev_set_source(&ev, out_port);
-        snd_seq_ev_set_subs(&ev);
         snd_seq_ev_set_direct(&ev);
         snd_seq_ev_set_sysex(&ev, length, (void*)data);
+
+        if (dest_client >= 0 && dest_port >= 0) {
+            ev.dest.client = (unsigned char)dest_client;
+            ev.dest.port = (unsigned char)dest_port;
+            snd_seq_event_output((snd_seq_t*)seq_handle, &ev);
+        }
+        snd_seq_ev_set_subs(&ev);
         snd_seq_event_output((snd_seq_t*)seq_handle, &ev);
         snd_seq_drain_output((snd_seq_t*)seq_handle);
     }
@@ -103,7 +113,6 @@ void MIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
         snd_seq_event_t ev;
         snd_seq_ev_clear(&ev);
         snd_seq_ev_set_source(&ev, out_port);
-        snd_seq_ev_set_subs(&ev);
         snd_seq_ev_set_direct(&ev);
 
         uint8_t type = status & 0xF0;
@@ -122,6 +131,13 @@ void MIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
         } else {
             snd_seq_ev_set_noteon(&ev, channel, data1, data2);
         }
+
+        if (dest_client >= 0 && dest_port >= 0) {
+            ev.dest.client = (unsigned char)dest_client;
+            ev.dest.port = (unsigned char)dest_port;
+            snd_seq_event_output((snd_seq_t*)seq_handle, &ev);
+        }
+        snd_seq_ev_set_subs(&ev);
         snd_seq_event_output((snd_seq_t*)seq_handle, &ev);
         snd_seq_drain_output((snd_seq_t*)seq_handle);
     }
@@ -429,6 +445,12 @@ bool MIDI_Init(MidiContext *ctx) {
     }
     if (seq_handle) {
         LinuxMIDI_AutoConnectPorts(deviceName);
+        // Dispatch Pioneer FLX/DDJ LED enable handshakes
+        MIDI_SendShortMsg(0x9F, 0x00, 0x7F);
+        MIDI_SendShortMsg(0x90, 0x00, 0x7F);
+        MIDI_SendShortMsg(0x91, 0x00, 0x7F);
+        static const uint8_t sysexEnable[] = {0xF0, 0x00, 0x20, 0x2B, 0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0xF7};
+        MIDI_SendSysEx(sysexEnable, sizeof(sysexEnable));
     } else {
         return false;
     }

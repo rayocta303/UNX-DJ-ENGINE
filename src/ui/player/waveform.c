@@ -363,15 +363,7 @@ static void Waveform_Draw(Component *base) {
   float centerX = SCREEN_WIDTH / 2.0f;
   float playheadX = centerX;
 
-  extern AudioEngine *globalAudioEngine;
-  // When editing Loop In/Out points via jogwheel, r->State->Position is updated to match LoopStartPos/LoopEndPos in half-frames
-  if (r->ID >= 0 && r->ID < 2 && (r->State->LoopAdjustIn || r->State->LoopAdjustOut)) {
-      if (globalAudioEngine && globalAudioEngine->Decks[r->ID].SampleRate > 0) {
-          double sr = (double)globalAudioEngine->Decks[r->ID].SampleRate;
-          double targetSamplePos = r->State->LoopAdjustIn ? globalAudioEngine->Decks[r->ID].LoopStartPos : globalAudioEngine->Decks[r->ID].LoopEndPos;
-          elapsedHalfFrames = (targetSamplePos * 150.0) / sr;
-      }
-  }
+  // Position is updated in real-time by main.c (including during Loop In/Out jog edit)
 
   float zoomDelta = effectiveZoom * r->dataDensity;
 
@@ -789,11 +781,12 @@ static void Waveform_Draw(Component *base) {
   }
 
   // --- LOOP HIGHLIGHT ---
+  // --- LOOP HIGHLIGHT & EDIT BOUNDARIES ---
   extern AudioEngine *globalAudioEngine;
-  if (globalAudioEngine) {
+  if (globalAudioEngine && r->ID >= 0 && r->ID < 2) {
     DeckAudioState *audio = &globalAudioEngine->Decks[r->ID];
-    if (audio->IsLooping) {
-        double ratioHF = (double)audio->SampleRate / 150.0;
+    if (audio->IsLooping || r->State->LoopAdjustIn || r->State->LoopAdjustOut) {
+        double ratioHF = (audio->SampleRate > 0) ? ((double)audio->SampleRate / 150.0) : 294.0;
         double loopStartHF = audio->LoopStartPos / ratioHF;
         double loopEndHF = audio->LoopEndPos / ratioHF;
         
@@ -803,18 +796,25 @@ static void Waveform_Draw(Component *base) {
         float bxStart = playheadX + xStart;
         float bxEnd = playheadX + xEnd;
         
-        // Only draw if visible
+        // Draw loop shaded region
         if (bxEnd >= wfLeft && bxStart <= wfRight) {
             float drawLeft = fmaxf(bxStart, wfLeft);
             float drawRight = fminf(bxEnd, wfRight);
-            Color loopCol = r->State->IsMaster ? ColorOrange : ColorWhite;
+            Color loopCol = (Color){ 255, 165, 0, 255 }; // Amber DJ loop color
             DrawRectangleRec((Rectangle){drawLeft, wfY, drawRight - drawLeft, waveH}, Fade(loopCol, 0.25f));
             
-            // Draw boundaries
-            if (bxStart >= wfLeft && bxStart <= wfRight)
-                DrawLineEx((Vector2){bxStart, wfY}, (Vector2){bxStart, wfY + waveH}, 2.0f, loopCol);
-            if (bxEnd >= wfLeft && bxEnd <= wfRight)
-                DrawLineEx((Vector2){bxEnd, wfY}, (Vector2){bxEnd, wfY + waveH}, 2.0f, loopCol);
+            // Draw In boundary
+            if (bxStart >= wfLeft && bxStart <= wfRight) {
+                Color inCol = r->State->LoopAdjustIn ? (Color){ 255, 255, 0, 255 } : loopCol;
+                DrawLineEx((Vector2){bxStart, wfY}, (Vector2){bxStart, wfY + waveH}, 2.5f, inCol);
+                DrawText("IN", (int)bxStart + 4, (int)wfY + 4, 12, inCol);
+            }
+            // Draw Out boundary
+            if (bxEnd >= wfLeft && bxEnd <= wfRight) {
+                Color outCol = r->State->LoopAdjustOut ? (Color){ 255, 255, 0, 255 } : loopCol;
+                DrawLineEx((Vector2){bxEnd, wfY}, (Vector2){bxEnd, wfY + waveH}, 2.5f, outCol);
+                DrawText("OUT", (int)bxEnd - 28, (int)wfY + 4, 12, outCol);
+            }
         }
     }
   }
