@@ -536,22 +536,16 @@ static void Waveform_Draw(Component *base) {
   // and height-stable during scrolling.
   double framesPerPixel = zoomDelta;
   
-  // Calculate exact visible distance from center to edges, plus a 10px buffer
-  // --- STEP 1: CALCULATE VISIBLE RANGE (RANGE-VISION) ---
-  // We only process frames that are within the viewport (plus a small margin).
-  // This allows the engine to handle hours-long tracks with constant, low CPU usage.
-  float distLeft = centerX - wfLeft;
-  float distRight = wfRight - centerX;
-  float maxVisibleDist = (distLeft > distRight) ? distLeft : distRight;
+  // Calculate exact visible frame range bounded by component edges (wfLeft/wfRight)
+  float minPx = (wfLeft - playheadX - 10.0f);
+  float maxPx = (wfRight - playheadX + 10.0f);
   
   MemoryLevel mem = MemoryGuard_GetLevel();
 
-  double halfVisibleFrames = (maxVisibleDist + 10.0f) * framesPerPixel;
-  
   int64_t startFrame =
-      (int64_t)floor(elapsedHalfFrames * r->dataDensity - halfVisibleFrames) - 1;
+      (int64_t)floor(elapsedHalfFrames * r->dataDensity + minPx * framesPerPixel) - 1;
   int64_t endFrame =
-      (int64_t)ceil(elapsedHalfFrames * r->dataDensity + halfVisibleFrames) + 1;
+      (int64_t)ceil(elapsedHalfFrames * r->dataDensity + maxPx * framesPerPixel) + 1;
 
   if (startFrame < 0)
     startFrame = 0;
@@ -576,12 +570,16 @@ static void Waveform_Draw(Component *base) {
     // LOD ADAPTIVE STEPPING: Skip decoding intermediate frames when zoomed out
     int adaptiveStep = (renderStep > 8 ? 8 : (renderStep > 4 ? 4 : (renderStep > 2 ? 2 : 1)));
     if (mem >= MEM_MODE_ECO) {
-        float cxCurrent = (float)(((double)i - elapsedHalfFrames * r->dataDensity) / framesPerPixel + centerX);
-        float distToCenter = fabsf(cxCurrent - centerX);
+        float cxCurrent = (float)(((double)i - elapsedHalfFrames * r->dataDensity) / framesPerPixel + playheadX);
+        float distToCenter = fabsf(cxCurrent - playheadX);
         if (distToCenter > 350) adaptiveStep = 8;
         else if (distToCenter > 150) adaptiveStep = 4;
         else if (distToCenter > 60) adaptiveStep = 2;
     }
+#if defined(__linux__) && !defined(__ANDROID__)
+    // On embedded ARM Linux DRM platforms (like S905X), ensure adaptive step is at least 2 when zoomed out
+    if (renderStep >= 3 && adaptiveStep < 2) adaptiveStep = 2;
+#endif
     if (adaptiveStep > 1 && (i % adaptiveStep != 0) && i != endFrame - 1) continue;
 
     float rL = 0, rM = 0, rH = 0;
@@ -654,8 +652,8 @@ static void Waveform_Draw(Component *base) {
     // We only push vertices to the GPU at fixed frame intervals (i % renderStep).
     // This 'anchoring' to frame indices prevents the "Jello" effect during scroll.
     if ((i % renderStep == 0) || (i == endFrame - 1)) {
-      float cx0 = (float)(((double)lastDrawnFrame - elapsedHalfFrames * r->dataDensity) / framesPerPixel + centerX);
-      float cx1 = (float)(((double)i - elapsedHalfFrames * r->dataDensity) / framesPerPixel + centerX);
+      float cx0 = (float)(((double)lastDrawnFrame - elapsedHalfFrames * r->dataDensity) / framesPerPixel + playheadX);
+      float cx1 = (float)(((double)i - elapsedHalfFrames * r->dataDensity) / framesPerPixel + playheadX);
 
       if (cx1 >= wfLeft - 2 && cx0 <= wfRight + 2) {
         if (userStyle == WAVEFORM_STYLE_BLUE || userStyle == WAVEFORM_STYLE_RGB) {
@@ -694,43 +692,37 @@ static void Waveform_Draw(Component *base) {
   rlEnd();
 #undef DRAW_TRAP
 
-  // Beat Grid — ticks use semi-transparent overlay to preserve waveform pixels
-  // beneath
+  // Beat Grid — ticks use semi-transparent overlay to preserve waveform pixels beneath
   if (r->State->LoadedTrack != NULL) {
+    double minVisibleMs = ((elapsedHalfFrames + (wfLeft - playheadX) * effectiveZoom) / 0.15) - 500.0;
+    double maxVisibleMs = ((elapsedHalfFrames + (wfRight - playheadX) * effectiveZoom) / 0.15) + 500.0;
+
     for (int i = 0; i < r->State->LoadedTrack->Analysis.BeatGridCount; i++) {
       unsigned int originalMs = r->State->LoadedTrack->Analysis.BeatGrid[i].Time;
-      uint16_t beatNum = r->State->LoadedTrack->Analysis.BeatGrid[i].BeatNumber;
-      if (originalMs == 0xFFFFFFFF)
-        break;
+      if (originalMs == 0xFFFFFFFF) break;
+      if ((double)originalMs < minVisibleMs) continue;
+      if ((double)originalMs > maxVisibleMs) break;
 
+      uint16_t beatNum = r->State->LoadedTrack->Analysis.BeatGrid[i].BeatNumber;
       double beatPosHF = (double)originalMs * 0.15;
-      float px =
-          (float)((beatPosHF - elapsedHalfFrames) / (double)effectiveZoom);
+      float px = (float)((beatPosHF - elapsedHalfFrames) / (double)effectiveZoom);
       float bx = playheadX + px;
 
       if (bx >= wfLeft && bx <= wfRight) {
         bool isBar = (beatNum == 1);
         bool isLastBeat = (i == r->State->LoadedTrack->Analysis.BeatGridCount - 1);
 
-        // Top cap tick (3px wide) — solid but semi-transparent
         Color capColor = isBar ? Fade(ColorRed, 0.85f) : Fade(colorHigh, 0.55f);
-        if (isLastBeat) capColor = ColorRed; // Bright red for end marker
+        if (isLastBeat) capColor = ColorRed;
 
-        DrawRectangleV((Vector2){bx - 1.0f, wfY}, (Vector2){3.0f, S(7)},
-                       capColor);
-        DrawRectangleV((Vector2){bx - 1.0f, wfY + waveH - S(7)},
-                       (Vector2){3.0f, S(7)}, capColor);
+        DrawRectangleV((Vector2){bx - 1.0f, wfY}, (Vector2){3.0f, S(7)}, capColor);
+        DrawRectangleV((Vector2){bx - 1.0f, wfY + waveH - S(7)}, (Vector2){3.0f, S(7)}, capColor);
 
-        // Hairline body — nearly invisible so waveform shows through
-        Color lineColor =
-            isBar ? Fade(ColorRed, 0.20f) : Fade(colorHigh, 0.12f);
-        
+        Color lineColor = isBar ? Fade(ColorRed, 0.20f) : Fade(colorHigh, 0.12f);
         if (isLastBeat) {
-            // Stronger boundary at the end
-            DrawRectangleV((Vector2){bx - 1.0f, wfY + S(7)}, (Vector2){3.0f, waveH - S(14)}, Fade(ColorRed, 0.8f));
+          DrawRectangleV((Vector2){bx - 1.0f, wfY + S(7)}, (Vector2){3.0f, waveH - S(14)}, Fade(ColorRed, 0.8f));
         } else {
-            DrawRectangleV((Vector2){bx, wfY + S(7)},
-                           (Vector2){1.0f, waveH - S(14)}, lineColor);
+          DrawRectangleV((Vector2){bx, wfY + S(7)}, (Vector2){1.0f, waveH - S(14)}, lineColor);
         }
       }
     }
