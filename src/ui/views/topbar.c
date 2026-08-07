@@ -7,9 +7,11 @@
 static int TopBar_Update(Component *base) {
   TopBar *t = (TopBar *)base;
 
+#if !defined(PLATFORM_DRM)
   if (UICheckClick((Rectangle){ 0, 0, t->btnFullX + t->btnFullW + S(4), TOP_BAR_H })) {
     ToggleFullscreen();
   }
+#endif
   if (UICheckClick((Rectangle){ t->btnBrowseX - S(3), 0, t->btnBrowseW + S(6), TOP_BAR_H })) {
     if (t->OnBrowse)
       t->OnBrowse(t->callbackCtx);
@@ -44,6 +46,7 @@ static void TopBar_Draw(Component *base) {
   float btnH = TOP_BAR_H - S(4);
   float btnY = S(2);
 
+#if !defined(PLATFORM_DRM)
   // 1. Fullscreen Button (Top-Left corner before CPU/RAM)
   t->btnFullX = t->MarginX;
   t->btnFullW = S(22);
@@ -77,6 +80,11 @@ static void TopBar_Draw(Component *base) {
 
   // 2. CPU & RAM Usage (Positioned after Fullscreen Button)
   float textStartX = t->btnFullX + t->btnFullW + S(4);
+#else
+  t->btnFullX = t->MarginX;
+  t->btnFullW = 0;
+  float textStartX = t->MarginX;
+#endif
   char cpuStr[32];
   sprintf(cpuStr, "CPU %d%%", (int)(t->CPUUsage * 100));
   UIDrawText(cpuStr, faceXS, textStartX, (TOP_BAR_H - S(16)) / 2.0f, S(8), ColorShadow);

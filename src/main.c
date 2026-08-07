@@ -1279,6 +1279,18 @@ static void* EvdevInput_Thread(void* arg) {
                     } else if (ev[k].code == ABS_Y || ev[k].code == ABS_MT_POSITION_Y) {
                         g_rawTouchY = (ev[k].value * 600) / g_evDevs[d].maxY;
                     }
+                } else if (ev[k].type == EV_REL) {
+                    if (g_rawTouchX < 0) g_rawTouchX = 512;
+                    if (g_rawTouchY < 0) g_rawTouchY = 300;
+                    if (ev[k].code == REL_X) {
+                        g_rawTouchX += ev[k].value;
+                        if (g_rawTouchX < 0) g_rawTouchX = 0;
+                        if (g_rawTouchX > 1023) g_rawTouchX = 1023;
+                    } else if (ev[k].code == REL_Y) {
+                        g_rawTouchY += ev[k].value;
+                        if (g_rawTouchY < 0) g_rawTouchY = 0;
+                        if (g_rawTouchY > 599) g_rawTouchY = 599;
+                    }
                 } else if (ev[k].type == EV_KEY) {
                     if (ev[k].code == BTN_TOUCH || ev[k].code == BTN_LEFT) {
                         bool down = (ev[k].value > 0);
