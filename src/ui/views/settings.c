@@ -2,6 +2,7 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
+#include "ui/components/touch_utility.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -416,7 +417,7 @@ static int Settings_Update(Component *base) {
       float tabW = SCREEN_WIDTH / (float)SETTING_CAT_COUNT;
       for (int tIdx = 0; tIdx < SETTING_CAT_COUNT; tIdx++) {
           Rectangle tabRect = { tIdx * tabW, TOP_BAR_H, tabW, tabH };
-          if (UICheckClick(tabRect)) {
+          if (Touch_CheckClick(tabRect, S(4.0f))) {
               if (r->State->SelectedTab != tIdx) {
                   g_lastSettingsClickTime = now;
                   r->State->SelectedTab = tIdx;
@@ -431,7 +432,7 @@ static int Settings_Update(Component *base) {
 
       // DONE Button
       Rectangle doneBtnRect = { S(15), divY + S(5), S(90), S(18) };
-      if (UICheckClick(doneBtnRect)) {
+      if (Touch_CheckClick(doneBtnRect, S(6.0f))) {
         g_lastSettingsClickTime = now;
         if (r->OnApply)
           r->OnApply(r->callbackCtx);
@@ -441,7 +442,7 @@ static int Settings_Update(Component *base) {
       }
       // CLOSE Button
       Rectangle closeBtnRect = { SCREEN_WIDTH - S(105), divY + S(5), S(90), S(18) };
-      if (UICheckClick(closeBtnRect)) {
+      if (Touch_CheckClick(closeBtnRect, S(6.0f))) {
         g_lastSettingsClickTime = now;
         if (r->OnClose)
           r->OnClose(r->callbackCtx);

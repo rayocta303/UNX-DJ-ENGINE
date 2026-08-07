@@ -2,33 +2,34 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
+#include "ui/components/touch_utility.h"
 #include <stdio.h>
 
 static int TopBar_Update(Component *base) {
   TopBar *t = (TopBar *)base;
 
 #if !defined(PLATFORM_DRM)
-  if (UICheckClick((Rectangle){ 0, 0, t->btnFullX + t->btnFullW + S(4), TOP_BAR_H })) {
+  if (Touch_CheckClick((Rectangle){ 0, 0, t->btnFullX + t->btnFullW, TOP_BAR_H }, S(4.0f))) {
     ToggleFullscreen();
   }
 #endif
-  if (UICheckClick((Rectangle){ t->btnBrowseX - S(3), 0, t->btnBrowseW + S(6), TOP_BAR_H })) {
+  if (Touch_CheckClick((Rectangle){ t->btnBrowseX, 0, t->btnBrowseW, TOP_BAR_H }, S(4.0f))) {
     if (t->OnBrowse)
       t->OnBrowse(t->callbackCtx);
   }
-  if (UICheckClick((Rectangle){ t->btnMixerX - S(3), 0, t->btnMixerW + S(6), TOP_BAR_H })) {
+  if (Touch_CheckClick((Rectangle){ t->btnMixerX, 0, t->btnMixerW, TOP_BAR_H }, S(4.0f))) {
     if (t->OnMixer)
       t->OnMixer(t->callbackCtx);
   }
-  if (UICheckClick((Rectangle){ t->btnPadX - S(3), 0, t->btnPadW + S(6), TOP_BAR_H })) {
+  if (Touch_CheckClick((Rectangle){ t->btnPadX, 0, t->btnPadW, TOP_BAR_H }, S(4.0f))) {
     if (t->OnPad)
       t->OnPad(t->callbackCtx);
   }
-  if (UICheckClick((Rectangle){ t->btnInfoX - S(3), 0, t->btnInfoW + S(6), TOP_BAR_H })) {
+  if (Touch_CheckClick((Rectangle){ t->btnInfoX, 0, t->btnInfoW, TOP_BAR_H }, S(4.0f))) {
     if (t->OnInfo)
       t->OnInfo(t->callbackCtx);
   }
-  if (UICheckClick((Rectangle){ t->btnSettingsX - S(3), 0, t->btnSettingsW + S(6), TOP_BAR_H })) {
+  if (Touch_CheckClick((Rectangle){ t->btnSettingsX, 0, t->btnSettingsW, TOP_BAR_H }, S(4.0f))) {
     if (t->OnSettings)
       t->OnSettings(t->callbackCtx);
   }
@@ -93,7 +94,7 @@ static void TopBar_Draw(Component *base) {
   // 3. Center Group
   float btnSpacing = S(6);
 
-  t->btnBrowseW = S(80); // Enlarged button width for touch accuracy
+  t->btnBrowseW = S(88); // Enlarged button width for touch accuracy
   t->btnMixerW = t->btnBrowseW;
   t->btnInfoW = t->btnBrowseW;
   t->btnSettingsW = t->btnBrowseW;

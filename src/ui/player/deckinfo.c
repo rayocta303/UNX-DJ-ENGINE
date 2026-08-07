@@ -2,6 +2,7 @@
 #include "ui/components/theme.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
+#include "ui/components/touch_utility.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -28,14 +29,14 @@ static int DeckInfo_Update(Component *base) {
     float btnY = y + deckInfoH - btnH - S(6);
     float btnW = (deckInfoW - margin * 2 - S(6)) / 2.0f;
 
-    // 1. Eject Button
+    // 1. Eject Button (Touch Utility)
     float ejectW = S(20);
     float ejectH = S(9);
     float ejectX = deckInfoW - ejectW - S(3);
     float ejectY = y + (headerH - ejectH) / 2.0f;
     Rectangle ejectRect = { ejectX, ejectY, ejectW, ejectH };
     
-    if (d->State->LoadedTrack != NULL && UICheckClick(ejectRect)) {
+    if (d->State->LoadedTrack != NULL && Touch_CheckClick(ejectRect, S(5.0f))) {
         DeckAudio_Unload(&d->Engine->Decks[d->ID]);
         d->State->IsPlaying = false;
         d->State->IsCueActive = false;
@@ -79,23 +80,23 @@ static int DeckInfo_Update(Component *base) {
 
     // Row 1: Master (Top-Left), Sync (Top-Right)
     Rectangle msRect = { margin, utilY, utilW, utilH };
-    if (UICheckClick(msRect)) {
+    if (Touch_CheckClick(msRect, S(4.0f))) {
         d->State->IsMaster = true; // Exclusivity handled in main.c loop
     }
 
     Rectangle syRect = { margin + utilW + utilGap, utilY, utilW, utilH };
-    if (UICheckClick(syRect)) {
+    if (Touch_CheckClick(syRect, S(4.0f))) {
         d->State->SyncMode = (d->State->SyncMode + 1) % 3;
     }
 
     // Row 2: MT (Bottom-Left), Vinyl / CDJ (Bottom-Right)
     Rectangle mtRect = { margin, utilY2, utilW, utilH };
-    if (UICheckClick(mtRect)) {
+    if (Touch_CheckClick(mtRect, S(4.0f))) {
         d->State->MasterTempo = !d->State->MasterTempo;
     }
 
     Rectangle viRect = { margin + utilW + utilGap, utilY2, utilW, utilH };
-    if (UICheckClick(viRect)) {
+    if (Touch_CheckClick(viRect, S(4.0f))) {
         d->State->VinylModeEnabled = !d->State->VinylModeEnabled;
     }
 

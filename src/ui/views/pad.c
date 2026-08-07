@@ -2,6 +2,7 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
+#include "ui/components/touch_utility.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -25,7 +26,7 @@ static int Pad_Update(Component *base) {
   float panelW = (SCREEN_WIDTH - S(24)) / 2.0f;
   float panelH = availableH - S(16);
 
-  float modeBarH = S(20);
+  float modeBarH = S(22);
   float padAreaW = panelW - S(20);
   float padAreaH = panelH - S(40) - modeBarH;
   float padW = (padAreaW - S(12)) / 4.0f;
@@ -35,21 +36,21 @@ static int Pad_Update(Component *base) {
     float panelX = S(8) + d * (panelW + S(8));
     float panelY = TOP_BAR_H + S(8);
 
-    // SHIFT Button hit
+    // SHIFT Button hit (Touch Utility)
     Rectangle shiftBtn = { panelX + panelW - S(52), panelY + S(2), S(48), S(20) };
-    if (UICheckClick(shiftBtn)) {
+    if (Touch_CheckClick(shiftBtn, S(6.0f))) {
       r->State->ShiftActive[d] = !r->State->ShiftActive[d];
       return 1;
     }
 
-    // Mode selection hits
+    // Mode selection hits (Touch Utility)
     float modeBtnW = (panelW - S(20)) / 6.0f;
     float modeX = panelX + S(10);
     float modeY = panelY + S(28);
 
     for (int m = 0; m < PAD_MODE_COUNT; m++) {
       Rectangle mRect = {modeX + m * modeBtnW, modeY, modeBtnW, modeBarH};
-      if (UICheckClick(mRect)) {
+      if (Touch_CheckClick(mRect, S(4.0f))) {
         r->State->Mode[d] = (PadMode)m;
         if (r->OnModeChange)
           r->OnModeChange(r->callbackCtx, d, (PadMode)m);
