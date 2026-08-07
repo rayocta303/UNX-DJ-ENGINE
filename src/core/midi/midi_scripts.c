@@ -158,7 +158,7 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
       } else if (callLeftPressed[targetDeckIdx]) {
         callLeftPressed[targetDeckIdx] = false;
         COType t;
-        bool *req = (bool *)CO_Find(group, "MidiRequestLoopHalve", &t);
+        bool *req = (bool *)CO_Find(group, "loop_halve", &t);
         if (req) *req = true;
       }
     }
@@ -170,7 +170,7 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
       } else if (callRightPressed[targetDeckIdx]) {
         callRightPressed[targetDeckIdx] = false;
         COType t;
-        bool *req = (bool *)CO_Find(group, "MidiRequestLoopDouble", &t);
+        bool *req = (bool *)CO_Find(group, "loop_double", &t);
         if (req) *req = true;
       }
     }

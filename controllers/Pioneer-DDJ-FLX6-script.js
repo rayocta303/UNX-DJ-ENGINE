@@ -903,13 +903,12 @@ PioneerDDJFLX6.jogTurn = function(channel, _control, value, _status, group) {
     // wheel center at 64; <64 rew >64 fwd
     let newVal = value - 64;
 
-    // loop_in / out adjust
-    const loopEnabled = engine.getValue(group, "loop_enabled");
-    if (loopEnabled > 0) {
-        if (PioneerDDJFLX6.loopAdjustIn[channel] || PioneerDDJFLX6.loopAdjustOut[channel]) {
-            engine.setValue(group, "jog", newVal);
-            return;
-        }
+    // loop_in / out adjust (nudge outer wheel without touch)
+    const adjIn = engine.getValue(group, "loop_adjust_in");
+    const adjOut = engine.getValue(group, "loop_adjust_out");
+    if (adjIn > 0 || adjOut > 0 || PioneerDDJFLX6.loopAdjustIn[channel] || PioneerDDJFLX6.loopAdjustOut[channel]) {
+        engine.setValue(group, "jog", newVal);
+        return;
     }
 
     if (engine.isScratching(deckNum)) {
