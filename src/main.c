@@ -2383,7 +2383,47 @@ void UpdateDrawFrame(App *app) {
     }
   }
 
-  // --- MIDI UI Navigation ---
+  // Handle Library Up/Down requests
+  if (app->browserState.MidiRequestUp) {
+    app->browserState.MidiBrowseDelta = -1;
+    app->browserState.MidiRequestUp = false;
+  }
+  if (app->browserState.MidiRequestDown) {
+    app->browserState.MidiBrowseDelta = 1;
+    app->browserState.MidiRequestDown = false;
+  }
+
+  // Route Encoder & MIDI signals to Settings FIRST when Settings screen is active
+  if (app->screen == ScreenSettings || app->settingsState.IsActive) {
+    if (app->browserState.MidiBrowseDelta != 0) {
+      app->settingsState.MidiBrowseDelta += app->browserState.MidiBrowseDelta;
+      app->browserState.MidiBrowseDelta = 0;
+    }
+    if (app->browserState.MidiRequestEnter) {
+      app->settingsState.MidiRequestEnter = true;
+      app->browserState.MidiRequestEnter = false;
+    }
+    if (app->browserState.MidiRequestBack) {
+      if (app->settingsState.IsDropdownOpen) {
+        app->settingsState.IsDropdownOpen = false;
+        app->settingsState.FocusLevel = 1;
+      } else if (app->settingsState.IsEditMappingOpen) {
+        app->settingsState.IsEditMappingOpen = false;
+      } else if (app->settingsState.IsMappingListOpen) {
+        app->settingsState.IsMappingListOpen = false;
+      } else if (app->settingsState.FocusLevel == 2) {
+        app->settingsState.FocusLevel = 1;
+      } else if (app->settingsState.FocusLevel == 1) {
+        app->settingsState.FocusLevel = 0;
+      } else {
+        app->screen = ScreenPlayer;
+        app->settingsState.IsActive = false;
+      }
+      app->browserState.MidiRequestBack = false;
+    }
+  }
+
+  // --- MIDI UI Navigation (Only processed if not consumed by Settings) ---
   bool _searchFocused = app->browserState.IsActive && app->browserState.IsSearching;
   if (app->MidiRequestBrowser || (!_searchFocused && IsKeyPressed(app->keyMap.toggleBrowser))) {
     TopBar_OnBrowse(app);
@@ -2446,46 +2486,6 @@ void UpdateDrawFrame(App *app) {
     Waveform_AdjustZoom(&app->deckA, -1);
     Waveform_AdjustZoom(&app->deckB, -1);
     app->MidiWaveformZoomOut = false;
-  }
-
-  // Handle Library Up/Down requests
-  if (app->browserState.MidiRequestUp) {
-    app->browserState.MidiBrowseDelta = -1;
-    app->browserState.MidiRequestUp = false;
-  }
-  if (app->browserState.MidiRequestDown) {
-    app->browserState.MidiBrowseDelta = 1;
-    app->browserState.MidiRequestDown = false;
-  }
-
-  // Route Encoder & MIDI signals to Settings when Settings screen is active
-  if (app->screen == ScreenSettings || app->settingsState.IsActive) {
-    if (app->browserState.MidiBrowseDelta != 0) {
-      app->settingsState.MidiBrowseDelta += app->browserState.MidiBrowseDelta;
-      app->browserState.MidiBrowseDelta = 0;
-    }
-    if (app->browserState.MidiRequestEnter) {
-      app->settingsState.MidiRequestEnter = true;
-      app->browserState.MidiRequestEnter = false;
-    }
-    if (app->browserState.MidiRequestBack) {
-      if (app->settingsState.IsDropdownOpen) {
-        app->settingsState.IsDropdownOpen = false;
-        app->settingsState.FocusLevel = 1;
-      } else if (app->settingsState.IsEditMappingOpen) {
-        app->settingsState.IsEditMappingOpen = false;
-      } else if (app->settingsState.IsMappingListOpen) {
-        app->settingsState.IsMappingListOpen = false;
-      } else if (app->settingsState.FocusLevel == 2) {
-        app->settingsState.FocusLevel = 1;
-      } else if (app->settingsState.FocusLevel == 1) {
-        app->settingsState.FocusLevel = 0;
-      } else {
-        app->screen = ScreenPlayer;
-        app->settingsState.IsActive = false;
-      }
-      app->browserState.MidiRequestBack = false;
-    }
   }
 
   // Handle Deck MIDI Requests
