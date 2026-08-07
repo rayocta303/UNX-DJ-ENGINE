@@ -218,8 +218,10 @@ void Log_Write(LogLevel level, const char* fmt, ...) {
     vsnprintf(buffer, sizeof(buffer), fmt, args);
     va_end(args);
 
-    // Print to console
-    printf("[%s] [%s] %s\n", timestamp, levelStr, buffer);
+    // Print to console only for Warning and Error to eliminate terminal I/O latency
+    if (level == UNX_LEVEL_WARNING || level == UNX_LEVEL_ERROR) {
+        printf("[%s] [%s] %s\n", timestamp, levelStr, buffer);
+    }
 
 #if defined(__ANDROID__)
     int priority = ANDROID_LOG_INFO;
@@ -268,15 +270,8 @@ static void* WatchdogProc(void* arg) {
 }
 
 void Log_Heartbeat(float fps, float frameTime) {
+    (void)fps; (void)frameTime;
     g_lastHeartbeat = time(NULL);
-
-    // Periodic Performance Logging (every 5 seconds)
-    static time_t lastPerfLog = 0;
-    if (g_lastHeartbeat - lastPerfLog >= 5) {
-        float ram = Log_GetRAMUsage();
-        UNX_LOG_INFO("[PERF] Heartbeat - FPS: %.1f, Frame: %.2f ms, RAM: %.2f MB", fps, frameTime * 1000.0f, ram);
-        lastPerfLog = g_lastHeartbeat;
-    }
 }
 
 // --- Signal Handlers ---

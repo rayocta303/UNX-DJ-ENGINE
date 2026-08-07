@@ -35,7 +35,7 @@ static int DeckInfo_Update(Component *base) {
     float ejectY = y + (headerH - ejectH) / 2.0f;
     Rectangle ejectRect = { ejectX, ejectY, ejectW, ejectH };
     
-    if (d->State->LoadedTrack != NULL && CheckCollisionPointRec(UIGetMousePosition(), ejectRect) && UI_IsPressed()) {
+    if (d->State->LoadedTrack != NULL && UICheckClick(ejectRect)) {
         DeckAudio_Unload(&d->Engine->Decks[d->ID]);
         d->State->IsPlaying = false;
         d->State->IsCueActive = false;
@@ -79,23 +79,23 @@ static int DeckInfo_Update(Component *base) {
 
     // Row 1: Master (Top-Left), Sync (Top-Right)
     Rectangle msRect = { margin, utilY, utilW, utilH };
-    if (CheckCollisionPointRec(UIGetMousePosition(), msRect) && UI_IsPressed()) {
+    if (UICheckClick(msRect)) {
         d->State->IsMaster = true; // Exclusivity handled in main.c loop
     }
 
     Rectangle syRect = { margin + utilW + utilGap, utilY, utilW, utilH };
-    if (CheckCollisionPointRec(UIGetMousePosition(), syRect) && UI_IsPressed()) {
+    if (UICheckClick(syRect)) {
         d->State->SyncMode = (d->State->SyncMode + 1) % 3;
     }
 
     // Row 2: MT (Bottom-Left), Vinyl / CDJ (Bottom-Right)
     Rectangle mtRect = { margin, utilY2, utilW, utilH };
-    if (CheckCollisionPointRec(UIGetMousePosition(), mtRect) && UI_IsPressed()) {
+    if (UICheckClick(mtRect)) {
         d->State->MasterTempo = !d->State->MasterTempo;
     }
 
     Rectangle viRect = { margin + utilW + utilGap, utilY2, utilW, utilH };
-    if (CheckCollisionPointRec(UIGetMousePosition(), viRect) && UI_IsPressed()) {
+    if (UICheckClick(viRect)) {
         d->State->VinylModeEnabled = !d->State->VinylModeEnabled;
     }
 
@@ -143,7 +143,7 @@ static int DeckInfo_Update(Component *base) {
     }
 
     Rectangle playRect = { margin + btnW + S(6), btnY, btnW, btnH };
-    if (CheckCollisionPointRec(UIGetMousePosition(), playRect) && UI_IsPressed()) {
+    if (UICheckClick(playRect)) {
         if (d->State->IsCueHeld) {
             // CUE + PLAY interlock: keep playing after CUE is released
             d->State->IsCueHeld = false;

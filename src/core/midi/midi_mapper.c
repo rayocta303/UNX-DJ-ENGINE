@@ -215,6 +215,19 @@ bool MIDI_LoadMapping(MidiMapping *map, const char *path) {
     return map->count > 0;
 }
 
+static bool match_device_name(const char *dev, const char *mapName) {
+    if (!dev || !mapName || dev[0] == '\0' || mapName[0] == '\0') return false;
+    if (strstr(dev, mapName) || strstr(mapName, dev)) return true;
+
+    const char *keywords[] = { "FLX6", "FLX4", "DDJ-400", "DDJ-800", "DDJ-1000", "DDJ" };
+    for (size_t i = 0; i < sizeof(keywords)/sizeof(keywords[0]); i++) {
+        if (strstr(dev, keywords[i]) && strstr(mapName, keywords[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool MIDI_ScanControllers(const char *dir, const char *deviceName, MidiMapping *out) {
 #if defined(_WIN32)
     char searchPath[MAX_PATH];
@@ -228,7 +241,7 @@ bool MIDI_ScanControllers(const char *dir, const char *deviceName, MidiMapping *
         snprintf(fullPath, MAX_PATH, "%s/%s", dir, findData.cFileName);
         MidiMapping temp;
         if (MIDI_LoadMapping(&temp, fullPath)) {
-            if (strstr(deviceName, temp.name) || strstr(temp.name, deviceName)) {
+            if (match_device_name(deviceName, temp.name)) {
                 *out = temp;
                 FindClose(hFind);
                 return true;
@@ -246,7 +259,7 @@ bool MIDI_ScanControllers(const char *dir, const char *deviceName, MidiMapping *
             snprintf(fullPath, 512, "%s/%s", dir, entry->d_name);
             MidiMapping temp;
             if (MIDI_LoadMapping(&temp, fullPath)) {
-                if (strstr(deviceName, temp.name) || strstr(temp.name, deviceName)) {
+                if (match_device_name(deviceName, temp.name)) {
                     *out = temp;
                     closedir(d);
                     return true;

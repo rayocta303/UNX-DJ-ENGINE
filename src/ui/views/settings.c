@@ -9,12 +9,16 @@
 #include "core/midi/midi_handler.h"
 
 
+static double g_lastSettingsClickTime = 0.0;
+
 static int Settings_Update(Component *base) {
   SettingsRenderer *r = (SettingsRenderer *)base;
   if (!r->State->IsActive)
     return 0;
 
-  Vector2 mouse = GetMousePosition();
+  double now = GetTime();
+  bool canClick = (now - g_lastSettingsClickTime) >= 0.12;
+  Vector2 mouse = UIGetMousePosition();
 
   // Handle dropdown intercept
   if (r->State->IsDropdownOpen) {
@@ -43,7 +47,8 @@ static int Settings_Update(Component *base) {
       if (r->State->DropdownScroll < 0) r->State->DropdownScroll = 0;
       if (r->State->DropdownScroll > maxScroll) r->State->DropdownScroll = maxScroll;
       
-      if (UI_IsReleased()) {
+      if (canClick && UI_IsReleased()) {
+          g_lastSettingsClickTime = now;
           if (!CheckCollisionPointRec(mouse, dropRect)) {
               r->State->IsDropdownOpen = false;
           } else {
@@ -108,14 +113,16 @@ static int Settings_Update(Component *base) {
       Rectangle btn3 = { modalX + S(15), modalY + S(140), S(135), S(24) };
       Rectangle btn4 = { modalX + S(170), modalY + S(140), S(135), S(24) };
 
-      if (UI_IsReleased()) {
+      if (canClick && UI_IsReleased()) {
           Vector2 mousePos = UIGetMousePosition();
           if (CheckCollisionPointRec(mousePos, btn1)) {
+              g_lastSettingsClickTime = now;
               r->State->IsLearningMidi = true;
               r->State->LearningItemIdx = r->State->EditMappingItemIdx;
               uint8_t s, m;
               while(MIDI_GetLastMessage(&s, &m)); // Flush
           } else if (CheckCollisionPointRec(mousePos, btn2)) {
+              g_lastSettingsClickTime = now;
               if (mapIdx >= 0 && mapIdx < map->count) {
                   if (strcmp(item->Options[0], "SCRIPT") == 0) {
                       strcpy(item->Options[0], "REL");
@@ -130,6 +137,7 @@ static int Settings_Update(Component *base) {
                   if (r->OnApply) r->OnApply(r->callbackCtx);
               }
           } else if (CheckCollisionPointRec(mousePos, btn3)) {
+              g_lastSettingsClickTime = now;
               if (mapIdx >= 0 && mapIdx < map->count) {
                   map->entries[mapIdx].status = 0;
                   map->entries[mapIdx].midino = 0;
@@ -137,6 +145,7 @@ static int Settings_Update(Component *base) {
                   if (r->OnApply) r->OnApply(r->callbackCtx);
               }
           } else if (CheckCollisionPointRec(mousePos, btn4)) {
+              g_lastSettingsClickTime = now;
               r->State->IsEditMappingOpen = false;
           }
       }
@@ -165,12 +174,13 @@ static int Settings_Update(Component *base) {
       int visibleRows = (int)((divY - listY) / rowH);
 
       // Mouse click list item inside mapping list sub-window
-      if (UI_IsReleased()) {
+      if (canClick && UI_IsReleased()) {
           Vector2 mousePos = UIGetMousePosition();
           
           // Back Button at the bottom
           Rectangle backRect = { S(15), divY + S(23), S(90), S(18) };
           if (CheckCollisionPointRec(mousePos, backRect)) {
+              g_lastSettingsClickTime = now;
               r->State->IsMappingListOpen = false;
               return 1;
           }
@@ -178,6 +188,7 @@ static int Settings_Update(Component *base) {
           // CREATE NEW Button
           Rectangle createRect = { SCREEN_WIDTH - S(250), divY + S(23), S(110), S(18) };
           if (CheckCollisionPointRec(mousePos, createRect)) {
+              g_lastSettingsClickTime = now;
               if (r->OnAction) r->OnAction(r->callbackCtx, 20);
               return 1;
           }
@@ -185,6 +196,7 @@ static int Settings_Update(Component *base) {
           // SAVE AS CUSTOM Button
           Rectangle saveRect = { SCREEN_WIDTH - S(130), divY + S(23), S(115), S(18) };
           if (CheckCollisionPointRec(mousePos, saveRect)) {
+              g_lastSettingsClickTime = now;
               if (r->OnAction) r->OnAction(r->callbackCtx, 21);
               return 1;
           }
@@ -197,6 +209,7 @@ static int Settings_Update(Component *base) {
               float ry = listY + (i * rowH);
               Rectangle rowRect = { 0, ry, SCREEN_WIDTH, rowH };
               if (CheckCollisionPointRec(mousePos, rowRect)) {
+                  g_lastSettingsClickTime = now;
                   r->State->MappingListCursorPos = i;
                   int actualIdx = mapIndices[idx_f];
                   r->State->IsEditMappingOpen = true;
@@ -278,43 +291,80 @@ static int Settings_Update(Component *base) {
     }
   }
 
-  if (UI_IsDown()) {
-    Vector2 delta = GetMouseDelta();
-    r->State->TouchDragAccumulator += delta.y;
-    
-    float viewH = SCREEN_HEIGHT - DECK_STR_H;
-    float tabH = S(28.0f);
-    float rowH = (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) ? S(38.0f) : S(32.0f);
-    float bottomH = S(46.0f);
-    float listY = TOP_BAR_H + tabH;
-    int visibleRows = (int)((viewH - listY - bottomH) / rowH);
-    
-    float threshold = S(20.0f);
-    if (r->State->TouchDragAccumulator < -threshold) { 
-      if (r->State->Scroll + visibleRows < filteredCount) {
-        r->State->Scroll++;
-      }
-      r->State->TouchDragAccumulator = 0;
-    } else if (r->State->TouchDragAccumulator > threshold) {
-      if (r->State->Scroll > 0) {
-        r->State->Scroll--;
-      }
-      r->State->TouchDragAccumulator = 0;
-    }
-  }
-
-  // Calculate hovered item row
-  Vector2 mousePos = UIGetMousePosition();
+  float viewH = SCREEN_HEIGHT - DECK_STR_H;
   float tabH = S(28.0f);
   float rowH = (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) ? S(38.0f) : S(32.0f);
-  float listY = TOP_BAR_H + tabH;
-  float viewH = SCREEN_HEIGHT - DECK_STR_H;
   float bottomH = S(46.0f);
-  float divY = viewH - bottomH;
-  int visibleRows = (int)((divY - listY) / rowH);
+  float listY = TOP_BAR_H + tabH;
+  int visibleRows = (int)((viewH - listY - bottomH) / rowH);
+  float maxScroll = (filteredCount - visibleRows) * rowH;
+  if (maxScroll < 0) maxScroll = 0;
 
+  // Touch Drag & Kinetic Swipe Scrubbing
+  Vector2 mousePos = UIGetMousePosition();
+  if (UI_IsPressed()) {
+      r->State->LastTouchY = mousePos.y;
+      r->State->TouchDragAccumulator = 0;
+      r->State->IsDragging = false;
+      r->State->ScrollVelocity = 0;
+  }
+
+  if (UI_IsDown()) {
+      float frameTime = GetFrameTime();
+      if (frameTime < 0.001f) frameTime = 0.016f;
+      float dy = mousePos.y - r->State->LastTouchY;
+      r->State->LastTouchY = mousePos.y;
+      r->State->TouchDragAccumulator += fabsf(dy);
+
+      if (!r->State->IsDragging && r->State->TouchDragAccumulator > S(4.0f)) {
+          r->State->IsDragging = true;
+      }
+
+      if (r->State->IsDragging || r->State->TouchDragAccumulator > S(2.0f)) {
+          float resistance = 1.0f;
+          if (r->State->VisualScroll < 0 && dy > 0) resistance = 0.3f;
+          if (r->State->VisualScroll > maxScroll && dy < 0) resistance = 0.3f;
+
+          r->State->VisualScroll -= dy * resistance;
+          float instantVel = (-dy * resistance) / frameTime;
+          r->State->TouchVelocityY = r->State->TouchVelocityY * 0.3f + instantVel * 0.7f;
+      }
+  } else {
+      // Kinetic Inertia Decay (Smooth Flick)
+      r->State->VisualScroll += r->State->ScrollVelocity * GetFrameTime();
+      r->State->ScrollVelocity *= 0.95f;
+      if (fabsf(r->State->ScrollVelocity) < 5.0f) r->State->ScrollVelocity = 0.0f;
+
+      // Elastic Bungee Return
+      float springK = 14.0f;
+      if (r->State->VisualScroll < 0) {
+          r->State->VisualScroll -= r->State->VisualScroll * springK * GetFrameTime();
+          if (fabsf(r->State->VisualScroll) < 0.5f) r->State->VisualScroll = 0.0f;
+      }
+      if (r->State->VisualScroll > maxScroll) {
+          float diff = r->State->VisualScroll - maxScroll;
+          r->State->VisualScroll -= diff * springK * GetFrameTime();
+          if (fabsf(r->State->VisualScroll - maxScroll) < 0.5f) r->State->VisualScroll = maxScroll;
+      }
+  }
+
+  if (UI_IsReleased()) {
+      if (r->State->IsDragging && fabsf(r->State->TouchVelocityY) > 60.0f) {
+          r->State->ScrollVelocity = r->State->TouchVelocityY;
+      }
+      r->State->IsDragging = false;
+  }
+
+  // Sync to discrete scroll offset
+  r->State->Scroll = (int)(r->State->VisualScroll / rowH);
+  if (r->State->Scroll < 0) r->State->Scroll = 0;
+  int maxOffset = filteredCount - visibleRows;
+  if (maxOffset < 0) maxOffset = 0;
+  if (r->State->Scroll > maxOffset) r->State->Scroll = maxOffset;
+
+  // Calculate hovered item row
   int hoveredItemIdx = -1;
-  if (mousePos.y >= listY && mousePos.y < divY) {
+  if (mousePos.y >= listY && mousePos.y < (viewH - bottomH)) {
       int rowIdx = (int)((mousePos.y - listY) / rowH);
       if (rowIdx >= 0 && rowIdx < visibleRows) {
           int idx_f = r->State->Scroll + rowIdx;
@@ -336,13 +386,8 @@ static int Settings_Update(Component *base) {
           if (kItem->Value > kItem->Max) kItem->Value = kItem->Max;
           if (r->OnApply) r->OnApply(r->callbackCtx);
       } else {
-          if (wheel > 0) {
-              if (r->State->Scroll > 0) r->State->Scroll--;
-          } else {
-              if (r->State->Scroll + visibleRows < filteredCount) {
-                  r->State->Scroll++;
-              }
-          }
+          r->State->VisualScroll -= wheel * rowH * 3.0f;
+          r->State->ScrollVelocity = 0;
       }
   }
 
@@ -362,84 +407,81 @@ static int Settings_Update(Component *base) {
       }
   }
 
-  if (UI_IsPressed()) {
-      r->State->TouchDragAccumulator = 0;
-  }
+  // OSK-style Touch Release & Debounced Tap Actions
+  if (canClick && UI_IsReleased() && !r->State->IsDragging) {
+    if (r->State->TouchDragAccumulator < S(22.0f) && fabsf(r->State->ScrollVelocity) < 40.0f) {
+      float divY = viewH - bottomH;
 
-  if (UI_IsReleased()) {
-    Vector2 mouse = UIGetMousePosition();
-    float viewH = SCREEN_HEIGHT - DECK_STR_H;
-    float bottomH = S(46.0f);
-    float divY = viewH - bottomH;
-    float tabH = S(28.0f);
+      // Tab Switching Logic
+      float tabW = SCREEN_WIDTH / (float)SETTING_CAT_COUNT;
+      for (int tIdx = 0; tIdx < SETTING_CAT_COUNT; tIdx++) {
+          Rectangle tabRect = { tIdx * tabW, TOP_BAR_H, tabW, tabH };
+          if (UICheckClick(tabRect)) {
+              if (r->State->SelectedTab != tIdx) {
+                  g_lastSettingsClickTime = now;
+                  r->State->SelectedTab = tIdx;
+                  r->State->Scroll = 0;
+                  r->State->VisualScroll = 0;
+                  r->State->ScrollVelocity = 0;
+                  r->State->CursorPos = 0;
+              }
+              return 1;
+          }
+      }
 
-    // Tab Switching Logic
-    if (mouse.y >= TOP_BAR_H && mouse.y <= TOP_BAR_H + tabH) {
-        float tabW = SCREEN_WIDTH / (float)SETTING_CAT_COUNT;
-        int tabIdx = (int)(mouse.x / tabW);
-        if (tabIdx >= 0 && tabIdx < SETTING_CAT_COUNT) {
-            if (r->State->SelectedTab != tabIdx) {
-                r->State->SelectedTab = tabIdx;
-                r->State->Scroll = 0;
-                r->State->CursorPos = 0;
-            }
-            return 1;
-        }
-    }
+      // DONE Button
+      Rectangle doneBtnRect = { S(15), divY + S(5), S(90), S(18) };
+      if (UICheckClick(doneBtnRect)) {
+        g_lastSettingsClickTime = now;
+        if (r->OnApply)
+          r->OnApply(r->callbackCtx);
+        if (r->OnClose)
+          r->OnClose(r->callbackCtx);
+        return 1;
+      }
+      // CLOSE Button
+      Rectangle closeBtnRect = { SCREEN_WIDTH - S(105), divY + S(5), S(90), S(18) };
+      if (UICheckClick(closeBtnRect)) {
+        g_lastSettingsClickTime = now;
+        if (r->OnClose)
+          r->OnClose(r->callbackCtx);
+        return 1;
+      }
 
-    // DONE Button
-    if (mouse.x >= S(15) && mouse.x <= S(105) && mouse.y >= divY + S(5) &&
-        mouse.y <= divY + S(23)) {
-      if (r->OnApply)
-        r->OnApply(r->callbackCtx);
-      if (r->OnClose)
-        r->OnClose(r->callbackCtx);
-      return 1;
-    }
-    // CLOSE Button
-    if (mouse.x >= SCREEN_WIDTH - S(105) && mouse.x <= SCREEN_WIDTH - S(15) &&
-        mouse.y >= divY + S(5) && mouse.y <= divY + S(23)) {
-      if (r->OnClose)
-        r->OnClose(r->callbackCtx);
-      return 1;
-    }
+      // List Item Selection & Action Clicking
+      for (int i = 0; i < visibleRows; i++) {
+        int idx_f = r->State->Scroll + i;
+        if (idx_f >= filteredCount)
+          break;
 
-    // List Item Selection & Action Clicking
-    float rowH = (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) ? S(38.0f) : S(32.0f); // Match Settings_Draw
-    float listY = TOP_BAR_H + tabH;
+        int idx = filteredIndices[idx_f];
+        float ry = listY + (i * rowH);
+        Rectangle rowRect = {0, ry, SCREEN_WIDTH, rowH};
 
-    int visibleRows = (int)((divY - listY) / rowH);
-    for (int i = 0; i < visibleRows; i++) {
-      int idx_f = r->State->Scroll + i;
-      if (idx_f >= filteredCount)
-        break;
-
-      int idx = filteredIndices[idx_f];
-      float ry = listY + (i * rowH);
-      Rectangle rowRect = {0, ry, SCREEN_WIDTH, rowH};
-
-      if (CheckCollisionPointRec(mouse, rowRect) && fabsf(r->State->TouchDragAccumulator) < 10.0f) {
-        r->State->CursorPos = i; 
-        
-        SettingItem *clickedItem = &r->State->Items[idx];
-        if (clickedItem->Category == SETTING_CAT_CONTROLLERS && idx >= MIDI_MAPPING_START_IDX) {
-            r->State->IsEditMappingOpen = true;
-            r->State->EditMappingItemIdx = idx;
-            return 1;
-        } else if (clickedItem->Type == SETTING_TYPE_ACTION) {
-            if (idx == 20) {
-                r->State->IsMappingListOpen = true;
-                r->State->MappingListScroll = 0;
-                r->State->MappingListCursorPos = 0;
-                return 1;
-            }
-            if (r->OnAction)
-              r->OnAction(r->callbackCtx, idx);
-        } else if (clickedItem->Type == SETTING_TYPE_LIST) {
-            r->State->IsDropdownOpen = true;
-            r->State->DropdownItemIdx = idx;
-            r->State->DropdownScroll = 0;
-            return 1;
+        if (UICheckClick(rowRect)) {
+          g_lastSettingsClickTime = now;
+          r->State->CursorPos = i; 
+          
+          SettingItem *clickedItem = &r->State->Items[idx];
+          if (clickedItem->Category == SETTING_CAT_CONTROLLERS && idx >= MIDI_MAPPING_START_IDX) {
+              r->State->IsEditMappingOpen = true;
+              r->State->EditMappingItemIdx = idx;
+              return 1;
+          } else if (clickedItem->Type == SETTING_TYPE_ACTION) {
+              if (idx == 20) {
+                  r->State->IsMappingListOpen = true;
+                  r->State->MappingListScroll = 0;
+                  r->State->MappingListCursorPos = 0;
+                  return 1;
+              }
+              if (r->OnAction)
+                r->OnAction(r->callbackCtx, idx);
+          } else if (clickedItem->Type == SETTING_TYPE_LIST) {
+              r->State->IsDropdownOpen = true;
+              r->State->DropdownItemIdx = idx;
+              r->State->DropdownScroll = 0;
+              return 1;
+          }
         }
       }
     }

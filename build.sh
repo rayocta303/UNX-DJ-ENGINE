@@ -2,8 +2,8 @@
 # XDJ-UNX-C Linux Build Script (Ported from build.bat)
 
 ZIG=${ZIG:-zig}
-CC="$ZIG cc"
-CXX="$ZIG c++"
+CC="${CC:-$ZIG cc}"
+CXX="${CXX:-$ZIG c++}"
 
 # Build Asset Bundle Tool
 echo "[Building Asset Bundle Tool...]"
@@ -37,11 +37,17 @@ echo "#endif" >> src/ui/components/assets_bundle.h
 BACKEND=${1:-drm}
 echo "[Selected Backend: $BACKEND]"
 
+if [[ "$CC" == *"zig"* ]]; then
+    TARGET_SPEC="-target aarch64-linux-gnu.2.36"
+else
+    TARGET_SPEC=""
+fi
+
 if [ "$BACKEND" == "desktop" ]; then
-    TARGET_FLAGS="-target aarch64-linux-gnu.2.36 -DPLATFORM_DESKTOP -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include"
+    TARGET_FLAGS="$TARGET_SPEC -DPLATFORM_DESKTOP -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include"
     LDFLAGS="-Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -lpthread -ldl -lm -lX11 -lwayland-client -lwayland-cursor -lwayland-egl -lxkbcommon"
 else
-    TARGET_FLAGS="-target aarch64-linux-gnu.2.36 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include"
+    TARGET_FLAGS="$TARGET_SPEC -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include"
     LDFLAGS="-Llib/linux_arm64 -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lpthread -ldl -lm"
 fi
 

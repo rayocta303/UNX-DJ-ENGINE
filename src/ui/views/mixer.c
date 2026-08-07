@@ -93,7 +93,7 @@ static bool DrawFXButton(const char *label, float x, float y, float w, float h,
                          bool active) {
   bool hovered =
       CheckCollisionPointRec(UIGetMousePosition(), (Rectangle){x, y, w, h});
-  bool pressed = hovered && UI_IsPressed();
+  bool pressed = UICheckClick((Rectangle){x, y, w, h});
   bool isFxBlinking = (fmod(GetTime(), 0.5) < 0.25);
   Color bg = active ? (isFxBlinking ? (Color){0, 140, 255, 255} : (Color){0, 40, 110, 255}) : (hovered ? ColorDark1 : ColorBlack);
   Color fg = active ? ColorWhite : ColorOrange;
@@ -285,10 +285,10 @@ static void Mixer_Draw(Component *base) {
 
     Font iconFont = UIFonts_GetIcon(S(12));
     UIDrawText("\xef\x80\xa5", iconFont, fcx - S(6), cueBtnY + S(4), S(12), d->IsCueActive ? ColorOrange : ColorShadow);
-    if (CheckCollisionPointRec(mousePos, (Rectangle){cueBtnX, cueBtnY, cueBtnSize, cueBtnSize}) && UI_IsPressed()) {
+    if (UICheckClick((Rectangle){cueBtnX, cueBtnY, cueBtnSize, cueBtnSize})) {
         d->IsCueActive = !d->IsCueActive;
     }
-    
+
     // Channel Label
     UIDrawText(i == 0 ? "CH1" : "CH2", fTiny, ecx - S(10), topY + S(2), S(9), ColorWhite);
 
@@ -376,7 +376,7 @@ static void Mixer_Draw(Component *base) {
   float bSelectorY = bfxY + S(12);
   DrawRectangle(rightX + S(10), bSelectorY, colRightW - S(20), S(18), ColorBlack);
   DrawCentredText(bfxNames[fxs->SelectedFX % 14], fSub, rightX, colRightW, bSelectorY + S(4), S(9), ColorWhite);
-  if (CheckCollisionPointRec(mousePos, (Rectangle){rightX + S(10), bSelectorY, colRightW - S(20), S(18)}) && UI_IsPressed()) {
+  if (UICheckClick((Rectangle){rightX + S(10), bSelectorY, colRightW - S(20), S(18)})) {
       fxs->SelectedFX = (fxs->SelectedFX + 1) % 14;
       BeatFXManager_SetFX(&eng->BeatFX, fxs->SelectedFX);
   }

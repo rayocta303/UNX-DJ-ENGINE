@@ -1134,6 +1134,7 @@ void App_Init(App *a) {
 #include <unistd.h>
 #include <pthread.h>
 #include <sys/ioctl.h>
+#include <errno.h>
 
 #define MAX_EVDEV_DEVS 16
 
@@ -1374,7 +1375,7 @@ int raylib_main(int argc, char *argv[]) {
 #else
 int main(void) {
 #endif
-  SetTraceLogLevel(LOG_ALL);
+  SetTraceLogLevel(LOG_WARNING);
   // Log_Init moved after InitWindow for Android path stability
   UNX_LOG_INFO("!!! [DEBUG] ENTRY POINT main() !!!");
 
@@ -1675,6 +1676,10 @@ Log_LogDeviceInfo(gpuModel);
               &app->deckA.MidiRequestHotCue[6], 0, 1);
   CO_Register("[Channel1]", "hotcue_8", CO_TYPE_BOOL,
               &app->deckA.MidiRequestHotCue[7], 0, 1);
+  CO_Register("[Channel1]", "memory_set", CO_TYPE_BOOL,
+              &app->deckA.MidiRequestMemoryCue, 0, 1);
+  CO_Register("[Channel1]", "padmode", CO_TYPE_INT,
+              &app->padState.Mode[0], 0, 5);
 
   // Beat Jump & Auto Loop
   CO_Register("[Channel1]", "beatjump_forward", CO_TYPE_BOOL,
@@ -1775,6 +1780,10 @@ Log_LogDeviceInfo(gpuModel);
               &app->deckB.MidiRequestHotCue[6], 0, 1);
   CO_Register("[Channel2]", "hotcue_8", CO_TYPE_BOOL,
               &app->deckB.MidiRequestHotCue[7], 0, 1);
+  CO_Register("[Channel2]", "memory_set", CO_TYPE_BOOL,
+              &app->deckB.MidiRequestMemoryCue, 0, 1);
+  CO_Register("[Channel2]", "padmode", CO_TYPE_INT,
+              &app->padState.Mode[1], 0, 5);
 
   // Beat Jump & Auto Loop
   CO_Register("[Channel2]", "beatjump_forward", CO_TYPE_BOOL,
@@ -1831,6 +1840,8 @@ Log_LogDeviceInfo(gpuModel);
   CO_Register("[Channel3]", "volume", CO_TYPE_FLOAT, &audioEngine->Decks[0].Fader, 0, 1.0f);
   CO_Register("[Channel3]", "jog", CO_TYPE_DOUBLE, &app->deckA.JogDelta, -1000, 1000);
   CO_Register("[Channel3]", "touch", CO_TYPE_BOOL, &app->deckA.IsTouching, 0, 1);
+  CO_Register("[Channel3]", "memory_set", CO_TYPE_BOOL, &app->deckA.MidiRequestMemoryCue, 0, 1);
+  CO_Register("[Channel3]", "padmode", CO_TYPE_INT, &app->padState.Mode[0], 0, 5);
 
   CO_Register("[Channel4]", "play", CO_TYPE_BOOL, &app->deckB.MidiRequestPlay, 0, 1);
   CO_Register("[Channel4]", "cue", CO_TYPE_BOOL, &app->deckB.MidiRequestCue, 0, 1);
@@ -1844,6 +1855,8 @@ Log_LogDeviceInfo(gpuModel);
   CO_Register("[Channel4]", "volume", CO_TYPE_FLOAT, &audioEngine->Decks[1].Fader, 0, 1.0f);
   CO_Register("[Channel4]", "jog", CO_TYPE_DOUBLE, &app->deckB.JogDelta, -1000, 1000);
   CO_Register("[Channel4]", "touch", CO_TYPE_BOOL, &app->deckB.IsTouching, 0, 1);
+  CO_Register("[Channel4]", "memory_set", CO_TYPE_BOOL, &app->deckB.MidiRequestMemoryCue, 0, 1);
+  CO_Register("[Channel4]", "padmode", CO_TYPE_INT, &app->padState.Mode[1], 0, 5);
 
   // --- Beat FX ---
   CO_Register("[Master]", "beatfx_select", CO_TYPE_INT,
@@ -2182,6 +2195,10 @@ void UpdateDrawFrame(App *app) {
     }
   }
 
+#if defined(PLATFORM_DRM) || (defined(__linux__) && !defined(__ANDROID__))
+  EvdevTouch_Update();
+#endif
+
   // Cache scale for this frame based on current window size
   UI_UpdateScale();
 
@@ -2361,6 +2378,18 @@ void UpdateDrawFrame(App *app) {
       app->browserState.MidiRequestEnter = false;
     }
   }
+  if (app->browserState.MidiRequestBack) {
+    if (app->screen == ScreenBrowser) {
+      if (app->browserState.BrowseLevel > 0) {
+        app->browserState.BrowseLevel--;
+      } else {
+        TopBar_OnBrowse(app);
+      }
+    } else {
+      TopBar_OnBrowse(app);
+    }
+    app->browserState.MidiRequestBack = false;
+  }
   if (app->MidiRequestSettings) {
     TopBar_OnSettings(app);
     app->MidiRequestSettings = false;
@@ -2474,74 +2503,209 @@ void UpdateDrawFrame(App *app) {
     // Hot Cues
     for (int j = 0; j < 8; j++) {
       if (ds->MidiRequestHotCue[j]) {
-        if (ds->LoadedTrack) {
-          int targetID = j + 1;
-          for (int h = 0; h < ds->LoadedTrack->HotCuesCount; h++) {
-            if (ds->LoadedTrack->HotCues[h].ID == (unsigned int)targetID) {
-              uint32_t targetMs = ds->LoadedTrack->HotCues[h].Start;
-              
-              if (ds->QuantizeEnabled && ds->IsPlaying) {
-                 int32_t waitMs = Quantize_GetWaitMs(ds->LoadedTrack, ds->PositionMs);
-                 if (waitMs > 5) { // Only queue if more than 5ms wait (avoid jitter)
-                     DeckAudio_ExitLoop(audio);
-                     DeckAudio_QueueJumpMs(audio, targetMs, (uint32_t)waitMs);
-                     ds->IsPlaying = true;
-                     audio->IsPlaying = true;
-                     audio->IsMotorOn = true;
-                 } else {
-                     DeckAudio_ExitLoop(audio);
-                     ds->SeekMs = targetMs;
-                     ds->HasSeekRequest = true;
-                     ds->IsPlaying = true;
-                     audio->IsPlaying = true;
-                     audio->IsMotorOn = true;
-                 }
-              } else {
-                 DeckAudio_ExitLoop(audio);
-                 ds->SeekMs = targetMs;
-                 ds->HasSeekRequest = true;
-                 ds->IsPlaying = true;
-                 audio->IsPlaying = true;
-                 audio->IsMotorOn = true;
-              }
-              break;
-            }
-          }
-        }
+        OnPadPress(app, i, j);
         ds->MidiRequestHotCue[j] = false;
       }
     }
 
-    // Looping
+    // Manual Looping (with Quantize Beatgrid Snapping)
     if (ds->MidiRequestLoopIn) {
-      DeckAudio_SetLoop(audio, true, audio->Position,
-                        audio->Position + 44100 * 4); // Default 4 beat loop
-      ds->MidiRequestLoopIn = false;
-    }
-    if (ds->MidiRequestLoopOut) {
-      if (audio->IsLooping)
-        DeckAudio_ExitLoop(audio);
-      ds->MidiRequestLoopOut = false;
-    }
-    if (ds->MidiRequestLoopExit) {
-      DeckAudio_ExitLoop(audio);
-      ds->MidiRequestLoopExit = false;
-    }
-    if (ds->MidiRequestLoopHalve) {
+      double trackSR = (double)audio->SampleRate;
+      if (trackSR < 100) trackSR = 44100.0;
+      double pos = audio->Position;
+
+      if (ds->QuantizeEnabled && ds->LoadedTrack && ds->LoadedTrack->Analysis.BeatGridCount > 0) {
+        double currentMs = (pos / trackSR) * 1000.0;
+        int nearestIdx = 0;
+        double minDist = 100000.0;
+        for (int b = 0; b < ds->LoadedTrack->Analysis.BeatGridCount; b++) {
+          double dist = fabs((double)ds->LoadedTrack->Analysis.BeatGrid[b].Time - currentMs);
+          if (dist < minDist) {
+            minDist = dist;
+            nearestIdx = b;
+          }
+        }
+        pos = (ds->LoadedTrack->Analysis.BeatGrid[nearestIdx].Time / 1000.0) * trackSR;
+      }
+
       if (audio->IsLooping) {
-        double len = audio->LoopEndPos - audio->LoopStartPos;
-        if (len > 4410.0) {
-          DeckAudio_SetLoop(audio, true, audio->LoopStartPos, audio->LoopStartPos + len / 2.0);
+        // Toggle Loop In Adjust mode if inside active loop
+        ds->LoopAdjustIn = !ds->LoopAdjustIn;
+        ds->LoopAdjustOut = false;
+      } else {
+        audio->LoopStartPos = pos;
+        if (audio->LoopEndPos <= audio->LoopStartPos) {
+          audio->LoopEndPos = audio->LoopStartPos + trackSR * 4.0;
         }
       }
-      ds->MidiRequestLoopHalve = false;
+      ds->MidiRequestLoopIn = false;
     }
-    if (ds->MidiRequestLoopDouble) {
+
+    if (ds->MidiRequestLoopOut) {
+      double trackSR = (double)audio->SampleRate;
+      if (trackSR < 100) trackSR = 44100.0;
+      double pos = audio->Position;
+
       if (audio->IsLooping) {
-        double len = audio->LoopEndPos - audio->LoopStartPos;
-        DeckAudio_SetLoop(audio, true, audio->LoopStartPos, audio->LoopStartPos + len * 2.0);
+        if (ds->LoopAdjustIn || ds->LoopAdjustOut) {
+          // Exit loop adjust mode
+          ds->LoopAdjustIn = false;
+          ds->LoopAdjustOut = false;
+        } else {
+          // Toggle Loop Out Adjust mode
+          ds->LoopAdjustOut = true;
+          ds->LoopAdjustIn = false;
+        }
+      } else {
+        if (ds->QuantizeEnabled && ds->LoadedTrack && ds->LoadedTrack->Analysis.BeatGridCount > 0) {
+          double currentMs = (pos / trackSR) * 1000.0;
+          int nearestIdx = 0;
+          double minDist = 100000.0;
+          for (int b = 0; b < ds->LoadedTrack->Analysis.BeatGridCount; b++) {
+            double dist = fabs((double)ds->LoadedTrack->Analysis.BeatGrid[b].Time - currentMs);
+            if (dist < minDist) {
+              minDist = dist;
+              nearestIdx = b;
+            }
+          }
+          pos = (ds->LoadedTrack->Analysis.BeatGrid[nearestIdx].Time / 1000.0) * trackSR;
+        }
+
+        if (pos <= audio->LoopStartPos) {
+          double beatMs = 60000.0 / (ds->CurrentBPM > 0 ? ds->CurrentBPM : 120.0);
+          pos = audio->LoopStartPos + (beatMs / 1000.0) * trackSR;
+        }
+
+        DeckAudio_SetLoop(audio, true, audio->LoopStartPos, pos);
+        ds->IsLooping = true;
       }
-      ds->MidiRequestLoopDouble = false;
+      ds->MidiRequestLoopOut = false;
+    }
+
+    if (ds->MidiRequestLoopExit) {
+      ds->LoopAdjustIn = false;
+      ds->LoopAdjustOut = false;
+      if (audio->IsLooping) {
+        DeckAudio_ExitLoop(audio);
+        ds->IsLooping = false;
+      } else if (audio->LoopEndPos > audio->LoopStartPos) {
+        DeckAudio_SetLoop(audio, true, audio->LoopStartPos, audio->LoopEndPos);
+        audio->Position = audio->LoopStartPos;
+        audio->MT_ReadPos = audio->LoopStartPos;
+        DeckAudio_ClearMT(audio);
+        ds->IsLooping = true;
+      }
+      ds->MidiRequestLoopExit = false;
+    }
+
+    // Static debouncing timers for Cue Call Left/Right and Memory Cue buttons (200ms threshold)
+    static double lastMemoryPress[2] = {0.0, 0.0};
+    static double lastCueCallLeftPress[2] = {0.0, 0.0};
+    static double lastCueCallRightPress[2] = {0.0, 0.0};
+    double nowTime = GetTime();
+
+    // Cue / Loop Call (Left = Halve / Jump Prev Cue, Right = Double / Jump Next Cue)
+    if (ds->MidiRequestLoopHalve) {
+      if (nowTime - lastCueCallLeftPress[i] < 0.200) {
+        ds->MidiRequestLoopHalve = false;
+      } else {
+        lastCueCallLeftPress[i] = nowTime;
+        if (audio->IsLooping) {
+          double len = audio->LoopEndPos - audio->LoopStartPos;
+          if (len > 4410.0) {
+            DeckAudio_SetLoop(audio, true, audio->LoopStartPos, audio->LoopStartPos + len / 2.0);
+          }
+        } else if (ds->LoadedTrack && ds->LoadedTrack->Analysis.CueCount > 0) {
+          uint32_t currentMs = (uint32_t)ds->PositionMs;
+          int prevMs = -1;
+          for (uint32_t c = 0; c < ds->LoadedTrack->Analysis.CueCount; c++) {
+            if (ds->LoadedTrack->Analysis.Cues[c].Time < currentMs - 100) {
+              if ((int)ds->LoadedTrack->Analysis.Cues[c].Time > prevMs) {
+                prevMs = ds->LoadedTrack->Analysis.Cues[c].Time;
+              }
+            }
+          }
+          if (prevMs >= 0) {
+            ds->SeekMs = prevMs;
+            ds->HasSeekRequest = true;
+          }
+        }
+        ds->MidiRequestLoopHalve = false;
+      }
+    }
+
+    if (ds->MidiRequestLoopDouble) {
+      if (nowTime - lastCueCallRightPress[i] < 0.200) {
+        ds->MidiRequestLoopDouble = false;
+      } else {
+        lastCueCallRightPress[i] = nowTime;
+        if (audio->IsLooping) {
+          double len = audio->LoopEndPos - audio->LoopStartPos;
+          DeckAudio_SetLoop(audio, true, audio->LoopStartPos, audio->LoopStartPos + len * 2.0);
+        } else if (ds->LoadedTrack && ds->LoadedTrack->Analysis.CueCount > 0) {
+          uint32_t currentMs = (uint32_t)ds->PositionMs;
+          uint32_t nextMs = 0xFFFFFFFF;
+          for (uint32_t c = 0; c < ds->LoadedTrack->Analysis.CueCount; c++) {
+            if (ds->LoadedTrack->Analysis.Cues[c].Time > currentMs + 100) {
+              if (ds->LoadedTrack->Analysis.Cues[c].Time < nextMs) {
+                nextMs = ds->LoadedTrack->Analysis.Cues[c].Time;
+              }
+            }
+          }
+          if (nextMs != 0xFFFFFFFF) {
+            ds->SeekMs = nextMs;
+            ds->HasSeekRequest = true;
+          }
+        }
+        ds->MidiRequestLoopDouble = false;
+      }
+    }
+
+    // Memory Cue Toggle (Set or Clear Memory Cue marker) with 200ms debounce
+    if (ds->MidiRequestMemoryCue) {
+      if (nowTime - lastMemoryPress[i] < 0.200) {
+        ds->MidiRequestMemoryCue = false;
+      } else {
+        lastMemoryPress[i] = nowTime;
+        if (ds->LoadedTrack) {
+          uint32_t currentMs = (uint32_t)ds->PositionMs;
+          if (ds->QuantizeEnabled && ds->LoadedTrack->Analysis.BeatGridCount > 0) {
+            currentMs = Quantize_GetNearestBeatMs(ds->LoadedTrack, currentMs);
+          }
+
+          int existingIdx = -1;
+          for (uint32_t c = 0; c < ds->LoadedTrack->Analysis.CueCount; c++) {
+            if (abs((int)ds->LoadedTrack->Analysis.Cues[c].Time - (int)currentMs) < 150) {
+              existingIdx = (int)c;
+              break;
+            }
+          }
+
+          if (existingIdx >= 0) {
+            for (uint32_t c = (uint32_t)existingIdx; c < ds->LoadedTrack->Analysis.CueCount - 1; c++) {
+              ds->LoadedTrack->Analysis.Cues[c] = ds->LoadedTrack->Analysis.Cues[c + 1];
+            }
+            ds->LoadedTrack->Analysis.CueCount--;
+            UNX_LOG_INFO("[MEMORY CUE] Cleared Memory Cue at %u ms on Deck %d", currentMs, i + 1);
+          } else {
+            RBCue newRc;
+            memset(&newRc, 0, sizeof(RBCue));
+            newRc.Time = currentMs;
+            newRc.ID = 0;
+            newRc.Type = 0; // Memory Cue
+            newRc.Status = 1;
+            newRc.Color[0] = 255; newRc.Color[1] = 165; newRc.Color[2] = 0; // Orange
+
+            RBCue *nextCues = (RBCue *)realloc(ds->LoadedTrack->Analysis.Cues, sizeof(RBCue) * (ds->LoadedTrack->Analysis.CueCount + 1));
+            if (nextCues) {
+              ds->LoadedTrack->Analysis.Cues = nextCues;
+              ds->LoadedTrack->Analysis.Cues[ds->LoadedTrack->Analysis.CueCount++] = newRc;
+            }
+            UNX_LOG_INFO("[MEMORY CUE] Set Memory Cue at %u ms on Deck %d", currentMs, i + 1);
+          }
+        }
+        ds->MidiRequestMemoryCue = false;
+      }
     }
 
     // Pitch Bend
@@ -2625,7 +2789,32 @@ void UpdateDrawFrame(App *app) {
     }
   }
 
-  if (audioEngine->Decks[0].ReleaseFXType == 2) {
+  if (app->deckA.LoopAdjustIn && app->deckA.JogDelta != 0) {
+    double trackSR = (double)audioEngine->Decks[0].SampleRate;
+    if (trackSR < 100) trackSR = 44100.0;
+    double deltaSamples = app->deckA.JogDelta * (trackSR / 400.0);
+    double newStart = audioEngine->Decks[0].LoopStartPos + deltaSamples;
+    if (newStart < 0) newStart = 0;
+    if (newStart > audioEngine->Decks[0].LoopEndPos - trackSR * 0.05) {
+      newStart = audioEngine->Decks[0].LoopEndPos - trackSR * 0.05;
+    }
+    audioEngine->Decks[0].LoopStartPos = newStart;
+    audioEngine->Decks[0].Position = newStart;
+    DeckAudio_SetLoop(&audioEngine->Decks[0], true, audioEngine->Decks[0].LoopStartPos, audioEngine->Decks[0].LoopEndPos);
+    app->deckA.JogDelta = 0;
+  } else if (app->deckA.LoopAdjustOut && app->deckA.JogDelta != 0) {
+    double trackSR = (double)audioEngine->Decks[0].SampleRate;
+    if (trackSR < 100) trackSR = 44100.0;
+    double deltaSamples = app->deckA.JogDelta * (trackSR / 400.0);
+    double newEnd = audioEngine->Decks[0].LoopEndPos + deltaSamples;
+    if (newEnd < audioEngine->Decks[0].LoopStartPos + trackSR * 0.05) {
+      newEnd = audioEngine->Decks[0].LoopStartPos + trackSR * 0.05;
+    }
+    audioEngine->Decks[0].LoopEndPos = newEnd;
+    audioEngine->Decks[0].Position = newEnd;
+    DeckAudio_SetLoop(&audioEngine->Decks[0], true, audioEngine->Decks[0].LoopStartPos, audioEngine->Decks[0].LoopEndPos);
+    app->deckA.JogDelta = 0;
+  } else if (audioEngine->Decks[0].ReleaseFXType == 2) {
     // Active Backspin: Let engine physics decay JogRate smoothly
   } else if (app->deckA.JogDelta != 0 || (app->deckA.IsTouching && app->deckA.VinylModeEnabled)) {
     double dt = GetFrameTime();
@@ -2633,9 +2822,10 @@ void UpdateDrawFrame(App *app) {
       dt = 0.016;
 
     if (app->deckA.JogDelta != 0) {
-      double calibRPM = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckA.Waveform.JogCalibRPM : 33.3333;
-      double jogScaleFactor = 777.77 * (33.3333 / calibRPM);
-      double rawRate = app->deckA.JogDelta / (jogScaleFactor * dt);
+      double calibRPM = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckA.Waveform.JogCalibRPM : 33.333333333333336;
+      // Pioneer FLX6 jog encoder: 720 ticks/revolution. At 33.3333 RPM (1.8s/rev), 720 ticks / 1.8s = 400.0 ticks/sec at 1.0x speed.
+      double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
+      double rawRate = app->deckA.JogDelta / (ticksPerSecAtNormalSpeed * dt);
       app->deckA.JogDelta = 0;
       // Exponential Moving Average filter to smooth MIDI packet jitter
       audioEngine->Decks[0].JogRate = audioEngine->Decks[0].JogRate * 0.25 + rawRate * 0.75;
@@ -2668,7 +2858,32 @@ void UpdateDrawFrame(App *app) {
     }
   }
 
-  if (audioEngine->Decks[1].ReleaseFXType == 2) {
+  if (app->deckB.LoopAdjustIn && app->deckB.JogDelta != 0) {
+    double trackSR = (double)audioEngine->Decks[1].SampleRate;
+    if (trackSR < 100) trackSR = 44100.0;
+    double deltaSamples = app->deckB.JogDelta * (trackSR / 400.0);
+    double newStart = audioEngine->Decks[1].LoopStartPos + deltaSamples;
+    if (newStart < 0) newStart = 0;
+    if (newStart > audioEngine->Decks[1].LoopEndPos - trackSR * 0.05) {
+      newStart = audioEngine->Decks[1].LoopEndPos - trackSR * 0.05;
+    }
+    audioEngine->Decks[1].LoopStartPos = newStart;
+    audioEngine->Decks[1].Position = newStart;
+    DeckAudio_SetLoop(&audioEngine->Decks[1], true, audioEngine->Decks[1].LoopStartPos, audioEngine->Decks[1].LoopEndPos);
+    app->deckB.JogDelta = 0;
+  } else if (app->deckB.LoopAdjustOut && app->deckB.JogDelta != 0) {
+    double trackSR = (double)audioEngine->Decks[1].SampleRate;
+    if (trackSR < 100) trackSR = 44100.0;
+    double deltaSamples = app->deckB.JogDelta * (trackSR / 400.0);
+    double newEnd = audioEngine->Decks[1].LoopEndPos + deltaSamples;
+    if (newEnd < audioEngine->Decks[1].LoopStartPos + trackSR * 0.05) {
+      newEnd = audioEngine->Decks[1].LoopStartPos + trackSR * 0.05;
+    }
+    audioEngine->Decks[1].LoopEndPos = newEnd;
+    audioEngine->Decks[1].Position = newEnd;
+    DeckAudio_SetLoop(&audioEngine->Decks[1], true, audioEngine->Decks[1].LoopStartPos, audioEngine->Decks[1].LoopEndPos);
+    app->deckB.JogDelta = 0;
+  } else if (audioEngine->Decks[1].ReleaseFXType == 2) {
     // Active Backspin: Let engine physics decay JogRate smoothly
   } else if (app->deckB.JogDelta != 0 || (app->deckB.IsTouching && app->deckB.VinylModeEnabled)) {
     double dt = GetFrameTime();
@@ -2676,9 +2891,9 @@ void UpdateDrawFrame(App *app) {
       dt = 0.016;
 
     if (app->deckB.JogDelta != 0) {
-      double calibRPM = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckB.Waveform.JogCalibRPM : 33.3333;
-      double jogScaleFactor = 777.77 * (33.3333 / calibRPM);
-      double rawRate = app->deckB.JogDelta / (jogScaleFactor * dt);
+      double calibRPM = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckB.Waveform.JogCalibRPM : 33.333333333333336;
+      double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
+      double rawRate = app->deckB.JogDelta / (ticksPerSecAtNormalSpeed * dt);
       app->deckB.JogDelta = 0;
       // Exponential Moving Average filter to smooth MIDI packet jitter
       audioEngine->Decks[1].JogRate = audioEngine->Decks[1].JogRate * 0.25 + rawRate * 0.75;
@@ -2710,8 +2925,8 @@ void UpdateDrawFrame(App *app) {
       if (app->deckA.LoadAnimTimer < 0.0f) app->deckA.LoadAnimTimer = 0.0f;
       app->deckA.JogPointerAngle += frameDt * 1440.0f; // Fast spin load animation
   } else if (app->deckA.IsPlaying || fabs(audioEngine->Decks[0].JogRate) > 0.01) {
-      float rpmA = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? app->deckA.Waveform.JogCalibRPM : 33.3333f;
-      float speedA = 1.0f + (app->deckA.TempoPercent / 100.0f) + (float)audioEngine->Decks[0].JogRate;
+      float rpmA = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? app->deckA.Waveform.JogCalibRPM : 33.333333f;
+      float speedA = (app->deckA.IsPlaying ? (1.0f + app->deckA.TempoPercent / 100.0f) : 0.0f) + (float)audioEngine->Decks[0].JogRate;
       app->deckA.JogPointerAngle += frameDt * (rpmA / 60.0f) * 360.0f * speedA;
   }
   app->deckA.JogPointerAngle = fmodf(app->deckA.JogPointerAngle, 360.0f);
@@ -2723,8 +2938,8 @@ void UpdateDrawFrame(App *app) {
       if (app->deckB.LoadAnimTimer < 0.0f) app->deckB.LoadAnimTimer = 0.0f;
       app->deckB.JogPointerAngle += frameDt * 1440.0f; // Fast spin load animation
   } else if (app->deckB.IsPlaying || fabs(audioEngine->Decks[1].JogRate) > 0.01) {
-      float rpmB = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? app->deckB.Waveform.JogCalibRPM : 33.3333f;
-      float speedB = 1.0f + (app->deckB.TempoPercent / 100.0f) + (float)audioEngine->Decks[1].JogRate;
+      float rpmB = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? app->deckB.Waveform.JogCalibRPM : 33.333333f;
+      float speedB = (app->deckB.IsPlaying ? (1.0f + app->deckB.TempoPercent / 100.0f) : 0.0f) + (float)audioEngine->Decks[1].JogRate;
       app->deckB.JogPointerAngle += frameDt * (rpmB / 60.0f) * 360.0f * speedB;
   }
   app->deckB.JogPointerAngle = fmodf(app->deckB.JogPointerAngle, 360.0f);
@@ -2871,7 +3086,9 @@ void UpdateDrawFrame(App *app) {
 
       // Periodically monitor USB storage device & MIDI Controller connections
       Browser_CheckStorageConnection(&app->browserState);
-      Browser_RefreshStorages(&app->browserState);
+      if (app->browserState.BrowseLevel == 3) {
+        Browser_RefreshStorages(&app->browserState);
+      }
       MIDI_CheckHotplug(&app->midiCtx);
     }
 

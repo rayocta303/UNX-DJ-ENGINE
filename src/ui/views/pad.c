@@ -31,31 +31,29 @@ static int Pad_Update(Component *base) {
   float padW = (padAreaW - S(12)) / 4.0f;
   float padH = (padAreaH - S(4)) / 2.0f;
 
-  if (isPressed) {
-    for (int d = 0; d < 2; d++) {
-      float panelX = S(8) + d * (panelW + S(8));
-      float panelY = TOP_BAR_H + S(8);
+  for (int d = 0; d < 2; d++) {
+    float panelX = S(8) + d * (panelW + S(8));
+    float panelY = TOP_BAR_H + S(8);
 
-      // SHIFT Button hit
-      Rectangle shiftBtn = { panelX + panelW - S(52), panelY + S(2), S(48), S(20) };
-      if (CheckCollisionPointRec(mouse, shiftBtn)) {
-        r->State->ShiftActive[d] = !r->State->ShiftActive[d];
+    // SHIFT Button hit
+    Rectangle shiftBtn = { panelX + panelW - S(52), panelY + S(2), S(48), S(20) };
+    if (UICheckClick(shiftBtn)) {
+      r->State->ShiftActive[d] = !r->State->ShiftActive[d];
+      return 1;
+    }
+
+    // Mode selection hits
+    float modeBtnW = (panelW - S(20)) / 6.0f;
+    float modeX = panelX + S(10);
+    float modeY = panelY + S(28);
+
+    for (int m = 0; m < PAD_MODE_COUNT; m++) {
+      Rectangle mRect = {modeX + m * modeBtnW, modeY, modeBtnW, modeBarH};
+      if (UICheckClick(mRect)) {
+        r->State->Mode[d] = (PadMode)m;
+        if (r->OnModeChange)
+          r->OnModeChange(r->callbackCtx, d, (PadMode)m);
         return 1;
-      }
-
-      // Mode selection hits
-      float modeBtnW = (panelW - S(20)) / 6.0f;
-      float modeX = panelX + S(10);
-      float modeY = panelY + S(28);
-
-      for (int m = 0; m < PAD_MODE_COUNT; m++) {
-        Rectangle mRect = {modeX + m * modeBtnW, modeY, modeBtnW, modeBarH};
-        if (CheckCollisionPointRec(mouse, mRect)) {
-          r->State->Mode[d] = (PadMode)m;
-          if (r->OnModeChange)
-            r->OnModeChange(r->callbackCtx, d, (PadMode)m);
-          return 1;
-        }
       }
     }
   }

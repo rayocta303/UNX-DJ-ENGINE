@@ -48,6 +48,11 @@ typedef struct {
   int Scroll;
   int SelectedTab;
   float TouchDragAccumulator;
+  float VisualScroll;
+  float ScrollVelocity;
+  float LastTouchY;
+  float TouchVelocityY;
+  bool IsDragging;
   bool IsDropdownOpen;
   int DropdownItemIdx;
   float DropdownScroll;

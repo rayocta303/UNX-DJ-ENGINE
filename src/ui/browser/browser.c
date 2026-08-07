@@ -417,6 +417,9 @@ void Browser_Back(BrowserState *s) {
 void Browser_CheckStorageConnection(BrowserState *s) {
   if (!s || !s->SelectedStorage) return;
 
+  // Only perform disconnection check if user has selected a storage and is actively inside it (BrowseLevel < 3)
+  if (s->BrowseLevel >= 3) return;
+
   struct stat st;
   bool isConnected = false;
 
@@ -475,6 +478,85 @@ void Browser_CheckStorageConnection(BrowserState *s) {
     Browser_RefreshStorages(s);
   }
 }
+
+#if defined(__linux__) && !defined(__ANDROID__)
+static void Linux_AutoMountUSBStorages(void) {
+    static double lastMountCheck = 0;
+    double now = GetTime();
+    if (now - lastMountCheck < 5.0) return;
+    lastMountCheck = now;
+
+    char mountsContent[4096] = "";
+    FILE *fmounts = fopen("/proc/mounts", "r");
+    if (fmounts) {
+        size_t len = fread(mountsContent, 1, sizeof(mountsContent) - 1, fmounts);
+        mountsContent[len] = '\0';
+        fclose(fmounts);
+    }
+
+    DIR *ddev = opendir("/dev");
+    if (ddev) {
+        struct dirent *ent;
+        while ((ent = readdir(ddev)) != NULL) {
+            if ((strncmp(ent->d_name, "sd", 2) == 0 && strlen(ent->d_name) >= 4) ||
+                (strncmp(ent->d_name, "mmcblk", 6) == 0 && strstr(ent->d_name, "p"))) {
+                
+                char devPath[128];
+                snprintf(devPath, sizeof(devPath), "/dev/%s", ent->d_name);
+                
+                if (strstr(mountsContent, devPath) == NULL) {
+                    char mountPoint[128];
+                    snprintf(mountPoint, sizeof(mountPoint), "/media/%s", ent->d_name);
+                    
+                    char cmd[512];
+                    snprintf(cmd, sizeof(cmd),
+                             "mkdir -p %s 2>/dev/null && "
+                             "(mount -o rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=utf8,utf8 %s %s 2>/dev/null || "
+                             " mount %s %s 2>/dev/null || true)",
+                             mountPoint, devPath, mountPoint, devPath, mountPoint);
+                    system(cmd);
+                }
+            }
+        }
+        closedir(ddev);
+    }
+}
+
+static bool IsValidStorageDir(const char *fullPath) {
+    struct stat st;
+    if (stat(fullPath, &st) != 0 || !S_ISDIR(st.st_mode) || access(fullPath, R_OK) != 0) {
+        return false;
+    }
+
+    FILE *f = fopen("/proc/mounts", "r");
+    if (f) {
+        char line[512];
+        while (fgets(line, sizeof(line), f)) {
+            if (strstr(line, fullPath)) {
+                fclose(f);
+                return true;
+            }
+        }
+        fclose(f);
+    }
+
+    DIR *d = opendir(fullPath);
+    if (d) {
+        struct dirent *ent;
+        bool hasFiles = false;
+        while ((ent = readdir(d)) != NULL) {
+            if (ent->d_name[0] != '.') {
+                hasFiles = true;
+                break;
+            }
+        }
+        closedir(d);
+        if (hasFiles) return true;
+    }
+
+    return false;
+}
+#endif
 
 void Browser_RefreshStorages(BrowserState *s) {
   s->StorageCount = 0;
@@ -562,27 +644,12 @@ void Browser_RefreshStorages(BrowserState *s) {
     }
   }
 #else
-#ifdef __ANDROID__
-  // 2. Scan Android / Linux /storage directory for OTG / SD Cards
-  if (s->StorageCount < 16) {
-    if (stat("/storage/emulated/0", &st) == 0) {
-      strcpy(s->AvailableStorages[s->StorageCount].Name, "Internal Storage");
-      strcpy(s->AvailableStorages[s->StorageCount].Path, "/storage/emulated/0");
-      strcpy(s->AvailableStorages[s->StorageCount].Type, "Internal");
-      s->StorageCount++;
-      printf("[BROWSER] Added Internal Storage: /storage/emulated/0\n");
-    } else {
-      printf("[BROWSER] Internal Storage /storage/emulated/0 NOT FOUND\n");
-    }
-  }
-#else
-  if (s->StorageCount < 8) {
+  if (stat("/storage/emulated/0", &st) == 0) {
     strcpy(s->AvailableStorages[s->StorageCount].Name, "Internal Storage");
     strcpy(s->AvailableStorages[s->StorageCount].Path, "/storage/emulated/0");
     strcpy(s->AvailableStorages[s->StorageCount].Type, "Internal");
     s->StorageCount++;
   }
-#endif
 
 #ifdef PLATFORM_IOS
   extern const char *ios_get_documents_path(const char *filename);
@@ -597,9 +664,7 @@ void Browser_RefreshStorages(BrowserState *s) {
 #endif
 
 #if defined(__linux__) && !defined(__ANDROID__)
-  system("mkdir -p /media/usb1 /media/usb2 /media/usb3 2>/dev/null; "
-         "mount /dev/sda1 /media/usb1 2>/dev/null || mount /dev/sda /media/usb1 2>/dev/null || true; "
-         "mount /dev/sdb1 /media/usb2 2>/dev/null || mount /dev/sdb /media/usb2 2>/dev/null || true;");
+  Linux_AutoMountUSBStorages();
 #endif
 
   for (int i = 0; i < scanDirCount; i++) {
@@ -636,57 +701,59 @@ void Browser_RefreshStorages(BrowserState *s) {
         char fullPath[512];
         snprintf(fullPath, sizeof(fullPath), "%s/%s", dirToScan, dir->d_name);
 
+#if defined(__linux__) && !defined(__ANDROID__)
+        if (!IsValidStorageDir(fullPath)) continue;
+#else
+        struct stat st_dir;
+        if (stat(fullPath, &st_dir) != 0 || !S_ISDIR(st_dir.st_mode) || access(fullPath, R_OK) != 0) continue;
+#endif
+
         printf("[BROWSER] Scanning potential storage: %s\n", fullPath);
 
-
-        struct stat st_dir;
-        if (stat(fullPath, &st_dir) == 0 && S_ISDIR(st_dir.st_mode) &&
-            access(fullPath, R_OK) == 0) {
-          bool exists = false;
-          for (int j = 0; j < s->StorageCount; j++) {
-            if (strcmp(s->AvailableStorages[j].Path, fullPath) == 0) {
-              exists = true;
-              break;
-            }
+        bool exists = false;
+        for (int j = 0; j < s->StorageCount; j++) {
+          if (strcmp(s->AvailableStorages[j].Path, fullPath) == 0) {
+            exists = true;
+            break;
           }
-          if (exists)
-            continue;
-
-          // Check for DB type
-          char dbPath[1024];
-          bool hasRB = false;
-          bool hasSerato = false;
-
-          snprintf(dbPath, sizeof(dbPath), "%s/PIONEER/rekordbox/export.pdb", fullPath);
-          if (stat(dbPath, &st) == 0) hasRB = true;
-          snprintf(dbPath, sizeof(dbPath), "%s/PIONEER/Rekordbox/export.pdb", fullPath);
-          if (stat(dbPath, &st) == 0) hasRB = true;
-          snprintf(dbPath, sizeof(dbPath), "%s/PIONEER/REKORDBOX/export.pdb", fullPath);
-          if (stat(dbPath, &st) == 0) hasRB = true;
-          snprintf(dbPath, sizeof(dbPath), "%s/pioneer/rekordbox/export.pdb", fullPath);
-          if (stat(dbPath, &st) == 0) hasRB = true;
-
-          snprintf(dbPath, sizeof(dbPath), "%s/_Serato_/database V2", fullPath);
-          if (stat(dbPath, &st) == 0)
-            hasSerato = true;
-
-          const char *type = "USB";
-          if (hasRB && hasSerato)
-            type = "RB/Serato";
-          else if (hasRB)
-            type = "Rekordbox";
-          else if (hasSerato)
-            type = "Serato";
-          else if (strchr(dir->d_name, '-') != NULL)
-            type = "SD";
-
-          snprintf(s->AvailableStorages[s->StorageCount].Name,
-                   sizeof(s->AvailableStorages[0].Name), "%s", dir->d_name);
-          snprintf(s->AvailableStorages[s->StorageCount].Path,
-                   sizeof(s->AvailableStorages[0].Path), "%s", fullPath);
-          strcpy(s->AvailableStorages[s->StorageCount].Type, type);
-          s->StorageCount++;
         }
+        if (exists)
+          continue;
+
+        // Check for DB type
+        char dbPath[1024];
+        bool hasRB = false;
+        bool hasSerato = false;
+
+        snprintf(dbPath, sizeof(dbPath), "%s/PIONEER/rekordbox/export.pdb", fullPath);
+        if (stat(dbPath, &st) == 0) hasRB = true;
+        snprintf(dbPath, sizeof(dbPath), "%s/PIONEER/Rekordbox/export.pdb", fullPath);
+        if (stat(dbPath, &st) == 0) hasRB = true;
+        snprintf(dbPath, sizeof(dbPath), "%s/PIONEER/REKORDBOX/export.pdb", fullPath);
+        if (stat(dbPath, &st) == 0) hasRB = true;
+        snprintf(dbPath, sizeof(dbPath), "%s/pioneer/rekordbox/export.pdb", fullPath);
+        if (stat(dbPath, &st) == 0) hasRB = true;
+
+        snprintf(dbPath, sizeof(dbPath), "%s/_Serato_/database V2", fullPath);
+        if (stat(dbPath, &st) == 0)
+          hasSerato = true;
+
+        const char *type = "USB";
+        if (hasRB && hasSerato)
+          type = "RB/Serato";
+        else if (hasRB)
+          type = "Rekordbox";
+        else if (hasSerato)
+          type = "Serato";
+        else if (strchr(dir->d_name, '-') != NULL)
+          type = "SD";
+
+        snprintf(s->AvailableStorages[s->StorageCount].Name,
+                 sizeof(s->AvailableStorages[0].Name), "%s", dir->d_name);
+        snprintf(s->AvailableStorages[s->StorageCount].Path,
+                 sizeof(s->AvailableStorages[0].Path), "%s", fullPath);
+        strcpy(s->AvailableStorages[s->StorageCount].Type, type);
+        s->StorageCount++;
       }
       closedir(d);
     }
@@ -939,9 +1006,11 @@ static int Browser_Update(Component *base) {
 
   // Load Popup Dialog Interaction handled FIRST to prevent same-frame double
   // triggers
+  static double lastPopupOpenedTime = 0.0;
+  static double lastBrowserListTapTime = 0.0;
   bool wasPopupOpen = s->ShowLoadPopup;
   if (wasPopupOpen) {
-    if (UI_IsReleased()) {
+    if ((GetTime() - lastPopupOpenedTime) >= 0.25 && UI_IsReleased()) {
       float pw = S(240);
       float ph = S(120);
       float viewH = SCREEN_HEIGHT - DECK_STR_H;
@@ -990,6 +1059,8 @@ static int Browser_Update(Component *base) {
     Rectangle boxRect = {0, boxY, sidebarW, sidebarW};
 
     if (UICheckClick(boxRect)) {
+        lastBrowserListTapTime = GetTime();
+        s->TouchDragAccumulator = 999.0f;
         s->ShowOSK = false;
         if (i < 4) {
           s->ScrollOffset = 0;
@@ -1216,10 +1287,13 @@ static int Browser_Update(Component *base) {
         }
 
         if (UI_IsReleased() && !s->IsDragging) {
-          if (s->TouchDragAccumulator < S(6.0f) && fabsf(s->ScrollVelocity) < 40.0f) {
+          double now = GetTime();
+          if ((now - lastBrowserListTapTime) >= 0.12 && s->TouchDragAccumulator < S(22.0f) && fabsf(s->ScrollVelocity) < 40.0f) {
+            lastBrowserListTapTime = now;
             s->ShowOSK = false; // Auto hide keyboard on list item tap
             if (s->BrowseLevel == 0) {
               s->ShowLoadPopup = true;
+              lastPopupOpenedTime = now;
               s->PopupTrackIdx = idx;
             } else if (!s->IsTagList) {
               triggerEnter = true;
@@ -1260,6 +1334,8 @@ static int Browser_Update(Component *base) {
   }
 
   if (IsKeyPressed(KEY_ENTER) || triggerEnter) {
+    lastBrowserListTapTime = GetTime();
+    s->TouchDragAccumulator = 999.0f; // Consume touch drag distance to prevent re-triggering sub-level
     if (s->BrowseLevel == 3) {
       int idx = s->ScrollOffset + s->CursorPos;
       if (idx < s->StorageCount) {
@@ -1687,6 +1763,10 @@ static int Browser_Update(Component *base) {
 static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   if (!s->ShowOSK) return;
 
+  static double lastOskKeyPressTime = 0.0;
+  double now = GetTime();
+  bool canPressOSK = (now - lastOskKeyPressTime) >= 0.10;
+
   float viewH = SCREEN_HEIGHT - DECK_STR_H;
   float oskH = S(172);
   float oskW = SCREEN_WIDTH;
@@ -1732,7 +1812,8 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
       char label[2] = { ch, '\0' };
       DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14), ColorWhite);
 
-      if (UI_IsPressed() && isHover) {
+      if (canPressOSK && UI_IsPressed() && isHover) {
+          lastOskKeyPressTime = now;
           if (strlen(s->SearchQuery) < 63) {
               int len = strlen(s->SearchQuery);
               s->SearchQuery[len] = ch;
@@ -1762,7 +1843,8 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
       char label[2] = { ch, '\0' };
       DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14), ColorWhite);
 
-      if (UI_IsPressed() && isHover) {
+      if (canPressOSK && UI_IsPressed() && isHover) {
+          lastOskKeyPressTime = now;
           if (strlen(s->SearchQuery) < 63) {
               int len = strlen(s->SearchQuery);
               s->SearchQuery[len] = ch;
@@ -1790,7 +1872,8 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(shiftRect, 1.0f, s->OSKShiftActive ? ColorWhite : ColorDark1);
   DrawCentredText("SHIFT", faceXS, shiftRect.x, shiftRect.width, shiftRect.y + S(12), S(10), ColorWhite);
 
-  if (UI_IsPressed() && hoverShift) {
+  if (canPressOSK && UI_IsPressed() && hoverShift) {
+      lastOskKeyPressTime = now;
       s->OSKShiftActive = !s->OSKShiftActive;
   }
 
@@ -1807,7 +1890,8 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
       char label[2] = { ch, '\0' };
       DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14), ColorWhite);
 
-      if (UI_IsPressed() && isHover) {
+      if (canPressOSK && UI_IsPressed() && isHover) {
+          lastOskKeyPressTime = now;
           if (strlen(s->SearchQuery) < 63) {
               int len = strlen(s->SearchQuery);
               s->SearchQuery[len] = ch;
@@ -1826,7 +1910,8 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(bkspRect, 1.0f, hoverBksp ? ColorWhite : ColorDark1);
   DrawCentredText("BKSP", faceXS, bkspRect.x, bkspRect.width, bkspRect.y + S(12), S(10), ColorWhite);
 
-  if (UI_IsPressed() && hoverBksp) {
+  if (canPressOSK && UI_IsPressed() && hoverBksp) {
+      lastOskKeyPressTime = now;
       int len = strlen(s->SearchQuery);
       if (len > 0) {
           s->SearchQuery[len - 1] = '\0';
@@ -1850,7 +1935,8 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(modeRect, 1.0f, ColorDark1);
   DrawCentredText((s->OSKMode == 0) ? "?123" : "ABC", faceSm, modeRect.x, modeRect.width, modeRect.y + S(11), S(12), ColorOrange);
 
-  if (UI_IsPressed() && hoverMode) {
+  if (canPressOSK && UI_IsPressed() && hoverMode) {
+      lastOskKeyPressTime = now;
       s->OSKMode = (s->OSKMode == 0) ? 1 : 0;
   }
 
@@ -1861,7 +1947,8 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(spaceRect, 1.0f, ColorDark1);
   DrawCentredText("SPACE", faceXS, spaceRect.x, spaceRect.width, spaceRect.y + S(12), S(10), ColorShadow);
 
-  if (UI_IsPressed() && hoverSpace) {
+  if (canPressOSK && UI_IsPressed() && hoverSpace) {
+      lastOskKeyPressTime = now;
       if (strlen(s->SearchQuery) < 63) {
           int len = strlen(s->SearchQuery);
           s->SearchQuery[len] = ' ';
@@ -1879,7 +1966,8 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(clearRect, 1.0f, ColorDark1);
   DrawCentredText("CLEAR", faceXS, clearRect.x, clearRect.width, clearRect.y + S(12), S(10), ColorWhite);
 
-  if (UI_IsPressed() && hoverClear) {
+  if (canPressOSK && UI_IsPressed() && hoverClear) {
+      lastOskKeyPressTime = now;
       s->SearchQuery[0] = '\0';
       s->CursorPos = s->ScrollOffset = 0;
       s->VisualScroll = 0;
@@ -1893,7 +1981,8 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(hideBtnRect, 1.0f, ColorWhite);
   DrawCentredText("HIDE", faceSm, hideBtnRect.x, hideBtnRect.width, hideBtnRect.y + S(11), S(12), ColorWhite);
 
-  if (UI_IsPressed() && hoverHide) {
+  if (canPressOSK && UI_IsPressed() && hoverHide) {
+      lastOskKeyPressTime = now;
       s->ShowOSK = false;
       s->IsSearching = (strlen(s->SearchQuery) > 0);
   }

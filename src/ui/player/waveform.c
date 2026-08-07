@@ -362,6 +362,20 @@ static void Waveform_Draw(Component *base) {
   double elapsedHalfFrames = r->State->Position;
   float centerX = SCREEN_WIDTH / 2.0f;
   float playheadX = centerX;
+
+  static double frozenPos[2] = {0.0, 0.0};
+  extern AudioEngine *globalAudioEngine;
+  if (r->ID >= 0 && r->ID < 2 && (r->State->LoopAdjustIn || r->State->LoopAdjustOut)) {
+    if (frozenPos[r->ID] <= 0.0) {
+      frozenPos[r->ID] = (r->State->LoopAdjustIn && globalAudioEngine) ? globalAudioEngine->Decks[r->ID].LoopStartPos : (globalAudioEngine ? globalAudioEngine->Decks[r->ID].LoopEndPos : r->State->Position);
+    }
+    elapsedHalfFrames = frozenPos[r->ID];
+    double posOffset = r->State->Position - elapsedHalfFrames;
+    playheadX = centerX + (float)(posOffset / (double)effectiveZoom);
+  } else if (r->ID >= 0 && r->ID < 2) {
+    frozenPos[r->ID] = 0.0;
+  }
+
   float zoomDelta = effectiveZoom * r->dataDensity;
 
   // === Style from Settings ===

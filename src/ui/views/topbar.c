@@ -79,19 +79,16 @@ static void TopBar_Draw(Component *base) {
   }
 
   // 2. CPU & RAM Usage (Positioned after Fullscreen Button)
-  float textStartX = t->btnFullX + t->btnFullW + S(4);
+  float textStartX = t->btnFullX + t->btnFullW + S(6);
 #else
   t->btnFullX = t->MarginX;
   t->btnFullW = 0;
-  float textStartX = t->MarginX;
+  float textStartX = t->MarginX + S(4);
 #endif
-  char cpuStr[32];
-  sprintf(cpuStr, "CPU %d%%", (int)(t->CPUUsage * 100));
-  UIDrawText(cpuStr, faceXS, textStartX, (TOP_BAR_H - S(16)) / 2.0f, S(8), ColorShadow);
-
-  char ramStr[32];
-  sprintf(ramStr, "RAM %dMB", (int)t->RAMUsage);
-  UIDrawText(ramStr, faceSm, textStartX + S(38), (TOP_BAR_H - S(10)) / 2.0f, S(9.5f), ColorWhite);
+  char cpuRamStr[64];
+  snprintf(cpuRamStr, sizeof(cpuRamStr), "CPU: %d%%  |  RAM: %dMB", (int)(t->CPUUsage * 100), (int)t->RAMUsage);
+  float sysTextY = (TOP_BAR_H - S(9.5f)) / 2.0f;
+  UIDrawText(cpuRamStr, faceSm, textStartX, sysTextY, S(9.5f), ColorWhite);
 
   // 3. Center Group
   float btnSpacing = S(6);
@@ -185,8 +182,6 @@ static void TopBar_Draw(Component *base) {
         UIDrawText("+", faceXS, batX + batW + S(4), batY, S(9), ColorYellow);
     }
   }
-
-  UIDrawText("LINK   MIDI", faceSm, pctX - S(72), (TOP_BAR_H - S(9.5f)) / 2.0f, S(9.5f), ColorWhite);
 }
 
 void TopBar_Init(TopBar *t) {

@@ -134,6 +134,7 @@ typedef struct DeckState {
   bool MidiRequestBeatJumpForward;
   bool MidiRequestBeatJumpBackward;
   bool MidiRequestAutoLoop[5]; // 1, 2, 4, 8, 16 beats
+  bool MidiRequestMemoryCue;
   bool MidiRequestPlay;
   bool MidiRequestCue;
 } DeckState;

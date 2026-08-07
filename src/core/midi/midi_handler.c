@@ -7,12 +7,55 @@
 #include <math.h>
 
 #if defined(__linux__) && !defined(__ANDROID__)
-#if __has_include(<alsa/asoundlib.h>)
 #include <alsa/asoundlib.h>
 #define HAS_ALSA
+static void* seq_handle = NULL;
+static int in_port = -1;
+static int out_port = -1;
+
+static void LinuxMIDI_AutoConnectPorts(char *outDetectedName) {
+#ifdef HAS_ALSA
+    if (!seq_handle) return;
+    snd_seq_t *seq = (snd_seq_t*)seq_handle;
+    snd_seq_client_info_t *cinfo;
+    snd_seq_port_info_t *pinfo;
+
+    snd_seq_client_info_alloca(&cinfo);
+    snd_seq_port_info_alloca(&pinfo);
+
+    snd_seq_client_info_set_client(cinfo, -1);
+    while (snd_seq_query_next_client(seq, cinfo) >= 0) {
+        int client = snd_seq_client_info_get_client(cinfo);
+        if (client == snd_seq_client_id(seq) || client == SND_SEQ_CLIENT_SYSTEM) continue;
+
+        const char *cName = snd_seq_client_info_get_name(cinfo);
+        if (!cName || strstr(cName, "Midi Through")) continue;
+
+        snd_seq_port_info_set_client(pinfo, client);
+        snd_seq_port_info_set_port(pinfo, -1);
+        while (snd_seq_query_next_port(seq, pinfo) >= 0) {
+            int port = snd_seq_port_info_get_port(pinfo);
+            unsigned int caps = snd_seq_port_info_get_capability(pinfo);
+
+            if ((caps & (SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ)) != 0) {
+                if (in_port >= 0) {
+                    snd_seq_connect_from(seq, in_port, client, port);
+                    if (outDetectedName && outDetectedName[0] == '\0') {
+                        strncpy(outDetectedName, cName, 127);
+                    }
+                }
+            }
+            if ((caps & (SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE)) != 0) {
+                if (out_port >= 0) {
+                    snd_seq_connect_to(seq, out_port, client, port);
+                }
+            }
+        }
+    }
+#else
+    (void)outDetectedName;
 #endif
-static void* seq_handle;
-static int in_port;
+}
 #elif defined(_WIN32)
 bool WinMIDI_Init(void (*cb)(uint8_t, uint8_t, uint8_t), char* outDeviceName);
 int WinMIDI_GetDevices(char outNames[16][64]);
@@ -30,11 +73,53 @@ static uint8_t lastStatus = 0;
 static uint8_t lastMidino = 0;
 static bool lastMsgSet = false;
 
+void MIDI_SendSysEx(const uint8_t *data, uint32_t length) {
+#if defined(_WIN32)
+    WinMIDI_SendSysEx(data, length);
+#elif defined(__linux__) && !defined(__ANDROID__)
+#ifdef HAS_ALSA
+    if (seq_handle && out_port >= 0 && data && length > 0) {
+        snd_seq_event_t ev;
+        snd_seq_ev_clear(&ev);
+        snd_seq_ev_set_source(&ev, out_port);
+        snd_seq_ev_set_subs(&ev);
+        snd_seq_ev_set_direct(&ev);
+        snd_seq_ev_set_sysex(&ev, length, (void*)data);
+        snd_seq_event_output((snd_seq_t*)seq_handle, &ev);
+        snd_seq_drain_output((snd_seq_t*)seq_handle);
+    }
+#endif
+#endif
+}
+
 void MIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
 #if defined(_WIN32)
     WinMIDI_SendShortMsg(status, data1, data2);
-#else
-    (void)status; (void)data1; (void)data2;
+#elif defined(__linux__) && !defined(__ANDROID__)
+#ifdef HAS_ALSA
+    if (seq_handle && out_port >= 0) {
+        snd_seq_event_t ev;
+        snd_seq_ev_clear(&ev);
+        snd_seq_ev_set_source(&ev, out_port);
+        snd_seq_ev_set_subs(&ev);
+        snd_seq_ev_set_direct(&ev);
+
+        uint8_t type = status & 0xF0;
+        uint8_t channel = status & 0x0F;
+
+        if (type == 0x90) {
+            snd_seq_ev_set_noteon(&ev, channel, data1, data2);
+        } else if (type == 0x80) {
+            snd_seq_ev_set_noteoff(&ev, channel, data1, data2);
+        } else if (type == 0xB0) {
+            snd_seq_ev_set_controller(&ev, channel, data1, data2);
+        } else {
+            return;
+        }
+        snd_seq_event_output((snd_seq_t*)seq_handle, &ev);
+        snd_seq_drain_output((snd_seq_t*)seq_handle);
+    }
+#endif
 #endif
 }
 
@@ -43,7 +128,14 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
     if (!d1 || !d2) return;
 
     static double lastSendTime = 0;
+    static double lastFullRefresh = 0;
     double now = GetTime();
+
+    bool forceRefresh = false;
+    if (now - lastFullRefresh > 2.0) {
+        lastFullRefresh = now;
+        forceRefresh = true;
+    }
 
     // 1. Pioneer SysEx Keep-Alive every 1.5 seconds
     static double lastSysEx = 0;
@@ -52,13 +144,11 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
         static const uint8_t PIONEER_SYSEX_KEEPALIVE[12] = {
             0xF0, 0x00, 0x40, 0x05, 0x00, 0x00, 0x04, 0x05, 0x00, 0x50, 0x02, 0xF7
         };
-#if defined(_WIN32)
-        WinMIDI_SendSysEx(PIONEER_SYSEX_KEEPALIVE, 12);
-#endif
+        MIDI_SendSysEx(PIONEER_SYSEX_KEEPALIVE, 12);
     }
 
     // Rate-limit short MIDI OUT updates to ~60 FPS (0.016s) for smooth LED spinner animation
-    if (now - lastSendTime < 0.016) return;
+    if (!forceRefresh && (now - lastSendTime < 0.016)) return;
     lastSendTime = now;
 
     static uint8_t lastPlay[2] = { 255, 255 };
@@ -95,21 +185,21 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
 
         // Play/Pause LED
         uint8_t playVal = decks[i]->IsPlaying ? 0x7F : 0x00;
-        if (playVal != lastPlay[i]) {
+        if (forceRefresh || playVal != lastPlay[i]) {
             MIDI_SendShortMsg(playStatus, playNote, playVal);
             lastPlay[i] = playVal;
         }
 
         // Cue LED
         uint8_t cueVal = (decks[i]->IsCueActive || !decks[i]->IsPlaying) ? 0x7F : 0x00;
-        if (cueVal != lastCue[i]) {
+        if (forceRefresh || cueVal != lastCue[i]) {
             MIDI_SendShortMsg(cueStatus, cueNote, cueVal);
             lastCue[i] = cueVal;
         }
 
         // Vinyl Mode LED
         uint8_t vinylVal = decks[i]->VinylModeEnabled ? 0x7F : 0x00;
-        if (vinylVal != lastVinyl[i]) {
+        if (forceRefresh || vinylVal != lastVinyl[i]) {
             MIDI_SendShortMsg(vinylStatus, vinylNote, vinylVal);
             lastVinyl[i] = vinylVal;
         }
@@ -121,15 +211,15 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
             float rms = (vuL > vuR ? vuL : vuR);
             uint8_t meterVal = (uint8_t)(rms * 0x76);
             if (rms >= 1.0f) meterVal += 0x09; // Peak/clip indicator
-            if (meterVal != lastVu[i]) {
+            if (forceRefresh || meterVal != lastVu[i]) {
                 MIDI_SendShortMsg(vuStatus, vuControl, meterVal);
                 lastVu[i] = meterVal;
             }
         }
 
-        // Hot Cue Pad LEDs (Dynamically fetched from mapping XML, e.g. status 0x97 for Deck 1, 0x99 for Deck 2)
+        // Hot Cue Pad LEDs
         for (int p = 0; p < 8; p++) {
-            uint8_t padStatus = 0x97 + (i * 2);
+            uint8_t padStatus = (i == 0) ? 0x97 : 0x99;
             uint8_t padNote = (uint8_t)p;
 
             char hcKey[32];
@@ -150,33 +240,51 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
                         break;
                     }
                 }
+                if (!hasHotCue && decks[i]->LoadedTrack->Analysis.CueCount > 0) {
+                    for (uint32_t c = 0; c < decks[i]->LoadedTrack->Analysis.CueCount; c++) {
+                        if (decks[i]->LoadedTrack->Analysis.Cues[c].ID == (unsigned int)(p + 1)) {
+                            hasHotCue = true;
+                            break;
+                        }
+                    }
+                }
             }
             uint8_t padVal = hasHotCue ? 0x7F : 0x00;
-            if (padVal != lastHotCue[i][p]) {
+            if (forceRefresh || padVal != lastHotCue[i][p]) {
                 MIDI_SendShortMsg(padStatus, padNote, padVal);
+                MIDI_SendShortMsg(padStatus, 0x30 + p, padVal);
+                if (i == 0) {
+                    MIDI_SendShortMsg(0x97, padNote, padVal);
+                    MIDI_SendShortMsg(0x97, 0x30 + p, padVal);
+                    MIDI_SendShortMsg(0x98, padNote, padVal);
+                } else {
+                    MIDI_SendShortMsg(0x99, padNote, padVal);
+                    MIDI_SendShortMsg(0x99, 0x30 + p, padVal);
+                    MIDI_SendShortMsg(0x9A, padNote, padVal);
+                }
                 lastHotCue[i][p] = padVal;
             }
         }
     }
 
-    // 3. Jog Wheel Rings (Dynamically resolved from mapping XML, default status 0xBB)
+    // 3. Jog Wheel Rings (Pioneer DDJ-FLX6 status 0xBB, control 0x00/0x01, value 0x01..0x48)
     uint8_t jogStatusA = 0xBB, jogNoteA = 0x00;
     uint8_t jogStatusB = 0xBB, jogNoteB = 0x01;
-    if (map) {
-        uint8_t s, m;
-        if (MIDI_GetRegisterAddress(map, "[Channel1]", "waveformZoom", &s, &m) || MIDI_GetRegisterAddress(map, "[Channel1]", "jog", &s, &m) || MIDI_GetRegisterAddress(map, "[Channel1]", "wheel", &s, &m)) {
-            // Note: Jog LED output status is 0xBB for FLX series
-        }
-    }
 
-    uint8_t posA = 0x01 + (uint8_t)fmodf((d1->JogPointerAngle / 360.0f) * 127.0f, 127.0f);
-    if (posA != lastJog[0]) {
+    float stepA = fmodf((d1->JogPointerAngle / 360.0f) * 72.0f, 72.0f);
+    if (stepA < 0.0f) stepA += 72.0f;
+    uint8_t posA = 0x01 + (uint8_t)stepA;
+    if (posA > 0x48) posA = 0x48;
+    if (forceRefresh || posA != lastJog[0]) {
         MIDI_SendShortMsg(jogStatusA, jogNoteA, posA);
         lastJog[0] = posA;
     }
 
-    uint8_t posB = 0x01 + (uint8_t)fmodf((d2->JogPointerAngle / 360.0f) * 127.0f, 127.0f);
-    if (posB != lastJog[1]) {
+    float stepB = fmodf((d2->JogPointerAngle / 360.0f) * 72.0f, 72.0f);
+    if (stepB < 0.0f) stepB += 72.0f;
+    uint8_t posB = 0x01 + (uint8_t)stepB;
+    if (posB > 0x48) posB = 0x48;
+    if (forceRefresh || posB != lastJog[1]) {
         MIDI_SendShortMsg(jogStatusB, jogNoteB, posB);
         lastJog[1] = posB;
     }
@@ -185,6 +293,39 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
 int MIDI_GetDeviceList(char outNames[16][64]) {
 #if defined(_WIN32)
     return WinMIDI_GetDevices(outNames);
+#elif defined(__linux__) && !defined(__ANDROID__)
+#ifdef HAS_ALSA
+    int count = 0;
+    snd_seq_t *seq = NULL;
+    if (seq_handle) {
+        seq = (snd_seq_t*)seq_handle;
+    } else {
+        if (snd_seq_open(&seq, "default", SND_SEQ_OPEN_READ, 0) < 0) return 0;
+    }
+
+    snd_seq_client_info_t *cinfo;
+    snd_seq_client_info_alloca(&cinfo);
+    snd_seq_client_info_set_client(cinfo, -1);
+    while (snd_seq_query_next_client(seq, cinfo) >= 0 && count < 16) {
+        int client = snd_seq_client_info_get_client(cinfo);
+        if (client == SND_SEQ_CLIENT_SYSTEM) continue;
+        if (seq_handle && client == snd_seq_client_id((snd_seq_t*)seq_handle)) continue;
+
+        const char *name = snd_seq_client_info_get_name(cinfo);
+        if (name && strlen(name) > 0 && strstr(name, "Midi Through") == NULL) {
+            strncpy(outNames[count], name, 63);
+            outNames[count][63] = '\0';
+            count++;
+        }
+    }
+    if (!seq_handle && seq) {
+        snd_seq_close(seq);
+    }
+    return count;
+#else
+    (void)outNames;
+    return 0;
+#endif
 #else
     (void)outNames;
     return 0;
@@ -196,6 +337,13 @@ bool MIDI_SelectDevice(MidiContext *ctx, int deviceIndex, char *outDeviceName, c
     bool success = false;
 #if defined(_WIN32)
     success = WinMIDI_OpenDevice(deviceIndex, deviceName);
+#elif defined(__linux__) && !defined(__ANDROID__)
+    char devNames[16][64];
+    int devCount = MIDI_GetDeviceList(devNames);
+    if (deviceIndex >= 0 && deviceIndex < devCount) {
+        strncpy(deviceName, devNames[deviceIndex], 255);
+        success = true;
+    }
 #else
     (void)deviceIndex;
 #endif
@@ -225,7 +373,7 @@ bool MIDI_SelectDevice(MidiContext *ctx, int deviceIndex, char *outDeviceName, c
 
     if (success) {
         char toastMsg[160];
-        snprintf(toastMsg, sizeof(toastMsg), "MIDI READ-ONLY CONNECTED: %s", deviceName);
+        snprintf(toastMsg, sizeof(toastMsg), "MIDI CONNECTED: %s", deviceName);
         Toast_Show(toastMsg, 3.5f, (Color){40, 200, 80, 255});
     }
 
@@ -235,15 +383,28 @@ bool MIDI_SelectDevice(MidiContext *ctx, int deviceIndex, char *outDeviceName, c
 bool MIDI_Init(MidiContext *ctx) {
     if (ctx->initialized) return true;
     
-    char deviceName[256] = "Generic MIDI";
+    char deviceName[256] = "";
 
 #if defined(__linux__) && !defined(__ANDROID__)
 #ifdef HAS_ALSA
-    if (snd_seq_open((snd_seq_t**)&seq_handle, "default", SND_SEQ_OPEN_INPUT, 0) < 0) return false;
-    snd_seq_set_client_name((snd_seq_t*)seq_handle, "UNX-DJ-OS MIDI");
-    in_port = snd_seq_create_simple_port((snd_seq_t*)seq_handle, "Input",
-                SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE,
-                SND_SEQ_PORT_TYPE_MIDI_GENERIC | SND_SEQ_PORT_TYPE_APPLICATION);
+    if (!seq_handle) {
+        snd_seq_t *seq = NULL;
+        if (snd_seq_open(&seq, "default", SND_SEQ_OPEN_DUPLEX, 0) >= 0) {
+            seq_handle = seq;
+            snd_seq_set_client_name(seq, "UNX-DJ-OS MIDI");
+            in_port = snd_seq_create_simple_port(seq, "Input",
+                        SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE,
+                        SND_SEQ_PORT_TYPE_MIDI_GENERIC | SND_SEQ_PORT_TYPE_APPLICATION);
+            out_port = snd_seq_create_simple_port(seq, "Output",
+                        SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ,
+                        SND_SEQ_PORT_TYPE_MIDI_GENERIC | SND_SEQ_PORT_TYPE_APPLICATION);
+        }
+    }
+    if (seq_handle) {
+        LinuxMIDI_AutoConnectPorts(deviceName);
+    } else {
+        return false;
+    }
 #else
     return false;
 #endif
@@ -252,19 +413,25 @@ bool MIDI_Init(MidiContext *ctx) {
 #elif defined(__ANDROID__)
 #endif
 
+    if (deviceName[0] == '\0') {
+        strncpy(deviceName, "Generic MIDI", 255);
+    }
+
     ctx->currentDevId = 0;
     strncpy(ctx->activeDeviceName, deviceName, 127);
 
     if (!MIDI_ScanControllers("controllers", deviceName, &global_mapping)) {
-        if (!MIDI_LoadMapping(&global_mapping, "controllers/LoopMIDI.midi.xml")) {
-            MIDI_LoadMapping(&global_mapping, "mapping.midi.xml");
+        if (!MIDI_LoadMapping(&global_mapping, "controllers/Pioneer-DDJ-FLX6.midi.xml")) {
+            if (!MIDI_LoadMapping(&global_mapping, "controllers/LoopMIDI.midi.xml")) {
+                MIDI_LoadMapping(&global_mapping, "mapping.midi.xml");
+            }
         }
     }
     
     ctx->initialized = true;
 
     char toastMsg[160];
-    snprintf(toastMsg, sizeof(toastMsg), "MIDI READ-ONLY CONNECTED: %s", deviceName);
+    snprintf(toastMsg, sizeof(toastMsg), "MIDI CONNECTED: %s", deviceName);
     Toast_Show(toastMsg, 3.5f, (Color){40, 200, 80, 255});
 
     return true;
@@ -280,7 +447,7 @@ void MIDI_Close(MidiContext *ctx) {
 
 #if defined(__linux__) && !defined(__ANDROID__)
 #ifdef HAS_ALSA
-    snd_seq_close((snd_seq_t*)seq_handle);
+    // Keep seq_handle open to allow instant auto-reconnect without re-allocating ALSA client
 #endif
 #elif defined(_WIN32)
     WinMIDI_Close();
@@ -292,35 +459,66 @@ void MIDI_Close(MidiContext *ctx) {
 void MIDI_CheckHotplug(MidiContext *ctx) {
     if (!ctx) return;
 
-    static int lastDevCount = -1;
+    static double lastCheckTime = 0;
+    double now = GetTime();
+    if (now - lastCheckTime < 0.4) return; // Rate-limit hotplug checks to every 400ms
+    lastCheckTime = now;
+
     char devNames[16][64];
     int count = MIDI_GetDeviceList(devNames);
 
-    if (lastDevCount == -1) {
-        lastDevCount = count;
-        return;
-    }
-
     if (ctx->initialized) {
-        bool found = false;
+        bool activeFound = false;
         for (int i = 0; i < count; i++) {
-            if (strcmp(devNames[i], ctx->activeDeviceName) == 0) {
-                found = true;
+            if (ctx->activeDeviceName[0] != '\0' &&
+                (strstr(devNames[i], ctx->activeDeviceName) || strstr(ctx->activeDeviceName, devNames[i]))) {
+                activeFound = true;
                 break;
             }
         }
-        if (!found && count < lastDevCount) {
+
+#if defined(__linux__) && !defined(__ANDROID__)
+        char autoDetected[128] = "";
+        LinuxMIDI_AutoConnectPorts(autoDetected);
+        if (!activeFound && autoDetected[0] != '\0') {
+            activeFound = true;
+            strncpy(ctx->activeDeviceName, autoDetected, 127);
+        }
+#endif
+
+        if (!activeFound && count == 0) {
             MIDI_Close(ctx);
             ctx->activeDeviceName[0] = '\0';
         }
     } else {
-        if (count > 0 && count > lastDevCount) {
-            char outDev[128];
-            MIDI_SelectDevice(ctx, 0, outDev, NULL);
+        if (count > 0) {
+            char deviceName[256] = "";
+#if defined(__linux__) && !defined(__ANDROID__)
+            LinuxMIDI_AutoConnectPorts(deviceName);
+#elif defined(_WIN32)
+            WinMIDI_OpenDevice(0, deviceName);
+#endif
+            if (deviceName[0] == '\0' && count > 0) {
+                strncpy(deviceName, devNames[0], 255);
+            }
+
+            ctx->currentDevId = 0;
+            strncpy(ctx->activeDeviceName, deviceName, 127);
+
+            if (!MIDI_ScanControllers("controllers", deviceName, &global_mapping)) {
+                if (!MIDI_LoadMapping(&global_mapping, "controllers/Pioneer-DDJ-FLX6.midi.xml")) {
+                    if (!MIDI_LoadMapping(&global_mapping, "controllers/LoopMIDI.midi.xml")) {
+                        MIDI_LoadMapping(&global_mapping, "mapping.midi.xml");
+                    }
+                }
+            }
+            ctx->initialized = true;
+
+            char toastMsg[160];
+            snprintf(toastMsg, sizeof(toastMsg), "MIDI RECONNECTED: %s", deviceName);
+            Toast_Show(toastMsg, 3.5f, (Color){40, 200, 80, 255});
         }
     }
-
-    lastDevCount = count;
 }
 
 void MIDI_Update(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine *engine) {
@@ -337,21 +535,34 @@ void MIDI_Update(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine *en
     }
 #elif defined(__linux__) && !defined(__ANDROID__)
 #ifdef HAS_ALSA
-    snd_seq_event_t *ev;
+    if (!seq_handle) return;
+    snd_seq_event_t *ev = NULL;
     while (snd_seq_event_input_pending((snd_seq_t*)seq_handle, 1) > 0) {
-        snd_seq_event_input((snd_seq_t*)seq_handle, &ev);
-        if (ev->type == SND_SEQ_EVENT_CONTROLLER) {
-            lastStatus = 0xB0 | ev->data.control.channel;
-            lastMidino = ev->data.control.param;
-            lastMsgSet = true;
-            MIDI_HandleMapping(&global_mapping, lastStatus, lastMidino, (float)ev->data.control.value / 127.0f);
-        } else if (ev->type == SND_SEQ_EVENT_NOTEON) {
-            lastStatus = 0x90 | ev->data.note.channel;
-            lastMidino = ev->data.note.note;
-            lastMsgSet = true;
-            MIDI_HandleMapping(&global_mapping, lastStatus, lastMidino, (float)ev->data.note.velocity / 127.0f);
+        if (snd_seq_event_input((snd_seq_t*)seq_handle, &ev) >= 0 && ev) {
+            if (ev->type == SND_SEQ_EVENT_CONTROLLER) {
+                lastStatus = 0xB0 | ev->data.control.channel;
+                lastMidino = ev->data.control.param;
+                lastMsgSet = true;
+                MIDI_HandleMapping(&global_mapping, lastStatus, lastMidino, (float)ev->data.control.value / 127.0f);
+            } else if (ev->type == SND_SEQ_EVENT_NOTEON) {
+                lastStatus = 0x90 | ev->data.note.channel;
+                lastMidino = ev->data.note.note;
+                lastMsgSet = true;
+                MIDI_HandleMapping(&global_mapping, lastStatus, lastMidino, (float)ev->data.note.velocity / 127.0f);
+            } else if (ev->type == SND_SEQ_EVENT_NOTEOFF) {
+                lastStatus = 0x80 | ev->data.note.channel;
+                lastMidino = ev->data.note.note;
+                lastMsgSet = true;
+                MIDI_HandleMapping(&global_mapping, lastStatus, lastMidino, 0.0f);
+            } else if (ev->type == SND_SEQ_EVENT_PITCHBEND) {
+                lastStatus = 0xE0 | ev->data.note.channel;
+                lastMidino = 0;
+                lastMsgSet = true;
+                float normVal = (float)(ev->data.control.value + 8192) / 16383.0f;
+                MIDI_HandleMapping(&global_mapping, lastStatus, lastMidino, normVal);
+            }
+            snd_seq_free_event(ev);
         }
-        snd_seq_free_event(ev);
     }
 #endif
 #endif

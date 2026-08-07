@@ -141,13 +141,18 @@ void UI_UpdateTouchState(void) {
     }
 }
 
+static double g_lastUIClickTime = -1.0;
+
 bool UICheckClick(Rectangle rect) {
+    double now = GetTime();
     if (!UI_IsReleased()) return false;
+    if (g_lastUIClickTime > 0.0 && (now - g_lastUIClickTime) < 0.12) return false;
     if (g_touchDragDistance >= S(22.0f)) return false;
     if (!CheckCollisionPointRec(g_touchStartPos, rect) && !CheckCollisionPointRec(UIGetMousePosition(), rect)) return false;
     
     // Consume click so no subsequent check or frame re-fires
     g_touchDragDistance = 999.0f;
+    g_lastUIClickTime = now;
     return true;
 }
 

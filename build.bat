@@ -41,12 +41,12 @@ if "%PLATFORM%"=="linux" (
     echo [Target: Linux ARM64 %BACKEND%]
     :: Use -Wl,-z,origin to enable $ORIGIN and -Wl,-rpath,$ORIGIN/lib to set the search path
     if "%BACKEND%"=="desktop" (
-        set TARGET_FLAGS=-target aarch64-linux-gnu.2.31 -DPLATFORM_DESKTOP -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include
+        set TARGET_FLAGS=-target aarch64-linux-gnu.2.31 -DPLATFORM_DESKTOP -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -DHAS_ALSA -Ilib/linux_arm64/include
         set LDFLAGS=-Llib/linux_arm64 -Wl,--allow-shlib-undefined -lraylib_desktop -lGLESv2 -lEGL -lpthread -ldl -lm -lX11 -lXcursor -lXinerama -lXi -lXrandr -lxcb -lXau -lXdmcp -lxkbcommon -lasound
         set OUT_DIR=build\linux_desktop
         set TARGET=xdjunx_desktop
     ) else (
-        set TARGET_FLAGS=-target aarch64-linux-gnu.2.31 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -Ilib/linux_arm64/include
+        set TARGET_FLAGS=-target aarch64-linux-gnu.2.31 -DPLATFORM_DRM -DGRAPHICS_API_OPENGL_ES2 -DKS_STR_ENCODING_NONE -DHAS_ALSA -Ilib/linux_arm64/include
         set LDFLAGS=-Llib/linux_arm64 -Wl,--allow-shlib-undefined -lraylib -lGLESv2 -lEGL -ldrm -lgbm -lpthread -ldl -lm -lasound
         set OUT_DIR=build\linux_drm
         set TARGET=xdjunx
