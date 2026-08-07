@@ -363,17 +363,14 @@ static void Waveform_Draw(Component *base) {
   float centerX = SCREEN_WIDTH / 2.0f;
   float playheadX = centerX;
 
-  static double frozenPos[2] = {0.0, 0.0};
   extern AudioEngine *globalAudioEngine;
+  // When editing Loop In/Out points via jogwheel, r->State->Position is updated to match LoopStartPos/LoopEndPos in half-frames
   if (r->ID >= 0 && r->ID < 2 && (r->State->LoopAdjustIn || r->State->LoopAdjustOut)) {
-    if (frozenPos[r->ID] <= 0.0) {
-      frozenPos[r->ID] = (r->State->LoopAdjustIn && globalAudioEngine) ? globalAudioEngine->Decks[r->ID].LoopStartPos : (globalAudioEngine ? globalAudioEngine->Decks[r->ID].LoopEndPos : r->State->Position);
-    }
-    elapsedHalfFrames = frozenPos[r->ID];
-    double posOffset = r->State->Position - elapsedHalfFrames;
-    playheadX = centerX + (float)(posOffset / (double)effectiveZoom);
-  } else if (r->ID >= 0 && r->ID < 2) {
-    frozenPos[r->ID] = 0.0;
+      if (globalAudioEngine && globalAudioEngine->Decks[r->ID].SampleRate > 0) {
+          double sr = (double)globalAudioEngine->Decks[r->ID].SampleRate;
+          double targetSamplePos = r->State->LoopAdjustIn ? globalAudioEngine->Decks[r->ID].LoopStartPos : globalAudioEngine->Decks[r->ID].LoopEndPos;
+          elapsedHalfFrames = (targetSamplePos * 150.0) / sr;
+      }
   }
 
   float zoomDelta = effectiveZoom * r->dataDensity;
