@@ -22,7 +22,6 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
     CO_SetValue(group, "shift", (value > 0) ? 1.0f : 0.0f);
   } else if (strstr(function, "jogTurn") || strstr(function, "jogSearch")) {
     float delta = (float)value - 64.0f;
-    bool isSearch = (strstr(function, "jogSearch") != NULL);
     bool adjusting = false;
 
     if (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2) {
@@ -51,17 +50,7 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
     }
 
     if (!adjusting) {
-      bool touching =
-          (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2)
-              ? (globalAudioEngine->Decks[targetDeckIdx].IsTouching &&
-                 globalAudioEngine->Decks[targetDeckIdx].VinylModeEnabled)
-              : false;
-      // JOG ADJUST RPM MULTIPLIER
-      // float scale = touching ? 0.08f : 0.010f;
-      float scale = touching ? 0.25f : 0.01f;
-      if (map->modifiers[0] || isSearch)
-        scale = 1.0f;
-      CO_AddValue(group, "jog", delta * scale);
+      CO_AddValue(group, "jog", delta);
     }
   } else if (strstr(function, "jogTouch") || strstr(function, "JogTouch")) {
     bool touching = (value > 0);
