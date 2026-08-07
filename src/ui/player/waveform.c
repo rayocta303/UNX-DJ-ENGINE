@@ -365,9 +365,9 @@ static void Waveform_Draw(Component *base) {
   if (globalAudioEngine != NULL && r->ID >= 0 && r->ID < 2) {
     DeckAudioState *audio = &globalAudioEngine->Decks[r->ID];
     double ratioHF = (audio->SampleRate > 0) ? ((double)audio->SampleRate / 150.0) : 294.0;
-    if (r->State->LoopAdjustIn) {
+    if (r->State->LoopAdjustIn && audio->LoopStartPos > 0) {
       elapsedHalfFrames = audio->LoopStartPos / ratioHF;
-    } else if (r->State->LoopAdjustOut) {
+    } else if (r->State->LoopAdjustOut && audio->LoopEndPos > 0) {
       elapsedHalfFrames = audio->LoopEndPos / ratioHF;
     }
   }
