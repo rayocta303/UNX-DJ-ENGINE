@@ -8,6 +8,7 @@
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
 #include "ui/player/player_state.h"
+#include "library/hotcue_db.h"
 #include "core/system_info.h"
 #include <math.h>
 #include <stdio.h>
@@ -1482,14 +1483,15 @@ static int Browser_Update(Component *base) {
         if (s->SelectedStorage) {
           RB_LoadTrackData(&t->Analysis, t->AnalyzePath, t->Title, t->ID, s->SelectedStorage->Path);
 
+          char trackFullPath[1024] = {0};
+          const char *relPath = t->FilePath;
+          if (relPath[0] == '/' || relPath[0] == '\\')
+            relPath++;
+          snprintf(trackFullPath, sizeof(trackFullPath), "%s/%s",
+                   s->SelectedStorage->Path, relPath);
+
           if (s->AudioPlugin) {
-            char fullPath[1024];
-            const char *relPath = t->FilePath;
-            if (relPath[0] == '/' || relPath[0] == '\\')
-              relPath++;
-            snprintf(fullPath, sizeof(fullPath), "%s/%s",
-                     s->SelectedStorage->Path, relPath);
-            if (!DeckAudio_LoadTrack(&s->AudioPlugin->Decks[loadToDeck], fullPath)) {
+            if (!DeckAudio_LoadTrack(&s->AudioPlugin->Decks[loadToDeck], trackFullPath)) {
               s->ShowLoadPopup = false;
               return 0;
             }
@@ -1611,6 +1613,41 @@ static int Browser_Update(Component *base) {
                 }
               }
 
+              strncpy(newTrack->FilePath, trackFullPath, sizeof(newTrack->FilePath) - 1);
+              strncpy(newTrack->Title, t->Title, sizeof(newTrack->Title) - 1);
+              strncpy(newTrack->Artist, t->Artist, sizeof(newTrack->Artist) - 1);
+
+              // Check persistent HotCue database for overrides (Rekordbox)
+              HotCue dbCues[8];
+              int dbCount = 0;
+              const char *storagePath = s->SelectedStorage ? s->SelectedStorage->Path : NULL;
+              if (HotCueDB_GetTrack(storagePath, newTrack->FilePath, newTrack->Title, newTrack->Artist, dbCues, &dbCount)) {
+                  newTrack->HotCuesCount = dbCount;
+                  memset(newTrack->HotCues, 0, sizeof(newTrack->HotCues));
+                  if (dbCount > 0) {
+                      memcpy(newTrack->HotCues, dbCues, sizeof(HotCue) * dbCount);
+                  }
+                  
+                  // Re-build Analysis.Cues to match persisted HotCues
+                  if (newTrack->Analysis.Cues) free(newTrack->Analysis.Cues);
+                  newTrack->Analysis.CueCount = dbCount;
+                  if (dbCount > 0) {
+                      newTrack->Analysis.Cues = (RBCue*)malloc(sizeof(RBCue) * dbCount);
+                      if (newTrack->Analysis.Cues) {
+                          for (int h = 0; h < dbCount; h++) {
+                              memset(&newTrack->Analysis.Cues[h], 0, sizeof(RBCue));
+                              newTrack->Analysis.Cues[h].Time = dbCues[h].Start;
+                              newTrack->Analysis.Cues[h].ID = dbCues[h].ID;
+                              newTrack->Analysis.Cues[h].Type = 1;
+                              newTrack->Analysis.Cues[h].Status = 1;
+                              memcpy(newTrack->Analysis.Cues[h].Color, dbCues[h].Color, 3);
+                          }
+                      }
+                  } else {
+                      newTrack->Analysis.Cues = NULL;
+                  }
+              }
+
               // Also copy Phrases to legacy array if needed for UI
               newTrack->PhraseCount = t->Analysis.PhraseCount > 64 ? 64 : t->Analysis.PhraseCount;
               for (int i = 0; i < newTrack->PhraseCount; i++) {
@@ -1652,17 +1689,15 @@ static int Browser_Update(Component *base) {
         if (s->SelectedStorage) {
           Serato_LoadTrackData(t, s->SelectedStorage->Path);
 
-          if (s->AudioPlugin) {
+          char trackFullPath[1024] = {0};
+          const char *relPath = t->FilePath;
+          if (relPath[0] == '/' || relPath[0] == '\\')
+            relPath++;
+          snprintf(trackFullPath, sizeof(trackFullPath), "%s/%s",
+                   s->SelectedStorage->Path, relPath);
 
-            char fullPath[1024];
-            const char *relPath = t->FilePath;
-            // Serato locations can be absolute or relative. Let's assume
-            // relative to root if it starts with /
-            if (relPath[0] == '/' || relPath[0] == '\\')
-              relPath++;
-            snprintf(fullPath, sizeof(fullPath), "%s/%s",
-                     s->SelectedStorage->Path, relPath);
-            if (!DeckAudio_LoadTrack(&s->AudioPlugin->Decks[loadToDeck], fullPath)) {
+          if (s->AudioPlugin) {
+            if (!DeckAudio_LoadTrack(&s->AudioPlugin->Decks[loadToDeck], trackFullPath)) {
               s->ShowLoadPopup = false;
               return 0;
             }
@@ -1740,6 +1775,41 @@ static int Browser_Update(Component *base) {
                          t->Cues[i].Color, 3);
                   newTrack->CuesCount++;
                 }
+              }
+
+              strncpy(newTrack->FilePath, trackFullPath, sizeof(newTrack->FilePath) - 1);
+              strncpy(newTrack->Title, t->Title, sizeof(newTrack->Title) - 1);
+              strncpy(newTrack->Artist, t->Artist, sizeof(newTrack->Artist) - 1);
+
+              // Check persistent HotCue database for overrides (Serato)
+              HotCue dbCues[8];
+              int dbCount = 0;
+              const char *storagePath = s->SelectedStorage ? s->SelectedStorage->Path : NULL;
+              if (HotCueDB_GetTrack(storagePath, newTrack->FilePath, newTrack->Title, newTrack->Artist, dbCues, &dbCount)) {
+                  newTrack->HotCuesCount = dbCount;
+                  memset(newTrack->HotCues, 0, sizeof(newTrack->HotCues));
+                  if (dbCount > 0) {
+                      memcpy(newTrack->HotCues, dbCues, sizeof(HotCue) * dbCount);
+                  }
+                  
+                  // Re-build Analysis.Cues to match persisted HotCues
+                  if (newTrack->Analysis.Cues) free(newTrack->Analysis.Cues);
+                  newTrack->Analysis.CueCount = dbCount;
+                  if (dbCount > 0) {
+                      newTrack->Analysis.Cues = (RBCue*)malloc(sizeof(RBCue) * dbCount);
+                      if (newTrack->Analysis.Cues) {
+                          for (int h = 0; h < dbCount; h++) {
+                              memset(&newTrack->Analysis.Cues[h], 0, sizeof(RBCue));
+                              newTrack->Analysis.Cues[h].Time = dbCues[h].Start;
+                              newTrack->Analysis.Cues[h].ID = dbCues[h].ID;
+                              newTrack->Analysis.Cues[h].Type = 1;
+                              newTrack->Analysis.Cues[h].Status = 1;
+                              memcpy(newTrack->Analysis.Cues[h].Color, dbCues[h].Color, 3);
+                          }
+                      }
+                  } else {
+                      newTrack->Analysis.Cues = NULL;
+                  }
               }
 
               TrackState *oldTrack = targetDeck->LoadedTrack;
