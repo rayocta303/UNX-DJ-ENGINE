@@ -8,7 +8,9 @@
 
 #if defined(__linux__) && !defined(__ANDROID__)
 #include <alsa/asoundlib.h>
-#define HAS_ALSA
+#ifndef HAS_ALSA
+#define HAS_ALSA 1
+#endif
 static void* seq_handle = NULL;
 static int in_port = -1;
 static int out_port = -1;
@@ -113,8 +115,12 @@ void MIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
             snd_seq_ev_set_noteoff(&ev, channel, data1, data2);
         } else if (type == 0xB0) {
             snd_seq_ev_set_controller(&ev, channel, data1, data2);
+        } else if (type == 0xE0) {
+            ev.type = SND_SEQ_EVENT_PITCHBEND;
+            ev.data.control.channel = channel;
+            ev.data.control.value = (int)data1 | ((int)data2 << 7);
         } else {
-            return;
+            snd_seq_ev_set_noteon(&ev, channel, data1, data2);
         }
         snd_seq_event_output((snd_seq_t*)seq_handle, &ev);
         snd_seq_drain_output((snd_seq_t*)seq_handle);
@@ -135,6 +141,12 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
     if (now - lastFullRefresh > 2.0) {
         lastFullRefresh = now;
         forceRefresh = true;
+
+        // Pioneer DDJ Hardware Keep-Alive / LED Enable Handshake
+        MIDI_SendShortMsg(0x9F, 0x00, 0x7F);
+        MIDI_SendShortMsg(0x9F, 0x01, 0x7F);
+        MIDI_SendShortMsg(0x90, 0x7F, 0x7F);
+        MIDI_SendShortMsg(0x91, 0x7F, 0x7F);
     }
 
     // 1. Pioneer SysEx Keep-Alive every 1.5 seconds
@@ -429,6 +441,14 @@ bool MIDI_Init(MidiContext *ctx) {
     }
     
     ctx->initialized = true;
+
+    // Pioneer DDJ Hardware Init / LED Enable Handshake
+    MIDI_SendShortMsg(0x9F, 0x00, 0x7F);
+    MIDI_SendShortMsg(0x9F, 0x01, 0x7F);
+    MIDI_SendShortMsg(0x90, 0x7F, 0x7F);
+    MIDI_SendShortMsg(0x91, 0x7F, 0x7F);
+    MIDI_SendShortMsg(0x93, 0x7F, 0x7F);
+    MIDI_SendShortMsg(0x94, 0x7F, 0x7F);
 
     char toastMsg[160];
     snprintf(toastMsg, sizeof(toastMsg), "MIDI CONNECTED: %s", deviceName);

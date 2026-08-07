@@ -60,27 +60,56 @@ void TouchScroll_Update(TouchScroll *ts, float maxScroll, float dt) {
     ts->VisualScroll += (ts->Scroll - ts->VisualScroll) * lerpSpeed;
 }
 
+static double g_lastTouchClickTime = -1.0;
+
 bool Touch_CheckClick(Rectangle rect, float padding) {
-    if (padding <= 0.0f) padding = S(6.0f);
+    if (padding <= 0.0f) padding = S(8.0f);
     Rectangle paddedRect = {
         rect.x - padding,
         rect.y - padding,
         rect.width + padding * 2.0f,
         rect.height + padding * 2.0f
     };
-    return UICheckClick(paddedRect);
+
+    double now = GetTime();
+    if (g_lastTouchClickTime > 0.0 && (now - g_lastTouchClickTime) < 0.06) {
+        return false;
+    }
+
+    Vector2 touchStart = UIGetTouchStartPos();
+    Vector2 currPos = UIGetMousePosition();
+    float dragDist = UIGetTouchDragDistance();
+
+    bool isHitStart = CheckCollisionPointRec(touchStart, paddedRect);
+    bool isHitCurr = CheckCollisionPointRec(currPos, paddedRect);
+
+    // 1. Instant Press Trigger (Fast finger tap down)
+    if (UI_IsPressed() && isHitCurr) {
+        g_lastTouchClickTime = now;
+        return true;
+    }
+
+    // 2. Tap Release Trigger (Finger release with relaxed drag threshold)
+    if (UI_IsReleased() && (isHitStart || isHitCurr) && dragDist < S(32.0f)) {
+        g_lastTouchClickTime = now;
+        return true;
+    }
+
+    return false;
 }
 
 bool Touch_CheckPress(Rectangle rect, float padding) {
-    if (!UI_IsPressed()) return false;
-    if (padding <= 0.0f) padding = S(6.0f);
+    if (!UI_IsPressed() && !UI_IsDown()) return false;
+    if (padding <= 0.0f) padding = S(8.0f);
     Rectangle paddedRect = {
         rect.x - padding,
         rect.y - padding,
         rect.width + padding * 2.0f,
         rect.height + padding * 2.0f
     };
-    return CheckCollisionPointRec(UIGetMousePosition(), paddedRect);
+
+    Vector2 currPos = UIGetMousePosition();
+    return CheckCollisionPointRec(currPos, paddedRect);
 }
 
 float Touch_GetSwipeVelocity(Vector2 startPos, Vector2 currentPos, float deltaTime) {
