@@ -67,6 +67,7 @@ typedef struct {
   int MappingListScroll;
   int MappingListCursorPos;
 
+  int FocusLevel; // 0 = Category/Tab selection, 1 = Sub-menu/List item selection, 2 = Active Value Editing
   int MidiBrowseDelta;
   bool MidiRequestEnter;
 } SettingsState;

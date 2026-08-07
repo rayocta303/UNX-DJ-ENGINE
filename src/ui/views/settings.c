@@ -306,68 +306,95 @@ static int Settings_Update(Component *base) {
   int visibleRows = (int)((viewH - listY - bottomH) / rowH);
   if (visibleRows <= 0) visibleRows = 1;
 
-  // Handle MIDI Rotary Encoder Navigation for Settings
+  // Handle 3-Tier MIDI Rotary Encoder Navigation for Settings
+  // Level 0 = Tab/Category selection
+  // Level 1 = Sub-menu/List item selection
+  // Level 2 = Value editing mode
   if (r->State->MidiBrowseDelta != 0) {
       int delta = r->State->MidiBrowseDelta;
       r->State->MidiBrowseDelta = 0;
-      
-      int idx_f = r->State->Scroll + r->State->CursorPos;
-      if (idx_f >= 0 && idx_f < filteredCount) {
-          int idx = filteredIndices[idx_f];
-          SettingItem *item = &r->State->Items[idx];
-          if (item->Type == SETTING_TYPE_KNOB) {
-              float step = (item->Step > 0) ? item->Step : (item->Max - item->Min) / 20.0f;
-              item->Value += (delta > 0 ? step : -step);
-              if (item->Value < item->Min) item->Value = item->Min;
-              if (item->Value > item->Max) item->Value = item->Max;
-              if (r->OnApply) r->OnApply(r->callbackCtx);
-          } else {
-              r->State->CursorPos += delta;
-              if (r->State->CursorPos < 0) {
-                  if (r->State->Scroll > 0) {
-                      r->State->Scroll += r->State->CursorPos;
-                      if (r->State->Scroll < 0) r->State->Scroll = 0;
-                  }
-                  r->State->CursorPos = 0;
-              } else if (r->State->CursorPos >= visibleRows) {
-                  int maxOffset = filteredCount - visibleRows;
-                  if (maxOffset < 0) maxOffset = 0;
-                  r->State->Scroll += (r->State->CursorPos - (visibleRows - 1));
-                  if (r->State->Scroll > maxOffset) r->State->Scroll = maxOffset;
-                  r->State->CursorPos = visibleRows - 1;
-              }
-              r->State->VisualScroll = r->State->Scroll * rowH;
-          }
-      } else {
+
+      if (r->State->FocusLevel == 0) {
+          int nextTab = r->State->SelectedTab + (delta > 0 ? 1 : -1);
+          if (nextTab < 0) nextTab = SETTING_CAT_COUNT - 1;
+          if (nextTab >= SETTING_CAT_COUNT) nextTab = 0;
+          r->State->SelectedTab = nextTab;
           r->State->CursorPos = 0;
           r->State->Scroll = 0;
           r->State->VisualScroll = 0;
+      } else if (r->State->FocusLevel == 1) {
+          r->State->CursorPos += delta;
+          if (r->State->CursorPos < 0) {
+              if (r->State->Scroll > 0) {
+                  r->State->Scroll += r->State->CursorPos;
+                  if (r->State->Scroll < 0) r->State->Scroll = 0;
+              }
+              r->State->CursorPos = 0;
+          } else if (r->State->CursorPos >= visibleRows) {
+              int maxOffset = filteredCount - visibleRows;
+              if (maxOffset < 0) maxOffset = 0;
+              r->State->Scroll += (r->State->CursorPos - (visibleRows - 1));
+              if (r->State->Scroll > maxOffset) r->State->Scroll = maxOffset;
+              r->State->CursorPos = visibleRows - 1;
+          }
+          r->State->VisualScroll = r->State->Scroll * rowH;
+      } else if (r->State->FocusLevel == 2) {
+          int idx_f = r->State->Scroll + r->State->CursorPos;
+          if (idx_f >= 0 && idx_f < filteredCount) {
+              int idx = filteredIndices[idx_f];
+              SettingItem *item = &r->State->Items[idx];
+              if (item->Type == SETTING_TYPE_KNOB) {
+                  float step = (item->Step > 0) ? item->Step : (item->Max - item->Min) / 20.0f;
+                  item->Value += (delta > 0 ? step : -step);
+                  if (item->Value < item->Min) item->Value = item->Min;
+                  if (item->Value > item->Max) item->Value = item->Max;
+                  if (r->OnApply) r->OnApply(r->callbackCtx);
+              }
+          }
       }
   }
 
-  // Handle MIDI Rotary Encoder Click for Settings
+  // Handle 3-Tier MIDI Rotary Encoder Click for Settings
   if (r->State->MidiRequestEnter) {
       r->State->MidiRequestEnter = false;
-      int idx_f = r->State->Scroll + r->State->CursorPos;
-      if (idx_f >= 0 && idx_f < filteredCount) {
-          int idx = filteredIndices[idx_f];
-          SettingItem *item = &r->State->Items[idx];
-          if (item->Type == SETTING_TYPE_LIST) {
-              r->State->IsDropdownOpen = true;
-              r->State->DropdownItemIdx = idx;
-              r->State->DropdownScroll = 0;
-          } else if (item->Type == SETTING_TYPE_ACTION) {
-              if (item->Category == SETTING_CAT_CONTROLLERS && idx >= MIDI_MAPPING_START_IDX) {
-                  r->State->IsEditMappingOpen = true;
-                  r->State->EditMappingItemIdx = idx;
-              } else if (idx == 20) {
-                  r->State->IsMappingListOpen = true;
-                  r->State->MappingListScroll = 0;
-                  r->State->MappingListCursorPos = 0;
-              } else {
-                  if (r->OnAction) r->OnAction(r->callbackCtx, idx);
+
+      if (r->State->FocusLevel == 0) {
+          r->State->FocusLevel = 1;
+          r->State->CursorPos = 0;
+          r->State->Scroll = 0;
+          r->State->VisualScroll = 0;
+      } else if (r->State->FocusLevel == 1) {
+          int idx_f = r->State->Scroll + r->State->CursorPos;
+          if (idx_f >= 0 && idx_f < filteredCount) {
+              int idx = filteredIndices[idx_f];
+              SettingItem *item = &r->State->Items[idx];
+              if (item->Type == SETTING_TYPE_LIST) {
+                  r->State->IsDropdownOpen = true;
+                  r->State->DropdownItemIdx = idx;
+                  r->State->DropdownScroll = 0;
+                  r->State->FocusLevel = 2;
+              } else if (item->Type == SETTING_TYPE_KNOB) {
+                  r->State->FocusLevel = 2;
+              } else if (item->Type == SETTING_TYPE_ACTION) {
+                  if (item->Category == SETTING_CAT_CONTROLLERS && idx >= MIDI_MAPPING_START_IDX) {
+                      r->State->IsEditMappingOpen = true;
+                      r->State->EditMappingItemIdx = idx;
+                  } else if (idx == 20) {
+                      r->State->IsMappingListOpen = true;
+                      r->State->MappingListScroll = 0;
+                      r->State->MappingListCursorPos = 0;
+                  } else {
+                      if (r->OnAction) r->OnAction(r->callbackCtx, idx);
+                  }
               }
           }
+      } else if (r->State->FocusLevel == 2) {
+          r->State->FocusLevel = 1;
+          if (r->State->IsDropdownOpen) {
+              r->State->IsDropdownOpen = false;
+              if (r->OnValueChanged) r->OnValueChanged(r->callbackCtx, r->State->DropdownItemIdx);
+          }
+          if (r->OnApply) r->OnApply(r->callbackCtx);
       }
   }
 
@@ -707,9 +734,14 @@ static void Settings_Draw(Component *base) {
   for (int i = 0; i < SETTING_CAT_COUNT; i++) {
       Rectangle tRect = { i * tabW, TOP_BAR_H, tabW, tabH };
       if (r->State->SelectedTab == i) {
-          DrawRectangleRec(tRect, (Color){ 255, 121, 0, 35 });
+          bool isTabFocused = (r->State->FocusLevel == 0);
+          Color fillClr = isTabFocused ? (Color){ 255, 121, 0, 75 } : (Color){ 255, 121, 0, 35 };
+          DrawRectangleRec(tRect, fillClr);
           DrawCentredText(tabs[i], faceSm, i * tabW, tabW, TOP_BAR_H + S(8), S(11), ColorOrange);
           DrawRectangle(i * tabW, TOP_BAR_H + tabH - S(3), tabW, S(3), ColorOrange);
+          if (isTabFocused) {
+              DrawRectangleLinesEx((Rectangle){ i * tabW + S(2), TOP_BAR_H + S(2), tabW - S(4), tabH - S(4) }, S(1.5f), ColorOrange);
+          }
       } else {
           Vector2 mouse = UIGetMousePosition();
           if (CheckCollisionPointRec(mouse, tRect)) {
@@ -758,8 +790,14 @@ static void Settings_Draw(Component *base) {
     SettingItem *item = &r->State->Items[idx];
     float ry = listY + (i * rowH);
 
-    bool selected = (i == r->State->CursorPos);
-    if (selected) {
+    bool selected = (r->State->FocusLevel >= 1 && i == r->State->CursorPos);
+    bool isEditingThis = (r->State->FocusLevel == 2 && selected);
+
+    if (isEditingThis) {
+      DrawRectangleRounded((Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)}, 0.15f, 4, (Color){ 255, 165, 0, 85 });
+      DrawRectangleRoundedLines((Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)}, 0.15f, 4, 2.0f, ColorYellow);
+      DrawCircle(S(14), ry + (rowH / 2.0f), S(3.5f), ColorYellow);
+    } else if (selected) {
       DrawRectangleRounded((Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)}, 0.15f, 4, (Color){ 255, 121, 0, 45 });
       DrawRectangleRoundedLines((Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)}, 0.15f, 4, 1.0f, ColorOrange);
       DrawCircle(S(14), ry + (rowH / 2.0f), S(3.5f), ColorOrange);

@@ -2471,10 +2471,15 @@ void UpdateDrawFrame(App *app) {
     if (app->browserState.MidiRequestBack) {
       if (app->settingsState.IsDropdownOpen) {
         app->settingsState.IsDropdownOpen = false;
+        app->settingsState.FocusLevel = 1;
       } else if (app->settingsState.IsEditMappingOpen) {
         app->settingsState.IsEditMappingOpen = false;
       } else if (app->settingsState.IsMappingListOpen) {
         app->settingsState.IsMappingListOpen = false;
+      } else if (app->settingsState.FocusLevel == 2) {
+        app->settingsState.FocusLevel = 1;
+      } else if (app->settingsState.FocusLevel == 1) {
+        app->settingsState.FocusLevel = 0;
       } else {
         app->screen = ScreenPlayer;
         app->settingsState.IsActive = false;
