@@ -360,6 +360,18 @@ static void Waveform_Draw(Component *base) {
   if (effectiveZoom < 0.1f)
     effectiveZoom = 0.1f;
   double elapsedHalfFrames = r->State->Position;
+
+  extern AudioEngine *globalAudioEngine;
+  if (globalAudioEngine != NULL && r->ID >= 0 && r->ID < 2) {
+    DeckAudioState *audio = &globalAudioEngine->Decks[r->ID];
+    double ratioHF = (audio->SampleRate > 0) ? ((double)audio->SampleRate / 150.0) : 294.0;
+    if (r->State->LoopAdjustIn) {
+      elapsedHalfFrames = audio->LoopStartPos / ratioHF;
+    } else if (r->State->LoopAdjustOut) {
+      elapsedHalfFrames = audio->LoopEndPos / ratioHF;
+    }
+  }
+
   float centerX = SCREEN_WIDTH / 2.0f;
   float playheadX = centerX;
 
@@ -823,13 +835,26 @@ static void Waveform_Draw(Component *base) {
             }
         }
 
-        // Active Loop Adjust Mode Badge
-        if (r->State->LoopAdjustIn) {
-            DrawRectangleRec((Rectangle){wfLeft + 10, wfY + 6, 106, 20}, Fade((Color){255, 220, 0, 255}, 0.9f));
-            DrawText("LOOP IN ADJ", (int)wfLeft + 16, (int)wfY + 10, 11, BLACK);
-        } else if (r->State->LoopAdjustOut) {
-            DrawRectangleRec((Rectangle){wfRight - 116, wfY + 6, 106, 20}, Fade((Color){255, 220, 0, 255}, 0.9f));
-            DrawText("LOOP OUT ADJ", (int)wfRight - 110, (int)wfY + 10, 11, BLACK);
+        // Active Loop Adjust Mode Badge & Running Live Playhead
+        if (r->State->LoopAdjustIn || r->State->LoopAdjustOut) {
+            if (r->State->LoopAdjustIn) {
+                DrawRectangleRec((Rectangle){wfLeft + 10, wfY + 6, 106, 20}, Fade((Color){255, 220, 0, 255}, 0.9f));
+                DrawText("LOOP IN ADJ", (int)wfLeft + 16, (int)wfY + 10, 11, BLACK);
+            } else {
+                DrawRectangleRec((Rectangle){wfRight - 116, wfY + 6, 106, 20}, Fade((Color){255, 220, 0, 255}, 0.9f));
+                DrawText("LOOP OUT ADJ", (int)wfRight - 110, (int)wfY + 10, 11, BLACK);
+            }
+
+            // Draw animated live playhead sweeping through loop area
+            double livePosHF = audio->Position / ratioHF;
+            float xLive = (float)((livePosHF - elapsedHalfFrames) / (double)effectiveZoom);
+            float bxLive = playheadX + xLive;
+            
+            if (bxLive >= wfLeft && bxLive <= wfRight) {
+                DrawLineEx((Vector2){bxLive, wfY}, (Vector2){bxLive, wfY + waveH}, 2.5f, ColorRed);
+                DrawTriangle((Vector2){bxLive - S(4), wfY}, (Vector2){bxLive + S(4), wfY}, (Vector2){bxLive, wfY + S(6)}, ColorRed);
+                DrawTriangle((Vector2){bxLive - S(4), wfY + waveH}, (Vector2){bxLive + S(4), wfY + waveH}, (Vector2){bxLive, wfY + waveH - S(6)}, ColorRed);
+            }
         }
     }
   }

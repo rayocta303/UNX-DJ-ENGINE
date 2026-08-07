@@ -455,19 +455,23 @@ PioneerDDJFLX4.beatFxChannel2 = function(_channel, control, value, _status, grou
 //
 
 PioneerDDJFLX4.toggleLoopAdjustIn = function(channel, _control, value, _status, group) {
-    if (value === 0 || engine.getValue(group, "loop_enabled" === 0)) {
+    if (value === 0 || engine.getValue(group, "loop_enabled") === 0) {
         return;
     }
     PioneerDDJFLX4.loopAdjustIn[channel] = !PioneerDDJFLX4.loopAdjustIn[channel];
     PioneerDDJFLX4.loopAdjustOut[channel] = false;
+    engine.setValue(group, "loop_adjust_in", PioneerDDJFLX4.loopAdjustIn[channel] ? 1 : 0);
+    engine.setValue(group, "loop_adjust_out", 0);
 };
 
 PioneerDDJFLX4.toggleLoopAdjustOut = function(channel, _control, value, _status, group) {
-    if (value === 0 || engine.getValue(group, "loop_enabled" === 0)) {
+    if (value === 0 || engine.getValue(group, "loop_enabled") === 0) {
         return;
     }
     PioneerDDJFLX4.loopAdjustOut[channel] = !PioneerDDJFLX4.loopAdjustOut[channel];
     PioneerDDJFLX4.loopAdjustIn[channel] = false;
+    engine.setValue(group, "loop_adjust_out", PioneerDDJFLX4.loopAdjustOut[channel] ? 1 : 0);
+    engine.setValue(group, "loop_adjust_in", 0);
 };
 
 // Two signals are sent here so that the light stays lit/unlit in its shift state too
@@ -603,14 +607,8 @@ PioneerDDJFLX4.jogTurn = function(channel, _control, value, _status, group) {
     // loop_in / out adjust
     const loopEnabled = engine.getValue(group, "loop_enabled");
     if (loopEnabled > 0) {
-        if (PioneerDDJFLX4.loopAdjustIn[channel]) {
-            newVal = newVal * PioneerDDJFLX4.loopAdjustMultiply + engine.getValue(group, "loop_start_position");
-            engine.setValue(group, "loop_start_position", newVal);
-            return;
-        }
-        if (PioneerDDJFLX4.loopAdjustOut[channel]) {
-            newVal = newVal * PioneerDDJFLX4.loopAdjustMultiply + engine.getValue(group, "loop_end_position");
-            engine.setValue(group, "loop_end_position", newVal);
+        if (PioneerDDJFLX4.loopAdjustIn[channel] || PioneerDDJFLX4.loopAdjustOut[channel]) {
+            engine.setValue(group, "jog", newVal);
             return;
         }
     }

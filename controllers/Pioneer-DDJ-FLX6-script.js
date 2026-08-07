@@ -759,6 +759,8 @@ PioneerDDJFLX6.toggleLoopAdjustIn = function(channel, _control, value, _status, 
     }
     PioneerDDJFLX6.loopAdjustIn[channel] = !PioneerDDJFLX6.loopAdjustIn[channel];
     PioneerDDJFLX6.loopAdjustOut[channel] = false;
+    engine.setValue(group, "loop_adjust_in", PioneerDDJFLX6.loopAdjustIn[channel] ? 1 : 0);
+    engine.setValue(group, "loop_adjust_out", 0);
 };
 
 PioneerDDJFLX6.toggleLoopAdjustOut = function(channel, _control, value, _status, group) {
@@ -767,6 +769,8 @@ PioneerDDJFLX6.toggleLoopAdjustOut = function(channel, _control, value, _status,
     }
     PioneerDDJFLX6.loopAdjustOut[channel] = !PioneerDDJFLX6.loopAdjustOut[channel];
     PioneerDDJFLX6.loopAdjustIn[channel] = false;
+    engine.setValue(group, "loop_adjust_out", PioneerDDJFLX6.loopAdjustOut[channel] ? 1 : 0);
+    engine.setValue(group, "loop_adjust_in", 0);
 };
 
 // Two signals are sent here so that the light stays lit/unlit in its shift state too
@@ -822,31 +826,8 @@ PioneerDDJFLX6.stopLoopLightsBlink = function(group, control, status) {
 };
 
 PioneerDDJFLX6.loopToggle = function(value, group, control) {
-	
-    let status;
-    let channel;
-
-    switch (group) {
-        case "[Channel1]":
-            status = 0x90;
-            channel = 0;
-            break;
-        case "[Channel2]":
-            status = 0x91;
-            channel = 1;
-            break;
-        case "[Channel3]":
-            status = 0x92;
-            channel = 2;
-            break;
-        case "[Channel4]":
-            status = 0x93;
-            channel = 3;
-            break;
-        default:
-            console.error("Unknown group: " + group);
-            return; // Exit if group doesn't match any case
-    }
+    const status = group === "[Channel1]" ? 0x90 : 0x91,
+        channel = group === "[Channel1]" ? 0 : 1;
 
     PioneerDDJFLX6.setReloopLight(status, value ? 0x7F : 0x00);
 
@@ -924,22 +905,9 @@ PioneerDDJFLX6.jogTurn = function(channel, _control, value, _status, group) {
 
     // loop_in / out adjust
     const loopEnabled = engine.getValue(group, "loop_enabled");
-    const minLoopRange = 1024;
     if (loopEnabled > 0) {
-        if (PioneerDDJFLX6.loopAdjustIn[channel]) {
-            const loopEndPosition = engine.getValue(group, "loop_end_position");
-            newVal = newVal * PioneerDDJFLX6.loopAdjustMultiply + engine.getValue(group, "loop_start_position");
-            if (newVal > loopEndPosition - minLoopRange)
-                newVal = loopEndPosition - minLoopRange;
-            engine.setValue(group, "loop_start_position", newVal);
-            return;
-        }
-        if (PioneerDDJFLX6.loopAdjustOut[channel]) {
-            const loopStartPosition = engine.getValue(group, "loop_start_position");
-            newVal = newVal * PioneerDDJFLX6.loopAdjustMultiply + engine.getValue(group, "loop_end_position");
-            if (newVal < loopStartPosition + minLoopRange)
-                newVal = loopStartPosition + minLoopRange;
-            engine.setValue(group, "loop_end_position", newVal);
+        if (PioneerDDJFLX6.loopAdjustIn[channel] || PioneerDDJFLX6.loopAdjustOut[channel]) {
+            engine.setValue(group, "jog", newVal);
             return;
         }
     }
