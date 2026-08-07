@@ -2458,6 +2458,31 @@ void UpdateDrawFrame(App *app) {
     app->browserState.MidiRequestDown = false;
   }
 
+  // Route Encoder & MIDI signals to Settings when Settings screen is active
+  if (app->screen == ScreenSettings || app->settingsState.IsActive) {
+    if (app->browserState.MidiBrowseDelta != 0) {
+      app->settingsState.MidiBrowseDelta += app->browserState.MidiBrowseDelta;
+      app->browserState.MidiBrowseDelta = 0;
+    }
+    if (app->browserState.MidiRequestEnter) {
+      app->settingsState.MidiRequestEnter = true;
+      app->browserState.MidiRequestEnter = false;
+    }
+    if (app->browserState.MidiRequestBack) {
+      if (app->settingsState.IsDropdownOpen) {
+        app->settingsState.IsDropdownOpen = false;
+      } else if (app->settingsState.IsEditMappingOpen) {
+        app->settingsState.IsEditMappingOpen = false;
+      } else if (app->settingsState.IsMappingListOpen) {
+        app->settingsState.IsMappingListOpen = false;
+      } else {
+        app->screen = ScreenPlayer;
+        app->settingsState.IsActive = false;
+      }
+      app->browserState.MidiRequestBack = false;
+    }
+  }
+
   // Handle Deck MIDI Requests
   for (int i = 0; i < 2; i++) {
     DeckState *ds = (i == 0) ? &app->deckA : &app->deckB;

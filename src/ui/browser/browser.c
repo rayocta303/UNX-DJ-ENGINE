@@ -826,6 +826,9 @@ static int Browser_Update(Component *base) {
   int loadToDeck = -1;
   int targetIdx = s->ScrollOffset + s->CursorPos;
   bool triggerEnter = false;
+  static double lastBrowserListTapTime = 0.0;
+  static double lastTrackTapTime = 0.0;
+  static int lastTrackTapIdx = -1;
 
   // Layout Variables
   Vector2 mousePos = UIGetMousePosition();
@@ -860,64 +863,72 @@ static int Browser_Update(Component *base) {
       }
     }
 
-    if (UI_IsPressed()) {
-      // Handle OSK Button Toggle
-      if (CheckCollisionPointRec(mousePos, oskButtonRect)) {
-        s->ShowOSK = !s->ShowOSK;
-        s->IsSearching = s->ShowOSK;
-        return 0;
-      }
-
-      // Handle Search Box Focus
-      if (CheckCollisionPointRec(mousePos, searchBoxRect)) {
-        s->IsSearching = true;
-        s->ShowOSK = true;
-      } else if (!s->ShowOSK && s->IsSearching) {
-        s->IsSearching = false;
-      }
-
-      // Handle Table Header Column Clicks (Sort ASC / DESC)
-      if (CheckCollisionPointRec(mousePos, headBpmRect)) {
-        if (s->SortMode == 1) {
-          s->SortAscending = !s->SortAscending;
-        } else {
-          s->SortMode = 1; // BPM
-          s->SortAscending = true;
+    if (UI_IsReleased() && !s->IsDragging) {
+      double now = GetTime();
+      if ((now - lastBrowserListTapTime) >= 0.18) {
+        // Handle OSK Button Toggle
+        if (CheckCollisionPointRec(mousePos, oskButtonRect)) {
+          lastBrowserListTapTime = now;
+          s->ShowOSK = !s->ShowOSK;
+          s->IsSearching = s->ShowOSK;
+          return 0;
         }
-        s->CursorPos = s->ScrollOffset = 0;
-        s->VisualScroll = 0;
-        s->ScrollVelocity = 0;
-        Browser_UpdateActiveTracks(s);
-        return 0;
-      }
 
-      if (CheckCollisionPointRec(mousePos, headKeyRect)) {
-        if (s->SortMode == 2) {
-          s->SortAscending = !s->SortAscending;
-        } else {
-          s->SortMode = 2; // Key
-          s->SortAscending = true;
+        // Handle Search Box Focus
+        if (CheckCollisionPointRec(mousePos, searchBoxRect)) {
+          lastBrowserListTapTime = now;
+          s->IsSearching = true;
+          s->ShowOSK = true;
+        } else if (!s->ShowOSK && s->IsSearching) {
+          s->IsSearching = false;
         }
-        s->CursorPos = s->ScrollOffset = 0;
-        s->VisualScroll = 0;
-        s->ScrollVelocity = 0;
-        Browser_UpdateActiveTracks(s);
-        return 0;
-      }
 
-      if (CheckCollisionPointRec(mousePos, headTitleRect)) {
-        if (s->SortMode == 3 || s->SortMode == 0) {
-          s->SortAscending = !s->SortAscending;
-          s->SortMode = 3; // Title
-        } else {
-          s->SortMode = 3; // Title
-          s->SortAscending = true;
+        // Handle Table Header Column Clicks (Sort ASC / DESC)
+        if (CheckCollisionPointRec(mousePos, headBpmRect)) {
+          lastBrowserListTapTime = now;
+          if (s->SortMode == 1) {
+            s->SortAscending = !s->SortAscending;
+          } else {
+            s->SortMode = 1; // BPM
+            s->SortAscending = true;
+          }
+          s->CursorPos = s->ScrollOffset = 0;
+          s->VisualScroll = 0;
+          s->ScrollVelocity = 0;
+          Browser_UpdateActiveTracks(s);
+          return 0;
         }
-        s->CursorPos = s->ScrollOffset = 0;
-        s->VisualScroll = 0;
-        s->ScrollVelocity = 0;
-        Browser_UpdateActiveTracks(s);
-        return 0;
+
+        if (CheckCollisionPointRec(mousePos, headKeyRect)) {
+          lastBrowserListTapTime = now;
+          if (s->SortMode == 2) {
+            s->SortAscending = !s->SortAscending;
+          } else {
+            s->SortMode = 2; // Key
+            s->SortAscending = true;
+          }
+          s->CursorPos = s->ScrollOffset = 0;
+          s->VisualScroll = 0;
+          s->ScrollVelocity = 0;
+          Browser_UpdateActiveTracks(s);
+          return 0;
+        }
+
+        if (CheckCollisionPointRec(mousePos, headTitleRect)) {
+          lastBrowserListTapTime = now;
+          if (s->SortMode == 3 || s->SortMode == 0) {
+            s->SortAscending = !s->SortAscending;
+            s->SortMode = 3; // Title
+          } else {
+            s->SortMode = 3; // Title
+            s->SortAscending = true;
+          }
+          s->CursorPos = s->ScrollOffset = 0;
+          s->VisualScroll = 0;
+          s->ScrollVelocity = 0;
+          Browser_UpdateActiveTracks(s);
+          return 0;
+        }
       }
     }
   }
@@ -1007,7 +1018,6 @@ static int Browser_Update(Component *base) {
   // Load Popup Dialog Interaction handled FIRST to prevent same-frame double
   // triggers
   static double lastPopupOpenedTime = 0.0;
-  static double lastBrowserListTapTime = 0.0;
   bool wasPopupOpen = s->ShowLoadPopup;
   if (wasPopupOpen) {
     if ((GetTime() - lastPopupOpenedTime) >= 0.25 && UI_IsReleased()) {
@@ -1279,24 +1289,35 @@ static int Browser_Update(Component *base) {
           if (s->BrowseLevel == 1) s->DraggingType = 1; 
           else if (s->BrowseLevel == 0) s->DraggingType = 0;
           else s->DraggingType = -1;
-
-          if (s->CursorPos + s->ScrollOffset != idx) {
-            s->CursorPos = idx - s->ScrollOffset;
-            s->MarqueeScrollX = 0; 
-          }
         }
 
         if (UI_IsReleased() && !s->IsDragging) {
           double now = GetTime();
-          if ((now - lastBrowserListTapTime) >= 0.12 && s->TouchDragAccumulator < S(22.0f) && fabsf(s->ScrollVelocity) < 40.0f) {
-            lastBrowserListTapTime = now;
+          if (s->TouchDragAccumulator < S(28.0f) && fabsf(s->ScrollVelocity) < 60.0f) {
             s->ShowOSK = false; // Auto hide keyboard on list item tap
+            if (s->CursorPos + s->ScrollOffset != idx) {
+              s->CursorPos = idx - s->ScrollOffset;
+              s->MarqueeScrollX = 0; 
+            }
             if (s->BrowseLevel == 0) {
-              s->ShowLoadPopup = true;
-              lastPopupOpenedTime = now;
-              s->PopupTrackIdx = idx;
+              // Double Tap on Track to open Load Option Popup
+              double dt = now - lastTrackTapTime;
+              if (idx == lastTrackTapIdx && dt <= 0.38 && dt >= 0.05) {
+                s->ShowLoadPopup = true;
+                lastPopupOpenedTime = now;
+                s->PopupTrackIdx = idx;
+                lastTrackTapTime = 0.0;
+                lastTrackTapIdx = -1;
+              } else {
+                lastTrackTapTime = now;
+                lastTrackTapIdx = idx;
+                lastBrowserListTapTime = now;
+              }
             } else if (!s->IsTagList) {
-              triggerEnter = true;
+              if ((now - lastBrowserListTapTime) >= 0.14) {
+                lastBrowserListTapTime = now;
+                triggerEnter = true;
+              }
             }
           }
         }

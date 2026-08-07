@@ -36,7 +36,26 @@ static int Settings_Update(Component *base) {
       
       Rectangle dropRect = { dropdownX, dropdownY, dropdownW, dropdownH };
       
-      // Scroll handling for dropdown
+      // Scroll handling & Encoder navigation for dropdown
+      if (r->State->MidiBrowseDelta != 0) {
+          if (r->State->MidiBrowseDelta > 0) {
+              item->Current = (item->Current + 1) % item->OptionsCount;
+          } else if (r->State->MidiBrowseDelta < 0) {
+              item->Current = (item->Current - 1 + item->OptionsCount) % item->OptionsCount;
+          }
+          r->State->MidiBrowseDelta = 0;
+          if (r->OnValueChanged) r->OnValueChanged(r->callbackCtx, r->State->DropdownItemIdx);
+          if (r->OnApply) r->OnApply(r->callbackCtx);
+      }
+
+      if (r->State->MidiRequestEnter) {
+          r->State->IsDropdownOpen = false;
+          r->State->MidiRequestEnter = false;
+          if (r->OnValueChanged) r->OnValueChanged(r->callbackCtx, r->State->DropdownItemIdx);
+          if (r->OnApply) r->OnApply(r->callbackCtx);
+          return 1;
+      }
+
       Vector2 mouseReq = GetMouseDelta();
       r->State->DropdownScroll -= GetMouseWheelMove() * S(30.0f);
       if (UI_IsDown()) {
@@ -264,19 +283,6 @@ static int Settings_Update(Component *base) {
       return 1; // block background interaction
   }
 
-  // Handle MIDI navigation for Settings
-  if (r->State->MidiBrowseDelta != 0) {
-      r->State->CursorPos += r->State->MidiBrowseDelta;
-      r->State->MidiBrowseDelta = 0;
-      if (r->State->CursorPos < 0) r->State->CursorPos = 0;
-      if (r->State->CursorPos >= r->State->ItemsCount) r->State->CursorPos = r->State->ItemsCount - 1;
-  }
-  if (r->State->MidiRequestEnter) {
-      // Logic to trigger the action at CursorPos
-      r->OnAction(r->callbackCtx, r->State->CursorPos);
-      r->State->MidiRequestEnter = false;
-  }
-
   // Get filtered indices (Hides individual mapping entries in main view)
   int filteredIndices[MAX_SETTINGS_ITEMS];
   int filteredCount = 0;
@@ -298,6 +304,73 @@ static int Settings_Update(Component *base) {
   float bottomH = S(46.0f);
   float listY = TOP_BAR_H + tabH;
   int visibleRows = (int)((viewH - listY - bottomH) / rowH);
+  if (visibleRows <= 0) visibleRows = 1;
+
+  // Handle MIDI Rotary Encoder Navigation for Settings
+  if (r->State->MidiBrowseDelta != 0) {
+      int delta = r->State->MidiBrowseDelta;
+      r->State->MidiBrowseDelta = 0;
+      
+      int idx_f = r->State->Scroll + r->State->CursorPos;
+      if (idx_f >= 0 && idx_f < filteredCount) {
+          int idx = filteredIndices[idx_f];
+          SettingItem *item = &r->State->Items[idx];
+          if (item->Type == SETTING_TYPE_KNOB) {
+              float step = (item->Step > 0) ? item->Step : (item->Max - item->Min) / 20.0f;
+              item->Value += (delta > 0 ? step : -step);
+              if (item->Value < item->Min) item->Value = item->Min;
+              if (item->Value > item->Max) item->Value = item->Max;
+              if (r->OnApply) r->OnApply(r->callbackCtx);
+          } else {
+              r->State->CursorPos += delta;
+              if (r->State->CursorPos < 0) {
+                  if (r->State->Scroll > 0) {
+                      r->State->Scroll += r->State->CursorPos;
+                      if (r->State->Scroll < 0) r->State->Scroll = 0;
+                  }
+                  r->State->CursorPos = 0;
+              } else if (r->State->CursorPos >= visibleRows) {
+                  int maxOffset = filteredCount - visibleRows;
+                  if (maxOffset < 0) maxOffset = 0;
+                  r->State->Scroll += (r->State->CursorPos - (visibleRows - 1));
+                  if (r->State->Scroll > maxOffset) r->State->Scroll = maxOffset;
+                  r->State->CursorPos = visibleRows - 1;
+              }
+              r->State->VisualScroll = r->State->Scroll * rowH;
+          }
+      } else {
+          r->State->CursorPos = 0;
+          r->State->Scroll = 0;
+          r->State->VisualScroll = 0;
+      }
+  }
+
+  // Handle MIDI Rotary Encoder Click for Settings
+  if (r->State->MidiRequestEnter) {
+      r->State->MidiRequestEnter = false;
+      int idx_f = r->State->Scroll + r->State->CursorPos;
+      if (idx_f >= 0 && idx_f < filteredCount) {
+          int idx = filteredIndices[idx_f];
+          SettingItem *item = &r->State->Items[idx];
+          if (item->Type == SETTING_TYPE_LIST) {
+              r->State->IsDropdownOpen = true;
+              r->State->DropdownItemIdx = idx;
+              r->State->DropdownScroll = 0;
+          } else if (item->Type == SETTING_TYPE_ACTION) {
+              if (item->Category == SETTING_CAT_CONTROLLERS && idx >= MIDI_MAPPING_START_IDX) {
+                  r->State->IsEditMappingOpen = true;
+                  r->State->EditMappingItemIdx = idx;
+              } else if (idx == 20) {
+                  r->State->IsMappingListOpen = true;
+                  r->State->MappingListScroll = 0;
+                  r->State->MappingListCursorPos = 0;
+              } else {
+                  if (r->OnAction) r->OnAction(r->callbackCtx, idx);
+              }
+          }
+      }
+  }
+
   float maxScroll = (filteredCount - visibleRows) * rowH;
   if (maxScroll < 0) maxScroll = 0;
 

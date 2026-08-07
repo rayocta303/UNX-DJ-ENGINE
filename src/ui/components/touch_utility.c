@@ -72,7 +72,8 @@ bool Touch_CheckClick(Rectangle rect, float padding) {
     };
 
     double now = GetTime();
-    if (g_lastTouchClickTime > 0.0 && (now - g_lastTouchClickTime) < 0.06) {
+    // 150ms UI touchscreen debounce to eliminate accidental double taps
+    if (g_lastTouchClickTime > 0.0 && (now - g_lastTouchClickTime) < 0.15) {
         return false;
     }
 

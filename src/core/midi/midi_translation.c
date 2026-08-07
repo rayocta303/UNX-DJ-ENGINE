@@ -101,6 +101,12 @@ static const MidiTranslation translations[] = {
     {"[Channel3]", "quantize", "[Channel1]", "quantize"},
     {"[Channel4]", "quantize", "[Channel2]", "quantize"},
 
+    // Pad Mode Synchronization
+    {"[Channel1]", "padmode", "[Channel1]", "padmode"},
+    {"[Channel2]", "padmode", "[Channel2]", "padmode"},
+    {"[Channel3]", "padmode", "[Channel1]", "padmode"},
+    {"[Channel4]", "padmode", "[Channel2]", "padmode"},
+
     // Beat FX Dry/Wet & Master Volume
     {"[EffectRack1_EffectUnit1_Effect1]", "meta", "[Master]", "beatfx_drywet"},
     {"[EffectRack1_EffectUnit2_Effect1]", "meta", "[Master]", "beatfx_drywet"},
