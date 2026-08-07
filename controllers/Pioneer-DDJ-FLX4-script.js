@@ -547,13 +547,13 @@ PioneerDDJFLX4.loopToggle = function(value, group, control) {
 
 PioneerDDJFLX4.cueLoopCallLeft = function(_channel, _control, value, _status, group) {
     if (value === 0) {
-        engine.setValue(group, "loop_scale", 0.5);
+        engine.setValue(group, "loop_halve", 1);
     }
 };
 
 PioneerDDJFLX4.cueLoopCallRight = function(_channel, _control, value, _status, group) {
     if (value === 0) {
-        engine.setValue(group, "loop_scale", 2.0);
+        engine.setValue(group, "loop_double", 1);
     }
 };
 

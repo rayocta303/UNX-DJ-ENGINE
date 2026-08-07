@@ -161,7 +161,10 @@ static int Waveform_Update(Component *base) {
 
       float moveHF = -dx * effectiveZoom;
 
-      if (r->State->VinylModeEnabled) {
+      if (r->State->LoopAdjustIn || r->State->LoopAdjustOut) {
+        // Absolute fine sample drag during loop adjustment
+        r->State->JogDelta += (double)moveHF;
+      } else if (r->State->VinylModeEnabled) {
         // Vinyl Mode (Scratch) movement (follows hand)
         r->State->JogDelta += (double)moveHF;
       } else {
