@@ -463,10 +463,9 @@ static void Waveform_Draw(Component *base) {
   // (pre-roll), its value at x=0 will be the same regardless of sub-pixel
   // scrolling offsets.
   {
-    double preRollWidth = 12.0;
+    double preRollWidth = 4.0;
     MemoryLevel mem = MemoryGuard_GetLevel();
-    if (mem == MEM_MODE_ECO) preRollWidth = 8.0;
-    else if (mem >= MEM_MODE_LITE) preRollWidth = 4.0;
+    if (mem >= MEM_MODE_ECO) preRollWidth = 2.0;
 
     for (int i = 0; i <= (int)preRollWidth; i++) {
       double px = (double)i - preRollWidth;
