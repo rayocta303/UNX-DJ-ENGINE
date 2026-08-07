@@ -65,6 +65,7 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2,
         for (int j = 0; j < d1->LoadedTrack->HotCuesCount; j++) {
           if (d1->LoadedTrack->HotCues[j].ID == (unsigned int)targetID) {
             uint32_t targetMs = d1->LoadedTrack->HotCues[j].Start;
+            d1->IsPlaying = true;
             if (d1->QuantizeEnabled) {
               int32_t waitMs =
                   Quantize_GetWaitMs(d1->LoadedTrack, d1->PositionMs);
@@ -111,6 +112,7 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2,
         for (int j = 0; j < d2->LoadedTrack->HotCuesCount; j++) {
           if (d2->LoadedTrack->HotCues[j].ID == (unsigned int)targetID) {
             uint32_t targetMs = d2->LoadedTrack->HotCues[j].Start;
+            d2->IsPlaying = true;
             if (d2->QuantizeEnabled) {
               int32_t waitMs =
                   Quantize_GetWaitMs(d2->LoadedTrack, d2->PositionMs);

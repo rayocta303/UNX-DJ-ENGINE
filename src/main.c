@@ -591,6 +591,7 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
         ds->HasSeekRequest = true;
 
         // Start playback immediately without motor ramp
+        ds->IsPlaying = true;
         DeckAudio_ExitLoop(audio);
         DeckAudio_InstantPlay(audio);
       } else {
@@ -772,6 +773,7 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
         HotCue hc = ds->LoadedTrack->HotCues[i];
         ds->SeekMs = hc.Start;
         ds->HasSeekRequest = true;
+        ds->IsPlaying = true;
         DeckAudio_ExitLoop(audio);
         DeckAudio_InstantPlay(audio);
         break;
