@@ -151,24 +151,16 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
       }
     }
   } else if (strstr(function, "cueLoopCallLeft")) {
-    if (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2) {
-      DeckAudioState *audio = &globalAudioEngine->Decks[targetDeckIdx];
-      if (audio->IsLooping) {
-        double loopLen = audio->LoopEndPos - audio->LoopStartPos;
-        double newLen = loopLen * 0.5;
-        if (newLen >= 4410) {
-          audio->LoopEndPos = audio->LoopStartPos + newLen;
-        }
-      }
+    if (value > 0 && targetDeckIdx >= 0 && targetDeckIdx < 2) {
+      COType t;
+      bool *req = (bool *)CO_Find(group, "MidiRequestLoopHalve", &t);
+      if (req) *req = true;
     }
   } else if (strstr(function, "cueLoopCallRight")) {
-    if (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2) {
-      DeckAudioState *audio = &globalAudioEngine->Decks[targetDeckIdx];
-      if (audio->IsLooping) {
-        double loopLen = audio->LoopEndPos - audio->LoopStartPos;
-        double newLen = loopLen * 2.0;
-        audio->LoopEndPos = audio->LoopStartPos + newLen;
-      }
+    if (value > 0 && targetDeckIdx >= 0 && targetDeckIdx < 2) {
+      COType t;
+      bool *req = (bool *)CO_Find(group, "MidiRequestLoopDouble", &t);
+      if (req) *req = true;
     }
   } else if (strstr(function, "tempoSliderMSB")) {
     if (deck >= 0 && deck < 4) {
