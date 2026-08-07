@@ -19,6 +19,7 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
 
   if (strstr(function, "shiftButton") || strstr(function, "shiftPressed")) {
     map->modifiers[0] = (value > 0); // Modifier 0 is Shift
+    CO_SetValue(group, "shift", (value > 0) ? 1.0f : 0.0f);
   } else if (strstr(function, "jogTurn") || strstr(function, "jogSearch")) {
     float delta = (float)value - 64.0f;
     bool isSearch = (strstr(function, "jogSearch") != NULL);

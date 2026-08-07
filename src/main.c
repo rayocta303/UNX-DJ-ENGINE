@@ -1676,6 +1676,16 @@ Log_LogDeviceInfo(gpuModel);
               &app->deckA.MidiRequestHotCue[6], 0, 1);
   CO_Register("[Channel1]", "hotcue_8", CO_TYPE_BOOL,
               &app->deckA.MidiRequestHotCue[7], 0, 1);
+  CO_Register("[Channel1]", "shift", CO_TYPE_BOOL,
+              &app->padState.ShiftActive[0], 0, 1);
+  CO_Register("[Channel1]", "hotcue_1_clear", CO_TYPE_BOOL, &app->deckA.MidiRequestHotCueClear[0], 0, 1);
+  CO_Register("[Channel1]", "hotcue_2_clear", CO_TYPE_BOOL, &app->deckA.MidiRequestHotCueClear[1], 0, 1);
+  CO_Register("[Channel1]", "hotcue_3_clear", CO_TYPE_BOOL, &app->deckA.MidiRequestHotCueClear[2], 0, 1);
+  CO_Register("[Channel1]", "hotcue_4_clear", CO_TYPE_BOOL, &app->deckA.MidiRequestHotCueClear[3], 0, 1);
+  CO_Register("[Channel1]", "hotcue_5_clear", CO_TYPE_BOOL, &app->deckA.MidiRequestHotCueClear[4], 0, 1);
+  CO_Register("[Channel1]", "hotcue_6_clear", CO_TYPE_BOOL, &app->deckA.MidiRequestHotCueClear[5], 0, 1);
+  CO_Register("[Channel1]", "hotcue_7_clear", CO_TYPE_BOOL, &app->deckA.MidiRequestHotCueClear[6], 0, 1);
+  CO_Register("[Channel1]", "hotcue_8_clear", CO_TYPE_BOOL, &app->deckA.MidiRequestHotCueClear[7], 0, 1);
   CO_Register("[Channel1]", "memory_set", CO_TYPE_BOOL,
               &app->deckA.MidiRequestMemoryCue, 0, 1);
   CO_Register("[Channel1]", "padmode", CO_TYPE_INT,
@@ -1780,6 +1790,16 @@ Log_LogDeviceInfo(gpuModel);
               &app->deckB.MidiRequestHotCue[6], 0, 1);
   CO_Register("[Channel2]", "hotcue_8", CO_TYPE_BOOL,
               &app->deckB.MidiRequestHotCue[7], 0, 1);
+  CO_Register("[Channel2]", "shift", CO_TYPE_BOOL,
+              &app->padState.ShiftActive[1], 0, 1);
+  CO_Register("[Channel2]", "hotcue_1_clear", CO_TYPE_BOOL, &app->deckB.MidiRequestHotCueClear[0], 0, 1);
+  CO_Register("[Channel2]", "hotcue_2_clear", CO_TYPE_BOOL, &app->deckB.MidiRequestHotCueClear[1], 0, 1);
+  CO_Register("[Channel2]", "hotcue_3_clear", CO_TYPE_BOOL, &app->deckB.MidiRequestHotCueClear[2], 0, 1);
+  CO_Register("[Channel2]", "hotcue_4_clear", CO_TYPE_BOOL, &app->deckB.MidiRequestHotCueClear[3], 0, 1);
+  CO_Register("[Channel2]", "hotcue_5_clear", CO_TYPE_BOOL, &app->deckB.MidiRequestHotCueClear[4], 0, 1);
+  CO_Register("[Channel2]", "hotcue_6_clear", CO_TYPE_BOOL, &app->deckB.MidiRequestHotCueClear[5], 0, 1);
+  CO_Register("[Channel2]", "hotcue_7_clear", CO_TYPE_BOOL, &app->deckB.MidiRequestHotCueClear[6], 0, 1);
+  CO_Register("[Channel2]", "hotcue_8_clear", CO_TYPE_BOOL, &app->deckB.MidiRequestHotCueClear[7], 0, 1);
   CO_Register("[Channel2]", "memory_set", CO_TYPE_BOOL,
               &app->deckB.MidiRequestMemoryCue, 0, 1);
   CO_Register("[Channel2]", "padmode", CO_TYPE_INT,
@@ -2502,7 +2522,13 @@ void UpdateDrawFrame(App *app) {
 
     // Hot Cues
     for (int j = 0; j < 8; j++) {
-      if (ds->MidiRequestHotCue[j]) {
+      if (ds->MidiRequestHotCueClear[j]) {
+        bool oldShift = app->padState.ShiftActive[i];
+        app->padState.ShiftActive[i] = true;
+        OnPadPress(app, i, j);
+        app->padState.ShiftActive[i] = oldShift;
+        ds->MidiRequestHotCueClear[j] = false;
+      } else if (ds->MidiRequestHotCue[j]) {
         OnPadPress(app, i, j);
         ds->MidiRequestHotCue[j] = false;
       }

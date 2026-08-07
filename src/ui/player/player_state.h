@@ -122,6 +122,7 @@ typedef struct DeckState {
 
   // MIDI Interaction Flags
   bool MidiRequestHotCue[8];
+  bool MidiRequestHotCueClear[8];
   bool MidiRequestLoopIn;
   bool MidiRequestLoopOut;
   bool MidiRequestLoopExit;
