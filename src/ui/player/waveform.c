@@ -805,16 +805,31 @@ static void Waveform_Draw(Component *base) {
             
             // Draw In boundary
             if (bxStart >= wfLeft && bxStart <= wfRight) {
-                Color inCol = r->State->LoopAdjustIn ? (Color){ 255, 255, 0, 255 } : loopCol;
-                DrawLineEx((Vector2){bxStart, wfY}, (Vector2){bxStart, wfY + waveH}, 2.5f, inCol);
-                DrawText("IN", (int)bxStart + 4, (int)wfY + 4, 12, inCol);
+                bool adjIn = r->State->LoopAdjustIn;
+                Color inCol = adjIn ? (Color){ 255, 230, 0, 255 } : loopCol;
+                float lineThick = adjIn ? 4.0f : 2.5f;
+                DrawLineEx((Vector2){bxStart, wfY}, (Vector2){bxStart, wfY + waveH}, lineThick, inCol);
+                DrawRectangleRec((Rectangle){bxStart, wfY + 2, 24, 16}, Fade(inCol, adjIn ? 0.95f : 0.7f));
+                DrawText("IN", (int)bxStart + 4, (int)wfY + 4, 10, BLACK);
             }
             // Draw Out boundary
             if (bxEnd >= wfLeft && bxEnd <= wfRight) {
-                Color outCol = r->State->LoopAdjustOut ? (Color){ 255, 255, 0, 255 } : loopCol;
-                DrawLineEx((Vector2){bxEnd, wfY}, (Vector2){bxEnd, wfY + waveH}, 2.5f, outCol);
-                DrawText("OUT", (int)bxEnd - 28, (int)wfY + 4, 12, outCol);
+                bool adjOut = r->State->LoopAdjustOut;
+                Color outCol = adjOut ? (Color){ 255, 230, 0, 255 } : loopCol;
+                float lineThick = adjOut ? 4.0f : 2.5f;
+                DrawLineEx((Vector2){bxEnd, wfY}, (Vector2){bxEnd, wfY + waveH}, lineThick, outCol);
+                DrawRectangleRec((Rectangle){bxEnd - 28, wfY + 2, 26, 16}, Fade(outCol, adjOut ? 0.95f : 0.7f));
+                DrawText("OUT", (int)bxEnd - 24, (int)wfY + 4, 10, BLACK);
             }
+        }
+
+        // Active Loop Adjust Mode Badge
+        if (r->State->LoopAdjustIn) {
+            DrawRectangleRec((Rectangle){wfLeft + 10, wfY + 6, 106, 20}, Fade((Color){255, 220, 0, 255}, 0.9f));
+            DrawText("LOOP IN ADJ", (int)wfLeft + 16, (int)wfY + 10, 11, BLACK);
+        } else if (r->State->LoopAdjustOut) {
+            DrawRectangleRec((Rectangle){wfRight - 116, wfY + 6, 106, 20}, Fade((Color){255, 220, 0, 255}, 0.9f));
+            DrawText("LOOP OUT ADJ", (int)wfRight - 110, (int)wfY + 10, 11, BLACK);
         }
     }
   }

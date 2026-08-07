@@ -151,16 +151,28 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
       }
     }
   } else if (strstr(function, "cueLoopCallLeft")) {
-    if (value > 0 && targetDeckIdx >= 0 && targetDeckIdx < 2) {
-      COType t;
-      bool *req = (bool *)CO_Find(group, "MidiRequestLoopHalve", &t);
-      if (req) *req = true;
+    static bool callLeftPressed[2] = {false, false};
+    if (targetDeckIdx >= 0 && targetDeckIdx < 2) {
+      if (value > 0) {
+        callLeftPressed[targetDeckIdx] = true;
+      } else if (callLeftPressed[targetDeckIdx]) {
+        callLeftPressed[targetDeckIdx] = false;
+        COType t;
+        bool *req = (bool *)CO_Find(group, "MidiRequestLoopHalve", &t);
+        if (req) *req = true;
+      }
     }
   } else if (strstr(function, "cueLoopCallRight")) {
-    if (value > 0 && targetDeckIdx >= 0 && targetDeckIdx < 2) {
-      COType t;
-      bool *req = (bool *)CO_Find(group, "MidiRequestLoopDouble", &t);
-      if (req) *req = true;
+    static bool callRightPressed[2] = {false, false};
+    if (targetDeckIdx >= 0 && targetDeckIdx < 2) {
+      if (value > 0) {
+        callRightPressed[targetDeckIdx] = true;
+      } else if (callRightPressed[targetDeckIdx]) {
+        callRightPressed[targetDeckIdx] = false;
+        COType t;
+        bool *req = (bool *)CO_Find(group, "MidiRequestLoopDouble", &t);
+        if (req) *req = true;
+      }
     }
   } else if (strstr(function, "tempoSliderMSB")) {
     if (deck >= 0 && deck < 4) {

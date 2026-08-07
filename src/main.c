@@ -2529,14 +2529,9 @@ void UpdateDrawFrame(App *app) {
       }
 
       if (audio->IsLooping) {
-        // Toggle Loop In Adjust mode if inside active loop
+        // Toggle Loop In Adjust mode if inside active loop (Mixxx style)
         ds->LoopAdjustIn = !ds->LoopAdjustIn;
         ds->LoopAdjustOut = false;
-        if (ds->LoopAdjustIn) {
-          audio->Position = audio->LoopStartPos;
-          ds->Position = (audio->LoopStartPos * 150.0) / trackSR;
-          ds->PositionMs = (long long)((audio->LoopStartPos / trackSR) * 1000.0);
-        }
       } else {
         audio->LoopStartPos = pos;
         if (audio->LoopEndPos <= audio->LoopStartPos) {
@@ -2557,12 +2552,9 @@ void UpdateDrawFrame(App *app) {
           ds->LoopAdjustIn = false;
           ds->LoopAdjustOut = false;
         } else {
-          // Toggle Loop Out Adjust mode
+          // Toggle Loop Out Adjust mode (Mixxx style)
           ds->LoopAdjustOut = true;
           ds->LoopAdjustIn = false;
-          audio->Position = audio->LoopEndPos;
-          ds->Position = (audio->LoopEndPos * 150.0) / trackSR;
-          ds->PositionMs = (long long)((audio->LoopEndPos / trackSR) * 1000.0);
         }
       } else {
         if (ds->QuantizeEnabled && ds->LoadedTrack && ds->LoadedTrack->Analysis.BeatGridCount > 0) {
@@ -2803,9 +2795,9 @@ void UpdateDrawFrame(App *app) {
       newStart = audioEngine->Decks[0].LoopEndPos - trackSR * 0.05;
     }
     audioEngine->Decks[0].LoopStartPos = newStart;
-    audioEngine->Decks[0].Position = newStart;
-    app->deckA.Position = (newStart * 150.0) / trackSR;
-    app->deckA.PositionMs = (long long)((newStart / trackSR) * 1000.0);
+    if (audioEngine->Decks[0].Position < newStart) {
+      audioEngine->Decks[0].Position = newStart;
+    }
     DeckAudio_SetLoop(&audioEngine->Decks[0], true, audioEngine->Decks[0].LoopStartPos, audioEngine->Decks[0].LoopEndPos);
     app->deckA.JogDelta = 0;
   } else if (app->deckA.LoopAdjustOut && app->deckA.JogDelta != 0) {
@@ -2817,9 +2809,9 @@ void UpdateDrawFrame(App *app) {
       newEnd = audioEngine->Decks[0].LoopStartPos + trackSR * 0.05;
     }
     audioEngine->Decks[0].LoopEndPos = newEnd;
-    audioEngine->Decks[0].Position = newEnd;
-    app->deckA.Position = (newEnd * 150.0) / trackSR;
-    app->deckA.PositionMs = (long long)((newEnd / trackSR) * 1000.0);
+    if (audioEngine->Decks[0].Position > newEnd) {
+      audioEngine->Decks[0].Position = audioEngine->Decks[0].LoopStartPos;
+    }
     DeckAudio_SetLoop(&audioEngine->Decks[0], true, audioEngine->Decks[0].LoopStartPos, audioEngine->Decks[0].LoopEndPos);
     app->deckA.JogDelta = 0;
   } else if (audioEngine->Decks[0].ReleaseFXType == 2) {
@@ -2876,9 +2868,9 @@ void UpdateDrawFrame(App *app) {
       newStart = audioEngine->Decks[1].LoopEndPos - trackSR * 0.05;
     }
     audioEngine->Decks[1].LoopStartPos = newStart;
-    audioEngine->Decks[1].Position = newStart;
-    app->deckB.Position = (newStart * 150.0) / trackSR;
-    app->deckB.PositionMs = (long long)((newStart / trackSR) * 1000.0);
+    if (audioEngine->Decks[1].Position < newStart) {
+      audioEngine->Decks[1].Position = newStart;
+    }
     DeckAudio_SetLoop(&audioEngine->Decks[1], true, audioEngine->Decks[1].LoopStartPos, audioEngine->Decks[1].LoopEndPos);
     app->deckB.JogDelta = 0;
   } else if (app->deckB.LoopAdjustOut && app->deckB.JogDelta != 0) {
@@ -2890,9 +2882,9 @@ void UpdateDrawFrame(App *app) {
       newEnd = audioEngine->Decks[1].LoopStartPos + trackSR * 0.05;
     }
     audioEngine->Decks[1].LoopEndPos = newEnd;
-    audioEngine->Decks[1].Position = newEnd;
-    app->deckB.Position = (newEnd * 150.0) / trackSR;
-    app->deckB.PositionMs = (long long)((newEnd / trackSR) * 1000.0);
+    if (audioEngine->Decks[1].Position > newEnd) {
+      audioEngine->Decks[1].Position = audioEngine->Decks[1].LoopStartPos;
+    }
     DeckAudio_SetLoop(&audioEngine->Decks[1], true, audioEngine->Decks[1].LoopStartPos, audioEngine->Decks[1].LoopEndPos);
     app->deckB.JogDelta = 0;
   } else if (audioEngine->Decks[1].ReleaseFXType == 2) {
