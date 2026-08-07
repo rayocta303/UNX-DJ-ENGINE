@@ -38,7 +38,7 @@ static void Splash_Draw(Component *base) {
     float sh = tex->height * scale;
 
     float dx = (SCREEN_WIDTH - sw) / 2.0f;
-    float dy = (SCREEN_HEIGHT - sh) / 2.0f - S(10.0f);
+    float dy = (SCREEN_HEIGHT - sh) / 2.0f;
 
     DrawTextureEx(*tex, (Vector2){dx, dy}, 0.0f, scale, WHITE);
   }

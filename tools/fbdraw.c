@@ -48,19 +48,31 @@ int main(int argc, char **argv) {
 
     memset(fbp, 0, screensize);
 
-    int start_x = (int)(fb_w - w) / 2;
-    int start_y = (int)(fb_h - h) / 2;
+    float scale_x = (float)fb_w / (float)w;
+    float scale_y = (float)fb_h / (float)h;
+    float scale = (scale_x < scale_y ? scale_x : scale_y);
+    if (scale > 1.0f) scale = 1.0f;
+
+    int render_w = (int)(w * scale);
+    int render_h = (int)(h * scale);
+
+    int start_x = (int)(fb_w - render_w) / 2;
+    int start_y = (int)(fb_h - render_h) / 2;
     if (start_x < 0) start_x = 0;
     if (start_y < 0) start_y = 0;
 
-    for (int y = 0; y < h && (y + start_y) < (int)fb_h; y++) {
-        for (int x = 0; x < w && (x + start_x) < (int)fb_w; x++) {
+    for (int dy = 0; dy < render_h && (dy + start_y) < (int)fb_h; dy++) {
+        int y = (int)(dy / scale);
+        if (y >= h) y = h - 1;
+        for (int dx = 0; dx < render_w && (dx + start_x) < (int)fb_w; dx++) {
+            int x = (int)(dx / scale);
+            if (x >= w) x = w - 1;
             int src_idx = (y * w + x) * 4;
             uint8_t r = img[src_idx];
             uint8_t g = img[src_idx + 1];
             uint8_t b = img[src_idx + 2];
 
-            long dst_idx = (y + start_y) * finfo.line_length + (x + start_x) * (bpp / 8);
+            long dst_idx = (dy + start_y) * finfo.line_length + (dx + start_x) * (bpp / 8);
 
             if (bpp == 32) {
                 fbp[dst_idx + vinfo.red.offset / 8] = r;
