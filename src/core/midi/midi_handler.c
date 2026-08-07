@@ -216,16 +216,31 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
             lastVinyl[i] = vinylVal;
         }
 
-        // VU Meter Level
+        // VU Meter Level (Channel 1 = 0xB0, Channel 2 = 0xB1, CC 0x02)
         if (engine) {
             float vuL = engine->Decks[i].VuMeterL;
             float vuR = engine->Decks[i].VuMeterR;
             float rms = (vuL > vuR ? vuL : vuR);
-            uint8_t meterVal = (uint8_t)(rms * 0x76);
-            if (rms >= 1.0f) meterVal += 0x09; // Peak/clip indicator
+            uint8_t meterVal = (uint8_t)(rms * 118.0f); // 0x76 = 118
+            if (rms >= 0.98f) meterVal += 9; // Peak/clip indicator -> 127
+            if (meterVal > 127) meterVal = 127;
             if (forceRefresh || meterVal != lastVu[i]) {
-                MIDI_SendShortMsg(vuStatus, vuControl, meterVal);
+                MIDI_SendShortMsg(0xB0 + i, 0x02, meterVal);
                 lastVu[i] = meterVal;
+            }
+        }
+
+        // Jogwheel LED Ring Output (Pioneer 0xBB, Control 0x00 for Deck 1, 0x01 for Deck 2)
+        if (engine && decks[i]->LoadedTrack && engine->Decks[i].SampleRate > 0) {
+            double currentSec = engine->Decks[i].Position / (double)engine->Decks[i].SampleRate;
+            if (currentSec < 0.0) currentSec = 0.0;
+            // 72 steps per 360deg circle (0x48), 0.6075 rotation speed multiplier (33.33 RPM)
+            double jogStep = fmod(currentSec * 72.0 * 0.6075, 72.0);
+            if (jogStep < 0.0) jogStep += 72.0;
+            uint8_t jogVal = (uint8_t)(jogStep) + 1; // 1..72
+            if (forceRefresh || jogVal != lastJog[i]) {
+                MIDI_SendShortMsg(0xBB, i, jogVal);
+                lastJog[i] = jogVal;
             }
         }
 

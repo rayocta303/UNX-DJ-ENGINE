@@ -2924,6 +2924,11 @@ void UpdateDrawFrame(App *app) {
       app->deckA.LoadAnimTimer -= frameDt;
       if (app->deckA.LoadAnimTimer < 0.0f) app->deckA.LoadAnimTimer = 0.0f;
       app->deckA.JogPointerAngle += frameDt * 1440.0f; // Fast spin load animation
+  } else if (app->deckA.LoadedTrack && audioEngine->Decks[0].SampleRate > 0) {
+      double currentSec = audioEngine->Decks[0].Position / (double)audioEngine->Decks[0].SampleRate;
+      float rpmA = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? app->deckA.Waveform.JogCalibRPM : 33.333333f;
+      double revPeriod = 60.0 / (double)rpmA; // 1.8 seconds per 360 deg rotation at 33.33 RPM
+      app->deckA.JogPointerAngle = (float)fmod((currentSec / revPeriod) * 360.0, 360.0);
   } else if (app->deckA.IsPlaying || fabs(audioEngine->Decks[0].JogRate) > 0.01) {
       float rpmA = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? app->deckA.Waveform.JogCalibRPM : 33.333333f;
       float speedA = (app->deckA.IsPlaying ? (1.0f + app->deckA.TempoPercent / 100.0f) : 0.0f) + (float)audioEngine->Decks[0].JogRate;
@@ -2937,6 +2942,11 @@ void UpdateDrawFrame(App *app) {
       app->deckB.LoadAnimTimer -= frameDt;
       if (app->deckB.LoadAnimTimer < 0.0f) app->deckB.LoadAnimTimer = 0.0f;
       app->deckB.JogPointerAngle += frameDt * 1440.0f; // Fast spin load animation
+  } else if (app->deckB.LoadedTrack && audioEngine->Decks[1].SampleRate > 0) {
+      double currentSec = audioEngine->Decks[1].Position / (double)audioEngine->Decks[1].SampleRate;
+      float rpmB = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? app->deckB.Waveform.JogCalibRPM : 33.333333f;
+      double revPeriod = 60.0 / (double)rpmB; // 1.8 seconds per 360 deg rotation at 33.33 RPM
+      app->deckB.JogPointerAngle = (float)fmod((currentSec / revPeriod) * 360.0, 360.0);
   } else if (app->deckB.IsPlaying || fabs(audioEngine->Decks[1].JogRate) > 0.01) {
       float rpmB = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? app->deckB.Waveform.JogCalibRPM : 33.333333f;
       float speedB = (app->deckB.IsPlaying ? (1.0f + app->deckB.TempoPercent / 100.0f) : 0.0f) + (float)audioEngine->Decks[1].JogRate;
