@@ -457,69 +457,77 @@ static void Waveform_Draw(Component *base) {
   Color smCol = {0, 0, 0, 0};
   float yy = wfY + waveCenter;
 
-  // Warm-up: seed smoothed state by simulating 100 frames of motion BEFORE the
-  // x=0 edge. This is CRITICAL for consistency during scrolling. An
-  // Attack/Release filter is state-dependent; by giving it a deep "history"
-  // (pre-roll), its value at x=0 will be the same regardless of sub-pixel
-  // scrolling offsets.
-  {
-    double preRollWidth = 4.0;
-    MemoryLevel mem = MemoryGuard_GetLevel();
-    if (mem >= MEM_MODE_ECO) preRollWidth = 2.0;
+  // --- DATA-DRIVEN RENDERING LOOP ---
+  // Frame-anchored binning: We align startFrame to exact multiples of renderStep.
+  // This guarantees that geometry segments have constant frame widths and frozen peak shapes
+  // during continuous scrolling, completely eliminating stuttering and canvas distortion.
+  double framesPerPixel = zoomDelta;
+  
+  float minPx = (wfLeft - playheadX - 10.0f);
+  float maxPx = (wfRight - playheadX + 10.0f);
+  
+  int renderStep = (int)floor(framesPerPixel);
+  if (renderStep < 1) renderStep = 1;
 
-    for (int i = 0; i <= (int)preRollWidth; i++) {
-      double px = (double)i - preRollWidth;
-      double pA =
-          elapsedHalfFrames * r->dataDensity + (px - centerX) * zoomDelta;
-      double pB = pA + zoomDelta;
+  int64_t rawStart = (int64_t)floor(elapsedHalfFrames * r->dataDensity + minPx * framesPerPixel);
+  int64_t rawEnd = (int64_t)ceil(elapsedHalfFrames * r->dataDensity + maxPx * framesPerPixel);
 
-      if (wfType == 3) {
-        float iL, iM, iH;
-        Get3BandPeak(wfData, wfFrames, pA, pB, &iL, &iM, &iH);
-        float rL = iL * LOW_SCALE * NORM * waveCenter * gLow;
-        float rM = iM * MID_SCALE * NORM * waveCenter * gMid;
-        float rH = iH * HIGH_SCALE * NORM * waveCenter * gHigh;
-        smLo += (rL - smLo) * ((rL > smLo) ? ATK : REL);
-        smMi += (rM - smMi) * ((rM > smMi) ? ATK : REL);
-        smHi += (rH - smHi) * ((rH > smHi) ? ATK : REL);
+  int64_t startFrame = (rawStart / renderStep) * renderStep;
+  if (startFrame < 0) startFrame = 0;
+  int64_t endFrame = ((rawEnd + renderStep - 1) / renderStep) * renderStep;
+  if (endFrame > wfFrames) endFrame = wfFrames;
+
+  // Warm-up: seed smoothed state using exact frame sequence locked to renderStep multiples
+  int64_t preRollStart = startFrame - (int64_t)(32 * renderStep);
+  if (preRollStart < 0) preRollStart = 0;
+
+  for (int64_t k = preRollStart; k < startFrame; k++) {
+    float rL = 0, rM = 0, rH = 0;
+    Color colRaw = {0, 0, 0, 255};
+
+    if (wfType == 3) {
+      rM = (float)wfData[k * 3] * MID_SCALE * NORM * waveCenter * gMid;
+      rH = (float)wfData[k * 3 + 1] * HIGH_SCALE * NORM * waveCenter * gHigh;
+      rL = (float)wfData[k * 3 + 2] * LOW_SCALE * NORM * waveCenter * gLow;
+    } else {
+      int h;
+      if (wfType == 2)
+        h = PWV4_Decode(wfData, k, wfFrames, &colRaw);
+      else
+        h = PWV2_Decode(wfData[k], &colRaw);
+
+      float baseH = h * PWV2_HSCALE;
+      if (wfType == 2) {
+        rL = baseH * ((float)colRaw.r / 255.0f) * gLow;
+        rM = baseH * ((float)colRaw.g / 255.0f) * gMid;
+        rH = baseH * ((float)colRaw.b / 255.0f) * gHigh;
       } else {
-        Color col = {0, 0, 0, 0};
-        int h = 0;
-        int64_t frameIdx = (int64_t)floor(pA + 0.5);
-
-        if (frameIdx >= 0 && frameIdx < wfFrames) {
-          if (wfType == 2)
-            h = PWV4_Decode(wfData, frameIdx, wfFrames, &col);
-          else
-            h = PWV2_Decode(wfData[frameIdx], &col);
-        }
-
-        float rL, rM, rH;
-        float baseH = h * PWV2_HSCALE;
-        if (wfType == 2) {
-          rL = baseH * ((float)col.r / 255.0f) * gLow;
-          rM = baseH * ((float)col.g / 255.0f) * gMid;
-          rH = baseH * ((float)col.b / 255.0f) * gHigh;
+        if (colRaw.r > colRaw.b && colRaw.r > colRaw.g) {
+          rL = baseH * 0.4f * gLow; rM = baseH * 0.9f * gMid; rH = baseH * 0.2f * gHigh;
+        } else if (colRaw.b > colRaw.r && colRaw.b > colRaw.g) {
+          rL = baseH * 0.95f * gLow; rM = baseH * 0.6f * gMid; rH = baseH * 0.1f * gHigh;
         } else {
-          if (col.r > col.b && col.r > col.g) {
-            rL = baseH * 0.4f * gLow; rM = baseH * 0.9f * gMid; rH = baseH * 0.2f * gHigh;
-          } else if (col.b > col.r && col.b > col.g) {
-            rL = baseH * 0.95f * gLow; rM = baseH * 0.6f * gMid; rH = baseH * 0.1f * gHigh;
-          } else {
-            rL = baseH * 0.8f * gLow; rM = baseH * 0.8f * gMid; rH = baseH * 0.6f * gHigh;
-          }
+          rL = baseH * 0.8f * gLow; rM = baseH * 0.8f * gMid; rH = baseH * 0.6f * gHigh;
         }
-
-        smLo += (rL - smLo) * ((rL > smLo) ? ATK : REL);
-        smMi += (rM - smMi) * ((rM > smMi) ? ATK : REL);
-        smHi += (rH - smHi) * ((rH > smHi) ? ATK : REL);
-
-        float coef = (rL > smLo) ? ATK : REL; // Use low for color smoothing
-        smCol.r = (unsigned char)(smCol.r + (col.r - smCol.r) * coef);
-        smCol.g = (unsigned char)(smCol.g + (col.g - smCol.g) * coef);
-        smCol.b = (unsigned char)(smCol.b + (col.b - smCol.b) * coef);
-        smCol.a = 255;
       }
+    }
+
+    smLo += (rL - smLo) * ((rL > smLo) ? ATK : REL);
+    smMi += (rM - smMi) * ((rM > smMi) ? ATK : REL);
+    smHi += (rH - smHi) * ((rH > smHi) ? ATK : REL);
+
+    if (smLo > waveCenter) smLo = waveCenter;
+    if (smMi > waveCenter) smMi = waveCenter;
+    if (smHi > waveCenter) smHi = waveCenter;
+    if (smLo < 0.5f && rL > 0) smLo = 0.5f;
+    if (smMi < 0.5f && rM > 0) smMi = 0.5f;
+    if (smHi < 0.5f && rH > 0) smHi = 0.5f;
+
+    if (wfType != 3) {
+      smCol.r = (unsigned char)(smCol.r + (colRaw.r - smCol.r) * ATK);
+      smCol.g = (unsigned char)(smCol.g + (colRaw.g - smCol.g) * ATK);
+      smCol.b = (unsigned char)(smCol.b + (colRaw.b - smCol.b) * ATK);
+      smCol.a = 255;
     }
   }
 
@@ -533,58 +541,12 @@ static void Waveform_Draw(Component *base) {
     rlVertex2f(cx1, yy - (cA));                                                \
   } while (0)
 
-  // --- DATA-DRIVEN RENDERING LOOP ---
-  // Instead of iterating over screen pixels, we iterate over the waveform data
-  // samples themselves. This ensures that every peak is consistently shaped
-  // and height-stable during scrolling.
-  double framesPerPixel = zoomDelta;
-  
-  // Calculate exact visible frame range bounded by component edges (wfLeft/wfRight)
-  float minPx = (wfLeft - playheadX - 10.0f);
-  float maxPx = (wfRight - playheadX + 10.0f);
-  
-  MemoryLevel mem = MemoryGuard_GetLevel();
-
-  int64_t startFrame =
-      (int64_t)floor(elapsedHalfFrames * r->dataDensity + minPx * framesPerPixel) - 1;
-  int64_t endFrame =
-      (int64_t)ceil(elapsedHalfFrames * r->dataDensity + maxPx * framesPerPixel) + 1;
-
-  if (startFrame < 0)
-    startFrame = 0;
-  if (endFrame > wfFrames)
-    endFrame = wfFrames;
-
-  // --- STEP 2: LEVEL OF DETAIL (LOD) & PIXEL BINNING ---
-  // 'renderStep' determines how many audio frames represent one visual pixel.
-  // Grouping frames reduces GPU vertex traffic significantly when zoomed out.
-  int renderStep = (int)floor(framesPerPixel);
-  if (renderStep < 1) renderStep = 1;
-
   int64_t lastDrawnFrame = startFrame;
   float pLo = smLo, pMi = smMi, pHi = smHi;
   Color pCol = smCol;
-  bool firstFrame = true;
 
   rlBegin(RL_TRIANGLES);
-  for (int64_t i = startFrame; i < endFrame; i++) {
-    // --- STEP 3A: SAMPLE & DECODE EVERY FRAME ---
-    
-    // LOD ADAPTIVE STEPPING: Skip decoding intermediate frames when zoomed out
-    int adaptiveStep = (renderStep > 8 ? 8 : (renderStep > 4 ? 4 : (renderStep > 2 ? 2 : 1)));
-    if (mem >= MEM_MODE_ECO) {
-        float cxCurrent = (float)(((double)i - elapsedHalfFrames * r->dataDensity) / framesPerPixel + playheadX);
-        float distToCenter = fabsf(cxCurrent - playheadX);
-        if (distToCenter > 350) adaptiveStep = 8;
-        else if (distToCenter > 150) adaptiveStep = 4;
-        else if (distToCenter > 60) adaptiveStep = 2;
-    }
-#if defined(__linux__) && !defined(__ANDROID__)
-    // On embedded ARM Linux DRM platforms (like S905X), ensure adaptive step is at least 2 when zoomed out
-    if (renderStep >= 3 && adaptiveStep < 2) adaptiveStep = 2;
-#endif
-    if (adaptiveStep > 1 && (i % adaptiveStep != 0) && i != endFrame - 1) continue;
-
+  for (int64_t i = startFrame + 1; i <= endFrame; i++) {
     float rL = 0, rM = 0, rH = 0;
     Color colRaw = {0, 0, 0, 255};
 
@@ -615,28 +577,17 @@ static void Waveform_Draw(Component *base) {
       }
     }
 
-    // --- STEP 3B: ATTACK/RELEASE SMOOTHING ---
-    // Simulates an analog-style envelope for smooth peak transitions.
-    float curAtk = ATK, curRel = REL;
-    if (adaptiveStep > 1) {
-        // Adjust smoothing coefficients for larger time steps
-        curAtk = 1.0f - powf(1.0f - ATK, (float)adaptiveStep);
-        curRel = 1.0f - powf(1.0f - REL, (float)adaptiveStep);
-    }
+    smLo += (rL - smLo) * ((rL > smLo) ? ATK : REL);
+    smMi += (rM - smMi) * ((rM > smMi) ? ATK : REL);
+    smHi += (rH - smHi) * ((rH > smHi) ? ATK : REL);
 
-    smLo += (rL - smLo) * ((rL > smLo) ? curAtk : curRel);
-    smMi += (rM - smMi) * ((rM > smMi) ? curAtk : curRel);
-    smHi += (rH - smHi) * ((rH > smHi) ? curAtk : curRel);
-
-    // Clamp and add minimum height to prevent empty space
     if (smLo > waveCenter) smLo = waveCenter;
     if (smMi > waveCenter) smMi = waveCenter;
     if (smHi > waveCenter) smHi = waveCenter;
-    
-    // Add noise floor for visibility
     if (smLo < 0.5f && rL > 0) smLo = 0.5f;
     if (smMi < 0.5f && rM > 0) smMi = 0.5f;
     if (smHi < 0.5f && rH > 0) smHi = 0.5f;
+
     if (wfType != 3) {
       smCol.r = (unsigned char)(smCol.r + (colRaw.r - smCol.r) * ATK);
       smCol.g = (unsigned char)(smCol.g + (colRaw.g - smCol.g) * ATK);
@@ -644,17 +595,7 @@ static void Waveform_Draw(Component *base) {
       smCol.a = 255;
     }
 
-    if (firstFrame) {
-      lastDrawnFrame = i;
-      pLo = smLo; pMi = smMi; pHi = smHi; pCol = smCol;
-      firstFrame = false;
-      continue;
-    }
-
-    // --- STEP 3C: ANCHORED BINNING GEOMETRY OUTPUT ---
-    // We only push vertices to the GPU at fixed frame intervals (i % renderStep).
-    // This 'anchoring' to frame indices prevents the "Jello" effect during scroll.
-    if ((i % renderStep == 0) || (i == endFrame - 1)) {
+    if ((i % renderStep == 0) || (i == endFrame)) {
       float cx0 = (float)(((double)lastDrawnFrame - elapsedHalfFrames * r->dataDensity) / framesPerPixel + playheadX);
       float cx1 = (float)(((double)i - elapsedHalfFrames * r->dataDensity) / framesPerPixel + playheadX);
 
