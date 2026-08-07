@@ -1196,11 +1196,21 @@ static int EvdevToRaylibKey(int code) {
     }
 }
 
-static void* EvdevInput_Thread(void* arg) {
-    (void)arg;
+static void EvdevScanDevices(void) {
     for (int i = 0; i < 16; i++) {
+        if (g_evDevCount >= MAX_EVDEV_DEVS) break;
         char devPath[64];
         snprintf(devPath, sizeof(devPath), "/dev/input/event%d", i);
+
+        bool alreadyOpen = false;
+        for (int d = 0; d < g_evDevCount; d++) {
+            if (strcmp(g_evDevs[d].path, devPath) == 0) {
+                alreadyOpen = true;
+                break;
+            }
+        }
+        if (alreadyOpen) continue;
+
         int fd = open(devPath, O_RDONLY | O_NONBLOCK);
         if (fd < 0) continue;
 
@@ -1219,29 +1229,46 @@ static void* EvdevInput_Thread(void* arg) {
             }
         }
 
-        if (g_evDevCount < MAX_EVDEV_DEVS) {
-            g_evDevs[g_evDevCount].fd = fd;
-            strncpy(g_evDevs[g_evDevCount].path, devPath, 63);
-            strncpy(g_evDevs[g_evDevCount].name, name, 127);
-            g_evDevs[g_evDevCount].isTouch = isTouch;
-            g_evDevs[g_evDevCount].maxX = maxX;
-            g_evDevs[g_evDevCount].maxY = maxY;
-            printf("[EVDEV] Listening: %s (%s) [Touch: %s]\n", devPath, name, isTouch ? "YES" : "NO");
-            UNX_LOG_INFO("[EVDEV] Listening: %s (%s) [Touch: %s]", devPath, name, isTouch ? "YES" : "NO");
-            g_evDevCount++;
-        } else {
-            close(fd);
-        }
+        g_evDevs[g_evDevCount].fd = fd;
+        strncpy(g_evDevs[g_evDevCount].path, devPath, 63);
+        strncpy(g_evDevs[g_evDevCount].name, name, 127);
+        g_evDevs[g_evDevCount].isTouch = isTouch;
+        g_evDevs[g_evDevCount].maxX = maxX;
+        g_evDevs[g_evDevCount].maxY = maxY;
+        printf("[EVDEV] Listening: %s (%s) [Touch: %s]\n", devPath, name, isTouch ? "YES" : "NO");
+        UNX_LOG_INFO("[EVDEV] Listening: %s (%s) [Touch: %s]", devPath, name, isTouch ? "YES" : "NO");
+        g_evDevCount++;
     }
+}
 
-    if (g_evDevCount == 0) return NULL;
-
+static void* EvdevInput_Thread(void* arg) {
+    (void)arg;
+    int scanCounter = 500; // Force immediate scan on thread start
     struct input_event ev[32];
+
     while (1) {
+        if (++scanCounter >= 500) { // Every ~2 seconds (500 * 4ms)
+            EvdevScanDevices();
+            scanCounter = 0;
+        }
+
         bool hadEvent = false;
         for (int d = 0; d < g_evDevCount; d++) {
             ssize_t bytes = read(g_evDevs[d].fd, ev, sizeof(ev));
-            if (bytes <= 0) continue;
+            if (bytes <= 0) {
+                if (bytes < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                    continue;
+                }
+                // Device read error or disconnect -> close and remove
+                close(g_evDevs[d].fd);
+                UNX_LOG_INFO("[EVDEV] Device disconnected or closed: %s", g_evDevs[d].path);
+                for (int m = d; m < g_evDevCount - 1; m++) {
+                    g_evDevs[m] = g_evDevs[m + 1];
+                }
+                g_evDevCount--;
+                d--;
+                continue;
+            }
             hadEvent = true;
 
             int count = (int)(bytes / sizeof(struct input_event));
