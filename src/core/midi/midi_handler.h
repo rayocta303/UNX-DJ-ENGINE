@@ -45,6 +45,7 @@ bool MIDI_GetLastMessage(uint8_t *status, uint8_t *midino);
 bool MIDI_PeekLastMessage(uint8_t *status, uint8_t *midino);
 void MIDI_CheckHotplug(MidiContext *ctx);
 bool MIDI_SaveCurrentMapping(const char *name);
+bool MIDI_IsControllerConnected(void);
 
 #endif // MIDI_HANDLER_H
 

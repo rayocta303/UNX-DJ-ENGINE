@@ -21,6 +21,11 @@ static int Settings_Update(Component *base) {
   bool canClick = (now - g_lastSettingsClickTime) >= 0.12;
   Vector2 mouse = UIGetMousePosition();
 
+  // If a sub-window or modal popup is open, disable background item clicking
+  if (r->State->IsDropdownOpen || r->State->IsEditMappingOpen || r->State->IsMappingListOpen) {
+      canClick = false;
+  }
+
   // Handle dropdown intercept
   if (r->State->IsDropdownOpen) {
       SettingItem *item = &r->State->Items[r->State->DropdownItemIdx];
@@ -67,10 +72,11 @@ static int Settings_Update(Component *base) {
       if (r->State->DropdownScroll < 0) r->State->DropdownScroll = 0;
       if (r->State->DropdownScroll > maxScroll) r->State->DropdownScroll = maxScroll;
       
-      if (canClick && UI_IsReleased()) {
+      if (UI_IsReleased()) {
           g_lastSettingsClickTime = now;
           if (!CheckCollisionPointRec(mouse, dropRect)) {
               r->State->IsDropdownOpen = false;
+              UI_ConsumeTouch();
           } else {
               float cy = dropdownY - r->State->DropdownScroll;
               for(int i=0; i<item->OptionsCount; i++) {
@@ -81,6 +87,7 @@ static int Settings_Update(Component *base) {
                           r->State->IsDropdownOpen = false;
                           if (r->OnValueChanged) r->OnValueChanged(r->callbackCtx, r->State->DropdownItemIdx);
                           if (r->OnApply) r->OnApply(r->callbackCtx);
+                          UI_ConsumeTouch();
                       }
                   }
                   cy += opHeight;
@@ -133,7 +140,7 @@ static int Settings_Update(Component *base) {
       Rectangle btn3 = { modalX + S(15), modalY + S(140), S(135), S(24) };
       Rectangle btn4 = { modalX + S(170), modalY + S(140), S(135), S(24) };
 
-      if (canClick && UI_IsReleased()) {
+      if (UI_IsReleased()) {
           Vector2 mousePos = UIGetMousePosition();
           if (CheckCollisionPointRec(mousePos, btn1)) {
               g_lastSettingsClickTime = now;
@@ -141,6 +148,7 @@ static int Settings_Update(Component *base) {
               r->State->LearningItemIdx = r->State->EditMappingItemIdx;
               uint8_t s, m;
               while(MIDI_GetLastMessage(&s, &m)); // Flush
+              UI_ConsumeTouch();
           } else if (CheckCollisionPointRec(mousePos, btn2)) {
               g_lastSettingsClickTime = now;
               if (mapIdx >= 0 && mapIdx < map->count) {
@@ -156,6 +164,7 @@ static int Settings_Update(Component *base) {
                   }
                   if (r->OnApply) r->OnApply(r->callbackCtx);
               }
+              UI_ConsumeTouch();
           } else if (CheckCollisionPointRec(mousePos, btn3)) {
               g_lastSettingsClickTime = now;
               if (mapIdx >= 0 && mapIdx < map->count) {
@@ -164,9 +173,13 @@ static int Settings_Update(Component *base) {
                   strcpy(item->Unit, "0x00:0x00");
                   if (r->OnApply) r->OnApply(r->callbackCtx);
               }
+              UI_ConsumeTouch();
           } else if (CheckCollisionPointRec(mousePos, btn4)) {
               g_lastSettingsClickTime = now;
               r->State->IsEditMappingOpen = false;
+              UI_ConsumeTouch();
+          } else {
+              UI_ConsumeTouch();
           }
       }
 
@@ -177,11 +190,13 @@ static int Settings_Update(Component *base) {
   }
 
   if (r->State->IsMappingListOpen) {
-      // Gather all actual mapping items (indices >= 22)
+      // Gather all actual mapping items
       int mapIndices[MAX_SETTINGS_ITEMS];
       int mapCount = 0;
-      for (int i = 22; i < r->State->ItemsCount; i++) {
-          if (r->State->Items[i].Category == SETTING_CAT_CONTROLLERS) {
+      for (int i = 0; i < r->State->ItemsCount; i++) {
+          if (r->State->Items[i].Category == SETTING_CAT_CONTROLLERS &&
+              strcmp(r->State->Items[i].Label, "CONNECTED DEVICE") != 0 &&
+              strcmp(r->State->Items[i].Label, "MAPPING PRESET") != 0) {
               mapIndices[mapCount++] = i;
           }
       }
@@ -194,7 +209,7 @@ static int Settings_Update(Component *base) {
       int visibleRows = (int)((divY - listY) / rowH);
 
       // Mouse click list item inside mapping list sub-window
-      if (canClick && UI_IsReleased()) {
+      if (UI_IsReleased()) {
           Vector2 mousePos = UIGetMousePosition();
           
           // Back Button at the bottom
@@ -202,6 +217,7 @@ static int Settings_Update(Component *base) {
           if (CheckCollisionPointRec(mousePos, backRect)) {
               g_lastSettingsClickTime = now;
               r->State->IsMappingListOpen = false;
+              UI_ConsumeTouch();
               return 1;
           }
           
@@ -210,6 +226,7 @@ static int Settings_Update(Component *base) {
           if (CheckCollisionPointRec(mousePos, createRect)) {
               g_lastSettingsClickTime = now;
               if (r->OnAction) r->OnAction(r->callbackCtx, 20);
+              UI_ConsumeTouch();
               return 1;
           }
           
@@ -218,6 +235,7 @@ static int Settings_Update(Component *base) {
           if (CheckCollisionPointRec(mousePos, saveRect)) {
               g_lastSettingsClickTime = now;
               if (r->OnAction) r->OnAction(r->callbackCtx, 21);
+              UI_ConsumeTouch();
               return 1;
           }
           
@@ -376,13 +394,17 @@ static int Settings_Update(Component *base) {
               } else if (item->Type == SETTING_TYPE_KNOB) {
                   r->State->FocusLevel = 2;
               } else if (item->Type == SETTING_TYPE_ACTION) {
-                  if (item->Category == SETTING_CAT_CONTROLLERS && idx >= MIDI_MAPPING_START_IDX) {
-                      r->State->IsEditMappingOpen = true;
-                      r->State->EditMappingItemIdx = idx;
-                  } else if (idx == 20) {
-                      r->State->IsMappingListOpen = true;
-                      r->State->MappingListScroll = 0;
-                      r->State->MappingListCursorPos = 0;
+                  if (item->Category == SETTING_CAT_CONTROLLERS &&
+                      strcmp(item->Label, "CONNECTED DEVICE") != 0 &&
+                      strcmp(item->Label, "MAPPING PRESET") != 0) {
+                      if (strcmp(item->Label, "EDIT MAPPING LIST") == 0) {
+                          r->State->IsMappingListOpen = true;
+                          r->State->MappingListScroll = 0;
+                          r->State->MappingListCursorPos = 0;
+                      } else {
+                          r->State->IsEditMappingOpen = true;
+                          r->State->EditMappingItemIdx = idx;
+                      }
                   } else {
                       if (r->OnAction) r->OnAction(r->callbackCtx, idx);
                   }
@@ -566,17 +588,19 @@ static int Settings_Update(Component *base) {
           r->State->CursorPos = i; 
           
           SettingItem *clickedItem = &r->State->Items[idx];
-          if (clickedItem->Category == SETTING_CAT_CONTROLLERS && idx >= MIDI_MAPPING_START_IDX) {
-              r->State->IsEditMappingOpen = true;
-              r->State->EditMappingItemIdx = idx;
-              return 1;
-          } else if (clickedItem->Type == SETTING_TYPE_ACTION) {
-              if (idx == 20) {
+          if (clickedItem->Category == SETTING_CAT_CONTROLLERS &&
+              strcmp(clickedItem->Label, "CONNECTED DEVICE") != 0 &&
+              strcmp(clickedItem->Label, "MAPPING PRESET") != 0) {
+              if (strcmp(clickedItem->Label, "EDIT MAPPING LIST") == 0) {
                   r->State->IsMappingListOpen = true;
                   r->State->MappingListScroll = 0;
                   r->State->MappingListCursorPos = 0;
-                  return 1;
+              } else {
+                  r->State->IsEditMappingOpen = true;
+                  r->State->EditMappingItemIdx = idx;
               }
+              return 1;
+          } else if (clickedItem->Type == SETTING_TYPE_ACTION) {
               if (r->OnAction)
                 r->OnAction(r->callbackCtx, idx);
           } else if (clickedItem->Type == SETTING_TYPE_LIST) {

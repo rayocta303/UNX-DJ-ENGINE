@@ -143,6 +143,13 @@ void UI_UpdateTouchState(void) {
 
 static double g_lastUIClickTime = -1.0;
 
+void UI_ConsumeTouch(void) {
+    g_touchDragDistance = 9999.0f;
+    g_lastUIClickTime = GetTime();
+    g_touchStartPos = (Vector2){ -9999.0f, -9999.0f };
+    g_lastMouseReleaseTime = -1.0;
+}
+
 bool UICheckClick(Rectangle rect) {
     double now = GetTime();
     if (!UI_IsReleased()) return false;

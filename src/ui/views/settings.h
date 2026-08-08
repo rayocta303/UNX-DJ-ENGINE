@@ -5,7 +5,7 @@
 
 #define MAX_SETTING_OPTIONS 32
 #define MAX_SETTINGS_ITEMS 512
-#define MIDI_MAPPING_START_IDX 23
+#define MIDI_MAPPING_START_IDX 25
 
 typedef enum {
   SETTING_TYPE_LIST,
@@ -67,6 +67,12 @@ typedef struct {
   bool IsMappingListOpen;
   int MappingListScroll;
   int MappingListCursorPos;
+
+  bool IsSliderPopupOpen;
+  int SliderPopupItemIdx;
+  double LastKnobTapTime;
+  int LastKnobTapItemIdx;
+  Vector2 LastKnobTapPos;
 
   int FocusLevel; // 0 = Category/Tab selection, 1 = Sub-menu/List item selection, 2 = Active Value Editing
   int MidiBrowseDelta;

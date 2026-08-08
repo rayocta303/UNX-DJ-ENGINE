@@ -1,6 +1,7 @@
 #include "ui/components/fonts.h"
 #include "ui/components/theme.h"
 #include <stdio.h>
+#include <string.h>
 
 #include "ui/components/assets_bundle.h"
 #include "core/logger.h"
@@ -32,7 +33,7 @@ void UIFonts_Init(void) {
       ios_get_bundle_path("assets/fonts/Inter-Bold.ttf");
 #else
   const char *fontPathBundled = "assets/fonts/Inter-Regular.ttf";
-  const char *boldPathBundled = "assets/fonts/Inter-Bold.ttf";
+  const char *boldPathBundled = FileExists("assets/fonts/Inter-Bold.ttf") ? "assets/fonts/Inter-Bold.ttf" : fontPathBundled;
 #endif
 
 #if defined(PLATFORM_IOS)
@@ -44,7 +45,11 @@ void UIFonts_Init(void) {
   UNX_LOG_INFO("[FONTS] Loading default from: %s", fontPathBundled);
   defaultFace = LoadFontEx(fontPathBundled, fontSize, 0, 0);
   UNX_LOG_INFO("[FONTS] Loading bold from: %s", boldPathBundled);
-  boldFace = LoadFontEx(boldPathBundled, fontSize, 0, 0);
+  if (strcmp(boldPathBundled, fontPathBundled) == 0) {
+    boldFace = defaultFace;
+  } else {
+    boldFace = LoadFontEx(boldPathBundled, fontSize, 0, 0);
+  }
   
   UNX_LOG_INFO("[FONTS] Result: Default ID=%u, Bold ID=%u", defaultFace.texture.id, boldFace.texture.id);
 
@@ -70,13 +75,13 @@ void UIFonts_Init(void) {
   }
 
   // Common Unicode ranges for Font Awesome 5/6 (PUA range)
-  // Most icons are in 0xF000 - 0xF8FF
+  // Most active icons are in 0xF000 - 0xF350
   UNX_LOG_INFO("[FONTS] Preparing icon codepoints...");
-  int codepoints[3000];
+  int codepoints[1024];
   int count = 0;
   for (int i = 32; i < 127; i++)
     codepoints[count++] = i;
-  for (int i = 0xF000; i <= 0xF8FF; i++)
+  for (int i = 0xF000; i <= 0xF350; i++)
     codepoints[count++] = i;
 
   // UI Symbols (Stars, Triangles, etc)
@@ -87,19 +92,21 @@ void UIFonts_Init(void) {
   codepoints[count++] = 0x266A; // eighth note
   codepoints[count++] = 0x2022; // bullet
 
+  int iconFontSize = 32;
+
   UNX_LOG_INFO(
-      "[FONTS] Loading icon fonts from memory (this may take a moment)...");
+      "[FONTS] Loading icon fonts from memory (optimized range)...");
   // Font Awesome 5 Solid - Loaded from Memory
   iconSolid =
       LoadFontFromMemory(".otf", font_awesome_solid, font_awesome_solid_size,
-                         fontSize, codepoints, count);
+                         iconFontSize, codepoints, count);
   if (iconSolid.texture.id == 0) {
     printf("[FONT] Failed to load solid icon font from memory\n");
   }
 
   // Font Awesome 5 Regular - Loaded from Memory
   iconRegular = LoadFontFromMemory(".otf", font_awesome_regular,
-                                   font_awesome_regular_size, fontSize,
+                                   font_awesome_regular_size, iconFontSize,
                                    codepoints, count);
   if (iconRegular.texture.id == 0) {
     printf("[FONT] Failed to load regular icon font from memory\n");
@@ -108,7 +115,7 @@ void UIFonts_Init(void) {
   // Font Awesome 5 Brands - Loaded from Memory
   iconBrand =
       LoadFontFromMemory(".otf", font_awesome_brand, font_awesome_brand_size,
-                         fontSize, codepoints, count);
+                         iconFontSize, codepoints, count);
   if (iconBrand.texture.id == 0) {
     printf("[FONT] Failed to load brand icon font from memory\n");
   }
@@ -116,11 +123,13 @@ void UIFonts_Init(void) {
 }
 
 void UIFonts_Unload(void) {
-  UnloadFont(defaultFace);
-  UnloadFont(boldFace);
-  UnloadFont(iconSolid);
-  UnloadFont(iconRegular);
-  UnloadFont(iconBrand);
+  if (defaultFace.texture.id != 0) UnloadFont(defaultFace);
+  if (boldFace.texture.id != 0 && boldFace.texture.id != defaultFace.texture.id) {
+    UnloadFont(boldFace);
+  }
+  if (iconSolid.texture.id != 0) UnloadFont(iconSolid);
+  if (iconRegular.texture.id != 0) UnloadFont(iconRegular);
+  if (iconBrand.texture.id != 0) UnloadFont(iconBrand);
 }
 
 Font UIFonts_GetFace(float size) {

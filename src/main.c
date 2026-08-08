@@ -129,6 +129,10 @@ typedef struct {
   KeyboardMapping keyMap;
   MidiContext midiCtx;
   bool showExitConfirm;
+  bool showPowerPopup;
+  bool showRestartAppConfirm;
+  bool showPowerActionConfirm;
+  int pendingPowerAction; // 1 = Reboot OS, 2 = Hibernate OS, 3 = Shutdown OS
   float masterVolume; // Persisted master output level (0.0 - 1.0)
   AudioBackendConfig activeAudioConfig;
 
@@ -462,6 +466,10 @@ void OnSettingsAction(void *ctx, int idx) {
   } else if (strcmp(item->Label, "CREDITS") == 0) {
     a->screen = ScreenCredits;
     a->creditsState.IsActive = true;
+  } else if (strcmp(item->Label, "RESTART APP") == 0) {
+    a->showRestartAppConfirm = true;
+  } else if (strcmp(item->Label, "OS POWER") == 0) {
+    a->showPowerPopup = true;
   } else if (strcmp(item->Label, "EXIT APPLICATION") == 0) {
     a->showExitConfirm = true;
   }
@@ -643,49 +651,52 @@ void PopulateJogSettings(App *a) {
 }
 
 void PopulateMidiSettings(App *a) {
-  // --- CONNECTED DEVICE SELECTION ITEM (Index 21) ---
+  int startIdx = a->settingsState.ItemsCount;
+  if (startIdx < 22) startIdx = 22;
+
+  // --- CONNECTED DEVICE SELECTION ITEM ---
   char devNames[16][64];
   int devCount = MIDI_GetDeviceList(devNames);
 
-  strcpy(a->settingsState.Items[21].Label, "CONNECTED DEVICE");
-  a->settingsState.Items[21].Type = SETTING_TYPE_LIST;
-  a->settingsState.Items[21].Category = SETTING_CAT_CONTROLLERS;
+  strcpy(a->settingsState.Items[startIdx].Label, "CONNECTED DEVICE");
+  a->settingsState.Items[startIdx].Type = SETTING_TYPE_LIST;
+  a->settingsState.Items[startIdx].Category = SETTING_CAT_CONTROLLERS;
   
-  strcpy(a->settingsState.Items[21].Options[0], "AUTO DETECT");
+  strcpy(a->settingsState.Items[startIdx].Options[0], "AUTO DETECT");
   for (int i = 0; i < devCount && (i + 1) < MAX_SETTING_OPTIONS; i++) {
-    strncpy(a->settingsState.Items[21].Options[i + 1], devNames[i], 31);
+    strncpy(a->settingsState.Items[startIdx].Options[i + 1], devNames[i], 31);
   }
-  a->settingsState.Items[21].OptionsCount = devCount + 1;
+  a->settingsState.Items[startIdx].OptionsCount = devCount + 1;
   
-  a->settingsState.Items[21].Current = 0;
+  a->settingsState.Items[startIdx].Current = 0;
   if (a->midiCtx.activeDeviceName[0] != '\0') {
     for (int i = 0; i < devCount; i++) {
       if (strstr(devNames[i], a->midiCtx.activeDeviceName) || strstr(a->midiCtx.activeDeviceName, devNames[i])) {
-        a->settingsState.Items[21].Current = i + 1;
+        a->settingsState.Items[startIdx].Current = i + 1;
         break;
       }
     }
   }
 
-  // --- PRESET SELECTION ITEM (Index 22) ---
+  // --- PRESET SELECTION ITEM ---
   char names[32][64];
   a->midiPresetCount =
       MIDI_ListControllers("controllers", names, a->midiPresetPaths);
 
-  strcpy(a->settingsState.Items[22].Label, "MAPPING PRESET");
-  a->settingsState.Items[22].Type = SETTING_TYPE_LIST;
-  a->settingsState.Items[22].Category = SETTING_CAT_CONTROLLERS;
-  a->settingsState.Items[22].OptionsCount = a->midiPresetCount;
-  a->settingsState.Items[22].Current = 0;
+  strcpy(a->settingsState.Items[startIdx + 1].Label, "MAPPING PRESET");
+  a->settingsState.Items[startIdx + 1].Type = SETTING_TYPE_LIST;
+  a->settingsState.Items[startIdx + 1].Category = SETTING_CAT_CONTROLLERS;
+  a->settingsState.Items[startIdx + 1].OptionsCount = a->midiPresetCount;
+  a->settingsState.Items[startIdx + 1].Current = 0;
 
   for (int i = 0; i < a->midiPresetCount; i++) {
-    strncpy(a->settingsState.Items[22].Options[i], names[i], 31);
+    strncpy(a->settingsState.Items[startIdx + 1].Options[i], names[i], 31);
     if (strcmp(a->activeControllerPath, a->midiPresetPaths[i]) == 0) {
-      a->settingsState.Items[22].Current = i;
+      a->settingsState.Items[startIdx + 1].Current = i;
     }
   }
 
-  a->settingsState.ItemsCount = 23;
+  a->settingsState.ItemsCount = startIdx + 2;
   PopulateJogSettings(a);
 }
 
@@ -1321,10 +1332,22 @@ void App_Init(App *a) {
   a->settingsState.Items[19].Type = SETTING_TYPE_ACTION;
   a->settingsState.Items[19].Category = SETTING_CAT_SYSTEM;
 
-  strcpy(a->settingsState.Items[20].Label, "EXIT APPLICATION");
+  strcpy(a->settingsState.Items[20].Label, "RESTART APP");
   a->settingsState.Items[20].Type = SETTING_TYPE_ACTION;
   a->settingsState.Items[20].Category = SETTING_CAT_SYSTEM;
-  a->settingsState.ItemsCount = 21;
+
+  strcpy(a->settingsState.Items[21].Label, "OS POWER");
+  a->settingsState.Items[21].Type = SETTING_TYPE_ACTION;
+  a->settingsState.Items[21].Category = SETTING_CAT_SYSTEM;
+
+  int sysCount = 22;
+#if !defined(PLATFORM_DRM)
+  strcpy(a->settingsState.Items[sysCount].Label, "EXIT APPLICATION");
+  a->settingsState.Items[sysCount].Type = SETTING_TYPE_ACTION;
+  a->settingsState.Items[sysCount].Category = SETTING_CAT_SYSTEM;
+  sysCount++;
+#endif
+  a->settingsState.ItemsCount = sysCount;
 
   // Set Load Lock current opt
   a->settingsState.Items[1].Current = a->deckA.Waveform.LoadLock ? 1 : 0;
@@ -1796,8 +1819,6 @@ Log_LogDeviceInfo(gpuModel);
 
   MIDI_Init(&app->midiCtx);
 
-  // MIDI_Init auto-scans connected devices and may overwrite the saved mapping.
-  // Re-apply the user's saved controller preset and re-populate the UI.
   if (app->activeControllerPath[0] != '\0') {
     MIDI_RefreshMapping(app->activeControllerPath);
   }
@@ -2400,6 +2421,38 @@ void ManageArtwork(DeckState *ds) {
   ArtworkLoader_Kick(pend, fixedPath);
 }
 
+static void System_RebootOS(void) {
+    UNX_LOG_INFO("[SYSTEM] Executing system reboot...");
+#if defined(__linux__)
+    system("systemctl reboot || reboot");
+#elif defined(_WIN32)
+    system("shutdown /r /t 0");
+#endif
+}
+
+static void System_HibernateOS(void) {
+    UNX_LOG_INFO("[SYSTEM] Executing system hibernation / sleep...");
+#if defined(__linux__)
+    system("systemctl hibernate || systemctl suspend || echo mem > /sys/power/state");
+#endif
+}
+
+static void System_ShutdownOS(void) {
+    UNX_LOG_INFO("[SYSTEM] Executing system poweroff...");
+#if defined(__linux__)
+    system("systemctl poweroff || poweroff");
+#elif defined(_WIN32)
+    system("shutdown /s /t 0");
+#endif
+}
+
+static void System_RestartApp(void) {
+    UNX_LOG_INFO("[SYSTEM] Executing application restart...");
+#if defined(__linux__)
+    system("systemctl restart xdjunx_drm.service &");
+#endif
+    exit(0);
+}
 
 void UpdateDrawFrame(App *app) {
   static bool firstCall = true;
@@ -2567,11 +2620,7 @@ void UpdateDrawFrame(App *app) {
   if (app->screen == ScreenSplash) {
     static float splashTime = 0;
     splashTime += GetFrameTime();
-#if defined(PLATFORM_DRM) || (defined(__linux__) && !defined(__ANDROID__))
-    if (splashTime >= 0.8f) { // 0.8 Seconds fast boot splash on DRM
-#else
-    if (splashTime >= 1.5f) { // 1.5 Seconds splash
-#endif
+    if (splashTime >= 1.5f) { // Standard 1.5 Seconds splash
       SplashRenderer_Unload(&app->splash);
       app->screen = ScreenPlayer;
     }
@@ -3674,15 +3723,170 @@ void UpdateDrawFrame(App *app) {
       if (noHover)
         app->showExitConfirm = false;
       if (yesHover) {
-        // In a callback-based loop, we might need a flag to exit
-        // For now, we'll just keep it as is, but it won't exit cleanly on iOS
-        // unless the platform handles it.
+        exit(0);
       }
-    }
-    if (IsKeyPressed(KEY_ENTER)) { /* handle */
+      UI_ConsumeTouch();
     }
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE))
       app->showExitConfirm = false;
+  }
+
+  // --- OS POWER SELECTION POPUP OVERLAY ---
+  if (app->showPowerPopup) {
+    float pw = S(280);
+    float ph = S(200);
+    float px = (SCREEN_WIDTH - pw) / 2.0f;
+    float py = (SCREEN_HEIGHT - ph) / 2.0f;
+
+    DrawRectangle(-UI_OffsetX, -UI_OffsetY, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, 0.8f));
+    DrawRectangle(px, py, pw, ph, ColorBGUtil);
+    DrawRectangleLinesEx((Rectangle){px, py, pw, ph}, 1.5f, (Color){0, 160, 255, 255});
+
+    Font fMd = UIFonts_GetFace(S(12));
+    Font fSm = UIFonts_GetFace(S(10));
+    DrawCentredText("OS POWER OPTIONS", fMd, px, pw, py + S(12), S(12), ColorWhite);
+    DrawCentredText("Select system power action", fSm, px, pw, py + S(28), S(9), ColorShadow);
+
+    float btnW = S(240);
+    float btnH = S(28);
+    float btnX = px + (pw - btnW) / 2.0f;
+    Vector2 mPos = UIGetMousePosition();
+
+    // 1. REBOOT OS
+    Rectangle r1 = {btnX, py + S(46), btnW, btnH};
+    bool h1 = CheckCollisionPointRec(mPos, r1);
+    DrawRectangleRec(r1, h1 ? (Color){0, 140, 220, 255} : (Color){20, 30, 45, 255});
+    DrawRectangleLinesEx(r1, 1.0f, (Color){0, 160, 255, 255});
+    DrawCentredText("REBOOT SYSTEM", fMd, btnX, btnW, py + S(54), S(11), ColorWhite);
+
+    // 2. HIBERNATE OS
+    Rectangle r2 = {btnX, py + S(80), btnW, btnH};
+    bool h2 = CheckCollisionPointRec(mPos, r2);
+    DrawRectangleRec(r2, h2 ? (Color){140, 60, 220, 255} : (Color){35, 20, 45, 255});
+    DrawRectangleLinesEx(r2, 1.0f, (Color){160, 80, 255, 255});
+    DrawCentredText("HIBERNATE / DEEP SLEEP", fMd, btnX, btnW, py + S(88), S(11), ColorWhite);
+
+    // 3. SHUTDOWN OS
+    Rectangle r3 = {btnX, py + S(114), btnW, btnH};
+    bool h3 = CheckCollisionPointRec(mPos, r3);
+    DrawRectangleRec(r3, h3 ? (Color){220, 50, 50, 255} : (Color){45, 20, 20, 255});
+    DrawRectangleLinesEx(r3, 1.0f, (Color){255, 60, 60, 255});
+    DrawCentredText("SHUTDOWN SYSTEM", fMd, btnX, btnW, py + S(122), S(11), ColorWhite);
+
+    // 4. CANCEL
+    Rectangle r4 = {btnX, py + S(154), btnW, S(24)};
+    bool h4 = CheckCollisionPointRec(mPos, r4);
+    DrawRectangleRec(r4, h4 ? ColorGray : ColorDark1);
+    DrawRectangleLinesEx(r4, 1.0f, ColorShadow);
+    DrawCentredText("CANCEL", fSm, btnX, btnW, py + S(160), S(10), ColorWhite);
+
+    if (UI_IsReleased()) {
+      if (h1) { app->showPowerPopup = false; app->pendingPowerAction = 1; app->showPowerActionConfirm = true; }
+      else if (h2) { app->showPowerPopup = false; app->pendingPowerAction = 2; app->showPowerActionConfirm = true; }
+      else if (h3) { app->showPowerPopup = false; app->pendingPowerAction = 3; app->showPowerActionConfirm = true; }
+      else if (h4) { app->showPowerPopup = false; }
+      UI_ConsumeTouch();
+    }
+    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) app->showPowerPopup = false;
+  }
+
+  // --- POWER ACTION CONFIRMATION DIALOG OVERLAY ---
+  if (app->showPowerActionConfirm) {
+    float pw = S(240);
+    float ph = S(110);
+    float px = (SCREEN_WIDTH - pw) / 2.0f;
+    float py = (SCREEN_HEIGHT - ph) / 2.0f;
+
+    DrawRectangle(-UI_OffsetX, -UI_OffsetY, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, 0.8f));
+    DrawRectangle(px, py, pw, ph, ColorBGUtil);
+    DrawRectangleLinesEx((Rectangle){px, py, pw, ph}, 1.0f, ColorRed);
+
+    Font fMd = UIFonts_GetFace(S(12));
+    Font fSm = UIFonts_GetFace(S(9));
+    const char *titleStr = "CONFIRM POWER ACTION";
+    const char *subStr = "Are you sure?";
+    if (app->pendingPowerAction == 1) { titleStr = "REBOOT SYSTEM?"; subStr = "System will restart now."; }
+    else if (app->pendingPowerAction == 2) { titleStr = "HIBERNATE SYSTEM?"; subStr = "System will enter deep sleep."; }
+    else if (app->pendingPowerAction == 3) { titleStr = "SHUTDOWN SYSTEM?"; subStr = "System will power off."; }
+
+    DrawCentredText(titleStr, fMd, px, pw, py + S(18), S(12), ColorWhite);
+    DrawCentredText(subStr, fSm, px, pw, py + S(38), S(9), ColorShadow);
+
+    float btnW = S(75);
+    float btnH = S(24);
+    Vector2 mPos = UIGetMousePosition();
+
+    // CANCEL / NO
+    Rectangle rNo = {px + S(25), py + S(68), btnW, btnH};
+    bool noHover = CheckCollisionPointRec(mPos, rNo);
+    DrawRectangleRec(rNo, noHover ? ColorGray : ColorDark1);
+    DrawRectangleLinesEx(rNo, 1.0f, ColorShadow);
+    DrawCentredText("CANCEL", fMd, px + S(25), btnW, py + S(74), S(10), ColorWhite);
+
+    // YES
+    Rectangle rYes = {px + pw - S(100), py + S(68), btnW, btnH};
+    bool yesHover = CheckCollisionPointRec(mPos, rYes);
+    DrawRectangleRec(rYes, yesHover ? ColorRed : (Color){60, 20, 20, 255});
+    DrawRectangleLinesEx(rYes, 1.0f, ColorRed);
+    DrawCentredText("CONFIRM", fMd, px + pw - S(100), btnW, py + S(74), S(10), ColorWhite);
+
+    if (UI_IsReleased()) {
+      if (noHover) app->showPowerActionConfirm = false;
+      if (yesHover) {
+        app->showPowerActionConfirm = false;
+        if (app->pendingPowerAction == 1) System_RebootOS();
+        else if (app->pendingPowerAction == 2) System_HibernateOS();
+        else if (app->pendingPowerAction == 3) System_ShutdownOS();
+      }
+      UI_ConsumeTouch();
+    }
+    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) app->showPowerActionConfirm = false;
+  }
+
+  // --- RESTART APP CONFIRMATION DIALOG OVERLAY ---
+  if (app->showRestartAppConfirm) {
+    float pw = S(240);
+    float ph = S(110);
+    float px = (SCREEN_WIDTH - pw) / 2.0f;
+    float py = (SCREEN_HEIGHT - ph) / 2.0f;
+
+    DrawRectangle(-UI_OffsetX, -UI_OffsetY, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, 0.8f));
+    DrawRectangle(px, py, pw, ph, ColorBGUtil);
+    DrawRectangleLinesEx((Rectangle){px, py, pw, ph}, 1.0f, (Color){255, 140, 0, 255});
+
+    Font fMd = UIFonts_GetFace(S(12));
+    Font fSm = UIFonts_GetFace(S(9));
+
+    DrawCentredText("RESTART APPLICATION?", fMd, px, pw, py + S(18), S(12), ColorWhite);
+    DrawCentredText("XDJ-UNX engine will reload.", fSm, px, pw, py + S(38), S(9), ColorShadow);
+
+    float btnW = S(75);
+    float btnH = S(24);
+    Vector2 mPos = UIGetMousePosition();
+
+    // CANCEL / NO
+    Rectangle rNo = {px + S(25), py + S(68), btnW, btnH};
+    bool noHover = CheckCollisionPointRec(mPos, rNo);
+    DrawRectangleRec(rNo, noHover ? ColorGray : ColorDark1);
+    DrawRectangleLinesEx(rNo, 1.0f, ColorShadow);
+    DrawCentredText("CANCEL", fMd, px + S(25), btnW, py + S(74), S(10), ColorWhite);
+
+    // YES
+    Rectangle rYes = {px + pw - S(100), py + S(68), btnW, btnH};
+    bool yesHover = CheckCollisionPointRec(mPos, rYes);
+    DrawRectangleRec(rYes, yesHover ? (Color){255, 140, 0, 255} : (Color){50, 30, 0, 255});
+    DrawRectangleLinesEx(rYes, 1.0f, (Color){255, 140, 0, 255});
+    DrawCentredText("RESTART", fMd, px + pw - S(100), btnW, py + S(74), S(10), ColorWhite);
+
+    if (UI_IsReleased()) {
+      if (noHover) app->showRestartAppConfirm = false;
+      if (yesHover) {
+        app->showRestartAppConfirm = false;
+        System_RestartApp();
+      }
+      UI_ConsumeTouch();
+    }
+    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) app->showRestartAppConfirm = false;
   }
 
   // GLOBAL MEMORY WARNING OVERLAY

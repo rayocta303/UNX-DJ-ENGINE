@@ -32,9 +32,10 @@ int main(int argc, char *argv[]) {
 
     DIR *dir = opendir(dir_path);
     if (!dir) {
-        perror("Failed to open directory");
+        fprintf(out, "#define SPLASH_FRAME_COUNT 0\n\n#endif\n");
         fclose(out);
-        return 1;
+        printf("Splash frame directory '%s' not found. Generated empty splash bundle.\n", dir_path);
+        return 0;
     }
 
     struct dirent *entry;

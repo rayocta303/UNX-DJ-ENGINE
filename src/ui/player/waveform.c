@@ -9,6 +9,7 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
+#include "core/midi/midi_handler.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -145,15 +146,17 @@ static int Waveform_Update(Component *base) {
 
   static bool isMouseTouchingWaveform[2] = {false, false};
   int dId = (r->State->ID >= 0 && r->State->ID < 2) ? r->State->ID : 0;
+  bool midiConnected = MIDI_IsControllerConnected();
 
-  if (inWaveform && UI_IsPressed()) {
+  // If a physical DJ controller is connected, disable UI waveform touch/scratch interaction
+  if (!midiConnected && inWaveform && UI_IsPressed()) {
     r->State->IsTouching = true;
     isMouseTouchingWaveform[dId] = true;
     r->lastMouseX = mouse.x;
   }
 
   if (isMouseTouchingWaveform[dId]) {
-    if (UI_IsDown()) {
+    if (!midiConnected && UI_IsDown()) {
       float dx = mouse.x - r->lastMouseX;
       r->lastMouseX = mouse.x;
 

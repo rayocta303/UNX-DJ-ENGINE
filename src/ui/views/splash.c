@@ -100,7 +100,7 @@ void SplashRenderer_Init(SplashRenderer *s, int *progress) {
     loaded = true;
   }
 
-#ifdef SPLASH_FRAME_COUNT
+#if defined(SPLASH_FRAME_COUNT) && (SPLASH_FRAME_COUNT > 0)
   // 2. Try first frame of splash bundle if logo was not available
   if (!loaded && splash_frames[0] != NULL) {
     Image imgFrame = LoadImageFromMemory(".png", splash_frames[0], splash_frames_size[0]);

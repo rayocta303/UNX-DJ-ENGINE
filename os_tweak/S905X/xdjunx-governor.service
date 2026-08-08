@@ -1,0 +1,12 @@
+[Unit]
+Description=Set CPU Governor to Performance for XDJ-UNX
+After=sysinit.target local-fs.target
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'for g in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do [ -f "$g" ] && echo performance > "$g"; done'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target

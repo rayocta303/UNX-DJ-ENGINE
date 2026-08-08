@@ -96,6 +96,7 @@ void WinMIDI_Close(void);
 #endif
 
 static MidiMapping global_mapping;
+static MidiContext *g_activeMidiCtx = NULL;
 
 static uint8_t lastStatus = 0;
 static uint8_t lastMidino = 0;
@@ -221,6 +222,7 @@ bool MIDI_SelectDevice(MidiContext *ctx, int deviceIndex, char *outDeviceName,
   if (ctx) {
     ctx->currentDevId = deviceIndex;
     strncpy(ctx->activeDeviceName, deviceName, 127);
+    g_activeMidiCtx = ctx;
   }
 
   if (MIDI_ScanControllers("controllers", deviceName, &global_mapping)) {
@@ -294,6 +296,7 @@ bool MIDI_Init(MidiContext *ctx) {
 
   ctx->currentDevId = 0;
   strncpy(ctx->activeDeviceName, deviceName, 127);
+  g_activeMidiCtx = ctx;
 
   if (!MIDI_ScanControllers("controllers", deviceName, &global_mapping)) {
     if (!MIDI_LoadMapping(&global_mapping,
@@ -509,4 +512,8 @@ bool MIDI_PeekLastMessage(uint8_t *status, uint8_t *midino) {
   *status = lastStatus;
   *midino = lastMidino;
   return true;
+}
+
+bool MIDI_IsControllerConnected(void) {
+  return (g_activeMidiCtx != NULL && g_activeMidiCtx->initialized && g_activeMidiCtx->activeDeviceName[0] != '\0');
 }

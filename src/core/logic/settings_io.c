@@ -35,91 +35,92 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
     if (!json) return;
     
     const char* p = json;
+    const char* sub = NULL;
     float val;
     int ival;
 
     // Deck A
     if ((p = strstr(json, "\"wfmA\""))) {
-        if (sscanf(strstr(p, "\"style\""), "\"style\": %d", &ival) == 1) wfmA->Style = (WaveformStyle)ival;
-        if (sscanf(strstr(p, "\"low\""), "\"low\": %f", &val) == 1) wfmA->GainLow = val;
-        if (sscanf(strstr(p, "\"mid\""), "\"mid\": %f", &val) == 1) wfmA->GainMid = val;
-        if (sscanf(strstr(p, "\"high\""), "\"high\": %f", &val) == 1) wfmA->GainHigh = val;
-        if (sscanf(strstr(p, "\"start\""), "\"start\": %f", &val) == 1) {
+        if ((sub = strstr(p, "\"style\"")) && sscanf(sub, "\"style\": %d", &ival) == 1) wfmA->Style = (WaveformStyle)ival;
+        if ((sub = strstr(p, "\"low\"")) && sscanf(sub, "\"low\": %f", &val) == 1) wfmA->GainLow = val;
+        if ((sub = strstr(p, "\"mid\"")) && sscanf(sub, "\"mid\": %f", &val) == 1) wfmA->GainMid = val;
+        if ((sub = strstr(p, "\"high\"")) && sscanf(sub, "\"high\": %f", &val) == 1) wfmA->GainHigh = val;
+        if ((sub = strstr(p, "\"start\"")) && sscanf(sub, "\"start\": %f", &val) == 1) {
             if (val > 16.0f) val = 0.5f; // Convert legacy millisecond settings to Bar
             wfmA->VinylStartMs = val;
         }
-        if (sscanf(strstr(p, "\"stop\""), "\"stop\": %f", &val) == 1) {
+        if ((sub = strstr(p, "\"stop\"")) && sscanf(sub, "\"stop\": %f", &val) == 1) {
             if (val > 16.0f) val = 1.0f; // Convert legacy millisecond settings to Bar
             wfmA->VinylStopMs = val;
         }
-        if (sscanf(strstr(p, "\"lock\""), "\"lock\": %d", &ival) == 1) wfmA->LoadLock = (bool)ival;
-        if (sscanf(strstr(p, "\"rpm\""), "\"rpm\": %f", &val) == 1) wfmA->JogCalibRPM = val;
+        if ((sub = strstr(p, "\"lock\"")) && sscanf(sub, "\"lock\": %d", &ival) == 1) wfmA->LoadLock = (bool)ival;
+        if ((sub = strstr(p, "\"rpm\"")) && sscanf(sub, "\"rpm\": %f", &val) == 1) wfmA->JogCalibRPM = val;
     }
 
     // Deck B
     if ((p = strstr(json, "\"wfmB\""))) {
-        if (sscanf(strstr(p, "\"style\""), "\"style\": %d", &ival) == 1) wfmB->Style = (WaveformStyle)ival;
-        if (sscanf(strstr(p, "\"low\""), "\"low\": %f", &val) == 1) wfmB->GainLow = val;
-        if (sscanf(strstr(p, "\"mid\""), "\"mid\": %f", &val) == 1) wfmB->GainMid = val;
-        if (sscanf(strstr(p, "\"high\""), "\"high\": %f", &val) == 1) wfmB->GainHigh = val;
-        if (sscanf(strstr(p, "\"start\""), "\"start\": %f", &val) == 1) {
+        if ((sub = strstr(p, "\"style\"")) && sscanf(sub, "\"style\": %d", &ival) == 1) wfmB->Style = (WaveformStyle)ival;
+        if ((sub = strstr(p, "\"low\"")) && sscanf(sub, "\"low\": %f", &val) == 1) wfmB->GainLow = val;
+        if ((sub = strstr(p, "\"mid\"")) && sscanf(sub, "\"mid\": %f", &val) == 1) wfmB->GainMid = val;
+        if ((sub = strstr(p, "\"high\"")) && sscanf(sub, "\"high\": %f", &val) == 1) wfmB->GainHigh = val;
+        if ((sub = strstr(p, "\"start\"")) && sscanf(sub, "\"start\": %f", &val) == 1) {
             if (val > 16.0f) val = 0.5f;
             wfmB->VinylStartMs = val;
         }
-        if (sscanf(strstr(p, "\"stop\""), "\"stop\": %f", &val) == 1) {
+        if ((sub = strstr(p, "\"stop\"")) && sscanf(sub, "\"stop\": %f", &val) == 1) {
             if (val > 16.0f) val = 1.0f;
             wfmB->VinylStopMs = val;
         }
-        if (sscanf(strstr(p, "\"lock\""), "\"lock\": %d", &ival) == 1) wfmB->LoadLock = (bool)ival;
-        if (sscanf(strstr(p, "\"rpm\""), "\"rpm\": %f", &val) == 1) wfmB->JogCalibRPM = val;
+        if ((sub = strstr(p, "\"lock\"")) && sscanf(sub, "\"lock\": %d", &ival) == 1) wfmB->LoadLock = (bool)ival;
+        if ((sub = strstr(p, "\"rpm\"")) && sscanf(sub, "\"rpm\": %f", &val) == 1) wfmB->JogCalibRPM = val;
     }
 
     // Audio
     if ((p = strstr(json, "\"audio\""))) {
-        if (sscanf(strstr(p, "\"devIdx\""), "\"devIdx\": %d", &ival) == 1) audio->DeviceIndex = ival;
-        if (sscanf(strstr(p, "\"mastL\""), "\"mastL\": %d", &ival) == 1) audio->MasterOutL = ival;
-        if (sscanf(strstr(p, "\"mastR\""), "\"mastR\": %d", &ival) == 1) audio->MasterOutR = ival;
-        if (sscanf(strstr(p, "\"cueL\""), "\"cueL\": %d", &ival) == 1) audio->CueOutL = ival;
-        if (sscanf(strstr(p, "\"cueR\""), "\"cueR\": %d", &ival) == 1) audio->CueOutR = ival;
-        if (sscanf(strstr(p, "\"sr\""), "\"sr\": %d", &ival) == 1) audio->SampleRate = ival;
-        if (sscanf(strstr(p, "\"buf\""), "\"buf\": %d", &ival) == 1) audio->BufferSizeFrames = ival;
-        if (sscanf(strstr(p, "\"bitdepth\""), "\"bitdepth\": %d", &ival) == 1) audio->PCMBitDepth = ival;
-        if (sscanf(strstr(p, "\"xfader\""), "\"xfader\": %d", &ival) == 1) audio->CrossfaderCurve = ival;
+        if ((sub = strstr(p, "\"devIdx\"")) && sscanf(sub, "\"devIdx\": %d", &ival) == 1) audio->DeviceIndex = ival;
+        if ((sub = strstr(p, "\"mastL\"")) && sscanf(sub, "\"mastL\": %d", &ival) == 1) audio->MasterOutL = ival;
+        if ((sub = strstr(p, "\"mastR\"")) && sscanf(sub, "\"mastR\": %d", &ival) == 1) audio->MasterOutR = ival;
+        if ((sub = strstr(p, "\"cueL\"")) && sscanf(sub, "\"cueL\": %d", &ival) == 1) audio->CueOutL = ival;
+        if ((sub = strstr(p, "\"cueR\"")) && sscanf(sub, "\"cueR\": %d", &ival) == 1) audio->CueOutR = ival;
+        if ((sub = strstr(p, "\"sr\"")) && sscanf(sub, "\"sr\": %d", &ival) == 1) audio->SampleRate = ival;
+        if ((sub = strstr(p, "\"buf\"")) && sscanf(sub, "\"buf\": %d", &ival) == 1) audio->BufferSizeFrames = ival;
+        if ((sub = strstr(p, "\"bitdepth\"")) && sscanf(sub, "\"bitdepth\": %d", &ival) == 1) audio->PCMBitDepth = ival;
+        if ((sub = strstr(p, "\"xfader\"")) && sscanf(sub, "\"xfader\": %d", &ival) == 1) audio->CrossfaderCurve = ival;
     }
     // Beat FX
     if ((p = strstr(json, "\"beatfx\""))) {
-        if (sscanf(strstr(p, "\"fx\""), "\"fx\": %d", &ival) == 1) fx->SelectedFX = ival;
-        if (sscanf(strstr(p, "\"pad\""), "\"pad\": %d", &ival) == 1) fx->SelectedPad = ival;
-        if (sscanf(strstr(p, "\"ch\""), "\"ch\": %d", &ival) == 1) fx->SelectedChannel = ival;
-        if (sscanf(strstr(p, "\"depth\""), "\"depth\": %f", &val) == 1) fx->LevelDepth = val;
-        if (sscanf(strstr(p, "\"q\""), "\"q\": %d", &ival) == 1) fx->Quantize = (bool)ival;
-        if (sscanf(strstr(p, "\"tab\""), "\"tab\": %d", &ival) == 1) fx->ShowBeatFXTab = (bool)ival;
-        if (sscanf(strstr(p, "\"on\""), "\"on\": %d", &ival) == 1) fx->IsFXOn = (bool)ival;
+        if ((sub = strstr(p, "\"fx\"")) && sscanf(sub, "\"fx\": %d", &ival) == 1) fx->SelectedFX = ival;
+        if ((sub = strstr(p, "\"pad\"")) && sscanf(sub, "\"pad\": %d", &ival) == 1) fx->SelectedPad = ival;
+        if ((sub = strstr(p, "\"ch\"")) && sscanf(sub, "\"ch\": %d", &ival) == 1) fx->SelectedChannel = ival;
+        if ((sub = strstr(p, "\"depth\"")) && sscanf(sub, "\"depth\": %f", &val) == 1) fx->LevelDepth = val;
+        if ((sub = strstr(p, "\"q\"")) && sscanf(sub, "\"q\": %d", &ival) == 1) fx->Quantize = (bool)ival;
+        if ((sub = strstr(p, "\"tab\"")) && sscanf(sub, "\"tab\": %d", &ival) == 1) fx->ShowBeatFXTab = (bool)ival;
+        if ((sub = strstr(p, "\"on\"")) && sscanf(sub, "\"on\": %d", &ival) == 1) fx->IsFXOn = (bool)ival;
     }
 
     // Color FX
     if ((p = strstr(json, "\"colorfx\""))) {
-        if (sscanf(strstr(p, "\"active\""), "\"active\": %d", &ival) == 1) {
+        if ((sub = strstr(p, "\"active\"")) && sscanf(sub, "\"active\": %d", &ival) == 1) {
             if (cfxA) ColorFXManager_SetFX(cfxA, (ColorFXType)ival);
             if (cfxB) ColorFXManager_SetFX(cfxB, (ColorFXType)ival);
         }
-        if (sscanf(strstr(p, "\"param\""), "\"param\": %f", &val) == 1) {
+        if ((sub = strstr(p, "\"param\"")) && sscanf(sub, "\"param\": %f", &val) == 1) {
             if (cfxA) cfxA->parameter = val;
             if (cfxB) cfxB->parameter = val;
         }
-        if (sscanf(strstr(p, "\"valA\""), "\"valA\": %f", &val) == 1 && cfxA) cfxA->colorValue = val;
-        if (sscanf(strstr(p, "\"valB\""), "\"valB\": %f", &val) == 1 && cfxB) cfxB->colorValue = val;
+        if ((sub = strstr(p, "\"valA\"")) && sscanf(sub, "\"valA\": %f", &val) == 1 && cfxA) cfxA->colorValue = val;
+        if ((sub = strstr(p, "\"valB\"")) && sscanf(sub, "\"valB\": %f", &val) == 1 && cfxB) cfxB->colorValue = val;
     }
 
     // Quantize
     if ((p = strstr(json, "\"quantize\""))) {
-        if (sscanf(strstr(p, "\"qA\""), "\"qA\": %d", &ival) == 1 && quantizeA) *quantizeA = (bool)ival;
-        if (sscanf(strstr(p, "\"qB\""), "\"qB\": %d", &ival) == 1 && quantizeB) *quantizeB = (bool)ival;
+        if ((sub = strstr(p, "\"qA\"")) && sscanf(sub, "\"qA\": %d", &ival) == 1 && quantizeA) *quantizeA = (bool)ival;
+        if ((sub = strstr(p, "\"qB\"")) && sscanf(sub, "\"qB\": %d", &ival) == 1 && quantizeB) *quantizeB = (bool)ival;
     }
 
     // Master Volume
     if ((p = strstr(json, "\"master\""))) {
-        if (sscanf(strstr(p, "\"vol\""), "\"vol\": %f", &val) == 1 && masterVolume) {
+        if ((sub = strstr(p, "\"vol\"")) && sscanf(sub, "\"vol\": %f", &val) == 1 && masterVolume) {
             if (val < 0.0f) val = 0.0f;
             if (val > 1.0f) val = 1.0f;
             *masterVolume = val;
