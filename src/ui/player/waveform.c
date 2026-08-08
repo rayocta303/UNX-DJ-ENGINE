@@ -3,6 +3,7 @@
 #include "core/logger.h"
 #include "audio/engine.h"
 #include "core/logic/quantize.h"
+#include "core/logic/jog_config.h"
 #include "rlgl.h"
 #include "ui/components/assets_bundle.h"
 #include "ui/components/fonts.h"
@@ -169,7 +170,7 @@ static int Waveform_Update(Component *base) {
         r->State->JogDelta += (double)moveHF;
       } else {
         // CDJ Nudge logic (Pitch bend)
-        r->State->JogDelta += (double)(moveHF * 0.5);
+        r->State->JogDelta += (double)(moveHF * g_JogConfig.WaveformNudgeScale);
       }
     } else {
       isMouseTouchingWaveform[dId] = false;

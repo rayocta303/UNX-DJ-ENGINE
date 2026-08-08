@@ -1,5 +1,6 @@
 #include "audio/engine.h"
 #include "audio/asrc_resampler.h"
+#include "core/logic/jog_config.h"
 #include "SoundTouch.h"
 #include "engine/util/engine_math.h"
 #include <algorithm>
@@ -353,7 +354,7 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
   }
 
   if (deck->ReleaseFXType == 2) { // Backspin Active
-    deck->JogRate *= 0.96f;       // smooth exponential decay
+    deck->JogRate *= (double)g_JogConfig.BackspinDecay; // smooth exponential decay
     if (fabs(deck->JogRate) < 0.15) {
       deck->ReleaseFXType = 0;
       deck->IsTouching = false;
@@ -934,7 +935,7 @@ void DeckAudio_TriggerReleaseFX(DeckAudioState *deck, int type) {
     if (durationSec < 0.2f) durationSec = 0.2f;
     deck->VinylModeEnabled = true;
     deck->IsTouching = true;
-    deck->JogRate = -7.0f;
+    deck->JogRate = (double)g_JogConfig.BackspinShortSpeed;
     deck->OutlinedRate = deck->JogRate;
     deck->ReleaseFXType = 2; // Backspin Active mode
     deck->ReleaseFXTimer = durationSec;
@@ -946,7 +947,7 @@ void DeckAudio_TriggerReleaseFX(DeckAudioState *deck, int type) {
     if (durationSec < 0.4f) durationSec = 0.4f;
     deck->VinylModeEnabled = true;
     deck->IsTouching = true;
-    deck->JogRate = -15.0f;
+    deck->JogRate = (double)g_JogConfig.BackspinLongSpeed;
     deck->OutlinedRate = deck->JogRate;
     deck->ReleaseFXType = 2; // Backspin Active mode
     deck->ReleaseFXTimer = durationSec;

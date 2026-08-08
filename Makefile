@@ -60,6 +60,7 @@ SRC_C = src/main.c \
         src/core/logic/quantize.c \
         src/core/logic/sync.c \
         src/core/logic/settings_io.c \
+        src/core/logic/jog_config.c \
         src/core/logic/control_object.c \
         src/engine/fx/dsp_utils.c \
         src/core/midi/midi_handler.c \

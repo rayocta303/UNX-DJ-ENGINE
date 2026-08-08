@@ -1,0 +1,27 @@
+{
+  "// Encoder Calibration": "Settings for physical jog encoder ticks and base RPM",
+  "DefaultRPM": 33.333333,
+  "TicksPerRev": 720.00,
+
+  "// Smoothing Filter": "Exponential Moving Average (EMA) weights for MIDI rate filtering",
+  "EmaRawWeight": 0.7500,
+  "EmaPrevWeight": 0.2500,
+
+  "// Vinyl Touch Release Inertia": "Momentum spin-down glide parameters when releasing top platter",
+  "VinylReleaseFriction": 0.9650,
+  "VinylReleaseCutoff": 0.005000,
+  "VinylReleaseMinVelocity": 0.0100,
+
+  "// CDJ Mode Pitch Bend Nudge": "Side ring pitch bend nudge sensitivity and friction",
+  "PitchBendFriction": 0.9200,
+  "PitchBendCutoff": 0.005000,
+  "PitchBendScale": 1.0000,
+
+  "// Waveform Touch Drag": "Waveform UI touch drag nudge sensitivity scaling",
+  "WaveformNudgeScale": 0.5000,
+
+  "// Backspin FX": "Special Release FX initial speeds and decay rate",
+  "BackspinShortSpeed": -7.00,
+  "BackspinLongSpeed": -15.00,
+  "BackspinDecay": 0.9600
+}

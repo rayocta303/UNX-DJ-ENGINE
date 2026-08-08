@@ -2,6 +2,7 @@
 #include "core/logger.h"
 #include "core/logic/control_object.h"
 #include "core/logic/settings_io.h"
+#include "core/logic/jog_config.h"
 #include "core/logic/sync.h"
 #include "core/midi/midi_handler.h"
 #include "core/system_info.h"
@@ -1634,6 +1635,8 @@ Log_LogDeviceInfo(gpuModel);
 
   // Register Controls after Init
   CO_Init();
+  JogConfig_Load(&g_JogConfig, "jog_config.json");
+  JogConfig_RegisterControlObjects();
   CO_Register("[Channel1]", "play", CO_TYPE_BOOL, &app->deckA.MidiRequestPlay, 0,
               1);
   CO_Register("[Channel1]", "cue", CO_TYPE_BOOL, &app->deckA.MidiRequestCue, 0,
@@ -2986,11 +2989,11 @@ void UpdateDrawFrame(App *app) {
     if (dt < 0.001) dt = 0.016;
 
     if (app->deckA.JogDelta != 0) {
-      double calibRPM = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckA.Waveform.JogCalibRPM : 33.333333333333336;
-      double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
+      double calibRPM = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckA.Waveform.JogCalibRPM : (double)g_JogConfig.DefaultRPM;
+      double ticksPerSecAtNormalSpeed = (double)g_JogConfig.TicksPerRev * (calibRPM / 60.0);
       double rawRate = app->deckA.JogDelta / (ticksPerSecAtNormalSpeed * dt);
       app->deckA.JogDelta = 0;
-      audioEngine->Decks[0].JogRate = audioEngine->Decks[0].JogRate * 0.25 + rawRate * 0.75;
+      audioEngine->Decks[0].JogRate = audioEngine->Decks[0].JogRate * (double)g_JogConfig.EmaPrevWeight + rawRate * (double)g_JogConfig.EmaRawWeight;
     } else {
       audioEngine->Decks[0].JogRate = 0.0;
     }
@@ -3002,8 +3005,8 @@ void UpdateDrawFrame(App *app) {
     float dtFactor = (float)(dt / 0.016667);
     if (dtFactor < 0.1f) dtFactor = 0.1f;
     if (dtFactor > 5.0f) dtFactor = 5.0f;
-    audioEngine->Decks[0].JogRate *= powf(0.965f, dtFactor);
-    if (fabs(audioEngine->Decks[0].JogRate) < 0.005) {
+    audioEngine->Decks[0].JogRate *= powf(g_JogConfig.VinylReleaseFriction, dtFactor);
+    if (fabs(audioEngine->Decks[0].JogRate) < (double)g_JogConfig.VinylReleaseCutoff) {
       audioEngine->Decks[0].JogRate = 0.0;
       audioEngine->Decks[0].VinylReleaseActive = false;
     }
@@ -3011,11 +3014,11 @@ void UpdateDrawFrame(App *app) {
     // CDJ pitch bend nudge (outer wheel turn without touching top plate)
     double dt = GetFrameTime();
     if (dt < 0.001) dt = 0.016;
-    double calibRPM = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckA.Waveform.JogCalibRPM : 33.333333333333336;
-    double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
-    double rawRate = app->deckA.JogDelta / (ticksPerSecAtNormalSpeed * dt);
+    double calibRPM = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckA.Waveform.JogCalibRPM : (double)g_JogConfig.DefaultRPM;
+    double ticksPerSecAtNormalSpeed = (double)g_JogConfig.TicksPerRev * (calibRPM / 60.0);
+    double rawRate = (app->deckA.JogDelta * (double)g_JogConfig.PitchBendScale) / (ticksPerSecAtNormalSpeed * dt);
     app->deckA.JogDelta = 0;
-    audioEngine->Decks[0].JogRate = audioEngine->Decks[0].JogRate * 0.25 + rawRate * 0.75;
+    audioEngine->Decks[0].JogRate = audioEngine->Decks[0].JogRate * (double)g_JogConfig.EmaPrevWeight + rawRate * (double)g_JogConfig.EmaRawWeight;
   } else {
     // Pitch bend release decay back to zero
     double dt = GetFrameTime();
@@ -3023,8 +3026,8 @@ void UpdateDrawFrame(App *app) {
     float dtFactor = (float)(dt / 0.016667);
     if (dtFactor < 0.1f) dtFactor = 0.1f;
     if (dtFactor > 5.0f) dtFactor = 5.0f;
-    audioEngine->Decks[0].JogRate *= powf(0.92f, dtFactor);
-    if (fabs(audioEngine->Decks[0].JogRate) < 0.005) {
+    audioEngine->Decks[0].JogRate *= powf(g_JogConfig.PitchBendFriction, dtFactor);
+    if (fabs(audioEngine->Decks[0].JogRate) < (double)g_JogConfig.PitchBendCutoff) {
       audioEngine->Decks[0].JogRate = 0.0;
     }
   }
@@ -3072,11 +3075,11 @@ void UpdateDrawFrame(App *app) {
     if (dt < 0.001) dt = 0.016;
 
     if (app->deckB.JogDelta != 0) {
-      double calibRPM = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckB.Waveform.JogCalibRPM : 33.333333333333336;
-      double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
+      double calibRPM = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckB.Waveform.JogCalibRPM : (double)g_JogConfig.DefaultRPM;
+      double ticksPerSecAtNormalSpeed = (double)g_JogConfig.TicksPerRev * (calibRPM / 60.0);
       double rawRate = app->deckB.JogDelta / (ticksPerSecAtNormalSpeed * dt);
       app->deckB.JogDelta = 0;
-      audioEngine->Decks[1].JogRate = audioEngine->Decks[1].JogRate * 0.25 + rawRate * 0.75;
+      audioEngine->Decks[1].JogRate = audioEngine->Decks[1].JogRate * (double)g_JogConfig.EmaPrevWeight + rawRate * (double)g_JogConfig.EmaRawWeight;
     } else {
       audioEngine->Decks[1].JogRate = 0.0;
     }
@@ -3088,8 +3091,8 @@ void UpdateDrawFrame(App *app) {
     float dtFactor = (float)(dt / 0.016667);
     if (dtFactor < 0.1f) dtFactor = 0.1f;
     if (dtFactor > 5.0f) dtFactor = 5.0f;
-    audioEngine->Decks[1].JogRate *= powf(0.965f, dtFactor);
-    if (fabs(audioEngine->Decks[1].JogRate) < 0.005) {
+    audioEngine->Decks[1].JogRate *= powf(g_JogConfig.VinylReleaseFriction, dtFactor);
+    if (fabs(audioEngine->Decks[1].JogRate) < (double)g_JogConfig.VinylReleaseCutoff) {
       audioEngine->Decks[1].JogRate = 0.0;
       audioEngine->Decks[1].VinylReleaseActive = false;
     }
@@ -3097,11 +3100,11 @@ void UpdateDrawFrame(App *app) {
     // CDJ pitch bend nudge (outer wheel turn without touching top plate)
     double dt = GetFrameTime();
     if (dt < 0.001) dt = 0.016;
-    double calibRPM = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckB.Waveform.JogCalibRPM : 33.333333333333336;
-    double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
-    double rawRate = app->deckB.JogDelta / (ticksPerSecAtNormalSpeed * dt);
+    double calibRPM = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckB.Waveform.JogCalibRPM : (double)g_JogConfig.DefaultRPM;
+    double ticksPerSecAtNormalSpeed = (double)g_JogConfig.TicksPerRev * (calibRPM / 60.0);
+    double rawRate = (app->deckB.JogDelta * (double)g_JogConfig.PitchBendScale) / (ticksPerSecAtNormalSpeed * dt);
     app->deckB.JogDelta = 0;
-    audioEngine->Decks[1].JogRate = audioEngine->Decks[1].JogRate * 0.25 + rawRate * 0.75;
+    audioEngine->Decks[1].JogRate = audioEngine->Decks[1].JogRate * (double)g_JogConfig.EmaPrevWeight + rawRate * (double)g_JogConfig.EmaRawWeight;
   } else {
     // Pitch bend release decay back to zero
     double dt = GetFrameTime();
@@ -3109,8 +3112,8 @@ void UpdateDrawFrame(App *app) {
     float dtFactor = (float)(dt / 0.016667);
     if (dtFactor < 0.1f) dtFactor = 0.1f;
     if (dtFactor > 5.0f) dtFactor = 5.0f;
-    audioEngine->Decks[1].JogRate *= powf(0.92f, dtFactor);
-    if (fabs(audioEngine->Decks[1].JogRate) < 0.005) {
+    audioEngine->Decks[1].JogRate *= powf(g_JogConfig.PitchBendFriction, dtFactor);
+    if (fabs(audioEngine->Decks[1].JogRate) < (double)g_JogConfig.PitchBendCutoff) {
       audioEngine->Decks[1].JogRate = 0.0;
     }
   }
