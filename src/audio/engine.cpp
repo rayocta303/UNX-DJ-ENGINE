@@ -995,7 +995,9 @@ void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching) {
   bool wasTouching = deck->IsTouching;
   deck->IsTouching = touching;
   
-  if (!touching && wasTouching) {
+  if (touching) {
+    deck->VinylReleaseActive = false;
+  } else if (wasTouching) {
     // Slip Mode Catch-up on touch release!
     if (deck->SlipActive) {
       deck->Position = deck->SlipPosition;
@@ -1007,6 +1009,12 @@ void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching) {
     if (deck->VinylModeEnabled) {
       double base = deck->IsMotorOn ? deck->BaseRate : 0.0;
       deck->JogRate = deck->OutlinedRate - base;
+      if (fabs(deck->JogRate) > 0.01) {
+        deck->VinylReleaseActive = true;
+      } else {
+        deck->VinylReleaseActive = false;
+        deck->JogRate = 0.0;
+      }
     }
   }
 }

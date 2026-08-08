@@ -54,6 +54,7 @@ typedef struct DeckAudioState {
   double JogRate;        // Inertia value for vinyl mode
   bool IsTouching;       // User is actively touching jog (renamed)
   bool VinylModeEnabled; // Vinyl vs CDJ mode
+  bool VinylReleaseActive; // True when smooth touch-release spin inertia is active
   bool IsPlaying;        // Deck is in play mode (logical)
   bool IsMotorOn;        // Platter motor state (physical)
   bool IsReverse;        // Reverse playback active

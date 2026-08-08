@@ -2980,31 +2980,50 @@ void UpdateDrawFrame(App *app) {
     app->deckA.JogDelta = 0;
   } else if (audioEngine->Decks[0].ReleaseFXType == 2) {
     // Active Backspin: Let engine physics decay JogRate smoothly
-  } else if (app->deckA.JogDelta != 0 || (effTouchA && app->deckA.VinylModeEnabled)) {
+  } else if (effTouchA && app->deckA.VinylModeEnabled) {
+    // Active vinyl scratch hold/move under hand
     double dt = GetFrameTime();
-    if (dt < 0.001)
-      dt = 0.016;
+    if (dt < 0.001) dt = 0.016;
 
     if (app->deckA.JogDelta != 0) {
       double calibRPM = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckA.Waveform.JogCalibRPM : 33.333333333333336;
-      // Pioneer FLX6 jog encoder: 720 ticks/revolution. At 33.3333 RPM (1.8s/rev), 720 ticks / 1.8s = 400.0 ticks/sec at 1.0x speed.
       double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
       double rawRate = app->deckA.JogDelta / (ticksPerSecAtNormalSpeed * dt);
       app->deckA.JogDelta = 0;
-      // Exponential Moving Average filter to smooth MIDI packet jitter
       audioEngine->Decks[0].JogRate = audioEngine->Decks[0].JogRate * 0.25 + rawRate * 0.75;
-    } else if (effTouchA && app->deckA.VinylModeEnabled) {
-      // Touch hold in Vinyl mode (vinyl platter held stationary under hand)
+    } else {
       audioEngine->Decks[0].JogRate = 0.0;
     }
-  } else {
-    // Pitch bend / Vinyl spin release decay (Frame-rate independent scaled by dt)
+  } else if (audioEngine->Decks[0].VinylReleaseActive) {
+    // Vinyl touch release inertia in progress: consume leftover physical wheel ticks
+    app->deckA.JogDelta = 0;
     double dt = GetFrameTime();
     if (dt < 0.001) dt = 0.016667;
     float dtFactor = (float)(dt / 0.016667);
     if (dtFactor < 0.1f) dtFactor = 0.1f;
     if (dtFactor > 5.0f) dtFactor = 5.0f;
     audioEngine->Decks[0].JogRate *= powf(0.965f, dtFactor);
+    if (fabs(audioEngine->Decks[0].JogRate) < 0.005) {
+      audioEngine->Decks[0].JogRate = 0.0;
+      audioEngine->Decks[0].VinylReleaseActive = false;
+    }
+  } else if (app->deckA.JogDelta != 0) {
+    // CDJ pitch bend nudge (outer wheel turn without touching top plate)
+    double dt = GetFrameTime();
+    if (dt < 0.001) dt = 0.016;
+    double calibRPM = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckA.Waveform.JogCalibRPM : 33.333333333333336;
+    double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
+    double rawRate = app->deckA.JogDelta / (ticksPerSecAtNormalSpeed * dt);
+    app->deckA.JogDelta = 0;
+    audioEngine->Decks[0].JogRate = audioEngine->Decks[0].JogRate * 0.25 + rawRate * 0.75;
+  } else {
+    // Pitch bend release decay back to zero
+    double dt = GetFrameTime();
+    if (dt < 0.001) dt = 0.016667;
+    float dtFactor = (float)(dt / 0.016667);
+    if (dtFactor < 0.1f) dtFactor = 0.1f;
+    if (dtFactor > 5.0f) dtFactor = 5.0f;
+    audioEngine->Decks[0].JogRate *= powf(0.92f, dtFactor);
     if (fabs(audioEngine->Decks[0].JogRate) < 0.005) {
       audioEngine->Decks[0].JogRate = 0.0;
     }
@@ -3047,30 +3066,50 @@ void UpdateDrawFrame(App *app) {
     app->deckB.JogDelta = 0;
   } else if (audioEngine->Decks[1].ReleaseFXType == 2) {
     // Active Backspin: Let engine physics decay JogRate smoothly
-  } else if (app->deckB.JogDelta != 0 || (effTouchB && app->deckB.VinylModeEnabled)) {
+  } else if (effTouchB && app->deckB.VinylModeEnabled) {
+    // Active vinyl scratch hold/move under hand
     double dt = GetFrameTime();
-    if (dt < 0.001)
-      dt = 0.016;
+    if (dt < 0.001) dt = 0.016;
 
     if (app->deckB.JogDelta != 0) {
       double calibRPM = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckB.Waveform.JogCalibRPM : 33.333333333333336;
       double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
       double rawRate = app->deckB.JogDelta / (ticksPerSecAtNormalSpeed * dt);
       app->deckB.JogDelta = 0;
-      // Exponential Moving Average filter to smooth MIDI packet jitter
       audioEngine->Decks[1].JogRate = audioEngine->Decks[1].JogRate * 0.25 + rawRate * 0.75;
-    } else if (effTouchB && app->deckB.VinylModeEnabled) {
-      // Touch hold in Vinyl mode (vinyl platter held stationary under hand)
+    } else {
       audioEngine->Decks[1].JogRate = 0.0;
     }
-  } else {
-    // Pitch bend / Vinyl spin release decay (Frame-rate independent scaled by dt)
+  } else if (audioEngine->Decks[1].VinylReleaseActive) {
+    // Vinyl touch release inertia in progress: consume leftover physical wheel ticks
+    app->deckB.JogDelta = 0;
     double dt = GetFrameTime();
     if (dt < 0.001) dt = 0.016667;
     float dtFactor = (float)(dt / 0.016667);
     if (dtFactor < 0.1f) dtFactor = 0.1f;
     if (dtFactor > 5.0f) dtFactor = 5.0f;
     audioEngine->Decks[1].JogRate *= powf(0.965f, dtFactor);
+    if (fabs(audioEngine->Decks[1].JogRate) < 0.005) {
+      audioEngine->Decks[1].JogRate = 0.0;
+      audioEngine->Decks[1].VinylReleaseActive = false;
+    }
+  } else if (app->deckB.JogDelta != 0) {
+    // CDJ pitch bend nudge (outer wheel turn without touching top plate)
+    double dt = GetFrameTime();
+    if (dt < 0.001) dt = 0.016;
+    double calibRPM = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckB.Waveform.JogCalibRPM : 33.333333333333336;
+    double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
+    double rawRate = app->deckB.JogDelta / (ticksPerSecAtNormalSpeed * dt);
+    app->deckB.JogDelta = 0;
+    audioEngine->Decks[1].JogRate = audioEngine->Decks[1].JogRate * 0.25 + rawRate * 0.75;
+  } else {
+    // Pitch bend release decay back to zero
+    double dt = GetFrameTime();
+    if (dt < 0.001) dt = 0.016667;
+    float dtFactor = (float)(dt / 0.016667);
+    if (dtFactor < 0.1f) dtFactor = 0.1f;
+    if (dtFactor > 5.0f) dtFactor = 5.0f;
+    audioEngine->Decks[1].JogRate *= powf(0.92f, dtFactor);
     if (fabs(audioEngine->Decks[1].JogRate) < 0.005) {
       audioEngine->Decks[1].JogRate = 0.0;
     }
