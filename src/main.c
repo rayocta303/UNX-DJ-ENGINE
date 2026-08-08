@@ -2433,7 +2433,9 @@ static void System_RebootOS(void) {
 static void System_HibernateOS(void) {
     UNX_LOG_INFO("[SYSTEM] Executing system hibernation / sleep...");
 #if defined(__linux__)
-    system("systemctl hibernate || systemctl suspend || echo mem > /sys/power/state");
+    system("systemctl hibernate 2>/dev/null || systemctl suspend 2>/dev/null || (echo 1 > /sys/class/graphics/fb0/blank 2>/dev/null; echo freeze > /sys/power/state 2>/dev/null; echo 0 > /sys/class/graphics/fb0/blank 2>/dev/null)");
+#elif defined(_WIN32)
+    system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0");
 #endif
 }
 

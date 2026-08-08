@@ -18,7 +18,7 @@ AllowSuspend=yes
 AllowHibernation=yes
 AllowSuspendThenHibernate=yes
 AllowHybridSleep=yes
-SuspendState=mem standby freeze
+SuspendState=freeze
 HibernateMode=platform shutdown
 EOF
 
