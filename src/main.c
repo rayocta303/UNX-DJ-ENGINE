@@ -2615,11 +2615,6 @@ void UpdateDrawFrame(App *app) {
         // Toggle Loop In Adjust mode if inside active loop (Mixxx style)
         ds->LoopAdjustIn = !ds->LoopAdjustIn;
         ds->LoopAdjustOut = false;
-        if (ds->LoopAdjustIn) {
-          audio->Position = audio->LoopStartPos;
-          ds->Position = (audio->LoopStartPos * 150.0) / trackSR;
-          ds->PositionMs = (long long)((audio->LoopStartPos / trackSR) * 1000.0);
-        }
       } else {
         audio->LoopStartPos = pos;
         if (audio->LoopEndPos <= audio->LoopStartPos) {
@@ -2643,9 +2638,6 @@ void UpdateDrawFrame(App *app) {
           // Toggle Loop Out Adjust mode (Mixxx style)
           ds->LoopAdjustOut = true;
           ds->LoopAdjustIn = false;
-          audio->Position = audio->LoopEndPos;
-          ds->Position = (audio->LoopEndPos * 150.0) / trackSR;
-          ds->PositionMs = (long long)((audio->LoopEndPos / trackSR) * 1000.0);
         }
       } else {
         if (ds->QuantizeEnabled && ds->LoadedTrack && ds->LoadedTrack->Analysis.BeatGridCount > 0) {

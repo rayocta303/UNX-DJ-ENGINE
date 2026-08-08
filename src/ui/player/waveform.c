@@ -364,17 +364,6 @@ static void Waveform_Draw(Component *base) {
     effectiveZoom = 0.1f;
   double elapsedHalfFrames = r->State->Position;
 
-  extern AudioEngine *globalAudioEngine;
-  if (globalAudioEngine != NULL && r->ID >= 0 && r->ID < 2) {
-    DeckAudioState *audio = &globalAudioEngine->Decks[r->ID];
-    double ratioHF = (audio->SampleRate > 0) ? ((double)audio->SampleRate / 150.0) : 294.0;
-    if (r->State->LoopAdjustIn && audio->LoopStartPos > 0) {
-      elapsedHalfFrames = audio->LoopStartPos / ratioHF;
-    } else if (r->State->LoopAdjustOut && audio->LoopEndPos > 0) {
-      elapsedHalfFrames = audio->LoopEndPos / ratioHF;
-    }
-  }
-
   float centerX = SCREEN_WIDTH / 2.0f;
   float playheadX = centerX;
 
