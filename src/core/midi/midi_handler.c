@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <stdarg.h>
 
 #if defined(__linux__) && !defined(__ANDROID__)
 #include <alsa/asoundlib.h>
@@ -148,11 +149,40 @@ void MIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
 #endif
 }
 
+typedef struct {
+    char text[128];
+} MidiLogMessage;
+
+#define MIDI_LOG_RING_SIZE 256
+static MidiLogMessage s_midiLogRing[MIDI_LOG_RING_SIZE];
+static volatile int s_midiLogHead = 0;
+static volatile int s_midiLogTail = 0;
+
+static void MIDI_LogDebugAsync(const char *fmt, ...) {
+    int nextHead = (s_midiLogHead + 1) % MIDI_LOG_RING_SIZE;
+    if (nextHead == s_midiLogTail) {
+        // Buffer full, drop log to maintain non-blocking realtime execution
+        return;
+    }
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(s_midiLogRing[s_midiLogHead].text, sizeof(s_midiLogRing[s_midiLogHead].text), fmt, args);
+    va_end(args);
+    s_midiLogHead = nextHead;
+}
+
+void MIDI_FlushDebugLogs(void) {
+    while (s_midiLogTail != s_midiLogHead) {
+        puts(s_midiLogRing[s_midiLogTail].text);
+        s_midiLogTail = (s_midiLogTail + 1) % MIDI_LOG_RING_SIZE;
+    }
+}
+
 static void MIDI_SendShortMsgNamed(uint8_t status, uint8_t data1, uint8_t data2, const char *name) {
     MIDI_SendShortMsg(status, data1, data2);
     if (name) {
-        printf("[MIDI OUT] %-28s | Status: 0x%02X, Note/CC: 0x%02X, Val: 0x%02X (%d)\n",
-               name, status, data1, data2, data2);
+        MIDI_LogDebugAsync("[MIDI OUT] %-28s | Status: 0x%02X, Note/CC: 0x%02X, Val: 0x%02X (%d)",
+                           name, status, data1, data2, data2);
     }
 }
 
@@ -314,12 +344,11 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
         MIDI_SendShortMsg(reloopStatus, reloopNote, deck->IsLooping ? 0x7F : 0x00); // Reloop
 
         // Channel VU Meter Level (Channel 1 = 0xB0, Channel 2 = 0xB1, Channel 3 = 0xB2, Channel 4 = 0xB3, CC 0x02)
-        if (engine && i < 2) {
+        if (engine && i < MAX_DECKS) {
             float vuL = engine->Decks[i].VuMeterL;
             float vuR = engine->Decks[i].VuMeterR;
             float rms = (vuL > vuR ? vuL : vuR);
-            uint8_t meterVal = (uint8_t)(rms * 118.0f);
-            if (rms >= 0.98f) meterVal += 9;
+            uint8_t meterVal = (uint8_t)(rms * 127.0f);
             if (meterVal > 127) meterVal = 127;
             if (forceRefresh || meterVal != lastVu[i]) {
                 char lblVu[64];
@@ -385,10 +414,10 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
     // 4. Master VU Meter Level (Master L = 0xBA CC 0x00, Master R = 0xBA CC 0x01)
     if (engine) {
         static uint8_t lastMasterL = 255, lastMasterR = 255;
-        float rmsL = (engine->Decks[0].VuMeterL + engine->Decks[1].VuMeterL) * 0.5f;
-        float rmsR = (engine->Decks[0].VuMeterR + engine->Decks[1].VuMeterR) * 0.5f;
-        uint8_t mL = (uint8_t)(rmsL * 127.0f);
-        uint8_t mR = (uint8_t)(rmsR * 127.0f);
+        float mL_val = engine->MasterVuL > 0.0f ? engine->MasterVuL : (engine->Decks[0].VuMeterL > engine->Decks[1].VuMeterL ? engine->Decks[0].VuMeterL : engine->Decks[1].VuMeterL);
+        float mR_val = engine->MasterVuR > 0.0f ? engine->MasterVuR : (engine->Decks[0].VuMeterR > engine->Decks[1].VuMeterR ? engine->Decks[0].VuMeterR : engine->Decks[1].VuMeterR);
+        uint8_t mL = (uint8_t)(mL_val * 127.0f);
+        uint8_t mR = (uint8_t)(mR_val * 127.0f);
         if (mL > 127) mL = 127;
         if (mR > 127) mR = 127;
         if (forceRefresh || mL != lastMasterL) {
@@ -415,6 +444,7 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
             lastJog[i] = pos;
         }
     }
+    MIDI_FlushDebugLogs();
 }
 
 int MIDI_GetDeviceList(char outNames[16][64]) {
@@ -672,6 +702,8 @@ void MIDI_Update(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine *en
         lastStatus = status;
         lastMidino = data1;
         lastMsgSet = true;
+        MIDI_LogDebugAsync("[MIDI IN ] Status: 0x%02X, Note/CC: 0x%02X, Val: 0x%02X (%d)",
+                           status, data1, data2, data2);
         MIDI_HandleMapping(&global_mapping, status, data1, (float)data2 / 127.0f);
     }
 #elif defined(__linux__) && !defined(__ANDROID__)
@@ -684,22 +716,26 @@ void MIDI_Update(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine *en
                 lastStatus = 0xB0 | ev->data.control.channel;
                 lastMidino = ev->data.control.param;
                 lastMsgSet = true;
+                MIDI_LogDebugAsync("[MIDI IN ] Status: 0x%02X, CC: 0x%02X, Val: %d", lastStatus, lastMidino, ev->data.control.value);
                 MIDI_HandleMapping(&global_mapping, lastStatus, lastMidino, (float)ev->data.control.value / 127.0f);
             } else if (ev->type == SND_SEQ_EVENT_NOTEON) {
                 lastStatus = 0x90 | ev->data.note.channel;
                 lastMidino = ev->data.note.note;
                 lastMsgSet = true;
+                MIDI_LogDebugAsync("[MIDI IN ] Status: 0x%02X, Note: 0x%02X, Vel: %d", lastStatus, lastMidino, ev->data.note.velocity);
                 MIDI_HandleMapping(&global_mapping, lastStatus, lastMidino, (float)ev->data.note.velocity / 127.0f);
             } else if (ev->type == SND_SEQ_EVENT_NOTEOFF) {
                 lastStatus = 0x80 | ev->data.note.channel;
                 lastMidino = ev->data.note.note;
                 lastMsgSet = true;
+                MIDI_LogDebugAsync("[MIDI IN ] Status: 0x%02X, Note: 0x%02X, Off", lastStatus, lastMidino);
                 MIDI_HandleMapping(&global_mapping, lastStatus, lastMidino, 0.0f);
             } else if (ev->type == SND_SEQ_EVENT_PITCHBEND) {
                 lastStatus = 0xE0 | ev->data.note.channel;
                 lastMidino = 0;
                 lastMsgSet = true;
                 float normVal = (float)(ev->data.control.value + 8192) / 16383.0f;
+                MIDI_LogDebugAsync("[MIDI IN ] Status: 0x%02X, PitchBend: %d", lastStatus, ev->data.control.value);
                 MIDI_HandleMapping(&global_mapping, lastStatus, lastMidino, normVal);
             }
             snd_seq_free_event(ev);
@@ -707,6 +743,7 @@ void MIDI_Update(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine *en
     }
 #endif
 #endif
+    MIDI_FlushDebugLogs();
 }
 
 MidiMapping* MIDI_GetGlobalMapping(void) {
