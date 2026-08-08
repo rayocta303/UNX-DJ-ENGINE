@@ -55,12 +55,9 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
               ? (globalAudioEngine->Decks[targetDeckIdx].IsTouching &&
                  globalAudioEngine->Decks[targetDeckIdx].VinylModeEnabled)
               : false;
-      bool isSearch = (strstr(function, "jogSearch") != NULL) || map->modifiers[0];
-      // Mixxx reference jog behavior:
-      // - Touching (Scratch mode): 1.0f (1:1 tick tracking for 720 ticks/rev @ 33.33 RPM)
-      // - Non-touching (Pitch bend nudge): 0.08f (Mixxx bendScale 0.8 * jogSensitivity 0.1)
-      // - Shift / Fast Search mode: 4.0f (Mixxx fastSeekScale 4.0)
-      float scale = isSearch ? 4.0f : (touching ? 1.0f : 0.08f);
+      bool isSearch =
+          (strstr(function, "jogSearch") != NULL) || map->modifiers[0];
+      float scale = isSearch ? 2.0f : (touching ? 0.1f : 0.00025f);
       CO_AddValue(group, "jog", delta * scale);
     }
   } else if (strstr(function, "jogTouch") || strstr(function, "JogTouch")) {
@@ -114,17 +111,25 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
       CO_SetValue("[Master]", "beatfx_toggle", 1.0f);
   } else if (strstr(function, "padMode") || strstr(function, "PadMode")) {
     if (value > 0) {
-      if (strstr(function, "HotCue") || strstr(function, "hotcueMode") || midino == 0x1B)
+      if (strstr(function, "HotCue") || strstr(function, "hotcueMode") ||
+          midino == 0x1B)
         CO_SetValue(group, "padmode", 0.0f); // PAD_MODE_HOT_CUE (0)
-      else if (strstr(function, "BeatLoop") || strstr(function, "beatLoopMode") || midino == 0x6D)
+      else if (strstr(function, "BeatLoop") ||
+               strstr(function, "beatLoopMode") || midino == 0x6D)
         CO_SetValue(group, "padmode", 1.0f); // PAD_MODE_BEAT_LOOP (1)
-      else if (strstr(function, "PadFX") || strstr(function, "padFX") || strstr(function, "SlipLoop") || midino == 0x1E || midino == 0x6B)
+      else if (strstr(function, "PadFX") || strstr(function, "padFX") ||
+               strstr(function, "SlipLoop") || midino == 0x1E || midino == 0x6B)
         CO_SetValue(group, "padmode", 2.0f); // PAD_MODE_SLIP_LOOP (2)
-      else if (strstr(function, "BeatJump") || strstr(function, "beatJumpMode") || midino == 0x20)
+      else if (strstr(function, "BeatJump") ||
+               strstr(function, "beatJumpMode") || midino == 0x20)
         CO_SetValue(group, "padmode", 3.0f); // PAD_MODE_BEAT_JUMP (3)
-      else if (strstr(function, "Sampler") || strstr(function, "samplerMode") || strstr(function, "GateCue") || midino == 0x22)
+      else if (strstr(function, "Sampler") || strstr(function, "samplerMode") ||
+               strstr(function, "GateCue") || midino == 0x22)
         CO_SetValue(group, "padmode", 4.0f); // PAD_MODE_GATE_CUE (4)
-      else if (strstr(function, "ReleaseFX") || strstr(function, "keyShiftMode") || strstr(function, "keyboardMode") || midino == 0x69 || midino == 0x6F)
+      else if (strstr(function, "ReleaseFX") ||
+               strstr(function, "keyShiftMode") ||
+               strstr(function, "keyboardMode") || midino == 0x69 ||
+               midino == 0x6F)
         CO_SetValue(group, "padmode", 5.0f); // PAD_MODE_RELEASE_FX (5)
     }
   } else if (strstr(function, "samplerPadPressed")) {
@@ -164,7 +169,8 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
         callLeftPressed[targetDeckIdx] = false;
         COType t;
         bool *req = (bool *)CO_Find(group, "loop_halve", &t);
-        if (req) *req = true;
+        if (req)
+          *req = true;
       }
     }
   } else if (strstr(function, "cueLoopCallRight")) {
@@ -176,7 +182,8 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
         callRightPressed[targetDeckIdx] = false;
         COType t;
         bool *req = (bool *)CO_Find(group, "loop_double", &t);
-        if (req) *req = true;
+        if (req)
+          *req = true;
       }
     }
   } else if (strstr(function, "tempoSliderMSB")) {
@@ -240,15 +247,18 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
              strstr(function, "browseToggle")) {
     if (value > 0)
       CO_SetValue("[Library]", "enter", 1.0f);
-  } else if (strstr(function, "headMix") || strstr(function, "headphone_mix") || strstr(function, "headMixRotate")) {
+  } else if (strstr(function, "headMix") || strstr(function, "headphone_mix") ||
+             strstr(function, "headMixRotate")) {
     float normVal = (float)value / 127.0f;
     CO_SetValue("[Master]", "headphone_mix", normVal);
     CO_SetValue("[Master]", "headMix", normVal);
   } else if (strstr(function, "beatjumpPadPressed")) {
     if (value > 0) {
-      static const double beatSizes[8] = {-1.0, 1.0, -2.0, 2.0, -4.0, 4.0, -8.0, 8.0};
+      static const double beatSizes[8] = {-1.0, 1.0, -2.0, 2.0,
+                                          -4.0, 4.0, -8.0, 8.0};
       int padIdx = -1;
-      if (midino >= 0x20 && midino <= 0x27) padIdx = midino - 0x20;
+      if (midino >= 0x20 && midino <= 0x27)
+        padIdx = midino - 0x20;
       if (padIdx >= 0 && padIdx < 8) {
         double beats = beatSizes[padIdx];
         if (beats < 0) {
@@ -259,11 +269,14 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
         if (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2) {
           DeckAudioState *audio = &globalAudioEngine->Decks[targetDeckIdx];
           double bpm = (audio->BPM > 0.0) ? audio->BPM : 120.0;
-          double sampleRate = (audio->SampleRate > 0) ? (double)audio->SampleRate : 44100.0;
+          double sampleRate =
+              (audio->SampleRate > 0) ? (double)audio->SampleRate : 44100.0;
           double jumpSamples = beats * sampleRate * (60.0 / bpm);
           audio->Position += jumpSamples;
-          if (audio->Position < 0.0) audio->Position = 0.0;
-          if (audio->TotalSamples > 0 && audio->Position >= (double)audio->TotalSamples) {
+          if (audio->Position < 0.0)
+            audio->Position = 0.0;
+          if (audio->TotalSamples > 0 &&
+              audio->Position >= (double)audio->TotalSamples) {
             audio->Position = (double)(audio->TotalSamples - 1);
           }
         }
@@ -275,10 +288,12 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
       if (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2) {
         DeckAudioState *audio = &globalAudioEngine->Decks[targetDeckIdx];
         double bpm = (audio->BPM > 0.0) ? audio->BPM : 120.0;
-        double sampleRate = (audio->SampleRate > 0) ? (double)audio->SampleRate : 44100.0;
+        double sampleRate =
+            (audio->SampleRate > 0) ? (double)audio->SampleRate : 44100.0;
         double jumpSamples = -16.0 * sampleRate * (60.0 / bpm);
         audio->Position += jumpSamples;
-        if (audio->Position < 0.0) audio->Position = 0.0;
+        if (audio->Position < 0.0)
+          audio->Position = 0.0;
       }
     }
   } else if (strstr(function, "increaseBeatjumpSizes")) {
@@ -287,10 +302,12 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
       if (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2) {
         DeckAudioState *audio = &globalAudioEngine->Decks[targetDeckIdx];
         double bpm = (audio->BPM > 0.0) ? audio->BPM : 120.0;
-        double sampleRate = (audio->SampleRate > 0) ? (double)audio->SampleRate : 44100.0;
+        double sampleRate =
+            (audio->SampleRate > 0) ? (double)audio->SampleRate : 44100.0;
         double jumpSamples = 16.0 * sampleRate * (60.0 / bpm);
         audio->Position += jumpSamples;
-        if (audio->TotalSamples > 0 && audio->Position >= (double)audio->TotalSamples) {
+        if (audio->TotalSamples > 0 &&
+            audio->Position >= (double)audio->TotalSamples) {
           audio->Position = (double)(audio->TotalSamples - 1);
         }
       }
@@ -303,7 +320,8 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
     if (value > 0) {
       CO_ToggleValue("[Channel2]", "deck_layer");
     }
-  } else if (strstr(function, "setGroupKeyValue") || strstr(function, "keyboardButtonPressed")) {
+  } else if (strstr(function, "setGroupKeyValue") ||
+             strstr(function, "keyboardButtonPressed")) {
     if (value > 0) {
       int semitone = 0;
       if (midino >= 0x70 && midino <= 0x77) {
@@ -313,9 +331,9 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
       }
       CO_SetValue(group, "key_shift", (float)semitone);
     }
-  } else if (strstr(function, "MoveVertical") || strstr(function, "scrollTrack")) {
+  } else if (strstr(function, "MoveVertical") ||
+             strstr(function, "scrollTrack")) {
     float diff = (value >= 64) ? (float)(value - 128) : (float)value;
     CO_AddValue("[Library]", "scroll", diff);
   }
 }
-
