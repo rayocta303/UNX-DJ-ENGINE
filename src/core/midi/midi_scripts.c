@@ -279,9 +279,13 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
     bool isTouch = (ds && ds->IsTouching) || (audio && audio->IsTouching);
 
     // Jog Outer/Inner Ring LED (0x9F, data1 = deck index 0..3)
+    // IMPORTANT: 0x9F 0xNN 0x7F is the Pioneer DDJ hardware handshake byte —
+    // NEVER send 0x7F here during normal playback or it re-triggers LED init.
     uint8_t jogRingVal = 0x00;
     if (hasTrack) {
-      jogRingVal = isTouch ? 0x7F : (isPlaying ? 0x7F : 0x40);
+      if (isTouch)     jogRingVal = 0x50; // Touched: bright but not 0x7F
+      else if (isPlaying) jogRingVal = 0x60; // Playing: bright
+      else             jogRingVal = 0x28; // Loaded/idle: dim
     }
     if (forceSend || jogRingVal != lastJogRingVal[i]) {
       MIDI_SendShortMsg(0x9F, (uint8_t)i, jogRingVal);
