@@ -425,11 +425,14 @@ void Browser_Back(BrowserState *s) {
   }
 
   if (s->BrowseLevel == 0) {
-    if (s->CurrentPlaylistIdx >= 0) {
+    // NAV-03: if entered via Playlist list → return there; if via bank/category shortcut → skip to Categories
+    if (s->CurrentPlaylistIdx >= 0 && !s->CameFromBank) {
       s->CurrentPlaylistIdx = -1;
       s->BrowseLevel = 1; // Return to Playlists List
     } else {
-      s->BrowseLevel = 2; // Return to Categories
+      s->CurrentPlaylistIdx = -1;
+      s->CameFromBank = false;
+      s->BrowseLevel = 2; // Return directly to Categories (skip Playlists)
     }
     s->CursorPos = s->ScrollOffset = 0;
     s->VisualScroll = 0.0f;
@@ -446,6 +449,7 @@ void Browser_Back(BrowserState *s) {
   } else if (s->BrowseLevel == 3) {
     s->IsActive = false; // Exit browser -> Return to Player
   }
+
 }
 
 void Browser_CheckStorageConnection(BrowserState *s) {
@@ -602,7 +606,7 @@ void Browser_RefreshStorages(BrowserState *s) {
   // On Android, check the root of internal storage for usb_test folder
   if (stat("/storage/emulated/0/usb_test", &st) == 0) {
     testPath = "/storage/emulated/0/usb_test";
-    printf("[BROWSER] Found Android usb_test at %s\n", testPath);
+    UNX_LOG_INFO("[BROWSER] Found Android usb_test at %s", testPath);
   }
 #endif
 
@@ -745,7 +749,7 @@ void Browser_RefreshStorages(BrowserState *s) {
         if (stat(fullPath, &st_dir) != 0 || !S_ISDIR(st_dir.st_mode) || access(fullPath, R_OK) != 0) continue;
 #endif
 
-        printf("[BROWSER] Scanning potential storage: %s\n", fullPath);
+        UNX_LOG_INFO("[BROWSER] Scanning storage: %s", fullPath);
 
         bool exists = false;
         for (int j = 0; j < s->StorageCount; j++) {
@@ -1115,19 +1119,18 @@ static int Browser_Update(Component *base) {
             s->BrowseLevel = 3;
             s->CursorPos = 0;
           } else {
-            // Navigate to categories (Playlist, Folder, Search)
-            s->BrowseLevel = 2; // Categories level
-            s->CursorPos = i;
-            // Trigger "Enter" logic for the category
-            if (s->CursorPos == 2) {
-              s->BrowseLevel = 1;
-            } // Playlists
-            else if (s->CursorPos == 0) {
+            // Navigate to categories
+            if (i == 2) {
+              s->BrowseLevel = 1; // Playlists level
+              s->CursorPos = 0;
+            } else {
+              // NAV-04 FIX: Both FILENAME (0) and FOLDER (1) go to tracks view consistently
               s->BrowseLevel = 0; // Tracks
               s->CurrentPlaylistIdx = -1;
+              s->CameFromBank = false;
+              s->CursorPos = 0;
               Browser_UpdateActiveTracks(s);
             }
-            s->CursorPos = 0;
           }
         } else {
           // Playlist Bank Jump
@@ -1139,6 +1142,7 @@ static int Browser_Update(Component *base) {
             }
             
             s->CurrentPlaylistIdx = s->PlaylistBank[bankIdx].PlaylistIdx;
+            s->CameFromBank = true; // NAV-03 FIX: Mark that we jumped directly from bank shortcut
             s->BrowseLevel = 0; // Tracks
             Browser_UpdateActiveTracks(s);
             s->CursorPos = s->ScrollOffset = 0;
@@ -1164,7 +1168,7 @@ static int Browser_Update(Component *base) {
               strncpy(s->PlaylistBank[bankIdx].Name, s->SeratoDB->Playlists[s->DraggingIdx].Name, 63);
             }
 
-            printf("[BROWSER] Banked Playlist '%s' to Slot %d\n", s->PlaylistBank[bankIdx].Name, bankIdx + 1);
+            UNX_LOG_INFO("[BROWSER] Banked Playlist '%s' to Slot %d", s->PlaylistBank[bankIdx].Name, bankIdx + 1);
           }
         }
         s->IsDragging = false;
@@ -1301,13 +1305,15 @@ static int Browser_Update(Component *base) {
       s->ScrollVelocity *= 0.95f; // Friction
       if (fabsf(s->ScrollVelocity) < 5.0f) s->ScrollVelocity = 0.0f;
 
-      // Elastic Bungee Return (Spring-back)
+      // Elastic Bungee Return (Spring-back) - NAV-08 FIX: reset velocity when spring activates
       float springK = 14.0f; 
       if (s->VisualScroll < 0) {
+        s->ScrollVelocity = 0.0f;
         s->VisualScroll -= s->VisualScroll * springK * GetFrameTime();
         if (fabsf(s->VisualScroll) < 0.5f) s->VisualScroll = 0.0f;
       }
       if (s->VisualScroll > maxScroll) {
+        s->ScrollVelocity = 0.0f;
         float diff = s->VisualScroll - maxScroll;
         s->VisualScroll -= diff * springK * GetFrameTime();
         if (fabsf(s->VisualScroll - maxScroll) < 0.5f) s->VisualScroll = maxScroll;
@@ -1467,7 +1473,7 @@ static int Browser_Update(Component *base) {
         s->CursorPos = s->ScrollOffset = 0;
         s->VisualScroll = 0;
         s->ScrollVelocity = 0;
-        printf("[BROWSER] Selected storage: %s (DB Found: %s)\n", 
+        UNX_LOG_INFO("[BROWSER] Selected storage: %s (DB Found: %s)", 
                s->SelectedStorage->Path, (s->DB || s->SeratoDB) ? "YES" : "NO");
 
       }
@@ -1476,7 +1482,7 @@ static int Browser_Update(Component *base) {
       if (catIdx == 5 && s->HasBothDatabases) {
         // TOGGLE DATABASE
         s->DatabaseType = (s->DatabaseType == 0) ? 1 : 0;
-        printf("[BROWSER] Switched database to %s\n",
+        UNX_LOG_INFO("[BROWSER] Switched database to %s",
                s->DatabaseType == 0 ? "Rekordbox" : "Serato");
         s->CurrentPlaylistIdx = -1; // Reset playlist selection on switch
         s->CursorPos = s->ScrollOffset = 0;
@@ -1543,17 +1549,18 @@ static int Browser_Update(Component *base) {
     struct DeckState *targetDeck = loadToDeck == 0 ? s->DeckA : s->DeckB;
     if (targetDeck) targetDeck->IsLoading = true;
     if (targetDeck && targetDeck->Waveform.LoadLock && targetDeck->IsPlaying) {
-      printf("[BROWSER] LOAD LOCKED: Deck %c is playing\n",
-             loadToDeck == 0 ? 'A' : 'B');
+      UNX_LOG_WARN("[BROWSER] LOAD LOCKED: Deck %c is playing",
+                   loadToDeck == 0 ? 'A' : 'B');
       return 0; // Prevent load
     }
 
-    int idx = targetIdx;
+    // NAV-02 FIX: calculate fresh target track index at point of loading
+    int idx = s->ScrollOffset + s->CursorPos;
     if (s->DatabaseType == 0) { // Rekordbox
       if (idx < s->ActiveTrackCount && s->TrackPointers[idx]) {
         RBTrack *t = s->TrackPointers[idx];
-        printf("[BROWSER] Loading RB track: %s to Deck %c\n", t->Title,
-               loadToDeck == 0 ? 'A' : 'B');
+        UNX_LOG_INFO("[BROWSER] Loading RB track: %s to Deck %c", t->Title,
+                     loadToDeck == 0 ? 'A' : 'B');
 
         if (MemoryGuard_GetLevel() == MEM_MODE_CRITICAL) {
             UNX_LOG_ERR("[BROWSER] LOAD BLOCKED: Memory is critical.");
@@ -1578,7 +1585,7 @@ static int Browser_Update(Component *base) {
             }
           }
 
-          struct DeckState *targetDeck = loadToDeck == 0 ? s->DeckA : s->DeckB;
+          // NAV-05 FIX: targetDeck is already declared above, do not shadow
           if (targetDeck) {
             strncpy(targetDeck->TrackTitle, t->Title, 127);
             targetDeck->TrackTitle[127] = '\0';
@@ -1597,9 +1604,11 @@ static int Browser_Update(Component *base) {
             targetDeck->Rating = t->Rating;
             targetDeck->Year = t->Year;
             targetDeck->TrackNumber = t->TrackNumber;
-            targetDeck->OriginalBPM = t->BPM;
-            targetDeck->CurrentBPM = t->BPM;
-            targetDeck->OriginalBPM = (t->BPM > 0) ? t->BPM : 120.0f;
+            
+            // NAV-06 FIX: assign OriginalBPM and CurrentBPM cleanly without redundant override
+            float validBpm = (t->BPM > 0) ? t->BPM : 120.0f;
+            targetDeck->OriginalBPM = validBpm;
+            targetDeck->CurrentBPM = validBpm;
 
             if (s->SelectedStorage) {
               strncpy(targetDeck->SourceName, s->SelectedStorage->Name, 31);
@@ -1764,8 +1773,8 @@ static int Browser_Update(Component *base) {
     } else { // Serato
       if (idx < s->ActiveTrackCount && s->SeratoTrackPointers[idx]) {
         SeratoTrack *t = s->SeratoTrackPointers[idx];
-        printf("[BROWSER] Loading Serato track: %s to Deck %c\n", t->Title,
-               loadToDeck == 0 ? 'A' : 'B');
+        UNX_LOG_INFO("[BROWSER] Loading Serato track: %s to Deck %c", t->Title,
+                     loadToDeck == 0 ? 'A' : 'B');
 
         if (s->SelectedStorage) {
           Serato_LoadTrackData(t, s->SelectedStorage->Path);
@@ -1784,7 +1793,7 @@ static int Browser_Update(Component *base) {
             }
           }
 
-          struct DeckState *targetDeck = loadToDeck == 0 ? s->DeckA : s->DeckB;
+          // NAV-05 FIX: targetDeck is already declared above
           if (targetDeck) {
             strncpy(targetDeck->TrackTitle, t->Title, 127);
             targetDeck->TrackTitle[127] = '\0';

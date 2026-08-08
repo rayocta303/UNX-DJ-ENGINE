@@ -81,6 +81,7 @@ typedef struct {
     int MidiBrowseDelta;
     bool MidiRequestLoadA;
     bool MidiRequestLoadB;
+    bool CameFromBank; // NAV-03: true if entered track list via playlist bank shortcut
 
     // Search & On-Screen Keyboard (OSK) functionality
     char SearchQuery[64];
