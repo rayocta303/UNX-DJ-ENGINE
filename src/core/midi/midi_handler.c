@@ -148,6 +148,14 @@ void MIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
 #endif
 }
 
+static void MIDI_SendShortMsgNamed(uint8_t status, uint8_t data1, uint8_t data2, const char *name) {
+    MIDI_SendShortMsg(status, data1, data2);
+    if (name) {
+        printf("[MIDI OUT] %-28s | Status: 0x%02X, Note/CC: 0x%02X, Val: 0x%02X (%d)\n",
+               name, status, data1, data2, data2);
+    }
+}
+
 void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine *engine, void *appPtr) {
     (void)ctx; (void)appPtr;
     if (!d1 || !d2) return;
@@ -169,12 +177,12 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
         forceRefresh = true;
 
         // Pioneer DDJ Hardware Keep-Alive / LED Enable Handshake
-        MIDI_SendShortMsg(0x9F, 0x00, 0x7F);
-        MIDI_SendShortMsg(0x9F, 0x01, 0x7F);
-        MIDI_SendShortMsg(0x90, 0x7F, 0x7F);
-        MIDI_SendShortMsg(0x91, 0x7F, 0x7F);
-        MIDI_SendShortMsg(0x92, 0x7F, 0x7F);
-        MIDI_SendShortMsg(0x93, 0x7F, 0x7F);
+        MIDI_SendShortMsgNamed(0x9F, 0x00, 0x7F, "Handshake Deck 1");
+        MIDI_SendShortMsgNamed(0x9F, 0x01, 0x7F, "Handshake Deck 2");
+        MIDI_SendShortMsgNamed(0x90, 0x7F, 0x7F, "Handshake Ch 1");
+        MIDI_SendShortMsgNamed(0x91, 0x7F, 0x7F, "Handshake Ch 2");
+        MIDI_SendShortMsgNamed(0x92, 0x7F, 0x7F, "Handshake Ch 3");
+        MIDI_SendShortMsgNamed(0x93, 0x7F, 0x7F, "Handshake Ch 4");
     }
 
     // 1. Pioneer SysEx Keep-Alive every 1.5 seconds
@@ -211,8 +219,7 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
         if (i == 0) deck = d1;
         else if (i == 1) deck = d2;
         else if (engine && i < 4) {
-            // Virtual deck pointers if engine active
-            deck = d1; // fallback
+            deck = d1; // fallback pointer
         }
         if (!deck) continue;
 
@@ -246,7 +253,9 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
             playVal = blinkState ? 0x7F : 0x00;
         }
         if (forceRefresh || playVal != lastPlay[i]) {
-            MIDI_SendShortMsg(playStatus, playNote, playVal);
+            char lbl[64];
+            snprintf(lbl, sizeof(lbl), "Play LED [Deck %d]", i + 1);
+            MIDI_SendShortMsgNamed(playStatus, playNote, playVal, lbl);
             lastPlay[i] = playVal;
         }
 
@@ -258,14 +267,18 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
             cueVal = blinkState ? 0x7F : 0x00;
         }
         if (forceRefresh || cueVal != lastCue[i]) {
-            MIDI_SendShortMsg(cueStatus, cueNote, cueVal);
+            char lbl[64];
+            snprintf(lbl, sizeof(lbl), "Cue LED [Deck %d]", i + 1);
+            MIDI_SendShortMsgNamed(cueStatus, cueNote, cueVal, lbl);
             lastCue[i] = cueVal;
         }
 
         // Vinyl Mode LED
         uint8_t vinylVal = deck->VinylModeEnabled ? 0x7F : 0x00;
         if (forceRefresh || vinylVal != lastVinyl[i]) {
-            MIDI_SendShortMsg(vinylStatus, vinylNote, vinylVal);
+            char lbl[64];
+            snprintf(lbl, sizeof(lbl), "Vinyl LED [Deck %d]", i + 1);
+            MIDI_SendShortMsgNamed(vinylStatus, vinylNote, vinylVal, lbl);
             lastVinyl[i] = vinylVal;
         }
 
@@ -276,6 +289,11 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
         } else if (deck->IsLooping) {
             loopVal = 0x7F;
         }
+        char lblLoopIn[64], lblLoopOut[64], lblReloop[64];
+        snprintf(lblLoopIn, sizeof(lblLoopIn), "Loop In LED [Deck %d]", i + 1);
+        snprintf(lblLoopOut, sizeof(lblLoopOut), "Loop Out LED [Deck %d]", i + 1);
+        snprintf(lblReloop, sizeof(lblReloop), "Reloop LED [Deck %d]", i + 1);
+
         MIDI_SendShortMsg(loopInStatus, loopInNote, loopVal); // Loop In
         MIDI_SendShortMsg(loopOutStatus, loopOutNote, loopVal); // Loop Out
         MIDI_SendShortMsg(loopInStatus, 0x4C, loopVal); // Shift Loop In
@@ -291,7 +309,9 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
             if (rms >= 0.98f) meterVal += 9;
             if (meterVal > 127) meterVal = 127;
             if (forceRefresh || meterVal != lastVu[i]) {
-                MIDI_SendShortMsg(vuStatus, vuControl, meterVal);
+                char lblVu[64];
+                snprintf(lblVu, sizeof(lblVu), "Channel VU LED [Deck %d]", i + 1);
+                MIDI_SendShortMsgNamed(vuStatus, vuControl, meterVal, lblVu);
                 lastVu[i] = meterVal;
             }
         }
@@ -329,7 +349,9 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
             }
             uint8_t padVal = hasHotCue ? 0x7F : 0x00;
             if (forceRefresh || padVal != lastHotCue[i][p]) {
-                MIDI_SendShortMsg(padStatus, padNote, padVal);
+                char lblPad[64];
+                snprintf(lblPad, sizeof(lblPad), "HotCue %d LED [Deck %d]", p + 1, i + 1);
+                MIDI_SendShortMsgNamed(padStatus, padNote, padVal, lblPad);
                 MIDI_SendShortMsg(padStatus, 0x30 + p, padVal);
                 lastHotCue[i][p] = padVal;
             }
@@ -341,7 +363,7 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
         static uint8_t lastFxOn = 255;
         uint8_t fxVal = engine->BeatFX.isFxOn ? 0x7F : 0x00;
         if (forceRefresh || fxVal != lastFxOn) {
-            MIDI_SendShortMsg(0x94, 0x47, fxVal); // Beat FX On/Off LED
+            MIDI_SendShortMsgNamed(0x94, 0x47, fxVal, "Beat FX On/Off LED");
             MIDI_SendShortMsg(0x94, 0x43, fxVal); // Shift Beat FX On/Off LED
             lastFxOn = fxVal;
         }
@@ -357,11 +379,11 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
         if (mL > 127) mL = 127;
         if (mR > 127) mR = 127;
         if (forceRefresh || mL != lastMasterL) {
-            MIDI_SendShortMsg(0xBA, 0x00, mL);
+            MIDI_SendShortMsgNamed(0xBA, 0x00, mL, "Master VU Left LED");
             lastMasterL = mL;
         }
         if (forceRefresh || mR != lastMasterR) {
-            MIDI_SendShortMsg(0xBA, 0x01, mR);
+            MIDI_SendShortMsgNamed(0xBA, 0x01, mR, "Master VU Right LED");
             lastMasterR = mR;
         }
     }
@@ -374,7 +396,9 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
         uint8_t pos = 0x01 + (uint8_t)step;
         if (pos > 0x48) pos = 0x48;
         if (forceRefresh || pos != lastJog[i]) {
-            MIDI_SendShortMsg(0xBB, i, pos);
+            char lblJog[64];
+            snprintf(lblJog, sizeof(lblJog), "Jog Ring LED [Deck %d]", i + 1);
+            MIDI_SendShortMsgNamed(0xBB, i, pos, lblJog);
             lastJog[i] = pos;
         }
     }
