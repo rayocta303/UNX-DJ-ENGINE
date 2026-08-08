@@ -226,13 +226,13 @@ static void Mixer_Draw(Component *base) {
   float fxY = panelY + S(12);
   DrawCentredText("SOUND COLOR FX", fTiny, leftX, colFXW, fxY, S(7), ColorShadow);
   
-  float cfy = fxY + S(16);
-  char *cfxNames[] = {"SPACE", "DUB ECHO", "SWEEP", "NOISE", "CRUSH", "FILTER", "JET"};
-  ColorFXType cfxTypes[] = {COLORFX_SPACE, COLORFX_DUBECHO, COLORFX_SWEEP, COLORFX_NOISE, COLORFX_CRUSH, COLORFX_FILTER, COLORFX_JET};
+  float cfy = fxY + S(18);
+  char *cfxNames[] = {"SPACE", "DUB ECHO", "SWEEP", "NOISE", "FILTER", "JET"};
+  ColorFXType cfxTypes[] = {COLORFX_SPACE, COLORFX_DUBECHO, COLORFX_SWEEP, COLORFX_NOISE, COLORFX_FILTER, COLORFX_JET};
   float cbtnW = colFXW - S(16);
-  float cbtnH = S(24);
-  float cbtnGap = S(5);
-  for (int i = 0; i < 7; i++) {
+  float cbtnH = S(26);
+  float cbtnGap = S(6);
+  for (int i = 0; i < 6; i++) {
     float bx = leftX + S(8);
     float by = cfy + i * (cbtnH + cbtnGap);
     if (DrawFXButton(cfxNames[i], bx, by, cbtnW, cbtnH, eng->Decks[0].ColorFX.activeFX == cfxTypes[i])) {
