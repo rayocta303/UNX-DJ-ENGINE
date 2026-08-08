@@ -94,8 +94,6 @@ void WinMIDI_Close(void);
 #elif defined(__ANDROID__)
 #endif
 
-#include "core/midi/midi_led_helper.h"
-
 static MidiMapping global_mapping;
 
 static uint8_t lastStatus = 0;
