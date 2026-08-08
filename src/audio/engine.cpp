@@ -334,9 +334,9 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
   float accel = 0.08f;
 
   if (deck->IsTouching && deck->VinylModeEnabled) {
-    // Vinyl Scratch Mode: Direct 1:1 platter rate lock
+    // Vinyl Scratch Mode: 1:1 platter rate lock when scrubbing, Touch Brake when held
     targetRate = deck->JogRate;
-    accel = 1.0f;
+    accel = (fabs(deck->JogRate) > 0.001) ? 1.0f : (deck->VinylStopAccel > 0 ? deck->VinylStopAccel : 0.12f);
   } else {
     // CDJ Pitch Bend Mode or Normal Motor Playback
     if (deck->IsMotorOn) {
@@ -344,7 +344,7 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
       accel = (deck->IsTouching && !deck->VinylModeEnabled) ? 0.4f : (deck->VinylStartAccel > 0 ? deck->VinylStartAccel : 0.12f);
     } else {
       targetRate = deck->JogRate;
-      accel = (fabs(deck->JogRate) > 0.001) ? 0.2f : 1.0f; // Instant stop when paused and jog stops
+      accel = (fabs(deck->JogRate) > 0.001) ? 0.2f : (deck->VinylStopAccel > 0 ? deck->VinylStopAccel : 0.12f);
     }
   }
 
@@ -1007,10 +1007,9 @@ void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching) {
       deck->SlipActive = false;
     }
     
-    // Instant zero lock if deck is paused
+    // Zero jog rate if deck is paused
     if (!deck->IsMotorOn && fabs(deck->JogRate) < 0.05) {
       deck->JogRate = 0.0;
-      deck->OutlinedRate = 0.0;
     }
   }
 }

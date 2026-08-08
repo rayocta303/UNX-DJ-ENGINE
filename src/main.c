@@ -2929,7 +2929,6 @@ void UpdateDrawFrame(App *app) {
     audioEngine->Decks[0].JogRate *= powf(0.92f, dtFactor);
     if (fabs(audioEngine->Decks[0].JogRate) < 0.01 || !audioEngine->Decks[0].IsMotorOn) {
       audioEngine->Decks[0].JogRate = 0.0;
-      if (!audioEngine->Decks[0].IsMotorOn) audioEngine->Decks[0].OutlinedRate = 0.0;
     }
   }
 
@@ -2996,7 +2995,6 @@ void UpdateDrawFrame(App *app) {
     audioEngine->Decks[1].JogRate *= powf(0.92f, dtFactor);
     if (fabs(audioEngine->Decks[1].JogRate) < 0.01 || !audioEngine->Decks[1].IsMotorOn) {
       audioEngine->Decks[1].JogRate = 0.0;
-      if (!audioEngine->Decks[1].IsMotorOn) audioEngine->Decks[1].OutlinedRate = 0.0;
     }
   }
 
