@@ -102,7 +102,8 @@ static uint8_t lastJogPosVal[4] = {0, 0, 0, 0};
 // Blink state: toggles every BLINK_INTERVAL calls (60fps -> ~4Hz blink)
 #define BLINK_INTERVAL 8
 static int blinkCounter = 0;
-static bool blinkPhase = false; // true = LED on, false = LED off
+static bool blinkPhase = false;     // current blink LED state
+static bool lastBlinkPhase = false; // previous phase — detect transition
 
 void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
                                AudioEngine *engine, bool forceSend) {
@@ -110,12 +111,15 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
   uint8_t mainStatuses[4] = {0x90, 0x91, 0x92, 0x93};
   uint8_t padStatuses[4] = {0x97, 0x99, 0x98, 0x9A};
 
-  // Advance global blink timer
+  // Advance blink timer — only Play/CUE LEDs are force-sent on phase change.
+  // All other LEDs use normal change-detection to avoid MIDI flooding.
   blinkCounter++;
   if (blinkCounter >= BLINK_INTERVAL) {
     blinkCounter = 0;
     blinkPhase = !blinkPhase;
   }
+  bool blinkChanged = (blinkPhase != lastBlinkPhase);
+  lastBlinkPhase = blinkPhase;
 
   for (int i = 0; i < 4; i++) {
     DeckState *ds = decks[i];
@@ -218,14 +222,16 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
     uint8_t syncVal = isSync ? 0x7F : 0x00;
     uint8_t mtVal = isMasterTempo ? 0x7F : 0x00;
 
-    if (forceSend || playVal != lastPlayVal[i]) {
+    // Play/CUE: resend when value changes OR blink phase toggles (max 2 msgs / 8 frames)
+    if (forceSend || blinkChanged || playVal != lastPlayVal[i]) {
       MIDI_SendShortMsg(mainStatus, 0x0B, playVal); // PLAY / PAUSE
       lastPlayVal[i] = playVal;
     }
-    if (forceSend || cueVal != lastCueVal[i]) {
+    if (forceSend || blinkChanged || cueVal != lastCueVal[i]) {
       MIDI_SendShortMsg(mainStatus, 0x0C, cueVal); // CUE
       lastCueVal[i] = cueVal;
     }
+    // Sync & Master Tempo: pure change-detection, no blink needed
     if (forceSend || syncVal != lastSyncVal[i]) {
       MIDI_SendShortMsg(mainStatus, 0x58, syncVal); // SYNC
       lastSyncVal[i] = syncVal;
