@@ -1370,7 +1370,7 @@ static int Browser_Update(Component *base) {
 
         if (UI_IsReleased() && !s->IsDragging) {
           double now = GetTime();
-          if (s->TouchDragAccumulator < S(28.0f) && fabsf(s->ScrollVelocity) < 60.0f) {
+          if (s->TouchDragAccumulator < S(10.0f) && fabsf(s->ScrollVelocity) < 60.0f) {
             s->ShowOSK = false; // Auto hide keyboard on list item tap
             if (s->CursorPos + s->ScrollOffset != idx) {
               s->CursorPos = idx - s->ScrollOffset;

@@ -510,7 +510,7 @@ static int Settings_Update(Component *base) {
 
   // OSK-style Touch Release & Debounced Tap Actions
   if (canClick && UI_IsReleased() && !r->State->IsDragging) {
-    if (r->State->TouchDragAccumulator < S(22.0f) && fabsf(r->State->ScrollVelocity) < 40.0f) {
+    if (r->State->TouchDragAccumulator < S(10.0f) && fabsf(r->State->ScrollVelocity) < 40.0f) {
       float divY = viewH - bottomH;
 
       // Tab Switching Logic
@@ -549,14 +549,16 @@ static int Settings_Update(Component *base) {
         return 1;
       }
 
-      // List Item Selection & Action Clicking
-      for (int i = 0; i < visibleRows; i++) {
+      // List Item Selection & Action Clicking with pixelOffset
+      float pixelOffset = fmodf(r->State->VisualScroll, rowH);
+      for (int i = 0; i < visibleRows + 1; i++) {
         int idx_f = r->State->Scroll + i;
         if (idx_f >= filteredCount)
           break;
 
         int idx = filteredIndices[idx_f];
-        float ry = listY + (i * rowH);
+        float ry = listY - pixelOffset + (i * rowH);
+        if (ry < listY - S(5.0f) || ry > (divY - S(5.0f))) continue;
         Rectangle rowRect = {0, ry, SCREEN_WIDTH, rowH};
 
         if (UICheckClick(rowRect)) {
@@ -781,14 +783,16 @@ static void Settings_Draw(Component *base) {
 
   BeginScissorMode(0, (int)listY, (int)SCREEN_WIDTH, (int)(divY - listY));
 
-  for (int i = 0; i < visibleRows; i++) {
+  float pixelOffset = fmodf(r->State->VisualScroll, rowH);
+
+  for (int i = 0; i < visibleRows + 1; i++) {
     int idx_f = r->State->Scroll + i;
     if (idx_f >= filteredCount)
       break;
 
     int idx = filteredIndices[idx_f];
     SettingItem *item = &r->State->Items[idx];
-    float ry = listY + (i * rowH);
+    float ry = listY - pixelOffset + (i * rowH);
 
     bool selected = (r->State->FocusLevel >= 1 && i == r->State->CursorPos);
     bool isEditingThis = (r->State->FocusLevel == 2 && selected);
@@ -1242,6 +1246,11 @@ void SettingsRenderer_Init(SettingsRenderer *r, SettingsState *state) {
   r->State->IsMappingListOpen = false;
   r->State->MappingListScroll = 0;
   r->State->MappingListCursorPos = 0;
+  r->State->IsSliderPopupOpen = false;
+  r->State->SliderPopupItemIdx = -1;
+  r->State->LastKnobTapTime = 0.0;
+  r->State->LastKnobTapItemIdx = -1;
+  r->State->LastKnobTapPos = (Vector2){ 0, 0 };
   r->OnClose = NULL;
   r->OnApply = NULL;
   r->callbackCtx = NULL;

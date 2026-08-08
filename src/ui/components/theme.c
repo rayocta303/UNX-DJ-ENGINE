@@ -146,8 +146,8 @@ static double g_lastUIClickTime = -1.0;
 bool UICheckClick(Rectangle rect) {
     double now = GetTime();
     if (!UI_IsReleased()) return false;
-    if (g_lastUIClickTime > 0.0 && (now - g_lastUIClickTime) < 0.14) return false;
-    if (g_touchDragDistance >= S(28.0f)) return false;
+    if (g_lastUIClickTime > 0.0 && (now - g_lastUIClickTime) < 0.18) return false;
+    if (g_touchDragDistance >= S(10.0f)) return false;
     Vector2 m = UIGetMousePosition();
     Vector2 s = UIGetTouchStartPos();
     if (!CheckCollisionPointRec(s, rect) && !CheckCollisionPointRec(m, rect)) return false;

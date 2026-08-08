@@ -72,8 +72,8 @@ bool Touch_CheckClick(Rectangle rect, float padding) {
     };
 
     double now = GetTime();
-    // 150ms UI touchscreen debounce to eliminate accidental double taps
-    if (g_lastTouchClickTime > 0.0 && (now - g_lastTouchClickTime) < 0.15) {
+    // 180ms UI touchscreen debounce to eliminate accidental double taps / re-triggers
+    if (g_lastTouchClickTime > 0.0 && (now - g_lastTouchClickTime) < 0.18) {
         return false;
     }
 
@@ -84,14 +84,8 @@ bool Touch_CheckClick(Rectangle rect, float padding) {
     bool isHitStart = CheckCollisionPointRec(touchStart, paddedRect);
     bool isHitCurr = CheckCollisionPointRec(currPos, paddedRect);
 
-    // 1. Instant Press Trigger (Fast finger tap down)
-    if (UI_IsPressed() && isHitCurr) {
-        g_lastTouchClickTime = now;
-        return true;
-    }
-
-    // 2. Tap Release Trigger (Finger release with relaxed drag threshold)
-    if (UI_IsReleased() && (isHitStart || isHitCurr) && dragDist < S(32.0f)) {
+    // Tap Release Trigger: finger release with tight drag threshold (<= 10px) so scrolling won't trigger clicks
+    if (UI_IsReleased() && (isHitStart || isHitCurr) && dragDist < S(10.0f)) {
         g_lastTouchClickTime = now;
         return true;
     }
