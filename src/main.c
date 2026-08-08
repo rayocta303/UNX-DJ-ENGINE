@@ -967,8 +967,8 @@ void App_Init(App *a) {
   strcpy(a->settingsState.Items[6].Label, "JOG RELEASE TIME");
   a->settingsState.Items[6].Type = SETTING_TYPE_KNOB;
   a->settingsState.Items[6].Min = 0;
-  a->settingsState.Items[6].Max = 2000;
-  a->settingsState.Items[6].Step = 50.0f;
+  a->settingsState.Items[6].Max = 10000;
+  a->settingsState.Items[6].Step = 100.0f;
   a->settingsState.Items[6].Value = a->deckA.Waveform.VinylStartMs;
   strcpy(a->settingsState.Items[6].Unit, "ms");
   a->settingsState.Items[6].Category = SETTING_CAT_DECK;
@@ -976,8 +976,8 @@ void App_Init(App *a) {
   strcpy(a->settingsState.Items[7].Label, "TOUCH BRAKE");
   a->settingsState.Items[7].Type = SETTING_TYPE_KNOB;
   a->settingsState.Items[7].Min = 0;
-  a->settingsState.Items[7].Max = 2000;
-  a->settingsState.Items[7].Step = 50.0f;
+  a->settingsState.Items[7].Max = 10000;
+  a->settingsState.Items[7].Step = 100.0f;
   a->settingsState.Items[7].Value = a->deckA.Waveform.VinylStopMs;
   strcpy(a->settingsState.Items[7].Unit, "ms");
   a->settingsState.Items[7].Category = SETTING_CAT_DECK;
