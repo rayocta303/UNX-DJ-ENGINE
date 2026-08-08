@@ -110,6 +110,7 @@ typedef struct {
   CreditsState creditsState;
   MixerState mixerState;
   PadState padState;
+  float libraryScrollDelta;
 
   TopBar topbar;
   DeckStrip stripA;
@@ -1838,6 +1839,16 @@ Log_LogDeviceInfo(gpuModel);
               0, 2.0f);
   CO_Register("[Master]", "headphone_mix", CO_TYPE_FLOAT, &audioEngine->HeadphoneMix,
               0, 1.0f);
+  CO_Register("[Master]", "headMix", CO_TYPE_FLOAT, &audioEngine->HeadphoneMix,
+              0, 1.0f);
+  CO_Register("[Library]", "scroll", CO_TYPE_FLOAT, &app->libraryScrollDelta,
+              -100.0f, 100.0f);
+  CO_Register("[Channel1]", "key_shift", CO_TYPE_INT, &audioEngine->Decks[0].ReleaseFXType,
+              -12, 12);
+  CO_Register("[Channel2]", "key_shift", CO_TYPE_INT, &audioEngine->Decks[1].ReleaseFXType,
+              -12, 12);
+  CO_Register("[Channel1]", "deck_layer", CO_TYPE_INT, &app->deckA.DeckLayer, 0, 1);
+  CO_Register("[Channel2]", "deck_layer", CO_TYPE_INT, &app->deckB.DeckLayer, 0, 1);
 
   // --- Touch & Jog ---
   CO_Register("[Channel1]", "touch", CO_TYPE_BOOL, &app->deckA.IsTouching, 0, 1);

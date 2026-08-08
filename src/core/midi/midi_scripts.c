@@ -240,21 +240,82 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
              strstr(function, "browseToggle")) {
     if (value > 0)
       CO_SetValue("[Library]", "enter", 1.0f);
-  } else if (strstr(function, "waveformZoom") ||
-             strstr(function, "waveform_zoom") ||
-             strstr(function, "zoomWaveform")) {
-    int delta = 0;
-    if (value == 1 || value == 0x01) {
-      delta = 1;
-    } else if (value == 127 || value == 0x7F) {
-      delta = -1;
-    } else if (value > 1 && value < 64) {
-      delta = (int)value;
-    } else if (value > 64 && value < 127) {
-      delta = -((int)128 - (int)value);
+  } else if (strstr(function, "headMix") || strstr(function, "headphone_mix") || strstr(function, "headMixRotate")) {
+    float normVal = (float)value / 127.0f;
+    CO_SetValue("[Master]", "headphone_mix", normVal);
+    CO_SetValue("[Master]", "headMix", normVal);
+  } else if (strstr(function, "beatjumpPadPressed")) {
+    if (value > 0) {
+      static const double beatSizes[8] = {-1.0, 1.0, -2.0, 2.0, -4.0, 4.0, -8.0, 8.0};
+      int padIdx = -1;
+      if (midino >= 0x20 && midino <= 0x27) padIdx = midino - 0x20;
+      if (padIdx >= 0 && padIdx < 8) {
+        double beats = beatSizes[padIdx];
+        if (beats < 0) {
+          CO_SetValue(group, "beatjump_backward", 1.0f);
+        } else {
+          CO_SetValue(group, "beatjump_forward", 1.0f);
+        }
+        if (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2) {
+          DeckAudioState *audio = &globalAudioEngine->Decks[targetDeckIdx];
+          double bpm = (audio->BPM > 0.0) ? audio->BPM : 120.0;
+          double sampleRate = (audio->SampleRate > 0) ? (double)audio->SampleRate : 44100.0;
+          double jumpSamples = beats * sampleRate * (60.0 / bpm);
+          audio->Position += jumpSamples;
+          if (audio->Position < 0.0) audio->Position = 0.0;
+          if (audio->TotalSamples > 0 && audio->Position >= (double)audio->TotalSamples) {
+            audio->Position = (double)(audio->TotalSamples - 1);
+          }
+        }
+      }
     }
-    if (delta != 0) {
-      CO_AddValue("[Master]", "waveform_zoom_step", (float)delta);
+  } else if (strstr(function, "decreaseBeatjumpSizes")) {
+    if (value > 0) {
+      CO_SetValue(group, "beatjump_backward", 1.0f);
+      if (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2) {
+        DeckAudioState *audio = &globalAudioEngine->Decks[targetDeckIdx];
+        double bpm = (audio->BPM > 0.0) ? audio->BPM : 120.0;
+        double sampleRate = (audio->SampleRate > 0) ? (double)audio->SampleRate : 44100.0;
+        double jumpSamples = -16.0 * sampleRate * (60.0 / bpm);
+        audio->Position += jumpSamples;
+        if (audio->Position < 0.0) audio->Position = 0.0;
+      }
     }
+  } else if (strstr(function, "increaseBeatjumpSizes")) {
+    if (value > 0) {
+      CO_SetValue(group, "beatjump_forward", 1.0f);
+      if (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2) {
+        DeckAudioState *audio = &globalAudioEngine->Decks[targetDeckIdx];
+        double bpm = (audio->BPM > 0.0) ? audio->BPM : 120.0;
+        double sampleRate = (audio->SampleRate > 0) ? (double)audio->SampleRate : 44100.0;
+        double jumpSamples = 16.0 * sampleRate * (60.0 / bpm);
+        audio->Position += jumpSamples;
+        if (audio->TotalSamples > 0 && audio->Position >= (double)audio->TotalSamples) {
+          audio->Position = (double)(audio->TotalSamples - 1);
+        }
+      }
+    }
+  } else if (strstr(function, "deckControlLPressed")) {
+    if (value > 0) {
+      CO_ToggleValue("[Channel1]", "deck_layer");
+    }
+  } else if (strstr(function, "deckControlRPressed")) {
+    if (value > 0) {
+      CO_ToggleValue("[Channel2]", "deck_layer");
+    }
+  } else if (strstr(function, "setGroupKeyValue") || strstr(function, "keyboardButtonPressed")) {
+    if (value > 0) {
+      int semitone = 0;
+      if (midino >= 0x70 && midino <= 0x77) {
+        semitone = (int)midino - 0x74; // 0x74 is 0 semitones (reset pitch)
+      } else if (midino >= 0x40 && midino <= 0x47) {
+        semitone = (int)midino - 0x44;
+      }
+      CO_SetValue(group, "key_shift", (float)semitone);
+    }
+  } else if (strstr(function, "MoveVertical") || strstr(function, "scrollTrack")) {
+    float diff = (value >= 64) ? (float)(value - 128) : (float)value;
+    CO_AddValue("[Library]", "scroll", diff);
   }
 }
+

@@ -141,6 +141,7 @@ typedef struct DeckState {
   bool MidiRequestMemoryCue;
   bool MidiRequestPlay;
   bool MidiRequestCue;
+  int DeckLayer;
 } DeckState;
 
 typedef struct BeatFXState {
