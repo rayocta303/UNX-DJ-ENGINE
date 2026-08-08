@@ -60,58 +60,60 @@ void Sync_Update(DeckState *deckA, DeckState *deckB, AudioEngine *audioEngine) {
     
     // Check if jogwheel manipulation or touch is active on follower or master
     int followerIdx = (follower->ID == 0) ? 0 : 1;
-    bool isJogActive = (follower->IsTouching || master->IsTouching);
+    bool isJogActive = (follower->IsTouching || master->IsTouching || follower->JogDelta != 0);
     if (audioEngine) {
-        if (fabs(audioEngine->Decks[followerIdx].JogRate) > 0.001) {
+        if (fabs(audioEngine->Decks[followerIdx].JogRate) > 0.005f) {
             isJogActive = true;
         }
     }
 
+    // When nudge / jog touch is triggered, release Beat Sync and downgrade to BPM Sync
+    if (follower->SyncMode == 2 && isJogActive) {
+        follower->SyncMode = 1;
+        follower->LastPhaseAdjustment = 0.0f;
+    }
+
     // 2. Phase Sync (Beat Snap) - Only active in BEAT SYNC mode (SyncMode == 2)
     if (follower->SyncMode == 2 && follower->IsPlaying && follower->LoadedTrack && master->LoadedTrack) {
-        if (isJogActive) {
-            // Manual jog nudge / platter touch: Suspend auto-correction, NEVER demote SyncMode!
-            follower->LastPhaseAdjustment = 0.0f;
-        } else {
-            double masterDist = Quantize_GetBeatDistance(master->LoadedTrack, master->PositionMs);
-            double followerDist = Quantize_GetBeatDistance(follower->LoadedTrack, follower->PositionMs);
-            
-            // Shortest error in beat fraction (-0.5 to 0.5)
-            double error = Sync_ShortestPercentageChange(masterDist, followerDist);
-            
-            // Calculate drift in milliseconds using follower's beat grid
-            uint32_t fCurrentMs = follower->PositionMs;
-            uint32_t fBeatLen = 500; // Default fallback (120 BPM)
-            for (int i = 0; i < follower->LoadedTrack->Analysis.BeatGridCount - 1; i++) {
-                if (fCurrentMs >= follower->LoadedTrack->Analysis.BeatGrid[i].Time && 
-                    fCurrentMs < follower->LoadedTrack->Analysis.BeatGrid[i+1].Time) {
-                    fBeatLen = follower->LoadedTrack->Analysis.BeatGrid[i+1].Time - follower->LoadedTrack->Analysis.BeatGrid[i].Time;
-                    break;
-                }
+        double masterDist = Quantize_GetBeatDistance(master->LoadedTrack, master->PositionMs);
+        double followerDist = Quantize_GetBeatDistance(follower->LoadedTrack, follower->PositionMs);
+        
+        // Shortest error in beat fraction (-0.5 to 0.5)
+        double error = Sync_ShortestPercentageChange(masterDist, followerDist);
+        
+        // Calculate drift in milliseconds using follower's beat grid
+        uint32_t fCurrentMs = follower->PositionMs;
+        uint32_t fBeatLen = 500; // Default fallback (120 BPM)
+        for (int i = 0; i < follower->LoadedTrack->Analysis.BeatGridCount - 1; i++) {
+            if (fCurrentMs >= follower->LoadedTrack->Analysis.BeatGrid[i].Time && 
+                fCurrentMs < follower->LoadedTrack->Analysis.BeatGrid[i+1].Time) {
+                fBeatLen = follower->LoadedTrack->Analysis.BeatGrid[i+1].Time - follower->LoadedTrack->Analysis.BeatGrid[i].Time;
+                break;
             }
-            
-            double driftMs = error * (double)fBeatLen;
-            
-            // Tracking drift status for UI feedback
-            if (fabs(driftMs) > 5.0) follower->IsPhaseDrifted = true;
-            else if (fabs(driftMs) < 1.0) follower->IsPhaseDrifted = false;
+        }
+        
+        double driftMs = error * (double)fBeatLen;
+        
+        // Tracking drift status for UI feedback
+        if (fabs(driftMs) > 5.0) follower->IsPhaseDrifted = true;
+        else if (fabs(driftMs) < 1.0) follower->IsPhaseDrifted = false;
 
-            // 1. Clean Grid Snap: If drift is large (> 120ms)
-            if (fabs(driftMs) > 120.0) {
-                Sync_RequestPhaseSnap(follower, master, audioEngine);
-                follower->LastPhaseAdjustment = 0.0f;
-                follower->IsPhaseDrifted = false;
-            } 
-            // 2. Pro Phase Tracking: Smooth pitch adjustment for smaller drift
-            else if (fabs(driftMs) > 1.0) {
-                float correction = (float)(-driftMs / (fBeatLen * 3.0)); 
-                if (correction > 0.02f) correction = 0.02f;
-                if (correction < -0.02f) correction = -0.02f;
-                follower->LastPhaseAdjustment = correction;
-            } else {
-                follower->LastPhaseAdjustment = 0.0f;
-                follower->IsPhaseDrifted = false;
-            }
+        // 1. Clean Grid Snap: If drift is large (> 100ms)
+        if (fabs(driftMs) > 100.0) {
+            Sync_RequestPhaseSnap(follower, master, audioEngine);
+            follower->LastPhaseAdjustment = 0.0f;
+            follower->IsPhaseDrifted = false;
+        } 
+        // 2. Pro Phase Tracking: Smooth pitch adjustment for smaller drift
+        else if (fabs(driftMs) > 2.0) {
+            float targetCorr = (float)(-driftMs / (fBeatLen * 4.0)); 
+            if (targetCorr > 0.015f) targetCorr = 0.015f;
+            if (targetCorr < -0.015f) targetCorr = -0.015f;
+            follower->LastPhaseAdjustment += (targetCorr - follower->LastPhaseAdjustment) * 0.1f;
+        } else {
+            follower->LastPhaseAdjustment *= 0.8f;
+            if (fabs(follower->LastPhaseAdjustment) < 0.0001f) follower->LastPhaseAdjustment = 0.0f;
+            follower->IsPhaseDrifted = false;
         }
     } else {
         follower->LastPhaseAdjustment = 0.0f;

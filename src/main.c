@@ -2847,13 +2847,16 @@ void UpdateDrawFrame(App *app) {
   Sync_Update(&app->deckA, &app->deckB, audioEngine);
 
   // Tempo Calculation (10000 = 100%)
-  float realPitchA = 1.0f + (app->deckA.TempoPercent / 100.0f) + app->deckA.LastPhaseAdjustment;
+  // Base pitch determines current track BPM (stable display, no flickering)
+  float basePitchA = 1.0f + (app->deckA.TempoPercent / 100.0f);
+  app->deckA.CurrentBPM = app->deckA.OriginalBPM * basePitchA;
+  float realPitchA = basePitchA + app->deckA.LastPhaseAdjustment;
   audioEngine->Decks[0].Pitch = (uint16_t)(realPitchA * 10000.0f);
-  app->deckA.CurrentBPM = app->deckA.OriginalBPM * realPitchA;
 
-  float realPitchB = 1.0f + (app->deckB.TempoPercent / 100.0f) + app->deckB.LastPhaseAdjustment;
+  float basePitchB = 1.0f + (app->deckB.TempoPercent / 100.0f);
+  app->deckB.CurrentBPM = app->deckB.OriginalBPM * basePitchB;
+  float realPitchB = basePitchB + app->deckB.LastPhaseAdjustment;
   audioEngine->Decks[1].Pitch = (uint16_t)(realPitchB * 10000.0f);
-  app->deckB.CurrentBPM = app->deckB.OriginalBPM * realPitchB;
 
   // --- Sync UI Jog/Modes back to Audio Engine ---
   // Sync state flags first so physics processing has up-to-date deck flags
