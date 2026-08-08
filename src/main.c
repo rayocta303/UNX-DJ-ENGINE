@@ -2989,7 +2989,8 @@ void UpdateDrawFrame(App *app) {
       double calibRPM = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckA.Waveform.JogCalibRPM : 33.333333333333336;
       // Pioneer FLX6 jog encoder: 720 ticks/revolution. At 33.3333 RPM (1.8s/rev), 720 ticks / 1.8s = 400.0 ticks/sec at 1.0x speed.
       double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
-      double rawRate = app->deckA.JogDelta / (ticksPerSecAtNormalSpeed * dt);
+      double jogGain = effTouchA ? 10.0 : 20.0;
+      double rawRate = (app->deckA.JogDelta * jogGain) / (ticksPerSecAtNormalSpeed * dt);
       app->deckA.JogDelta = 0;
       // Exponential Moving Average filter to smooth MIDI packet jitter
       audioEngine->Decks[0].JogRate = audioEngine->Decks[0].JogRate * 0.25 + rawRate * 0.75;
@@ -3059,7 +3060,8 @@ void UpdateDrawFrame(App *app) {
     if (app->deckB.JogDelta != 0) {
       double calibRPM = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckB.Waveform.JogCalibRPM : 33.333333333333336;
       double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
-      double rawRate = app->deckB.JogDelta / (ticksPerSecAtNormalSpeed * dt);
+      double jogGain = effTouchB ? 10.0 : 20.0;
+      double rawRate = (app->deckB.JogDelta * jogGain) / (ticksPerSecAtNormalSpeed * dt);
       app->deckB.JogDelta = 0;
       // Exponential Moving Average filter to smooth MIDI packet jitter
       audioEngine->Decks[1].JogRate = audioEngine->Decks[1].JogRate * 0.25 + rawRate * 0.75;
