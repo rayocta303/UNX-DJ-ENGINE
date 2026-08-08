@@ -1928,8 +1928,12 @@ Log_LogDeviceInfo(gpuModel);
               &app->browserState.MidiBrowseDelta, -10, 10);
   CO_Register("[Library]", "enter", CO_TYPE_BOOL,
               &app->browserState.MidiRequestEnter, 0, 1);
+  CO_Register("[Library]", "MoveFocusForward", CO_TYPE_BOOL,
+              &app->browserState.MidiRequestMoveFocusForward, 0, 1);
   CO_Register("[Library]", "back", CO_TYPE_BOOL,
               &app->browserState.MidiRequestBack, 0, 1);
+  CO_Register("[Library]", "MoveFocusBackward", CO_TYPE_BOOL,
+              &app->browserState.MidiRequestMoveFocusBackward, 0, 1);
   CO_Register("[Library]", "up", CO_TYPE_BOOL, &app->browserState.MidiRequestUp,
               0, 1);
   CO_Register("[Library]", "down", CO_TYPE_BOOL,

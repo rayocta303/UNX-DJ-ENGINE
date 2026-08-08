@@ -1028,14 +1028,16 @@ static int Browser_Update(Component *base) {
       }
   }
   
-  if (s->MidiRequestEnter) {
+  if (s->MidiRequestEnter || s->MidiRequestMoveFocusForward) {
       triggerEnter = true;
       s->MidiRequestEnter = false;
+      s->MidiRequestMoveFocusForward = false;
   }
   
-  if (s->MidiRequestBack) {
+  if (s->MidiRequestBack || s->MidiRequestMoveFocusBackward) {
       Browser_Back(s);
       s->MidiRequestBack = false;
+      s->MidiRequestMoveFocusBackward = false;
   }
 
   if (s->MidiRequestLoadA) {

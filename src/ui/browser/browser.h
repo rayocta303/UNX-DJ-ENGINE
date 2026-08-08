@@ -74,6 +74,8 @@ typedef struct {
     // MIDI/External Interaction Flags
     bool MidiRequestEnter;
     bool MidiRequestBack;
+    bool MidiRequestMoveFocusForward;
+    bool MidiRequestMoveFocusBackward;
     bool MidiRequestUp;
     bool MidiRequestDown;
     int MidiBrowseDelta;
