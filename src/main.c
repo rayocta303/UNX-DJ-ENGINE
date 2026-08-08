@@ -2989,28 +2989,27 @@ void UpdateDrawFrame(App *app) {
       double calibRPM = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckA.Waveform.JogCalibRPM : 33.333333333333336;
       // Pioneer FLX6 jog encoder: 720 ticks/revolution. At 33.3333 RPM (1.8s/rev), 720 ticks / 1.8s = 400.0 ticks/sec at 1.0x speed.
       double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
-      double jogGain = effTouchA ? 10.0 : 20.0;
-      double rawRate = (app->deckA.JogDelta * jogGain) / (ticksPerSecAtNormalSpeed * dt);
+      double rawRate = app->deckA.JogDelta / (ticksPerSecAtNormalSpeed * dt);
       app->deckA.JogDelta = 0;
       // Exponential Moving Average filter to smooth MIDI packet jitter
       audioEngine->Decks[0].JogRate = audioEngine->Decks[0].JogRate * 0.25 + rawRate * 0.75;
     } else if (effTouchA && app->deckA.VinylModeEnabled) {
-      // Touch hold in Vinyl mode: decay rapidly if hand stopped, preserving velocity during fast spin & release
-      if (fabs(audioEngine->Decks[0].JogRate) > 0.1) {
-        audioEngine->Decks[0].JogRate *= 0.5;
-      } else {
-        audioEngine->Decks[0].JogRate = 0.0;
-      }
+      // Touch hold in Vinyl mode (vinyl platter held stationary under hand)
+      audioEngine->Decks[0].JogRate = 0.0;
     }
   } else {
-    // Pitch bend release decay (Frame-rate independent scaled by dt)
+    // Velocity-adaptive release decay for realistic jog momentum (backspin & forward spin release velocity)
     double dt = GetFrameTime();
     if (dt < 0.001) dt = 0.016667;
     float dtFactor = (float)(dt / 0.016667);
     if (dtFactor < 0.1f) dtFactor = 0.1f;
     if (dtFactor > 5.0f) dtFactor = 5.0f;
-    audioEngine->Decks[0].JogRate *= powf(0.92f, dtFactor);
-    if (fabs(audioEngine->Decks[0].JogRate) < 0.01 || !audioEngine->Decks[0].IsMotorOn) {
+
+    double absRate = fabs(audioEngine->Decks[0].JogRate);
+    float baseDecay = (absRate > 0.3) ? (float)fmin(0.94 + absRate * 0.01, 0.982) : 0.92f;
+
+    audioEngine->Decks[0].JogRate *= powf(baseDecay, dtFactor);
+    if (fabs(audioEngine->Decks[0].JogRate) < 0.02) {
       audioEngine->Decks[0].JogRate = 0.0;
     }
   }
@@ -3060,28 +3059,27 @@ void UpdateDrawFrame(App *app) {
     if (app->deckB.JogDelta != 0) {
       double calibRPM = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckB.Waveform.JogCalibRPM : 33.333333333333336;
       double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
-      double jogGain = effTouchB ? 10.0 : 20.0;
-      double rawRate = (app->deckB.JogDelta * jogGain) / (ticksPerSecAtNormalSpeed * dt);
+      double rawRate = app->deckB.JogDelta / (ticksPerSecAtNormalSpeed * dt);
       app->deckB.JogDelta = 0;
       // Exponential Moving Average filter to smooth MIDI packet jitter
       audioEngine->Decks[1].JogRate = audioEngine->Decks[1].JogRate * 0.25 + rawRate * 0.75;
     } else if (effTouchB && app->deckB.VinylModeEnabled) {
-      // Touch hold in Vinyl mode: decay rapidly if hand stopped, preserving velocity during fast spin & release
-      if (fabs(audioEngine->Decks[1].JogRate) > 0.1) {
-        audioEngine->Decks[1].JogRate *= 0.5;
-      } else {
-        audioEngine->Decks[1].JogRate = 0.0;
-      }
+      // Touch hold in Vinyl mode (vinyl platter held stationary under hand)
+      audioEngine->Decks[1].JogRate = 0.0;
     }
   } else {
-    // Pitch bend release decay (Frame-rate independent scaled by dt)
+    // Velocity-adaptive release decay for realistic jog momentum (backspin & forward spin release velocity)
     double dt = GetFrameTime();
     if (dt < 0.001) dt = 0.016667;
     float dtFactor = (float)(dt / 0.016667);
     if (dtFactor < 0.1f) dtFactor = 0.1f;
     if (dtFactor > 5.0f) dtFactor = 5.0f;
-    audioEngine->Decks[1].JogRate *= powf(0.92f, dtFactor);
-    if (fabs(audioEngine->Decks[1].JogRate) < 0.01 || !audioEngine->Decks[1].IsMotorOn) {
+
+    double absRate = fabs(audioEngine->Decks[1].JogRate);
+    float baseDecay = (absRate > 0.3) ? (float)fmin(0.94 + absRate * 0.01, 0.982) : 0.92f;
+
+    audioEngine->Decks[1].JogRate *= powf(baseDecay, dtFactor);
+    if (fabs(audioEngine->Decks[1].JogRate) < 0.02) {
       audioEngine->Decks[1].JogRate = 0.0;
     }
   }
