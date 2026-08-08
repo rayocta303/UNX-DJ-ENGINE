@@ -128,6 +128,7 @@ typedef struct {
   KeyboardMapping keyMap;
   MidiContext midiCtx;
   bool showExitConfirm;
+  float masterVolume; // Persisted master output level (0.0 - 1.0)
   AudioBackendConfig activeAudioConfig;
 
   bool MidiRequestSettings;
@@ -213,11 +214,12 @@ void App_SaveSettings(App *a) {
     a->fxState.SelectedChannel = globalAudioEngine->BeatFX.targetChannel;
     a->fxState.LevelDepth = globalAudioEngine->BeatFX.levelDepth;
     a->fxState.IsFXOn = globalAudioEngine->BeatFX.isFxOn;
+    a->masterVolume = globalAudioEngine->MasterVolume;
   }
   Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig,
                 a->fxState, a->colorFxDeckA, a->colorFxDeckB,
                 a->activeControllerPath, a->deckA.QuantizeEnabled,
-                a->deckB.QuantizeEnabled);
+                a->deckB.QuantizeEnabled, a->masterVolume);
 }
 
 void OnSettingsClose(void *ctx) {
@@ -931,10 +933,11 @@ void App_Init(App *a) {
   a->settingsState.Items[1].Category = SETTING_CAT_DECK;
 
   // Load persisted settings
+  a->masterVolume = 1.0f; // default before load
   Settings_Load(&a->deckA.Waveform, &a->deckB.Waveform, &a->activeAudioConfig,
                 &a->fxState, &a->colorFxDeckA, &a->colorFxDeckB,
                 a->activeControllerPath, &a->deckA.QuantizeEnabled,
-                &a->deckB.QuantizeEnabled);
+                &a->deckB.QuantizeEnabled, &a->masterVolume);
   if (a->activeControllerPath[0] != '\0') {
     MIDI_RefreshMapping(a->activeControllerPath);
   }
@@ -983,7 +986,7 @@ void App_Init(App *a) {
   strcpy(a->settingsState.Items[6].Label, "JOG RELEASE TIME");
   a->settingsState.Items[6].Type = SETTING_TYPE_KNOB;
   a->settingsState.Items[6].Min = 0.0f;
-  a->settingsState.Items[6].Max = 8.0f;
+  a->settingsState.Items[6].Max = 16.0f;
   a->settingsState.Items[6].Step = 0.25f;
   a->settingsState.Items[6].Value = a->deckA.Waveform.VinylStartMs;
   strcpy(a->settingsState.Items[6].Unit, "Bar");
@@ -992,7 +995,7 @@ void App_Init(App *a) {
   strcpy(a->settingsState.Items[7].Label, "TOUCH BRAKE");
   a->settingsState.Items[7].Type = SETTING_TYPE_KNOB;
   a->settingsState.Items[7].Min = 0.0f;
-  a->settingsState.Items[7].Max = 8.0f;
+  a->settingsState.Items[7].Max = 16.0f;
   a->settingsState.Items[7].Step = 0.25f;
   a->settingsState.Items[7].Value = a->deckA.Waveform.VinylStopMs;
   strcpy(a->settingsState.Items[7].Unit, "Bar");
@@ -1616,6 +1619,7 @@ Log_LogDeviceInfo(gpuModel);
   audioEngine->BeatFX.targetChannel = app->fxState.SelectedChannel;
   audioEngine->BeatFX.levelDepth = app->fxState.LevelDepth;
   audioEngine->BeatFX.isFxOn = app->fxState.IsFXOn;
+  audioEngine->MasterVolume = app->masterVolume; // Restore saved master volume
   app->browserState.AudioPlugin = (struct AudioEngine *)audioEngine;
   app->browserState.DeckA = (struct DeckState *)&app->deckA;
   app->browserState.DeckB = (struct DeckState *)&app->deckB;

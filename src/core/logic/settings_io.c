@@ -31,7 +31,7 @@ static void EnsureControllersExist(const char* baseDir) {
     }
 }
 
-static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB, bool *quantizeA, bool *quantizeB) {
+static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB, bool *quantizeA, bool *quantizeB, float *masterVolume) {
     if (!json) return;
     
     const char* p = json;
@@ -45,11 +45,11 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         if (sscanf(strstr(p, "\"mid\""), "\"mid\": %f", &val) == 1) wfmA->GainMid = val;
         if (sscanf(strstr(p, "\"high\""), "\"high\": %f", &val) == 1) wfmA->GainHigh = val;
         if (sscanf(strstr(p, "\"start\""), "\"start\": %f", &val) == 1) {
-            if (val > 8.0f) val = 0.5f; // Convert legacy millisecond settings to Bar
+            if (val > 16.0f) val = 0.5f; // Convert legacy millisecond settings to Bar
             wfmA->VinylStartMs = val;
         }
         if (sscanf(strstr(p, "\"stop\""), "\"stop\": %f", &val) == 1) {
-            if (val > 8.0f) val = 1.0f; // Convert legacy millisecond settings to Bar
+            if (val > 16.0f) val = 1.0f; // Convert legacy millisecond settings to Bar
             wfmA->VinylStopMs = val;
         }
         if (sscanf(strstr(p, "\"lock\""), "\"lock\": %d", &ival) == 1) wfmA->LoadLock = (bool)ival;
@@ -63,11 +63,11 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         if (sscanf(strstr(p, "\"mid\""), "\"mid\": %f", &val) == 1) wfmB->GainMid = val;
         if (sscanf(strstr(p, "\"high\""), "\"high\": %f", &val) == 1) wfmB->GainHigh = val;
         if (sscanf(strstr(p, "\"start\""), "\"start\": %f", &val) == 1) {
-            if (val > 8.0f) val = 0.5f;
+            if (val > 16.0f) val = 0.5f;
             wfmB->VinylStartMs = val;
         }
         if (sscanf(strstr(p, "\"stop\""), "\"stop\": %f", &val) == 1) {
-            if (val > 8.0f) val = 1.0f;
+            if (val > 16.0f) val = 1.0f;
             wfmB->VinylStopMs = val;
         }
         if (sscanf(strstr(p, "\"lock\""), "\"lock\": %d", &ival) == 1) wfmB->LoadLock = (bool)ival;
@@ -116,9 +116,18 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         if (sscanf(strstr(p, "\"qA\""), "\"qA\": %d", &ival) == 1 && quantizeA) *quantizeA = (bool)ival;
         if (sscanf(strstr(p, "\"qB\""), "\"qB\": %d", &ival) == 1 && quantizeB) *quantizeB = (bool)ival;
     }
+
+    // Master Volume
+    if ((p = strstr(json, "\"master\""))) {
+        if (sscanf(strstr(p, "\"vol\""), "\"vol\": %f", &val) == 1 && masterVolume) {
+            if (val < 0.0f) val = 0.0f;
+            if (val > 1.0f) val = 1.0f;
+            *masterVolume = val;
+        }
+    }
 }
 
-void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB, char *controllerPath, bool *quantizeA, bool *quantizeB) {
+void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB, char *controllerPath, bool *quantizeA, bool *quantizeB, float *masterVolume) {
     // Defaults
     controllerPath[0] = '\0';
     wfmA->Style = WAVEFORM_STYLE_RGB;
@@ -142,6 +151,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
 
     if (quantizeA) *quantizeA = true;
     if (quantizeB) *quantizeB = true;
+    if (masterVolume) *masterVolume = 1.0f;
 
     if (cfxA) ColorFXManager_Init(cfxA);
     if (cfxB) ColorFXManager_Init(cfxB);
@@ -185,7 +195,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
 
     if (!f) {
         EnsureControllersExist("."); // Fallback to current dir if nothing else
-        Settings_Save(*wfmA, *wfmB, *audio, *fx, *cfxA, *cfxB, controllerPath, quantizeA ? *quantizeA : true, quantizeB ? *quantizeB : true);
+        Settings_Save(*wfmA, *wfmB, *audio, *fx, *cfxA, *cfxB, controllerPath, quantizeA ? *quantizeA : true, quantizeB ? *quantizeB : true, masterVolume ? *masterVolume : 1.0f);
         return;
     }
 
@@ -197,7 +207,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     if (buf) {
         fread(buf, 1, size, f);
         buf[size] = '\0';
-        LoadFromJSON(buf, wfmA, wfmB, audio, fx, cfxA, cfxB, quantizeA, quantizeB);
+        LoadFromJSON(buf, wfmA, wfmB, audio, fx, cfxA, cfxB, quantizeA, quantizeB, masterVolume);
         
         // Extract controller path manually to avoid changing too many signatures
         const char *p;
@@ -219,7 +229,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     fclose(f);
 }
 
-void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendConfig audio, BeatFXState fx, ColorFXManager cfxA, ColorFXManager cfxB, const char *controllerPath, bool quantizeA, bool quantizeB) {
+void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendConfig audio, BeatFXState fx, ColorFXManager cfxA, ColorFXManager cfxB, const char *controllerPath, bool quantizeA, bool quantizeB, float masterVolume) {
     char path[512];
 
 #if defined(__ANDROID__)
@@ -261,6 +271,7 @@ void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendCon
     fprintf(f, "  \"colorfx\": { \"active\": %d, \"param\": %.2f, \"valA\": %.2f, \"valB\": %.2f },\n",
             (int)cfxA.activeFX, cfxA.parameter, cfxA.colorValue, cfxB.colorValue);
     fprintf(f, "  \"quantize\": { \"qA\": %d, \"qB\": %d },\n", quantizeA ? 1 : 0, quantizeB ? 1 : 0);
+    fprintf(f, "  \"master\": { \"vol\": %.3f },\n", masterVolume);
     fprintf(f, "  \"controllers\": { \"path\": \"%s\" }\n", controllerPath ? controllerPath : "");
     fprintf(f, "}\n");
 
