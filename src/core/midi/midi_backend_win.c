@@ -6,10 +6,8 @@
 #include <mmsystem.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <stdio.h>
 
 #define MIDI_RING_SIZE 1024
-#define MIDI_OUT_RING_SIZE 2048
 
 typedef struct {
     uint8_t status;
@@ -17,67 +15,10 @@ typedef struct {
     uint8_t data2;
 } MidiRawEvent;
 
-typedef struct {
-    uint8_t type; // 0 = short, 1 = sysex
-    uint8_t status;
-    uint8_t data1;
-    uint8_t data2;
-    uint8_t sysexBuf[64];
-    uint32_t sysexLen;
-} MidiOutMsg;
-
 static HMIDIIN hMidiIn = NULL;
-static HMIDIOUT hMidiOut = NULL;
-
 static MidiRawEvent g_midiRingBuffer[MIDI_RING_SIZE];
 static volatile uint32_t g_midiRingHead = 0;
 static volatile uint32_t g_midiRingTail = 0;
-
-static MidiOutMsg g_midiOutRing[MIDI_OUT_RING_SIZE];
-static volatile uint32_t g_midiOutHead = 0;
-static volatile uint32_t g_midiOutTail = 0;
-
-static HANDLE hMidiOutThread = NULL;
-static HANDLE hMidiOutEvent = NULL;
-static volatile bool g_midiOutRunning = false;
-
-static DWORD WINAPI MidiOutWorkerThread(LPVOID lpParam) {
-    (void)lpParam;
-    while (g_midiOutRunning) {
-        bool hadWork = false;
-        while (g_midiOutTail != g_midiOutHead) {
-            hadWork = true;
-            MidiOutMsg msg = g_midiOutRing[g_midiOutTail];
-            g_midiOutTail = (g_midiOutTail + 1) % MIDI_OUT_RING_SIZE;
-
-            if (hMidiOut != NULL) {
-                if (msg.type == 0) {
-                    DWORD dwMsg = ((DWORD)msg.status) | (((DWORD)msg.data1) << 8) | (((DWORD)msg.data2) << 16);
-                    midiOutShortMsg(hMidiOut, dwMsg);
-                } else if (msg.type == 1 && msg.sysexLen > 0) {
-                    MIDIHDR header;
-                    memset(&header, 0, sizeof(MIDIHDR));
-                    header.lpData = (LPSTR)msg.sysexBuf;
-                    header.dwBufferLength = msg.sysexLen;
-                    header.dwBytesRecorded = msg.sysexLen;
-                    if (midiOutPrepareHeader(hMidiOut, &header, sizeof(MIDIHDR)) == MMSYSERR_NOERROR) {
-                        midiOutLongMsg(hMidiOut, &header, sizeof(MIDIHDR));
-                        int tries = 0;
-                        while (!(header.dwFlags & MHDR_DONE) && tries < 10) {
-                            Sleep(1);
-                            tries++;
-                        }
-                        midiOutUnprepareHeader(hMidiOut, &header, sizeof(MIDIHDR));
-                    }
-                }
-            }
-        }
-        if (!hadWork) {
-            WaitForSingleObject(hMidiOutEvent, 10);
-        }
-    }
-    return 0;
-}
 
 void CALLBACK MidiInProc(HMIDIIN hMidiInDev, UINT wMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2) {
     (void)hMidiInDev; (void)dwInstance; (void)dwParam2;
@@ -93,35 +34,13 @@ void CALLBACK MidiInProc(HMIDIIN hMidiInDev, UINT wMsg, DWORD_PTR dwInstance, DW
 }
 
 void WinMIDI_Close(void) {
-    if (g_midiOutRunning) {
-        g_midiOutRunning = false;
-        if (hMidiOutEvent) {
-            SetEvent(hMidiOutEvent);
-        }
-        if (hMidiOutThread) {
-            WaitForSingleObject(hMidiOutThread, 200);
-            CloseHandle(hMidiOutThread);
-            hMidiOutThread = NULL;
-        }
-        if (hMidiOutEvent) {
-            CloseHandle(hMidiOutEvent);
-            hMidiOutEvent = NULL;
-        }
-    }
     if (hMidiIn) {
         midiInStop(hMidiIn);
         midiInClose(hMidiIn);
         hMidiIn = NULL;
     }
-    if (hMidiOut) {
-        midiOutReset(hMidiOut);
-        midiOutClose(hMidiOut);
-        hMidiOut = NULL;
-    }
     g_midiRingHead = 0;
     g_midiRingTail = 0;
-    g_midiOutHead = 0;
-    g_midiOutTail = 0;
 }
 
 int WinMIDI_GetDevices(char outNames[16][64]) {
@@ -160,32 +79,6 @@ bool WinMIDI_OpenDevice(int devId, char* outDeviceName) {
 
     if (midiInOpen(&hMidiIn, (UINT)devId, (DWORD_PTR)MidiInProc, 0, CALLBACK_FUNCTION) == MMSYSERR_NOERROR) {
         midiInStart(hMidiIn);
-
-        UINT numDevsOut = midiOutGetNumDevs();
-        int matchedOutIdx = -1;
-        for (UINT i = 0; i < numDevsOut; i++) {
-            MIDIOUTCAPS capsOut;
-            if (midiOutGetDevCaps(i, &capsOut, sizeof(MIDIOUTCAPS)) == MMSYSERR_NOERROR) {
-                if (strstr(capsOut.szPname, capsIn.szPname) || strstr(capsIn.szPname, capsOut.szPname)) {
-                    matchedOutIdx = (int)i;
-                    break;
-                }
-            }
-        }
-        if (matchedOutIdx < 0 && (UINT)devId < numDevsOut) {
-            matchedOutIdx = devId;
-        }
-
-        if (matchedOutIdx >= 0) {
-            if (midiOutOpen(&hMidiOut, (UINT)matchedOutIdx, 0, 0, CALLBACK_NULL) == MMSYSERR_NOERROR) {
-                hMidiOutEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-                g_midiOutRunning = true;
-                hMidiOutThread = CreateThread(NULL, 0, MidiOutWorkerThread, NULL, 0, NULL);
-                if (hMidiOutThread) {
-                    SetThreadPriority(hMidiOutThread, THREAD_PRIORITY_HIGHEST);
-                }
-            }
-        }
         return true;
     }
     return false;
@@ -201,35 +94,12 @@ bool WinMIDI_PopEvent(uint8_t *status, uint8_t *data1, uint8_t *data2) {
 }
 
 bool WinMIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
-    if (!hMidiOut || !g_midiOutRunning) return false;
-    uint32_t next = (g_midiOutHead + 1) % MIDI_OUT_RING_SIZE;
-    if (next == g_midiOutTail) return false;
-
-    g_midiOutRing[g_midiOutHead].type = 0;
-    g_midiOutRing[g_midiOutHead].status = status;
-    g_midiOutRing[g_midiOutHead].data1 = data1;
-    g_midiOutRing[g_midiOutHead].data2 = data2;
-    g_midiOutHead = next;
-
-    if (hMidiOutEvent) {
-        SetEvent(hMidiOutEvent);
-    }
+    (void)status; (void)data1; (void)data2;
     return true;
 }
 
 bool WinMIDI_SendSysEx(const uint8_t *data, uint32_t length) {
-    if (!hMidiOut || !g_midiOutRunning || !data || length == 0 || length > 64) return false;
-    uint32_t next = (g_midiOutHead + 1) % MIDI_OUT_RING_SIZE;
-    if (next == g_midiOutTail) return false;
-
-    g_midiOutRing[g_midiOutHead].type = 1;
-    memcpy(g_midiOutRing[g_midiOutHead].sysexBuf, data, length);
-    g_midiOutRing[g_midiOutHead].sysexLen = length;
-    g_midiOutHead = next;
-
-    if (hMidiOutEvent) {
-        SetEvent(hMidiOutEvent);
-    }
+    (void)data; (void)length;
     return true;
 }
 

@@ -97,67 +97,17 @@ void WinMIDI_Close(void);
 #include "core/midi/midi_led_helper.h"
 
 static MidiMapping global_mapping;
-static MidiLedCache s_ledCache;
 
 static uint8_t lastStatus = 0;
 static uint8_t lastMidino = 0;
 static bool lastMsgSet = false;
 
 void MIDI_SendSysEx(const uint8_t *data, uint32_t length) {
-#if defined(_WIN32)
-  WinMIDI_SendSysEx(data, length);
-#elif defined(__linux__) && !defined(__ANDROID__)
-#ifdef HAS_ALSA
-  if (seq_handle && out_port >= 0 && data && length > 0) {
-    snd_seq_event_t ev;
-    snd_seq_ev_clear(&ev);
-    snd_seq_ev_set_source(&ev, out_port);
-    snd_seq_ev_set_subs(&ev);
-    if (dest_client >= 0 && dest_port >= 0) {
-      ev.dest.client = (uint8_t)dest_client;
-      ev.dest.port = (uint8_t)dest_port;
-    }
-    snd_seq_ev_set_direct(&ev);
-    snd_seq_ev_set_sysex(&ev, length, (void *)data);
-
-    snd_seq_event_output((snd_seq_t *)seq_handle, &ev);
-    snd_seq_drain_output((snd_seq_t *)seq_handle);
-  }
-#endif
-#endif
+  (void)data; (void)length;
 }
 
 void MIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
-#if defined(_WIN32)
-  WinMIDI_SendShortMsg(status, data1, data2);
-#elif defined(__linux__) && !defined(__ANDROID__)
-#ifdef HAS_ALSA
-  if (seq_handle && out_port >= 0) {
-    if (!midi_coder) {
-      snd_midi_event_new(256, (snd_midi_event_t **)&midi_coder);
-    }
-    if (midi_coder) {
-      uint8_t buf[3] = {status, data1, data2};
-      snd_seq_event_t ev;
-      snd_seq_ev_clear(&ev);
-      snd_seq_ev_set_source(&ev, out_port);
-      snd_seq_ev_set_subs(&ev);
-      if (dest_client >= 0 && dest_port >= 0) {
-        ev.dest.client = (uint8_t)dest_client;
-        ev.dest.port = (uint8_t)dest_port;
-      }
-      snd_seq_ev_set_direct(&ev);
-
-      snd_midi_event_init(midi_coder);
-      long ret = snd_midi_event_encode(midi_coder, buf, 3, &ev);
-      if (ret > 0) {
-        snd_seq_event_output((snd_seq_t *)seq_handle, &ev);
-        snd_seq_drain_output((snd_seq_t *)seq_handle);
-      }
-    }
-  }
-#endif
-#endif
+  (void)status; (void)data1; (void)data2;
 }
 
 void MIDI_FlushDebugLogs(void) {
@@ -165,10 +115,7 @@ void MIDI_FlushDebugLogs(void) {
 
 void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2,
                      AudioEngine *engine, void *appPtr) {
-  (void)ctx;
-  (void)appPtr;
-  double now = GetTime();
-  MidiLed_Update(&s_ledCache, d1, d2, engine, now);
+  (void)ctx; (void)d1; (void)d2; (void)engine; (void)appPtr;
 }
 
 int MIDI_GetDeviceList(char outNames[16][64]) {
