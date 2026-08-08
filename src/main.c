@@ -2998,7 +2998,7 @@ void UpdateDrawFrame(App *app) {
       audioEngine->Decks[0].JogRate = 0.0;
     }
   } else {
-    // Velocity-adaptive release decay for realistic jog momentum (backspin & forward spin release velocity)
+    // Authentic Vinyl Platter Release Momentum Physics
     double dt = GetFrameTime();
     if (dt < 0.001) dt = 0.016667;
     float dtFactor = (float)(dt / 0.016667);
@@ -3006,10 +3006,16 @@ void UpdateDrawFrame(App *app) {
     if (dtFactor > 5.0f) dtFactor = 5.0f;
 
     double absRate = fabs(audioEngine->Decks[0].JogRate);
-    float baseDecay = (absRate > 0.3) ? (float)fmin(0.94 + absRate * 0.01, 0.982) : 0.92f;
-
-    audioEngine->Decks[0].JogRate *= powf(baseDecay, dtFactor);
-    if (fabs(audioEngine->Decks[0].JogRate) < 0.02) {
+    if (absRate > 0.01) {
+      // Vinyl Platter Friction Curve:
+      // High release speed (|JogRate| > 1.0) -> heavy vinyl platter momentum (glide decay up to 0.986)
+      // Low release speed (|JogRate| <= 0.3) -> quick pitch bend snap back (decay 0.920)
+      float vinylFriction = (absRate > 0.3) ? (float)fmin(0.940 + absRate * 0.009, 0.986) : 0.920f;
+      audioEngine->Decks[0].JogRate *= powf(vinylFriction, dtFactor);
+      if (fabs(audioEngine->Decks[0].JogRate) < 0.015) {
+        audioEngine->Decks[0].JogRate = 0.0;
+      }
+    } else {
       audioEngine->Decks[0].JogRate = 0.0;
     }
   }
@@ -3068,7 +3074,7 @@ void UpdateDrawFrame(App *app) {
       audioEngine->Decks[1].JogRate = 0.0;
     }
   } else {
-    // Velocity-adaptive release decay for realistic jog momentum (backspin & forward spin release velocity)
+    // Authentic Vinyl Platter Release Momentum Physics
     double dt = GetFrameTime();
     if (dt < 0.001) dt = 0.016667;
     float dtFactor = (float)(dt / 0.016667);
@@ -3076,10 +3082,16 @@ void UpdateDrawFrame(App *app) {
     if (dtFactor > 5.0f) dtFactor = 5.0f;
 
     double absRate = fabs(audioEngine->Decks[1].JogRate);
-    float baseDecay = (absRate > 0.3) ? (float)fmin(0.94 + absRate * 0.01, 0.982) : 0.92f;
-
-    audioEngine->Decks[1].JogRate *= powf(baseDecay, dtFactor);
-    if (fabs(audioEngine->Decks[1].JogRate) < 0.02) {
+    if (absRate > 0.01) {
+      // Vinyl Platter Friction Curve:
+      // High release speed (|JogRate| > 1.0) -> heavy vinyl platter momentum (glide decay up to 0.986)
+      // Low release speed (|JogRate| <= 0.3) -> quick pitch bend snap back (decay 0.920)
+      float vinylFriction = (absRate > 0.3) ? (float)fmin(0.940 + absRate * 0.009, 0.986) : 0.920f;
+      audioEngine->Decks[1].JogRate *= powf(vinylFriction, dtFactor);
+      if (fabs(audioEngine->Decks[1].JogRate) < 0.015) {
+        audioEngine->Decks[1].JogRate = 0.0;
+      }
+    } else {
       audioEngine->Decks[1].JogRate = 0.0;
     }
   }
