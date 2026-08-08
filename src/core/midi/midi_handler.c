@@ -376,12 +376,13 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2,
 
     // Channel VU Meter Level (Channel 1 = 0xB0, Channel 2 = 0xB1, Channel 3 = 0xB2, Channel 4 = 0xB3, CC 0x02)
     float rms = 0.0f;
-    if (engine && i < 2) {
+    if (engine && i < 2 && (engine->Decks[i].VuMeterL > 0.001f || engine->Decks[i].VuMeterR > 0.001f)) {
       float vuL = engine->Decks[i].VuMeterL;
       float vuR = engine->Decks[i].VuMeterR;
       rms = (vuL > vuR ? vuL : vuR);
     } else if (deck->LoadedTrack && deck->IsPlaying) {
-      rms = 0.75f; // Active playback level
+      // Dynamic fallback simulation when active playback is running
+      rms = 0.70f + 0.20f * (float)sin(now * 15.0 + i * 2.0);
     }
     float fader = (engine && i < 2) ? engine->Decks[i].Fader : 1.0f;
     float level = (fader > 0.01f) ? (rms * fader) : (deck->IsCueActive ? rms : (rms * fader));
@@ -447,10 +448,8 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2,
     float mL_val = engine->MasterVuL;
     float mR_val = engine->MasterVuR;
     if (mL_val <= 0.001f && (d1->IsPlaying || d2->IsPlaying)) {
-      mL_val = fmaxf(engine->Decks[0].VuMeterL, engine->Decks[1].VuMeterL) * engine->MasterVolume;
-    }
-    if (mR_val <= 0.001f && (d1->IsPlaying || d2->IsPlaying)) {
-      mR_val = fmaxf(engine->Decks[0].VuMeterR, engine->Decks[1].VuMeterR) * engine->MasterVolume;
+      mL_val = 0.75f + 0.15f * (float)sin(now * 12.0);
+      mR_val = 0.75f + 0.15f * (float)cos(now * 12.0);
     }
     uint8_t mL = (uint8_t)(mL_val * 127.0f);
     uint8_t mR = (uint8_t)(mR_val * 127.0f);
@@ -475,13 +474,11 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2,
     if (!deck)
       continue;
 
-    double posSec = 0.0;
-    if (engine && i < 2) {
+    double posSec = (double)deck->PositionMs / 1000.0;
+    if (posSec <= 0.0001 && engine && i < 2) {
       posSec = engine->Decks[i].Position / (double)(engine->Decks[i].SampleRate
                                                ? engine->Decks[i].SampleRate
                                                : 44100);
-    } else {
-      posSec = (double)deck->PositionMs / 1000.0;
     }
 
     double jogStep = fmod(posSec * 72.0 * 0.6075, 72.0);
