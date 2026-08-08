@@ -338,13 +338,17 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
     targetRate = deck->JogRate;
     accel = (fabs(deck->JogRate) > 0.001) ? 1.0f : (deck->VinylStopAccel > 0 ? deck->VinylStopAccel : 0.12f);
   } else {
-    // CDJ Pitch Bend Mode or Normal Motor Playback
-    if (deck->IsMotorOn) {
-      targetRate = deck->BaseRate + deck->JogRate;
-      accel = (deck->IsTouching && !deck->VinylModeEnabled) ? 0.4f : (deck->VinylStartAccel > 0 ? deck->VinylStartAccel : 0.12f);
+    // CDJ Pitch Bend Mode or Vinyl Release Inertia
+    double base = deck->IsMotorOn ? deck->BaseRate : 0.0;
+    targetRate = base + deck->JogRate;
+
+    if (fabs(deck->JogRate) > 0.001f) {
+      // Active vinyl/waveform spin release inertia: follow decay curve directly without linear lag
+      accel = 1.0f;
+    } else if (deck->IsMotorOn) {
+      accel = (deck->VinylStartAccel > 0 ? deck->VinylStartAccel : 0.12f);
     } else {
-      targetRate = deck->JogRate;
-      accel = (fabs(deck->JogRate) > 0.001) ? 0.2f : (deck->VinylStopAccel > 0 ? deck->VinylStopAccel : 0.12f);
+      accel = (deck->VinylStopAccel > 0 ? deck->VinylStopAccel : 0.12f);
     }
   }
 
@@ -991,17 +995,18 @@ void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching) {
   bool wasTouching = deck->IsTouching;
   deck->IsTouching = touching;
   
-  if (!touching) {
+  if (!touching && wasTouching) {
     // Slip Mode Catch-up on touch release!
-    if (wasTouching && deck->SlipActive) {
+    if (deck->SlipActive) {
       deck->Position = deck->SlipPosition;
       deck->MT_ReadPos = deck->SlipPosition;
       deck->SlipActive = false;
     }
     
-    // Zero jog rate if deck is paused
-    if (!deck->IsMotorOn && fabs(deck->JogRate) < 0.05) {
-      deck->JogRate = 0.0;
+    // Smooth vinyl spin release: initialize release offset relative to motor speed
+    if (deck->VinylModeEnabled) {
+      double base = deck->IsMotorOn ? deck->BaseRate : 0.0;
+      deck->JogRate = deck->OutlinedRate - base;
     }
   }
 }
