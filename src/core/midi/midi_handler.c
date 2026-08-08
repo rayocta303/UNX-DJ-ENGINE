@@ -11,6 +11,13 @@
 #ifndef HAS_ALSA
 #define HAS_ALSA 1
 #endif
+
+typedef struct _snd_midi_event snd_midi_event_t;
+int snd_midi_event_new(size_t bufsize, snd_midi_event_t **rdev);
+void snd_midi_event_free(snd_midi_event_t *dev);
+void snd_midi_event_reset(snd_midi_event_t *dev);
+long snd_midi_event_encode(snd_midi_event_t *dev, const unsigned char *buf, long count, snd_seq_event_t *ev);
+
 static void* seq_handle = NULL;
 static int in_port = -1;
 static int out_port = -1;
@@ -19,7 +26,7 @@ static int dest_port = -1;
 
 static void LinuxMIDI_AutoConnectPorts(char *outDetectedName) {
 #ifdef HAS_ALSA
-    if (!seq_handle) return;
+    if (!seq_handle || dest_client >= 0) return;
     snd_seq_t *seq = (snd_seq_t*)seq_handle;
     snd_seq_client_info_t *cinfo;
     snd_seq_port_info_t *pinfo;
@@ -41,19 +48,25 @@ static void LinuxMIDI_AutoConnectPorts(char *outDetectedName) {
             int port = snd_seq_port_info_get_port(pinfo);
             unsigned int caps = snd_seq_port_info_get_capability(pinfo);
 
-            if ((caps & (SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ)) != 0) {
+            if ((caps & (SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ)) == (SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ)) {
                 if (in_port >= 0) {
-                    snd_seq_connect_from(seq, in_port, client, port);
+                    int err1 = snd_seq_connect_from(seq, in_port, client, port);
+                    printf("[MIDI] ALSA connect_from (in_port %d <- client %d:%d): %d (%s)\n",
+                           in_port, client, port, err1, cName);
                     if (outDetectedName && outDetectedName[0] == '\0') {
                         strncpy(outDetectedName, cName, 127);
                     }
                 }
             }
-            if ((caps & (SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE)) != 0) {
+            if ((caps & (SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE)) == (SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE)) {
                 if (out_port >= 0) {
-                    snd_seq_connect_to(seq, out_port, client, port);
-                    dest_client = client;
-                    dest_port = port;
+                    int err2 = snd_seq_connect_to(seq, out_port, client, port);
+                    printf("[MIDI] ALSA connect_to (out_port %d -> client %d:%d): %d (%s)\n",
+                           out_port, client, port, err2, cName);
+                    if (dest_client < 0 || port == 0) {
+                        dest_client = client;
+                        dest_port = port;
+                    }
                 }
             }
         }
@@ -88,15 +101,10 @@ void MIDI_SendSysEx(const uint8_t *data, uint32_t length) {
         snd_seq_event_t ev;
         snd_seq_ev_clear(&ev);
         snd_seq_ev_set_source(&ev, out_port);
+        snd_seq_ev_set_subs(&ev);
         snd_seq_ev_set_direct(&ev);
         snd_seq_ev_set_sysex(&ev, length, (void*)data);
 
-        if (dest_client >= 0 && dest_port >= 0) {
-            ev.dest.client = (unsigned char)dest_client;
-            ev.dest.port = (unsigned char)dest_port;
-            snd_seq_event_output((snd_seq_t*)seq_handle, &ev);
-        }
-        snd_seq_ev_set_subs(&ev);
         snd_seq_event_output((snd_seq_t*)seq_handle, &ev);
         snd_seq_drain_output((snd_seq_t*)seq_handle);
     }
@@ -113,31 +121,38 @@ void MIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
         snd_seq_event_t ev;
         snd_seq_ev_clear(&ev);
         snd_seq_ev_set_source(&ev, out_port);
+        snd_seq_ev_set_subs(&ev);
         snd_seq_ev_set_direct(&ev);
 
         uint8_t type = status & 0xF0;
         uint8_t channel = status & 0x0F;
 
         if (type == 0x90) {
-            snd_seq_ev_set_noteon(&ev, channel, data1, data2);
+            ev.type = SND_SEQ_EVENT_NOTEON;
+            ev.data.note.channel = channel;
+            ev.data.note.note = data1;
+            ev.data.note.velocity = data2;
         } else if (type == 0x80) {
-            snd_seq_ev_set_noteoff(&ev, channel, data1, data2);
+            ev.type = SND_SEQ_EVENT_NOTEOFF;
+            ev.data.note.channel = channel;
+            ev.data.note.note = data1;
+            ev.data.note.velocity = data2;
         } else if (type == 0xB0) {
-            snd_seq_ev_set_controller(&ev, channel, data1, data2);
+            ev.type = SND_SEQ_EVENT_CONTROLLER;
+            ev.data.control.channel = channel;
+            ev.data.control.param = data1;
+            ev.data.control.value = data2;
         } else if (type == 0xE0) {
             ev.type = SND_SEQ_EVENT_PITCHBEND;
             ev.data.control.channel = channel;
             ev.data.control.value = (int)data1 | ((int)data2 << 7);
         } else {
-            snd_seq_ev_set_noteon(&ev, channel, data1, data2);
+            ev.type = SND_SEQ_EVENT_NOTEON;
+            ev.data.note.channel = channel;
+            ev.data.note.note = data1;
+            ev.data.note.velocity = data2;
         }
 
-        if (dest_client >= 0 && dest_port >= 0) {
-            ev.dest.client = (unsigned char)dest_client;
-            ev.dest.port = (unsigned char)dest_port;
-            snd_seq_event_output((snd_seq_t*)seq_handle, &ev);
-        }
-        snd_seq_ev_set_subs(&ev);
         snd_seq_event_output((snd_seq_t*)seq_handle, &ev);
         snd_seq_drain_output((snd_seq_t*)seq_handle);
     }

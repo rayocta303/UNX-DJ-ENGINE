@@ -3,7 +3,9 @@
 
 static const MidiTranslation translations[] = {
     {"[Library]", "MoveVertical", "[Library]", "browse"},
-    {"[Library]", "MoveFocusForward", "[Library]", "enter"},
+    {"[Library]", "MoveFocusForward", "[Library]", "view"},
+    {"[Library]", "view", "[Library]", "view"},
+    {"[Library]", "toggle_view", "[Library]", "view"},
     {"[Library]", "MoveFocusBackward", "[Library]", "back"},
     {"[Library]", "back", "[Library]", "back"},
     {"[App]", "browser_toggle", "[App]", "browser_toggle"},

@@ -31,7 +31,7 @@ static void EnsureControllersExist(const char* baseDir) {
     }
 }
 
-static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx) {
+static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB) {
     if (!json) return;
     
     const char* p = json;
@@ -83,9 +83,23 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         if (sscanf(strstr(p, "\"q\""), "\"q\": %d", &ival) == 1) fx->Quantize = (bool)ival;
         if (sscanf(strstr(p, "\"tab\""), "\"tab\": %d", &ival) == 1) fx->ShowBeatFXTab = (bool)ival;
     }
+
+    // Color FX
+    if ((p = strstr(json, "\"colorfx\""))) {
+        if (sscanf(strstr(p, "\"active\""), "\"active\": %d", &ival) == 1) {
+            if (cfxA) ColorFXManager_SetFX(cfxA, (ColorFXType)ival);
+            if (cfxB) ColorFXManager_SetFX(cfxB, (ColorFXType)ival);
+        }
+        if (sscanf(strstr(p, "\"param\""), "\"param\": %f", &val) == 1) {
+            if (cfxA) cfxA->parameter = val;
+            if (cfxB) cfxB->parameter = val;
+        }
+        if (sscanf(strstr(p, "\"valA\""), "\"valA\": %f", &val) == 1 && cfxA) cfxA->colorValue = val;
+        if (sscanf(strstr(p, "\"valB\""), "\"valB\": %f", &val) == 1 && cfxB) cfxB->colorValue = val;
+    }
 }
 
-void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, char *controllerPath) {
+void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB, char *controllerPath) {
     // Defaults
     controllerPath[0] = '\0';
     wfmA->Style = WAVEFORM_STYLE_RGB;
@@ -105,6 +119,9 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     fx->SelectedChannel = 0; // Master
     fx->LevelDepth = 0.5f;
     fx->Quantize = true;
+
+    if (cfxA) ColorFXManager_Init(cfxA);
+    if (cfxB) ColorFXManager_Init(cfxB);
 
     char path[512];
 
@@ -145,7 +162,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
 
     if (!f) {
         EnsureControllersExist("."); // Fallback to current dir if nothing else
-        Settings_Save(*wfmA, *wfmB, *audio, *fx, controllerPath);
+        Settings_Save(*wfmA, *wfmB, *audio, *fx, *cfxA, *cfxB, controllerPath);
         return;
     }
 
@@ -157,7 +174,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     if (buf) {
         fread(buf, 1, size, f);
         buf[size] = '\0';
-        LoadFromJSON(buf, wfmA, wfmB, audio, fx);
+        LoadFromJSON(buf, wfmA, wfmB, audio, fx, cfxA, cfxB);
         
         // Extract controller path manually to avoid changing too many signatures
         const char *p;
@@ -179,7 +196,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     fclose(f);
 }
 
-void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendConfig audio, BeatFXState fx, const char *controllerPath) {
+void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendConfig audio, BeatFXState fx, ColorFXManager cfxA, ColorFXManager cfxB, const char *controllerPath) {
     char path[512];
 
 #if defined(__ANDROID__)
@@ -218,6 +235,8 @@ void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendCon
             audio.DeviceIndex, audio.MasterOutL, audio.MasterOutR, audio.CueOutL, audio.CueOutR, audio.SampleRate, audio.BufferSizeFrames, audio.PCMBitDepth, audio.CrossfaderCurve);
     fprintf(f, "  \"beatfx\": { \"fx\": %d, \"pad\": %d, \"ch\": %d, \"depth\": %.2f, \"q\": %d, \"tab\": %d },\n",
             fx.SelectedFX, fx.SelectedPad, fx.SelectedChannel, fx.LevelDepth, fx.Quantize ? 1 : 0, fx.ShowBeatFXTab ? 1 : 0);
+    fprintf(f, "  \"colorfx\": { \"active\": %d, \"param\": %.2f, \"valA\": %.2f, \"valB\": %.2f },\n",
+            (int)cfxA.activeFX, cfxA.parameter, cfxA.colorValue, cfxB.colorValue);
     fprintf(f, "  \"controllers\": { \"path\": \"%s\" }\n", controllerPath ? controllerPath : "");
     fprintf(f, "}\n");
 

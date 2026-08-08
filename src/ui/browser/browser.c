@@ -404,14 +404,47 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
 }
 
 void Browser_Back(BrowserState *s) {
-  if (s->IsSearching) {
-      s->IsSearching = false;
-      s->SearchQuery[0] = '\0';
-      Browser_UpdateActiveTracks(s);
-  } else if (s->IsTagList) {
+  if (!s || !s->IsActive) return;
+
+  if (s->ShowLoadPopup) {
+    s->ShowLoadPopup = false;
+    return;
+  }
+  if (s->ShowOSK || s->IsSearching) {
+    s->ShowOSK = false;
+    s->IsSearching = false;
+    s->SearchQuery[0] = '\0';
+    s->CursorPos = s->ScrollOffset = 0;
+    s->VisualScroll = 0.0f;
+    Browser_UpdateActiveTracks(s);
+    return;
+  }
+  if (s->IsTagList) {
     s->IsTagList = false;
-  } else if (s->BrowseLevel < 3) {
-    s->BrowseLevel++;
+    return;
+  }
+
+  if (s->BrowseLevel == 0) {
+    if (s->CurrentPlaylistIdx >= 0) {
+      s->CurrentPlaylistIdx = -1;
+      s->BrowseLevel = 1; // Return to Playlists List
+    } else {
+      s->BrowseLevel = 2; // Return to Categories
+    }
+    s->CursorPos = s->ScrollOffset = 0;
+    s->VisualScroll = 0.0f;
+    Browser_UpdateActiveTracks(s);
+  } else if (s->BrowseLevel == 1) {
+    s->BrowseLevel = 2; // Return to Categories
+    s->CursorPos = s->ScrollOffset = 0;
+    s->VisualScroll = 0.0f;
+    Browser_UpdateActiveTracks(s);
+  } else if (s->BrowseLevel == 2) {
+    s->BrowseLevel = 3; // Return to Storage Selection (USB)
+    s->CursorPos = s->ScrollOffset = 0;
+    s->VisualScroll = 0.0f;
+  } else if (s->BrowseLevel == 3) {
+    s->IsActive = false; // Exit browser -> Return to Player
   }
 }
 
@@ -976,22 +1009,6 @@ static int Browser_Update(Component *base) {
       if (isShift) {
           CO_AddValue("[Master]", "waveform_zoom_step", (float)s->MidiBrowseDelta);
           s->MidiBrowseDelta = 0;
-      } else {
-          float itemRowH = S(28.0f);
-          if (s->MidiBrowseDelta > 0) {
-              for (int i = 0; i < s->MidiBrowseDelta; i++) {
-                  if (s->CursorPos < 9) s->CursorPos++;
-                  else s->ScrollOffset++;
-              }
-          } else {
-              for (int i = 0; i < -s->MidiBrowseDelta; i++) {
-                  if (s->CursorPos > 0) s->CursorPos--;
-                  else if (s->ScrollOffset > 0) s->ScrollOffset--;
-              }
-          }
-          s->MidiBrowseDelta = 0;
-          s->VisualScroll = (float)(s->ScrollOffset * itemRowH);
-          s->ScrollVelocity = 0;
       }
   }
   
@@ -1173,6 +1190,27 @@ static int Browser_Update(Component *base) {
   if (listAreaH < S(50)) listAreaH = S(50);
   totalVisible = (int)floorf(listAreaH / rowH);
   if (totalVisible < 1) totalVisible = 1;
+
+  if (s->MidiBrowseDelta != 0) {
+      float itemRowH = S(28.0f);
+      int delta = s->MidiBrowseDelta;
+      s->MidiBrowseDelta = 0;
+      if (delta > 0) {
+          for (int i = 0; i < delta; i++) {
+              if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
+                  if (s->CursorPos < totalVisible - 1) s->CursorPos++;
+                  else s->ScrollOffset++;
+              }
+          }
+      } else if (delta < 0) {
+          for (int i = 0; i < -delta; i++) {
+              if (s->CursorPos > 0) s->CursorPos--;
+              else if (s->ScrollOffset > 0) s->ScrollOffset--;
+          }
+      }
+      s->VisualScroll = (float)(s->ScrollOffset * itemRowH);
+      s->ScrollVelocity = 0;
+  }
 
   // 3. Touch Kinetic Scrolling & Interactive Scrollbar Logic
   if (!s->ShowLoadPopup) {

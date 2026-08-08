@@ -101,6 +101,8 @@ typedef struct {
   DeckState deckA;
   DeckState deckB;
   BeatFXState fxState;
+  ColorFXManager colorFxDeckA;
+  ColorFXManager colorFxDeckB;
   BrowserState browserState;
   InfoState infoState;
   SettingsState settingsState;
@@ -297,7 +299,7 @@ void OnSettingsApply(void *ctx) {
   }
 
   Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig,
-                a->fxState, a->activeControllerPath);
+                a->fxState, a->colorFxDeckA, a->colorFxDeckB, a->activeControllerPath);
 }
 
 void UpdateChannelOptions(App *a, int deviceIdx) {
@@ -368,7 +370,7 @@ void OnSettingsValueChanged(void *ctx, int idx) {
     }
     PopulateMidiSettings(a);
     Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig,
-                  a->fxState, a->activeControllerPath);
+                  a->fxState, a->colorFxDeckA, a->colorFxDeckB, a->activeControllerPath);
   } else if (strcmp(item->Label, "MAPPING PRESET") == 0) {
     int presetIdx = item->Current;
     if (presetIdx < a->midiPresetCount) {
@@ -378,7 +380,7 @@ void OnSettingsValueChanged(void *ctx, int idx) {
       PopulateMidiSettings(a);
       // Save immediately when preset changes
       Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig,
-                    a->fxState, a->activeControllerPath);
+                    a->fxState, a->colorFxDeckA, a->colorFxDeckB, a->activeControllerPath);
     }
   }
 }
@@ -915,7 +917,7 @@ void App_Init(App *a) {
 
   // Load persisted settings
   Settings_Load(&a->deckA.Waveform, &a->deckB.Waveform, &a->activeAudioConfig,
-                &a->fxState, a->activeControllerPath);
+                &a->fxState, &a->colorFxDeckA, &a->colorFxDeckB, a->activeControllerPath);
   if (a->activeControllerPath[0] != '\0') {
     MIDI_RefreshMapping(a->activeControllerPath);
   }
@@ -1997,7 +1999,7 @@ Log_LogDeviceInfo(gpuModel);
 
   UNX_LOG_INFO("[MAIN] Shutting down...");
   Settings_Save(app->deckA.Waveform, app->deckB.Waveform,
-                app->activeAudioConfig, app->fxState,
+                app->activeAudioConfig, app->fxState, app->colorFxDeckA, app->colorFxDeckB,
                 app->activeControllerPath);
   UIFonts_Unload();
 
