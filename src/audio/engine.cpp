@@ -543,8 +543,8 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
   float sampleRateRatio =
       (float)deck->SampleRate / (float)engine->OutputSampleRate;
 
-  // Audio Buffering
-  float outBuf[4096 * 2]; // Large enough for any process block
+  // Audio Buffering — per-invocation stack buffer (NOT static: thread-safe, no shared state)
+  float outBuf[4096 * 2];
   uint32_t received = 0;
 
   // Bypass MT during motor start/stop or scratching/spinning inertia
@@ -774,7 +774,6 @@ void AudioEngine_SetFXRouting(AudioEngine *engine, FXRoutingMode mode) {
 void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
   static std::thread::id g_audioThreadId;
   static bool g_audioThreadIdSet = false;
-  auto startTime = std::chrono::high_resolution_clock::now();
 
   if (!g_audioThreadIdSet) {
     g_audioThreadId = std::this_thread::get_id();
@@ -850,32 +849,25 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
   }
   engine->LastCrossfader = engine->Crossfader;
 
-  auto endTime = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> elapsed = endTime - startTime;
-  double budget = (double)frames / (double)engine->OutputSampleRate;
-  
-  // Periodic Performance Logging (every 5 seconds)
-  static double accumTime = 0;
-  static int accumCount = 0;
-  static auto lastLogTime = std::chrono::steady_clock::now();
-  accumTime += elapsed.count();
-  accumCount++;
-  
-  auto now = std::chrono::steady_clock::now();
-  if (std::chrono::duration_cast<std::chrono::seconds>(now - lastLogTime).count() >= 5) {
-      double avgMs = (accumTime / accumCount) * 1000.0;
-      double budgetMs = budget * 1000.0;
-      UNX_LOG_INFO("[PERF] [AUDIO] Latency: %.2f ms (Budget: %.2f ms)", avgMs, budgetMs);
-      accumTime = 0;
-      accumCount = 0;
+  // BUG-04 FIX: gate chrono syscalls (QPC on Windows ~200ns overhead) behind a
+  // counter so they only fire every PERF_LOG_INTERVAL callbacks.
+  // At 48kHz/256buf = ~187 calls/s -> 1000 calls ~ 5 s between logs.
+#define PERF_LOG_INTERVAL 1000
+  static int perfCallCount = 0;
+  if (++perfCallCount >= PERF_LOG_INTERVAL) {
+    perfCallCount = 0;
+    static auto lastLogTime = std::chrono::steady_clock::now();
+    auto now = std::chrono::steady_clock::now();
+    double secsSinceLog = std::chrono::duration<double>(now - lastLogTime).count();
+    if (secsSinceLog >= 5.0) {
+      double budgetMs = ((double)frames / (double)engine->OutputSampleRate) * 1000.0;
+      UNX_LOG_INFO("[PERF] [AUDIO] Budget: %.2f ms/buf | %d frames @ %u Hz",
+                   budgetMs, frames, engine->OutputSampleRate);
       lastLogTime = now;
-  }
-
-  if (elapsed.count() > budget) {
-    UNX_LOG_WARN("[AUDIO] Buffer Underrun Detected! Processed %d frames in %.2f ms (Budget: %.2f ms)",
-                 frames, elapsed.count() * 1000.0, budget * 1000.0);
+    }
   }
 }
+
 
 void DeckAudio_Play(DeckAudioState *deck) { deck->IsMotorOn = true; }
 void DeckAudio_Stop(DeckAudioState *deck) { deck->IsMotorOn = false; }

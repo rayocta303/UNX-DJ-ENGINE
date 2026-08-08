@@ -2077,43 +2077,112 @@ Log_LogDeviceInfo(gpuModel);
   return 0;
 }
 
-// Helper to manage artwork texture loading/unloading
+// ---------------------------------------------------------------------------
+// Async Artwork Loader (BUG-02 + BUG-07)
+// Disk I/O + decode runs in a background thread via artwork_loader.cpp.
+// This file stays pure C; only the .cpp module uses std::thread.
+// ---------------------------------------------------------------------------
+
+// Forward declarations (implemented in src/artwork_loader.cpp)
+void ArtworkLoader_Kick(void *pendingSlot, const char *path);
+bool ArtworkLoader_IsReady(void *pendingSlot);
+bool ArtworkLoader_IsLoading(void *pendingSlot);
+void *ArtworkLoader_TakePixels(void *pendingSlot, int *outW, int *outH);
+void ArtworkLoader_Abort(void *pendingSlot);
+
+typedef struct {
+  bool   loading;
+  bool   ready;
+  void  *data;
+  int    w, h;
+  char   path[512];
+} ArtworkPending;
+
+static ArtworkPending g_artPending[2];
+static bool           g_artPendingInit = false;
+
+static int ArtworkSlotForDeck(DeckState *ds) {
+  static DeckState *reg[2] = {NULL, NULL};
+  for (int i = 0; i < 2; i++) {
+    if (reg[i] == ds) return i;
+    if (reg[i] == NULL) { reg[i] = ds; return i; }
+  }
+  return 0;
+}
+
 void ManageArtwork(DeckState *ds) {
-  if (strcmp(ds->ArtworkPath, ds->LastLoadedArtPath) != 0) {
-    printf("[ARTWORK] Path changed: '%s'\n", ds->ArtworkPath);
+  if (!g_artPendingInit) {
+    memset(g_artPending, 0, sizeof(g_artPending));
+    g_artPendingInit = true;
+  }
+
+  int slot = ArtworkSlotForDeck(ds);
+  ArtworkPending *pend = &g_artPending[slot];
+
+  // Upload phase: background thread finished, upload to GPU on render thread
+  if (pend->ready && !pend->loading) {
     if (ds->ArtworkTexture.id != 0)
       UnloadTexture(ds->ArtworkTexture);
     ds->ArtworkTexture = (Texture2D){0};
 
-    if (ds->ArtworkPath[0] != '\0') {
-      char fixedPath[512];
-      strncpy(fixedPath, ds->ArtworkPath, 511);
-      fixedPath[511] = '\0';
-
-      // Normalize slashes for Windows
-      for (int p = 0; fixedPath[p]; p++)
-        if (fixedPath[p] == '\\')
-          fixedPath[p] = '/';
-
-      if (FileExists(fixedPath)) {
-        printf("[ARTWORK] File found: '%s'\n", fixedPath);
-        Image img = LoadImageManual(fixedPath);
-        if (img.data != NULL) {
-          printf("[ARTWORK] Image data loaded: %dx%d\n", img.width, img.height);
-          // Resize to a standard size for UI consistency
-          ImageResize(&img, 128, 128);
-          ds->ArtworkTexture = LoadTextureFromImage(img);
-          UnloadImage(img);
-          if (ds->ArtworkTexture.id != 0)
-            SetTextureFilter(ds->ArtworkTexture, TEXTURE_FILTER_BILINEAR);
-        }
-      } else {
-        printf("[ARTWORK] File NOT FOUND: '%s'\n", fixedPath);
-      }
+    if (pend->data) {
+      Image img = {
+        .data    = pend->data,
+        .width   = pend->w,
+        .height  = pend->h,
+        .mipmaps = 1,
+        .format  = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
+      };
+      ds->ArtworkTexture = LoadTextureFromImage(img);
+      if (ds->ArtworkTexture.id != 0)
+        SetTextureFilter(ds->ArtworkTexture, TEXTURE_FILTER_BILINEAR);
+      free(pend->data);
+      pend->data = NULL;
     }
-    strncpy(ds->LastLoadedArtPath, ds->ArtworkPath, 511);
+    strncpy(ds->LastLoadedArtPath, pend->path, 511);
+    pend->ready = false;
+    return;
   }
+
+  // Nothing to do if path unchanged
+  if (strcmp(ds->ArtworkPath, ds->LastLoadedArtPath) == 0)
+    return;
+  // Already loading this path — wait for background thread
+  if (pend->loading)
+    return;
+
+  // Stale data cleanup
+  if (pend->data) { free(pend->data); pend->data = NULL; }
+  pend->ready = false;
+
+  // Empty path — clear texture immediately
+  if (ds->ArtworkPath[0] == '\0') {
+    if (ds->ArtworkTexture.id != 0)
+      UnloadTexture(ds->ArtworkTexture);
+    ds->ArtworkTexture = (Texture2D){0};
+    strncpy(ds->LastLoadedArtPath, ds->ArtworkPath, 511);
+    return;
+  }
+
+  // Normalize path
+  char fixedPath[512];
+  strncpy(fixedPath, ds->ArtworkPath, 511);
+  fixedPath[511] = '\0';
+  for (int p = 0; fixedPath[p]; p++)
+    if (fixedPath[p] == '\\') fixedPath[p] = '/';
+
+  if (!FileExists(fixedPath)) {
+    UNX_LOG_WARN("[ARTWORK] File NOT FOUND: '%s'", fixedPath);
+    strncpy(ds->LastLoadedArtPath, ds->ArtworkPath, 511);
+    return;
+  }
+
+  // Kick background thread (implemented in artwork_loader.cpp)
+  pend->loading = true;
+  strncpy(pend->path, ds->ArtworkPath, 511);
+  ArtworkLoader_Kick(pend, fixedPath);
 }
+
 
 void UpdateDrawFrame(App *app) {
   static bool firstCall = true;
