@@ -9,14 +9,7 @@
 
 static int Splash_Update(Component *base) {
   SplashRenderer *s = (SplashRenderer *)base;
-  if (s->frameCount > 1) {
-    s->frameTimer += GetFrameTime();
-    // Assuming 0.04s average delay (approx 25 FPS)
-    if (s->frameTimer >= 0.04f) {
-      s->frameTimer = 0;
-      s->currentFrame = (s->currentFrame + 1) % s->frameCount;
-    }
-  }
+  s->currentFrame = 0;
   return 0;
 }
 
@@ -81,104 +74,77 @@ static void Splash_Draw(Component *base) {
 #include "ui/components/assets_bundle.h"
 
 void SplashRenderer_Init(SplashRenderer *s, int *progress) {
-  // Silence Raylib logs during frame loading to speed up startup
+  // Silence Raylib logs during loading to speed up startup
   SetTraceLogLevel(LOG_WARNING);
 
   s->base.Update = Splash_Update;
   s->base.Draw = Splash_Draw;
   
-#ifdef SPLASH_FRAME_COUNT
-  s->frameCount = SPLASH_FRAME_COUNT;
-#else
-  s->frameCount = 192;
-#endif
-
-#if defined(PLATFORM_IOS) || defined(__ANDROID__)
-  // Cap frames on mobile to prevent OOM (30 frames is enough for a smooth 2s splash)
-  if (s->frameCount > 30) s->frameCount = 30;
-#endif
-  
+  s->frameCount = 1;
   s->currentFrame = 0;
   s->frameTimer = 0;
-#if !defined(PLATFORM_IOS)
-  s->frames = (Texture2D *)malloc(sizeof(Texture2D) * s->frameCount);
-#else
-  s->frames = NULL;
-#endif
+  s->frames = (Texture2D *)malloc(sizeof(Texture2D));
 
-#if !defined(PLATFORM_IOS)
-  bool loadedAny = false;
-  int framesToLoad = s->frameCount;
-  
-  for (int i = 0; i < framesToLoad; i++) {
-    bool frameLoaded = false;
-    
-    // 1. Try memory bundle first
-#ifdef SPLASH_FRAME_COUNT
-    if (splash_frames[i] != NULL) {
-      Image img = LoadImageFromMemory(".png", splash_frames[i], splash_frames_size[i]);
-      if (img.data != NULL) {
-        if (img.width > 1080) {
-            float aspect = (float)img.height / (float)img.width;
-            ImageResize(&img, 1080, (int)(1080.0f * aspect));
-        }
-        s->frames[i] = LoadTextureFromImage(img);
-        SetTextureFilter(s->frames[i], TEXTURE_FILTER_BILINEAR);
-        UnloadImage(img);
-        frameLoaded = true;
-        loadedAny = true;
-      }
+  bool loaded = false;
+
+  // 1. Try static logo from memory bundle
+  Image img = LoadImageFromMemory(".png", unx_logo, unx_logo_size);
+  if (img.data != NULL) {
+    if (img.width > 1080) {
+      float aspect = (float)img.height / (float)img.width;
+      ImageResize(&img, 1080, (int)(1080.0f * aspect));
     }
+    s->frames[0] = LoadTextureFromImage(img);
+    SetTextureFilter(s->frames[0], TEXTURE_FILTER_BILINEAR);
+    UnloadImage(img);
+    loaded = true;
+  }
+
+#ifdef SPLASH_FRAME_COUNT
+  // 2. Try first frame of splash bundle if logo was not available
+  if (!loaded && splash_frames[0] != NULL) {
+    Image imgFrame = LoadImageFromMemory(".png", splash_frames[0], splash_frames_size[0]);
+    if (imgFrame.data != NULL) {
+      if (imgFrame.width > 1080) {
+        float aspect = (float)imgFrame.height / (float)imgFrame.width;
+        ImageResize(&imgFrame, 1080, (int)(1080.0f * aspect));
+      }
+      s->frames[0] = LoadTextureFromImage(imgFrame);
+      SetTextureFilter(s->frames[0], TEXTURE_FILTER_BILINEAR);
+      UnloadImage(imgFrame);
+      loaded = true;
+    }
+  }
 #endif
 
-    // 2. Fallback to disk ONLY if memory load failed AND we aren't purely using memory bundle
-    if (!frameLoaded) {
-      char path[256];
-      sprintf(path, "assets/splash/frame_%03d_delay-0.04s.png", i);
-      if (!FileExists(path)) {
-        sprintf(path, "assets/splash/frame_%03d_delay-0.05s.png", i);
-      }
-
-      if (FileExists(path)) {
-        Image imgDisk = LoadImage(path);
+  // 3. Fallback to disk image
+  if (!loaded) {
+    const char *diskPaths[] = {
+      "assets/splash.png",
+      "assets/splash/frame_000_delay-0.04s.png",
+      "assets/splash/frame_000_delay-0.05s.png"
+    };
+    for (int i = 0; i < 3; i++) {
+      if (FileExists(diskPaths[i])) {
+        Image imgDisk = LoadImage(diskPaths[i]);
         if (imgDisk.data != NULL) {
           if (imgDisk.width > 1080) {
-              float aspect = (float)imgDisk.height / (float)imgDisk.width;
-              ImageResize(&imgDisk, 1080, (int)(1080.0f * aspect));
+            float aspect = (float)imgDisk.height / (float)imgDisk.width;
+            ImageResize(&imgDisk, 1080, (int)(1080.0f * aspect));
           }
-          s->frames[i] = LoadTextureFromImage(imgDisk);
-          SetTextureFilter(s->frames[i], TEXTURE_FILTER_BILINEAR);
+          s->frames[0] = LoadTextureFromImage(imgDisk);
+          SetTextureFilter(s->frames[0], TEXTURE_FILTER_BILINEAR);
           UnloadImage(imgDisk);
-          frameLoaded = true;
-          loadedAny = true;
+          loaded = true;
+          break;
         }
       }
     }
-
-    // 3. Last resort: reuse previous frame
-    if (!frameLoaded) {
-      if (i > 0)
-        s->frames[i] = s->frames[i - 1];
-      else
-        s->frames[i] = (Texture2D){0};
-    }
   }
 
-  // Fallback to static if sequence failed
-  if (!loadedAny) {
-    Image img = LoadImageFromMemory(".png", unx_logo, unx_logo_size);
-    if (img.data == NULL) {
-      img = LoadImage("assets/splash.png");
-    }
-    if (img.data != NULL) {
-      s->frameCount = 1;
-      s->frames[0] = LoadTextureFromImage(img);
-      UnloadImage(img);
-    }
+  if (!loaded) {
+    s->frames[0] = (Texture2D){0};
   }
-#else
-  s->frameCount = 0;
-#endif
 
   // Restore Raylib logs
   SetTraceLogLevel(LOG_INFO);
