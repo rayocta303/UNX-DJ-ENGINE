@@ -27,34 +27,32 @@ uint8_t MidiLed_CalcJogPosition(double posSec) {
     return pos;
 }
 
-uint8_t MidiLed_CalcVuLevel(float peakLevel, float fader, bool isCueActive, bool isPlaying, double nowTime, int deckIndex) {
-    float rms = peakLevel;
-    if (rms <= 0.001f && isPlaying) {
-        // Dynamic fallback bounce when active playback is running but DSP peak buffer is 0
-        rms = 0.70f + 0.20f * (float)sin(nowTime * 15.0 + deckIndex * 2.0);
-    }
-    float level = (fader > 0.01f) ? (rms * fader) : (isCueActive ? rms : (rms * fader));
-    uint8_t val = (uint8_t)(level * 127.0f);
+uint8_t MidiLed_CalcVuLevel(float peakL, float peakR, float fader, bool isCueActive) {
+    float rawPeak = (peakL > peakR) ? peakL : peakR;
+    float chanVu = (fader > 0.01f) ? (rawPeak * fader) : (isCueActive ? rawPeak : (rawPeak * fader));
+    int val = (int)(chanVu * 127.0f + 0.5f);
+    if (val < 0) val = 0;
     if (val > 127) val = 127;
-    return val;
+    return (uint8_t)val;
 }
 
 void MidiLed_UpdateVUMeters(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngine *engine, double nowTime, bool forceRefresh) {
-    if (!cache || !d1 || !d2) return;
+    (void)d1; (void)d2; (void)nowTime;
+    if (!cache || !engine) return;
 
     MidiMapping *map = MIDI_GetGlobalMapping();
 
-    // 1. Channel VU Meters (Deck 1-4 -> 0xB0..0xB3, CC 0x02)
-    for (int i = 0; i < 4; i++) {
-        DeckState *deck = (i == 0) ? d1 : (i == 1 ? d2 : (i == 2 ? d1 : d2));
-        if (!deck) continue;
+    // 1. Channel 1 & 2 VU Meters (Exact 1:1 parity with UI Mixer)
+    for (int i = 0; i < 2; i++) {
+        DeckAudioState *deckAudio = &engine->Decks[i];
+        DeckState *deckState = (i == 0) ? d1 : d2;
 
         uint8_t vuStatus = 0xB0 + i;
         uint8_t vuControl = 0x02;
 
         if (map) {
             uint8_t s, m;
-            const char *groupNames[4] = {"[Channel1]", "[Channel2]", "[Channel3]", "[Channel4]"};
+            const char *groupNames[2] = {"[Channel1]", "[Channel2]"};
             if (MIDI_GetRegisterAddress(map, groupNames[i], "vuMeterUpdate", &s, &m) ||
                 MIDI_GetRegisterAddress(map, groupNames[i], "vu", &s, &m)) {
                 vuStatus = s;
@@ -62,58 +60,42 @@ void MidiLed_UpdateVUMeters(MidiLedCache *cache, DeckState *d1, DeckState *d2, A
             }
         }
 
-        float peakL = (engine && i < 2) ? engine->Decks[i].VuMeterL : 0.0f;
-        float peakR = (engine && i < 2) ? engine->Decks[i].VuMeterR : 0.0f;
-        float peak = (peakL > peakR) ? peakL : peakR;
-        float fader = (engine && i < 2) ? engine->Decks[i].Fader : 1.0f;
+        bool cueActive = deckState ? deckState->IsCueActive : false;
+        uint8_t meterVal = MidiLed_CalcVuLevel(deckAudio->VuMeterL, deckAudio->VuMeterR, deckAudio->Fader, cueActive);
 
-        uint8_t meterVal = MidiLed_CalcVuLevel(peak, fader, deck->IsCueActive, deck->IsPlaying, nowTime, i);
-
-        // Send MIDI OUT ONLY if value changed (differential dirty caching)
+        // Immediate direct hardware dispatch on value change
         if (forceRefresh || meterVal != cache->lastVu[i]) {
             MIDI_SendShortMsg(vuStatus, vuControl, meterVal);
             cache->lastVu[i] = meterVal;
         }
     }
 
-    // 2. Master VU Meters (Master L = 0xBA CC 0x00, Master R = 0xBA CC 0x01)
-    if (engine) {
-        float mL_val = engine->MasterVuL * engine->MasterVolume;
-        float mR_val = engine->MasterVuR * engine->MasterVolume;
+    // 2. Master VU Meters (Exact 1:1 parity with UI Master VU)
+    uint8_t mL = (uint8_t)(engine->MasterVuL * 127.0f);
+    uint8_t mR = (uint8_t)(engine->MasterVuR * 127.0f);
+    if (mL > 127) mL = 127;
+    if (mR > 127) mR = 127;
 
-        if (mL_val <= 0.001f && (d1->IsPlaying || d2->IsPlaying)) {
-            mL_val = 0.75f + 0.15f * (float)sin(nowTime * 12.0);
-            mR_val = 0.75f + 0.15f * (float)cos(nowTime * 12.0);
-        }
-
-        uint8_t mL = (uint8_t)(mL_val * 127.0f);
-        uint8_t mR = (uint8_t)(mR_val * 127.0f);
-        if (mL > 127) mL = 127;
-        if (mR > 127) mR = 127;
-
-        if (forceRefresh || mL != cache->lastMasterL) {
-            MIDI_SendShortMsg(0xBA, 0x00, mL);
-            cache->lastMasterL = mL;
-        }
-        if (forceRefresh || mR != cache->lastMasterR) {
-            MIDI_SendShortMsg(0xBA, 0x01, mR);
-            cache->lastMasterR = mR;
-        }
+    if (forceRefresh || mL != cache->lastMasterL) {
+        MIDI_SendShortMsg(0xBA, 0x00, mL);
+        cache->lastMasterL = mL;
+    }
+    if (forceRefresh || mR != cache->lastMasterR) {
+        MIDI_SendShortMsg(0xBA, 0x01, mR);
+        cache->lastMasterR = mR;
     }
 }
 
 void MidiLed_Update(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngine *engine, double nowTime) {
     if (!cache || !d1 || !d2) return;
 
-    // 1. Connection Handshake (Wakeup hardware drivers on connect)
+    // 1. Connection Handshake (Wakeup hardware drivers on connect - Channels 1 & 2)
     if (!cache->connectionHandshakeDone) {
         cache->connectionHandshakeDone = true;
         MidiLed_Reset(cache);
         MIDI_SendShortMsg(0x9F, 0x00, 0x7F); // Wakeup master hardware driver
         MIDI_SendShortMsg(0x90, 0x7F, 0x7F); // Init Ch 1
         MIDI_SendShortMsg(0x91, 0x7F, 0x7F); // Init Ch 2
-        MIDI_SendShortMsg(0x92, 0x7F, 0x7F); // Init Ch 3
-        MIDI_SendShortMsg(0x93, 0x7F, 0x7F); // Init Ch 4
     }
 
     // 2. Blink timer (300ms cycle)
@@ -137,18 +119,18 @@ void MidiLed_Update(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngi
         MIDI_SendSysEx(PIONEER_SYSEX_KEEPALIVE, 12);
     }
 
-    // 5. Non-blocking Rate Limit (~60 FPS = 0.016s delta)
-    if (!forceRefresh && (nowTime - cache->lastSendTime < 0.016)) return;
-    cache->lastSendTime = nowTime;
-
-    // 6. PRIORITY 1: Update Channel & Master VU Meters
+    // 5. PRIORITY 1: Update Channel 1 & 2 & Master VU Meters (Evaluated every frame in 100% sync with UI)
     MidiLed_UpdateVUMeters(cache, d1, d2, engine, nowTime, forceRefresh);
+
+    // 6. Rate Limit for buttons and jog ring (~200 FPS = 0.005s delta)
+    if (!forceRefresh && (nowTime - cache->lastSendTime < 0.005)) return;
+    cache->lastSendTime = nowTime;
 
     MidiMapping *map = MIDI_GetGlobalMapping();
 
-    // 7. Deck 1..4 Transport & Pad Signal Mapping
-    for (int i = 0; i < 4; i++) {
-        DeckState *deck = (i == 0) ? d1 : (i == 1 ? d2 : (i == 2 ? d1 : d2));
+    // 7. Deck 1 & 2 Transport & Pad Signal Mapping (Channels 1 & 2 only)
+    for (int i = 0; i < 2; i++) {
+        DeckState *deck = (i == 0) ? d1 : d2;
         if (!deck) continue;
 
         if (deck->LoadedTrack != cache->lastLoadedTrack[i]) {
@@ -158,7 +140,7 @@ void MidiLed_Update(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngi
             }
         }
 
-        const char *groupNames[4] = {"[Channel1]", "[Channel2]", "[Channel3]", "[Channel4]"};
+        const char *groupNames[2] = {"[Channel1]", "[Channel2]"};
         const char *group = groupNames[i];
 
         uint8_t playStatus = 0x90 + i, playNote = 0x0B;
@@ -224,8 +206,8 @@ void MidiLed_Update(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngi
         MIDI_SendShortMsg(loopOutStatus, 0x4E, loopVal);
         MIDI_SendShortMsg(reloopStatus, reloopNote, deck->IsLooping ? 0x7F : 0x00);
 
-        // HotCue Pad LEDs (Deck 1=0x97, Deck 2=0x99, Deck 3=0x98, Deck 4=0x9A)
-        uint8_t padStatus = (i == 0) ? 0x97 : (i == 1 ? 0x99 : (i == 2 ? 0x98 : 0x9A));
+        // HotCue Pad LEDs (Deck 1=0x97, Deck 2=0x99)
+        uint8_t padStatus = (i == 0) ? 0x97 : 0x99;
         for (int p = 0; p < 8; p++) {
             uint8_t padNote = (uint8_t)p;
             bool hasHotCue = false;
@@ -262,13 +244,13 @@ void MidiLed_Update(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngi
         }
     }
 
-    // 9. Jog Wheel Rings (Pioneer DDJ-FLX6 status 0xBB, control 0x00..0x03)
-    for (int i = 0; i < 4; i++) {
-        DeckState *deck = (i == 0) ? d1 : (i == 1 ? d2 : (i == 2 ? d1 : d2));
+    // 9. Jog Wheel Rings (Decks 1 & 2 only)
+    for (int i = 0; i < 2; i++) {
+        DeckState *deck = (i == 0) ? d1 : d2;
         if (!deck) continue;
 
         double posSec = (double)deck->PositionMs / 1000.0;
-        if (posSec <= 0.0001 && engine && i < 2) {
+        if (posSec <= 0.0001 && engine) {
             posSec = engine->Decks[i].Position / (double)(engine->Decks[i].SampleRate ? engine->Decks[i].SampleRate : 44100);
         }
 

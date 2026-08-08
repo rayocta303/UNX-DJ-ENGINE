@@ -189,16 +189,10 @@ bool WinMIDI_PopEvent(uint8_t *status, uint8_t *data1, uint8_t *data2) {
 }
 
 bool WinMIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
-    if (!hMidiOut || !g_midiOutRunning) return false;
-    uint32_t next = (g_midiOutHead + 1) % MIDI_OUT_RING_SIZE;
-    if (next == g_midiOutTail) return false; // Overflow drop
-
-    g_midiOutRing[g_midiOutHead].type = 0;
-    g_midiOutRing[g_midiOutHead].status = status;
-    g_midiOutRing[g_midiOutHead].data1 = data1;
-    g_midiOutRing[g_midiOutHead].data2 = data2;
-    g_midiOutHead = next;
-    return true;
+    if (!hMidiOut) return false;
+    DWORD dwMsg = ((DWORD)status) | (((DWORD)data1) << 8) | (((DWORD)data2) << 16);
+    MMRESULT res = midiOutShortMsg(hMidiOut, dwMsg);
+    return (res == MMSYSERR_NOERROR);
 }
 
 bool WinMIDI_SendSysEx(const uint8_t *data, uint32_t length) {

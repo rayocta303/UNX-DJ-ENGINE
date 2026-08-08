@@ -53,7 +53,7 @@ uint8_t MidiLed_CalcJogPosition(double posSec);
 /**
  * Calculate VU meter LED output (0 to 127) accounting for Trim/Fader/Cue and playback state
  */
-uint8_t MidiLed_CalcVuLevel(float peakLevel, float fader, bool isCueActive, bool isPlaying, double nowTime, int deckIndex);
+uint8_t MidiLed_CalcVuLevel(float peakL, float peakR, float fader, bool isCueActive);
 
 /**
  * Non-blocking LED update loop for Pioneer DDJ controllers
