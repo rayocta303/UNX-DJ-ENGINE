@@ -1,51 +1,45 @@
 /**
- * artwork_loader.cpp
- * Async artwork decode worker — BUG-07 fix.
+ * artwork_loader.cpp — BUG-A, BUG-B, BUG-C fix
  *
- * Disk I/O + image decode + resize run on a detached std::thread.
- * main.c (pure C) calls these extern "C" helpers so the render thread
- * never blocks on file I/O.
- *
- * Thread safety:
- *   ArtworkPending.loading is written only by the render thread (kick/abort)
- *   and the worker thread (clear on finish) — one writer per field at a time.
- *   ArtworkPending.ready / .data are written only by the worker thread and
- *   read by the render thread AFTER loading == false, so no mutex needed for
- *   the simple state machine used here.
+ * Fixes:
+ *   BUG-A: std::atomic<bool> for ready/loading (acquire/release ordering)
+ *   BUG-B: std::mutex g_stbiMutex — serializes stbi_load calls from concurrent threads
+ *   BUG-C: ArtworkPending defined once in artwork_loader.h
  */
 
+#include "artwork_loader.h"
 #include "raylib.h"
 #include "core/logger.h"
+#include <atomic>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <string>
 #include <thread>
 
-// Must match the ArtworkPending typedef in main.c (plain-C layout)
-struct ArtworkPending {
-  bool  loading;
-  bool  ready;
-  void *data;
-  int   w, h;
-  char  path[512];
-};
+// BUG-B FIX: stbi_load has internal global state (stbi__g_failure_reason etc.)
+// — not safe to call from multiple threads concurrently.
+static std::mutex g_stbiMutex;
 
 extern "C" {
 
-// Declared in main.c and called from ManageArtwork
-Image LoadImageManual(const char *path); // defined in main.c / raylib wrapper
+Image LoadImageManual(const char *path); // defined in main.c
 
 void ArtworkLoader_Kick(void *slot, const char *path) {
   ArtworkPending *pend = static_cast<ArtworkPending *>(slot);
-
   std::string filePath(path);
 
   std::thread([pend, filePath]() {
-    Image img = LoadImageManual(filePath.c_str());
+    // BUG-B: serialize all stbi_load calls to prevent concurrent global state access
+    Image img;
+    {
+      std::lock_guard<std::mutex> lk(g_stbiMutex);
+      img = LoadImageManual(filePath.c_str());
+    }
+
     if (img.data) {
+      // ImageResize / ImageCopy / ImageFormat are pure CPU ops — no global state
       ImageResize(&img, 128, 128);
-      // Convert to a plain RGBA pixel buffer so the render thread can upload
-      // without holding a Raylib Image struct across thread boundaries.
       Image rgba = ImageCopy(img);
       ImageFormat(&rgba, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
       UnloadImage(img);
@@ -53,6 +47,7 @@ void ArtworkLoader_Kick(void *slot, const char *path) {
       void *pixels = malloc(static_cast<size_t>(rgba.width * rgba.height * 4));
       if (pixels) {
         memcpy(pixels, rgba.data, static_cast<size_t>(rgba.width * rgba.height * 4));
+        // BUG-A FIX: write data/w/h BEFORE signalling ready with release store
         pend->data = pixels;
         pend->w    = rgba.width;
         pend->h    = rgba.height;
@@ -63,25 +58,28 @@ void ArtworkLoader_Kick(void *slot, const char *path) {
       UNX_LOG_WARN("[ARTWORK] Failed to decode: '%s'", filePath.c_str());
       pend->data = nullptr;
     }
-    // Render thread polls pend->ready after pend->loading clears
-    pend->ready   = true;
-    pend->loading = false;
+
+    // BUG-A FIX: release store ensures data/w/h are visible to render thread
+    // before ready becomes true (acquire load in ManageArtwork).
+    pend->ready.store(true, std::memory_order_release);
+    pend->loading.store(false, std::memory_order_relaxed);
   }).detach();
 }
 
-// Unused stubs — kept for the forward declarations in main.c
-bool  ArtworkLoader_IsReady(void *slot)   { return static_cast<ArtworkPending*>(slot)->ready; }
-bool  ArtworkLoader_IsLoading(void *slot) { return static_cast<ArtworkPending*>(slot)->loading; }
+bool  ArtworkLoader_IsReady(void *slot)   { return static_cast<ArtworkPending*>(slot)->ready.load(std::memory_order_acquire); }
+bool  ArtworkLoader_IsLoading(void *slot) { return static_cast<ArtworkPending*>(slot)->loading.load(std::memory_order_relaxed); }
+
 void *ArtworkLoader_TakePixels(void *slot, int *outW, int *outH) {
   auto *p = static_cast<ArtworkPending*>(slot);
   *outW = p->w; *outH = p->h;
   void *d = p->data; p->data = nullptr;
   return d;
 }
+
 void ArtworkLoader_Abort(void *slot) {
   auto *p = static_cast<ArtworkPending*>(slot);
   if (p->data) { free(p->data); p->data = nullptr; }
-  p->ready = false;
+  p->ready.store(false, std::memory_order_relaxed);
 }
 
 } // extern "C"

@@ -849,14 +849,14 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
   }
   engine->LastCrossfader = engine->Crossfader;
 
-  // BUG-04 FIX: gate chrono syscalls (QPC on Windows ~200ns overhead) behind a
-  // counter so they only fire every PERF_LOG_INTERVAL callbacks.
-  // At 48kHz/256buf = ~187 calls/s -> 1000 calls ~ 5 s between logs.
-#define PERF_LOG_INTERVAL 1000
+  // BUG-D FIX: use constexpr instead of #define inside function body.
+  // BUG-E FIX: lastLogTime static is now before the if-block so it initialises
+  // at first function call, not first time the counter trips.
+  static constexpr int kPerfLogInterval = 1000;
   static int perfCallCount = 0;
-  if (++perfCallCount >= PERF_LOG_INTERVAL) {
+  static auto lastLogTime = std::chrono::steady_clock::now();
+  if (++perfCallCount >= kPerfLogInterval) {
     perfCallCount = 0;
-    static auto lastLogTime = std::chrono::steady_clock::now();
     auto now = std::chrono::steady_clock::now();
     double secsSinceLog = std::chrono::duration<double>(now - lastLogTime).count();
     if (secsSinceLog >= 5.0) {

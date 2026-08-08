@@ -72,7 +72,7 @@ Image LoadImageManual(const char *path) {
   int width, height, channels;
   unsigned char *data = stbi_load(path, &width, &height, &channels, 4);
   if (!data) {
-    printf("[STBI] Failed to load '%s': %s\n", path, stbi_failure_reason());
+    UNX_LOG_WARN("[STBI] Failed to load '%s': %s", path, stbi_failure_reason());
     return (Image){0};
   }
 
@@ -2083,20 +2083,8 @@ Log_LogDeviceInfo(gpuModel);
 // This file stays pure C; only the .cpp module uses std::thread.
 // ---------------------------------------------------------------------------
 
-// Forward declarations (implemented in src/artwork_loader.cpp)
-void ArtworkLoader_Kick(void *pendingSlot, const char *path);
-bool ArtworkLoader_IsReady(void *pendingSlot);
-bool ArtworkLoader_IsLoading(void *pendingSlot);
-void *ArtworkLoader_TakePixels(void *pendingSlot, int *outW, int *outH);
-void ArtworkLoader_Abort(void *pendingSlot);
-
-typedef struct {
-  bool   loading;
-  bool   ready;
-  void  *data;
-  int    w, h;
-  char   path[512];
-} ArtworkPending;
+// BUG-C FIX: ArtworkPending struct and ArtworkLoader_* forward decls moved to artwork_loader.h
+#include "artwork_loader.h"
 
 static ArtworkPending g_artPending[2];
 static bool           g_artPendingInit = false;
