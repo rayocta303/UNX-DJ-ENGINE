@@ -25,13 +25,14 @@ static void MidiLed_ResolveMappingAddresses(MidiLedCache *cache, const MidiMappi
     
     for (int i = 0; i < 4; i++) {
         MidiDeckAddresses *addr = &cache->deckAddr[i];
-        addr->playStatus = 0x90 + i;  addr->playNote = 0x0B;
-        addr->cueStatus = 0x90 + i;   addr->cueNote = 0x0C;
-        addr->vinylStatus = 0x90 + i; addr->vinylNote = 0x0E;
-        addr->loopInStatus = 0x90 + i;  addr->loopInNote = 0x10;
-        addr->loopOutStatus = 0x90 + i; addr->loopOutNote = 0x11;
-        addr->reloopStatus = 0x90 + i;  addr->reloopNote = 0x4D;
-        addr->vuStatus = 0xB0 + i;     addr->vuControl = 0x02;
+        // Pioneer Default Standard MIDI Addresses (Mixxx parity)
+        addr->playStatus    = 0x90 + i;  addr->playNote   = 0x0B;
+        addr->cueStatus     = 0x90 + i;  addr->cueNote    = 0x0C;
+        addr->vinylStatus   = 0x90 + i;  addr->vinylNote  = 0x0E;
+        addr->loopInStatus  = 0x90 + i;  addr->loopInNote = 0x10;
+        addr->loopOutStatus = 0x90 + i;  addr->loopOutNote= 0x11;
+        addr->reloopStatus  = 0x90 + i;  addr->reloopNote = 0x4D;
+        addr->vuStatus      = 0xB0 + i;  addr->vuControl  = 0x02;
 
         if (map) {
             const char *groupNames[4] = {"[Channel1]", "[Channel2]", "[Channel3]", "[Channel4]"};
@@ -64,6 +65,10 @@ static void MidiLed_ResolveMappingAddresses(MidiLedCache *cache, const MidiMappi
     }
 }
 
+/**
+ * 72-segment Pioneer Jog Wheel Ring formula (Mixxx playPositionUpdate)
+ * (posSec * 72 * 0.6075) % 72 + 1
+ */
 uint8_t MidiLed_CalcJogPosition(double posSec) {
     if (posSec < 0.0) posSec = 0.0;
     double jogStep = fmod(posSec * 72.0 * 0.6075, 72.0);
@@ -73,6 +78,9 @@ uint8_t MidiLed_CalcJogPosition(double posSec) {
     return pos;
 }
 
+/**
+ * Ported Mixxx vuMeterUpdate formula: value * 127
+ */
 uint8_t MidiLed_CalcVuLevel(float peakL, float peakR, float fader, bool isCueActive) {
     float rawPeak = (peakL > peakR) ? peakL : peakR;
     float chanVu = (fader > 0.01f) ? (rawPeak * fader) : (isCueActive ? rawPeak : (rawPeak * fader));
@@ -83,7 +91,7 @@ uint8_t MidiLed_CalcVuLevel(float peakL, float peakR, float fader, bool isCueAct
 }
 
 void MidiLed_UpdateVUMeters(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngine *engine, double nowTime, bool forceRefresh) {
-    (void)d1; (void)d2; (void)nowTime;
+    (void)nowTime;
     if (!cache || !engine) return;
 
     MidiMapping *map = MIDI_GetGlobalMapping();
@@ -91,7 +99,7 @@ void MidiLed_UpdateVUMeters(MidiLedCache *cache, DeckState *d1, DeckState *d2, A
         MidiLed_ResolveMappingAddresses(cache, map);
     }
 
-    // 1. Channel 1 & 2 VU Meters (Fast pre-cached 1:1 parity with UI Mixer)
+    // 1. Channel 1 & 2 VU Meters (Mixxx vuMeterUpdate port)
     for (int i = 0; i < 2; i++) {
         DeckAudioState *deckAudio = &engine->Decks[i];
         DeckState *deckState = (i == 0) ? d1 : d2;
@@ -102,14 +110,14 @@ void MidiLed_UpdateVUMeters(MidiLedCache *cache, DeckState *d1, DeckState *d2, A
         bool cueActive = deckState ? deckState->IsCueActive : false;
         uint8_t meterVal = MidiLed_CalcVuLevel(deckAudio->VuMeterL, deckAudio->VuMeterR, deckAudio->Fader, cueActive);
 
-        // Immediate direct hardware dispatch on value change
+        // Send ONLY on state change (differential caching for zero latency and zero bus contention)
         if (forceRefresh || meterVal != cache->lastVu[i]) {
             MIDI_SendShortMsg(vuStatus, vuControl, meterVal);
             cache->lastVu[i] = meterVal;
         }
     }
 
-    // 2. Master VU Meters (Exact 1:1 parity with UI Master VU)
+    // 2. Master VU Meters (Master L/R Mixxx port)
     uint8_t mL = (uint8_t)(engine->MasterVuL * 127.0f);
     uint8_t mR = (uint8_t)(engine->MasterVuR * 127.0f);
     if (mL > 127) mL = 127;
@@ -133,7 +141,7 @@ void MidiLed_Update(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngi
         MidiLed_ResolveMappingAddresses(cache, map);
     }
 
-    // 1. Connection Handshake (Wakeup hardware drivers on connect - Channels 1 & 2)
+    // 1. Connection Handshake (Mixxx startup handshake)
     if (!cache->connectionHandshakeDone) {
         cache->connectionHandshakeDone = true;
         MidiLed_Reset(cache);
@@ -142,20 +150,20 @@ void MidiLed_Update(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngi
         MIDI_SendShortMsg(0x91, 0x7F, 0x7F); // Init Ch 2
     }
 
-    // 2. Blink timer (300ms cycle)
+    // 2. Blink timer (300ms Mixxx LED blink cycle)
     if (nowTime - cache->lastBlinkTime > 0.300) {
         cache->lastBlinkTime = nowTime;
         cache->blinkState = !cache->blinkState;
     }
 
-    // 3. Periodic full refresh every 2.5 seconds
+    // 3. Periodic full refresh every 3 seconds
     bool forceRefresh = false;
-    if (cache->lastFullRefresh == 0 || nowTime - cache->lastFullRefresh > 2.5) {
+    if (cache->lastFullRefresh == 0 || nowTime - cache->lastFullRefresh > 3.0) {
         cache->lastFullRefresh = nowTime;
         forceRefresh = true;
     }
 
-    // 4. Pioneer SysEx Keep-Alive every 1.5 seconds
+    // 4. Pioneer SysEx Keep-Alive every 1.5 seconds (Wireshark reverse-engineered Pioneer FLX6 keep-alive)
     if (nowTime - cache->lastSysExTime > 1.5) {
         cache->lastSysExTime = nowTime;
         static const uint8_t PIONEER_SYSEX_KEEPALIVE[12] = {
@@ -163,12 +171,12 @@ void MidiLed_Update(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngi
         MIDI_SendSysEx(PIONEER_SYSEX_KEEPALIVE, 12);
     }
 
-    // 5. PRIORITY 1: Update Channel 1 & 2 & Master VU Meters (Evaluated every frame in 100% sync with UI)
-    MidiLed_UpdateVUMeters(cache, d1, d2, engine, nowTime, forceRefresh);
-
-    // 6. Rate Limit for buttons and jog ring (~200 FPS = 0.005s delta)
-    if (!forceRefresh && (nowTime - cache->lastSendTime < 0.005)) return;
+    // 5. Rate Limit for LED updates (~60 FPS / 16ms delta) to prevent thread/bus saturation
+    if (!forceRefresh && (nowTime - cache->lastSendTime < 0.016)) return;
     cache->lastSendTime = nowTime;
+
+    // 6. Channel 1 & 2 & Master VU Meters Update
+    MidiLed_UpdateVUMeters(cache, d1, d2, engine, nowTime, forceRefresh);
 
     // 7. Deck 1 & 2 Transport & Pad Signal Mapping (Channels 1 & 2 only)
     for (int i = 0; i < 2; i++) {
@@ -267,7 +275,7 @@ void MidiLed_Update(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngi
         }
     }
 
-    // 9. Jog Wheel Rings (Decks 1 & 2 only)
+    // 9. Jog Wheel Rings (Mixxx 72-segment position calculation)
     for (int i = 0; i < 2; i++) {
         DeckState *deck = (i == 0) ? d1 : d2;
         if (!deck) continue;
