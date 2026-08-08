@@ -50,10 +50,6 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2,
           if (d1->SyncMode == 2 && !d1->IsMaster) {
             Sync_RequestPhaseSnap(d1, d2, engine);
           }
-        } else {
-          // Revert to BPM sync on stop to avoid snapping during motor brake
-          if (d1->SyncMode == 2)
-            d1->SyncMode = 1;
         }
       }
     }
@@ -97,10 +93,6 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2,
           if (d2->SyncMode == 2 && !d2->IsMaster) {
             Sync_RequestPhaseSnap(d2, d1, engine);
           }
-        } else {
-          // Revert to BPM sync on stop to avoid snapping during motor brake
-          if (d2->SyncMode == 2)
-            d2->SyncMode = 1;
         }
       }
     }
