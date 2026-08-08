@@ -1,6 +1,7 @@
 #include "core/midi/midi_handler.h"
 #include "core/logic/control_object.h"
 #include "core/midi/midi_mapper.h"
+#include "core/midi/midi_scripts.h"
 #include "ui/components/helpers.h"
 #include <math.h>
 #include <stdarg.h>
@@ -101,11 +102,41 @@ static uint8_t lastMidino = 0;
 static bool lastMsgSet = false;
 
 void MIDI_SendSysEx(const uint8_t *data, uint32_t length) {
+#if defined(_WIN32)
+  WinMIDI_SendSysEx(data, length);
+#else
   (void)data; (void)length;
+#endif
 }
 
 void MIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
+#if defined(_WIN32)
+  WinMIDI_SendShortMsg(status, data1, data2);
+#elif defined(__linux__) && !defined(__ANDROID__)
+#ifdef HAS_ALSA
+  if (!seq_handle)
+    return;
+  snd_seq_event_t ev;
+  snd_seq_ev_clear(&ev);
+  snd_seq_ev_set_source(&ev, out_port);
+  snd_seq_ev_set_subs(&ev);
+  snd_seq_ev_set_direct(&ev);
+  uint8_t type = status & 0xF0;
+  if (type == 0xB0) {
+    snd_seq_ev_set_controller(&ev, status & 0x0F, data1, data2);
+  } else if (type == 0x90) {
+    snd_seq_ev_set_noteon(&ev, status & 0x0F, data1, data2);
+  } else if (type == 0x80) {
+    snd_seq_ev_set_noteoff(&ev, status & 0x0F, data1, data2);
+  } else {
+    snd_seq_ev_set_controller(&ev, status & 0x0F, data1, data2);
+  }
+  snd_seq_event_output((snd_seq_t *)seq_handle, &ev);
+  snd_seq_drain_output((snd_seq_t *)seq_handle);
+#endif
+#else
   (void)status; (void)data1; (void)data2;
+#endif
 }
 
 void MIDI_FlushDebugLogs(void) {
@@ -113,8 +144,12 @@ void MIDI_FlushDebugLogs(void) {
 
 void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2,
                      AudioEngine *engine, void *appPtr) {
-  (void)ctx; (void)d1; (void)d2; (void)engine; (void)appPtr;
+  (void)ctx; (void)d1; (void)d2; (void)appPtr;
+  if (!engine)
+    return;
+  MIDI_UpdateVuMeters(engine, false);
 }
+
 
 int MIDI_GetDeviceList(char outNames[16][64]) {
 #if defined(_WIN32)

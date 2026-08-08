@@ -6,6 +6,8 @@
 #include <mmsystem.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
 
 #define MIDI_RING_SIZE 1024
 
@@ -16,6 +18,7 @@ typedef struct {
 } MidiRawEvent;
 
 static HMIDIIN hMidiIn = NULL;
+static HMIDIOUT hMidiOut = NULL;
 static MidiRawEvent g_midiRingBuffer[MIDI_RING_SIZE];
 static volatile uint32_t g_midiRingHead = 0;
 static volatile uint32_t g_midiRingTail = 0;
@@ -38,6 +41,10 @@ void WinMIDI_Close(void) {
         midiInStop(hMidiIn);
         midiInClose(hMidiIn);
         hMidiIn = NULL;
+    }
+    if (hMidiOut) {
+        midiOutClose(hMidiOut);
+        hMidiOut = NULL;
     }
     g_midiRingHead = 0;
     g_midiRingTail = 0;
@@ -75,13 +82,58 @@ bool WinMIDI_OpenDevice(int devId, char* outDeviceName) {
                 outDeviceName[i + 1] = '\0';
             }
         }
+    } else {
+        return false;
     }
 
-    if (midiInOpen(&hMidiIn, (UINT)devId, (DWORD_PTR)MidiInProc, 0, CALLBACK_FUNCTION) == MMSYSERR_NOERROR) {
-        midiInStart(hMidiIn);
-        return true;
+    if (midiInOpen(&hMidiIn, (UINT)devId, (DWORD_PTR)MidiInProc, 0, CALLBACK_FUNCTION) != MMSYSERR_NOERROR) {
+        return false;
     }
-    return false;
+    midiInStart(hMidiIn);
+
+    // Matching MIDI OUT device by name (controller_debug logic)
+    UINT numOut = midiOutGetNumDevs();
+    bool outOpened = false;
+    for (UINT o = 0; o < numOut; o++) {
+        MIDIOUTCAPS capsOut;
+        if (midiOutGetDevCaps(o, &capsOut, sizeof(MIDIOUTCAPS)) == MMSYSERR_NOERROR) {
+            if (strstr(capsOut.szPname, capsIn.szPname) || strstr(capsIn.szPname, capsOut.szPname)) {
+                if (midiOutOpen(&hMidiOut, o, 0, 0, CALLBACK_NULL) == MMSYSERR_NOERROR) {
+                    outOpened = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Fallback: search for non-synth hardware MIDI output
+    if (!outOpened && numOut > 0) {
+        for (UINT o = 0; o < numOut; o++) {
+            MIDIOUTCAPS capsOut;
+            if (midiOutGetDevCaps(o, &capsOut, sizeof(MIDIOUTCAPS)) == MMSYSERR_NOERROR) {
+                if (strstr(capsOut.szPname, "Mapper") == NULL && strstr(capsOut.szPname, "Synth") == NULL) {
+                    if (midiOutOpen(&hMidiOut, o, 0, 0, CALLBACK_NULL) == MMSYSERR_NOERROR) {
+                        outOpened = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!outOpened) {
+            midiOutOpen(&hMidiOut, 0, 0, 0, CALLBACK_NULL);
+        }
+    }
+
+    // Dispatch Pioneer LED & VU Meter Enable Handshake immediately upon connecting
+    if (hMidiOut) {
+        midiOutShortMsg(hMidiOut, (DWORD)(0x9F | (0x00 << 8) | (0x7F << 16)));
+        midiOutShortMsg(hMidiOut, (DWORD)(0x90 | (0x7F << 8) | (0x7F << 16)));
+        midiOutShortMsg(hMidiOut, (DWORD)(0x91 | (0x7F << 8) | (0x7F << 16)));
+        midiOutShortMsg(hMidiOut, (DWORD)(0x93 | (0x7F << 8) | (0x7F << 16)));
+        midiOutShortMsg(hMidiOut, (DWORD)(0x94 | (0x7F << 8) | (0x7F << 16)));
+    }
+
+    return true;
 }
 
 bool WinMIDI_PopEvent(uint8_t *status, uint8_t *data1, uint8_t *data2) {
@@ -94,13 +146,31 @@ bool WinMIDI_PopEvent(uint8_t *status, uint8_t *data1, uint8_t *data2) {
 }
 
 bool WinMIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
-    (void)status; (void)data1; (void)data2;
-    return true;
+    if (hMidiOut) {
+        DWORD msg = (DWORD)(status | (data1 << 8) | (data2 << 16));
+        return (midiOutShortMsg(hMidiOut, msg) == MMSYSERR_NOERROR);
+    }
+    return false;
 }
 
 bool WinMIDI_SendSysEx(const uint8_t *data, uint32_t length) {
-    (void)data; (void)length;
-    return true;
+    if (hMidiOut && data && length > 0) {
+        MIDIHDR midiHdr;
+        memset(&midiHdr, 0, sizeof(MIDIHDR));
+        midiHdr.lpData = (LPSTR)data;
+        midiHdr.dwBufferLength = length;
+        midiHdr.dwBytesRecorded = length;
+
+        if (midiOutPrepareHeader(hMidiOut, &midiHdr, sizeof(MIDIHDR)) == MMSYSERR_NOERROR) {
+            midiOutLongMsg(hMidiOut, &midiHdr, sizeof(MIDIHDR));
+            while ((midiHdr.dwFlags & MHDR_DONE) == 0) {
+                Sleep(1);
+            }
+            midiOutUnprepareHeader(hMidiOut, &midiHdr, sizeof(MIDIHDR));
+            return true;
+        }
+    }
+    return false;
 }
 
 bool WinMIDI_Init(void (*cb)(uint8_t, uint8_t, uint8_t), char* outDeviceName) {
@@ -108,3 +178,4 @@ bool WinMIDI_Init(void (*cb)(uint8_t, uint8_t, uint8_t), char* outDeviceName) {
     return WinMIDI_OpenDevice(0, outDeviceName);
 }
 #endif
+

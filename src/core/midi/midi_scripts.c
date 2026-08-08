@@ -1,12 +1,82 @@
 #include "core/midi/midi_scripts.h"
 #include "audio/engine.h"
 #include "core/logic/control_object.h"
+#include "core/midi/midi_handler.h"
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
 extern AudioEngine *globalAudioEngine;
 
 static uint8_t highResMSB[4] = {0, 0, 0, 0};
+static uint8_t lastVuVal[4] = {0, 0, 0, 0};
+static uint8_t lastMasterVuL = 0;
+static uint8_t lastMasterVuR = 0;
+
+void MIDI_UpdateVuMeters(AudioEngine *engine, bool forceSend) {
+  if (!engine)
+    return;
+
+  // 1. Channel VU Meters (Deck 1 - 4)
+  for (int i = 0; i < 4; i++) {
+    float peak = 0.0f;
+
+    if (i < MAX_DECKS) {
+      DeckAudioState *audio = &engine->Decks[i];
+      float rawPeak = fmaxf(audio->VuMeterL, audio->VuMeterR);
+      float trimVal = (audio->Trim > 0.0f) ? audio->Trim : 1.0f;
+      peak = rawPeak * trimVal;
+      if (peak > 1.0f)
+        peak = 1.0f;
+      if (peak < 0.0f)
+        peak = 0.0f;
+    }
+
+    // Pioneer VU meters: 0x00 to 0x7F (0 to 127)
+    uint8_t midiVal = (uint8_t)(peak * 127.0f);
+
+    if (forceSend || (midiVal != lastVuVal[i])) {
+      // 0xB0 = Ch 1, 0xB1 = Ch 2, 0xB2 = Ch 3, 0xB3 = Ch 4
+      uint8_t status = 0xB0 | (i & 0x0F);
+      uint8_t cc = 0x02; // Pioneer Channel Level Meter CC
+      MIDI_SendShortMsg(status, cc, midiVal);
+      lastVuVal[i] = midiVal;
+    }
+  }
+
+  // 2. Master VU Meters (Master L & R)
+  float masterVol = (engine->MasterVolume > 0.0f) ? engine->MasterVolume : 1.0f;
+  float masterL = engine->MasterVuL * masterVol;
+  float masterR = engine->MasterVuR * masterVol;
+  if (masterL > 1.0f) masterL = 1.0f; if (masterL < 0.0f) masterL = 0.0f;
+  if (masterR > 1.0f) masterR = 1.0f; if (masterR < 0.0f) masterR = 0.0f;
+
+  uint8_t mValL = (uint8_t)(masterL * 127.0f);
+  uint8_t mValR = (uint8_t)(masterR * 127.0f);
+
+  if (forceSend || (mValL != lastMasterVuL)) {
+    MIDI_SendShortMsg(0xBA, 0x00, mValL);
+    lastMasterVuL = mValL;
+  }
+  if (forceSend || (mValR != lastMasterVuR)) {
+    MIDI_SendShortMsg(0xBA, 0x01, mValR);
+    lastMasterVuR = mValR;
+  }
+}
+
+void MIDI_ResetVuMeters(void) {
+  for (int i = 0; i < 4; i++) {
+    uint8_t status = 0xB0 | (i & 0x0F);
+    uint8_t cc = 0x02;
+    MIDI_SendShortMsg(status, cc, 0);
+    lastVuVal[i] = 0;
+  }
+  MIDI_SendShortMsg(0xBA, 0x00, 0);
+  MIDI_SendShortMsg(0xBA, 0x01, 0);
+  lastMasterVuL = 0;
+  lastMasterVuR = 0;
+}
+
 
 void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
                         uint8_t midino, uint8_t value) {
@@ -57,12 +127,12 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
               : false;
       bool isSearch =
           (strstr(function, "jogSearch") != NULL) || map->modifiers[0];
-      float scale = isSearch ? 2.0f : (touching ? 0.1f : 0.00025f);
+      float scale = isSearch ? 2.0f : (touching ? 0.1f : 0.005f);
       CO_AddValue(group, "jog", delta * scale);
     }
   } else if (strstr(function, "jogTouch") || strstr(function, "JogTouch")) {
     bool touching = (value > 0);
-    CO_SetValue(group, "touch", touching ? 1.0f : 0.0f);
+    CO_SetValue(group, "touch", touching ? 1.0f : 0.001f);
     if (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2) {
       DeckAudio_SetJogTouch(&globalAudioEngine->Decks[targetDeckIdx], touching);
     }
