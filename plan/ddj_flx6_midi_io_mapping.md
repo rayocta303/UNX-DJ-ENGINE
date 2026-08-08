@@ -1,6 +1,6 @@
 # Pioneer DDJ-FLX6 MIDI I/O Mapping & Exhaustive Register Audit Specification
 
-Dokumen ini memuat analisis spesifikasi teknis protokol MIDI I/O, spesifikasi pengiriman data LED (**Jog Wheel Spinner**, **VU Meter**, **Pioneer SysEx Keep-Alive**), serta **breakdown audit menyeluruh untuk seluruh 552 register MIDI (158 Terimplementasi & 394 Belum Terimplementasi)** pada kontroler **Pioneer DDJ-FLX6** di engine **XDJ-UNX-C** dengan kolom **No. Register Counter** dan **Range Channel MIDI**.
+Dokumen ini memuat analisis spesifikasi teknis protokol MIDI I/O, spesifikasi pengiriman data LED (**Jog Wheel Spinner**, **VU Meter**, **Pioneer SysEx Keep-Alive**), serta **breakdown audit menyeluruh untuk seluruh 552 register MIDI (158 Terimplementasi & 394 Belum Terimplementasi)** pada kontroler **Pioneer DDJ-FLX6** di engine **XDJ-UNX-C** dengan format tabel Markdown presisi tinggi tanpa pemutusan baris (*single-line table rows*).
 
 ---
 
@@ -184,22 +184,10 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 | 108 | `0xB1` | `0x29` | Ch 2 (CC) | `[Channel2]` | `PioneerDDJFLX6.jogSearch` | JOG DIAL PLATTER +SHIFT (DECK2) - rotate - Search (Fast Pitch bend) |
 | 109 | `0xB2` | `0x29` | Ch 3 (CC) | `[Channel3]` | `PioneerDDJFLX6.jogSearch` | JOG DIAL PLATTER +SHIFT (DECK3) - rotate - Search (Fast Pitch bend) |
 | 110 | `0xB3` | `0x29` | Ch 4 (CC) | `[Channel4]` | `PioneerDDJFLX6.jogSearch` | JOG DIAL PLATTER +SHIFT (DECK4) - rotate - Search (Fast Pitch bend) |
-| 111 | `0x90` | `0x36` | Ch 1 (Note) | `[Channel1]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER (DECK1) - touch - enable (on touch) / disable (on
-                    release) Scratching/Pitch
-                    bend
-                 |
-| 112 | `0x91` | `0x36` | Ch 2 (Note) | `[Channel2]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER (DECK2) - touch - enable (on touch) / disable (on
-                    release) Scratching/Pitch
-                    bend
-                 |
-| 113 | `0x92` | `0x36` | Ch 3 (Note) | `[Channel3]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER (DECK3) - touch - enable (on touch) / disable (on
-                    release) Scratching/Pitch
-                    bend
-                 |
-| 114 | `0x93` | `0x36` | Ch 4 (Note) | `[Channel4]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER (DECK4) - touch - enable (on touch) / disable (on
-                    release) Scratching/Pitch
-                    bend
-                 |
+| 111 | `0x90` | `0x36` | Ch 1 (Note) | `[Channel1]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER (DECK1) - touch - enable (on touch) / disable (on release) Scratching/Pitch bend |
+| 112 | `0x91` | `0x36` | Ch 2 (Note) | `[Channel2]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER (DECK2) - touch - enable (on touch) / disable (on release) Scratching/Pitch bend |
+| 113 | `0x92` | `0x36` | Ch 3 (Note) | `[Channel3]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER (DECK3) - touch - enable (on touch) / disable (on release) Scratching/Pitch bend |
+| 114 | `0x93` | `0x36` | Ch 4 (Note) | `[Channel4]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER (DECK4) - touch - enable (on touch) / disable (on release) Scratching/Pitch bend |
 | 115 | `0x90` | `0x58` | Ch 1 (Note) | `[Channel1]` | `sync_enabled` | MIDI Learned from 8 messages. |
 | 116 | `0x91` | `0x58` | Ch 2 (Note) | `[Channel2]` | `sync_enabled` | MIDI Learned from 8 messages. |
 | 117 | `0x92` | `0x58` | Ch 3 (Note) | `[Channel3]` | `sync_enabled` | MIDI Learned from 8 messages. |
@@ -208,22 +196,10 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 | 120 | `0x91` | `0x5C` | Ch 2 (Note) | `[Channel2]` | `sync_leader` | MIDI Learned from 8 messages. |
 | 121 | `0x92` | `0x5C` | Ch 3 (Note) | `[Channel3]` | `sync_leader` | MIDI Learned from 11 messages. |
 | 122 | `0x93` | `0x5C` | Ch 4 (Note) | `[Channel4]` | `sync_leader` | MIDI Learned from 9 messages. |
-| 123 | `0x90` | `0x67` | Ch 1 (Note) | `[Channel1]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER +SHIFT (DECK1) - touch - enable (on touch) / disable
-                    (on release) highspeed
-                    Pitch bend
-                 |
-| 124 | `0x91` | `0x67` | Ch 2 (Note) | `[Channel2]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER +SHIFT (DECK2) - touch - enable (on touch) / disable
-                    (on release) highspeed
-                    Pitch bend
-                 |
-| 125 | `0x92` | `0x67` | Ch 3 (Note) | `[Channel3]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER +SHIFT (DECK3) - touch - enable (on touch) / disable
-                    (on release) highspeed
-                    Pitch bend
-                 |
-| 126 | `0x93` | `0x67` | Ch 4 (Note) | `[Channel4]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER +SHIFT (DECK4) - touch - enable (on touch) / disable
-                    (on release) highspeed
-                    Pitch bend
-                 |
+| 123 | `0x90` | `0x67` | Ch 1 (Note) | `[Channel1]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER +SHIFT (DECK1) - touch - enable (on touch) / disable (on release) highspeed Pitch bend |
+| 124 | `0x91` | `0x67` | Ch 2 (Note) | `[Channel2]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER +SHIFT (DECK2) - touch - enable (on touch) / disable (on release) highspeed Pitch bend |
+| 125 | `0x92` | `0x67` | Ch 3 (Note) | `[Channel3]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER +SHIFT (DECK3) - touch - enable (on touch) / disable (on release) highspeed Pitch bend |
+| 126 | `0x93` | `0x67` | Ch 4 (Note) | `[Channel4]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER +SHIFT (DECK4) - touch - enable (on touch) / disable (on release) highspeed Pitch bend |
 
 
 ### 5.3. Library & Navigation Registers (Total: 4 Registers)
@@ -621,14 +597,10 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 | 280 | `0x91` | `0x1B` | Ch 2 (Note) | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | HOT CUE MODE (DECK2) - press - set hotcue mode |
 | 281 | `0x92` | `0x1B` | Ch 3 (Note) | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | HOT CUE MODE (DECK3) - press - set hotcue mode |
 | 282 | `0x93` | `0x1B` | Ch 4 (Note) | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | HOT CUE MODE (DECK4) - press - set hotcue mode |
-| 283 | `0x90` | `0x47` | Ch 1 (Note) | `[Channel1]` | `reverseroll` | PLAY/PAUSE +SHIFT (DECK1) - press - Reverse playback in Slip Mode while
-                    held (Censor) |
-| 284 | `0x91` | `0x47` | Ch 2 (Note) | `[Channel2]` | `reverseroll` | PLAY/PAUSE +SHIFT (DECK2) - press - Reverse playback in Slip Mode while
-                    held (Censor) |
-| 285 | `0x92` | `0x47` | Ch 3 (Note) | `[Channel3]` | `reverseroll` | PLAY/PAUSE +SHIFT (DECK3) - press - Reverse playback in Slip Mode while
-                    held (Censor) |
-| 286 | `0x93` | `0x47` | Ch 4 (Note) | `[Channel4]` | `reverseroll` | PLAY/PAUSE +SHIFT (DECK4) - press - Reverse playback in Slip Mode while
-                    held (Censor) |
+| 283 | `0x90` | `0x47` | Ch 1 (Note) | `[Channel1]` | `reverseroll` | PLAY/PAUSE +SHIFT (DECK1) - press - Reverse playback in Slip Mode while held (Censor) |
+| 284 | `0x91` | `0x47` | Ch 2 (Note) | `[Channel2]` | `reverseroll` | PLAY/PAUSE +SHIFT (DECK2) - press - Reverse playback in Slip Mode while held (Censor) |
+| 285 | `0x92` | `0x47` | Ch 3 (Note) | `[Channel3]` | `reverseroll` | PLAY/PAUSE +SHIFT (DECK3) - press - Reverse playback in Slip Mode while held (Censor) |
+| 286 | `0x93` | `0x47` | Ch 4 (Note) | `[Channel4]` | `reverseroll` | PLAY/PAUSE +SHIFT (DECK4) - press - Reverse playback in Slip Mode while held (Censor) |
 | 287 | `0x90` | `0x48` | Ch 1 (Note) | `[Channel1]` | `start_stop` | CUE +SHIFT (DECK1) - press - Jump to track start |
 | 288 | `0x91` | `0x48` | Ch 2 (Note) | `[Channel2]` | `start_stop` | CUE +SHIFT (DECK2) - press - Jump to track start |
 | 289 | `0x92` | `0x48` | Ch 3 (Note) | `[Channel3]` | `start_stop` | CUE +SHIFT (DECK3) - press - Jump to track start |
@@ -656,17 +628,13 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 | 305 | `0x9B` | `0x25` | Ch 12 (Note) | `[Channel3]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 6 (DECK3) BEAT JUMP MODE - press - Jump 4 Beats forwards |
 | 306 | `0x9D` | `0x25` | Ch 14 (Note) | `[Channel4]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 6 (DECK4) BEAT JUMP MODE - press - Jump 4 Beats forwards |
 | 307 | `0x9B` | `0x26` | Ch 12 (Note) | `[Channel3]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 7 (DECK3) BEAT JUMP MODE - press - Jump 8 Beats backwards |
-| 308 | `0x9C` | `0x26` | Ch 13 (Note) | `[Channel3]` | `PioneerDDJFLX6.decreaseBeatjumpSizes` | PAD 7 (DECK3) +SHift BEAT JUMP MODE - press - decrease Beatjump by a
-                    factor of 16 |
+| 308 | `0x9C` | `0x26` | Ch 13 (Note) | `[Channel3]` | `PioneerDDJFLX6.decreaseBeatjumpSizes` | PAD 7 (DECK3) +SHift BEAT JUMP MODE - press - decrease Beatjump by a factor of 16 |
 | 309 | `0x9D` | `0x26` | Ch 14 (Note) | `[Channel4]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 7 (DECK4) BEAT JUMP MODE - press - Jump 8 Beats backwards |
-| 310 | `0x9E` | `0x26` | Ch 15 (Note) | `[Channel4]` | `PioneerDDJFLX6.decreaseBeatjumpSizes` | PAD 7 (DECK4) +Shift BEAT JUMP MODE - press - decrease Beatjump by a
-                    factor of 16 |
+| 310 | `0x9E` | `0x26` | Ch 15 (Note) | `[Channel4]` | `PioneerDDJFLX6.decreaseBeatjumpSizes` | PAD 7 (DECK4) +Shift BEAT JUMP MODE - press - decrease Beatjump by a factor of 16 |
 | 311 | `0x9B` | `0x27` | Ch 12 (Note) | `[Channel3]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 8 (DECK3) BEAT JUMP MODE - press - Jump 8 Beats forwards |
-| 312 | `0x9C` | `0x27` | Ch 13 (Note) | `[Channel3]` | `PioneerDDJFLX6.increaseBeatjumpSizes` | PAD 8 (DECK3) +SHift BEAT JUMP MODE - press - increase Beatjump by a
-                    factor of 16 |
+| 312 | `0x9C` | `0x27` | Ch 13 (Note) | `[Channel3]` | `PioneerDDJFLX6.increaseBeatjumpSizes` | PAD 8 (DECK3) +SHift BEAT JUMP MODE - press - increase Beatjump by a factor of 16 |
 | 313 | `0x9D` | `0x27` | Ch 14 (Note) | `[Channel4]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 8 (DECK4) BEAT JUMP MODE - press - Jump 8 Beats forwards |
-| 314 | `0x9E` | `0x27` | Ch 15 (Note) | `[Channel4]` | `PioneerDDJFLX6.increaseBeatjumpSizes` | PAD 8 (DECK4) +Shift BEAT JUMP MODE - press - increase Beatjump by a
-                    factor of 16 |
+| 314 | `0x9E` | `0x27` | Ch 15 (Note) | `[Channel4]` | `PioneerDDJFLX6.increaseBeatjumpSizes` | PAD 8 (DECK4) +Shift BEAT JUMP MODE - press - increase Beatjump by a factor of 16 |
 | 315 | `0x92` | `0x3C` | Ch 3 (Note) | `[Channel3]` | `PioneerDDJFLX6.deckControlLPressed` | DeckControl CH3 |
 | 316 | `0x93` | `0x3C` | Ch 4 (Note) | `[Channel4]` | `PioneerDDJFLX6.deckControlRPressed` | DeckControl CH4 |
 | 317 | `0x92` | `0x3D` | Ch 3 (Note) | `[Channel3]` | `slip_enabled` | MIDI Learned from 8 messages. |
@@ -715,17 +683,13 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 | 354 | `0x97` | `0x25` | Ch 8 (Note) | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 6 (DECK1) BEAT JUMP MODE - press - Jump 4 Beats forwards |
 | 355 | `0x99` | `0x25` | Ch 10 (Note) | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 6 (DECK2) BEAT JUMP MODE - press - Jump 4 Beats forwards |
 | 356 | `0x97` | `0x26` | Ch 8 (Note) | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 7 (DECK1) BEAT JUMP MODE - press - Jump 8 Beats backwards |
-| 357 | `0x98` | `0x26` | Ch 9 (Note) | `[Channel1]` | `PioneerDDJFLX6.decreaseBeatjumpSizes` | PAD 7 (DECK1) +SHift BEAT JUMP MODE - press - decrease Beatjump by a
-                    factor of 16 |
+| 357 | `0x98` | `0x26` | Ch 9 (Note) | `[Channel1]` | `PioneerDDJFLX6.decreaseBeatjumpSizes` | PAD 7 (DECK1) +SHift BEAT JUMP MODE - press - decrease Beatjump by a factor of 16 |
 | 358 | `0x99` | `0x26` | Ch 10 (Note) | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 7 (DECK2) BEAT JUMP MODE - press - Jump 8 Beats backwards |
-| 359 | `0x9A` | `0x26` | Ch 11 (Note) | `[Channel2]` | `PioneerDDJFLX6.decreaseBeatjumpSizes` | PAD 7 (DECK2) +Shift BEAT JUMP MODE - press - decrease Beatjump by a
-                    factor of 16 |
+| 359 | `0x9A` | `0x26` | Ch 11 (Note) | `[Channel2]` | `PioneerDDJFLX6.decreaseBeatjumpSizes` | PAD 7 (DECK2) +Shift BEAT JUMP MODE - press - decrease Beatjump by a factor of 16 |
 | 360 | `0x97` | `0x27` | Ch 8 (Note) | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 8 (DECK1) BEAT JUMP MODE - press - Jump 8 Beats forwards |
-| 361 | `0x98` | `0x27` | Ch 9 (Note) | `[Channel1]` | `PioneerDDJFLX6.increaseBeatjumpSizes` | PAD 8 (DECK1) +SHift BEAT JUMP MODE - press - increase Beatjump by a
-                    factor of 16 |
+| 361 | `0x98` | `0x27` | Ch 9 (Note) | `[Channel1]` | `PioneerDDJFLX6.increaseBeatjumpSizes` | PAD 8 (DECK1) +SHift BEAT JUMP MODE - press - increase Beatjump by a factor of 16 |
 | 362 | `0x99` | `0x27` | Ch 10 (Note) | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 8 (DECK2) BEAT JUMP MODE - press - Jump 8 Beats forwards |
-| 363 | `0x9A` | `0x27` | Ch 11 (Note) | `[Channel2]` | `PioneerDDJFLX6.increaseBeatjumpSizes` | PAD 8 (DECK2) +Shift BEAT JUMP MODE - press - increase Beatjump by a
-                    factor of 16 |
+| 363 | `0x9A` | `0x27` | Ch 11 (Note) | `[Channel2]` | `PioneerDDJFLX6.increaseBeatjumpSizes` | PAD 8 (DECK2) +Shift BEAT JUMP MODE - press - increase Beatjump by a factor of 16 |
 | 364 | `0xB6` | `0x2C` | Ch 7 (CC) | `[Master]` | `headMix` | HEADPHONES MIXING - rotate - Monitor Balance |
 | 365 | `0x90` | `0x3C` | Ch 1 (Note) | `[Channel1]` | `PioneerDDJFLX6.deckControlLPressed` | DeckControl CH1 |
 | 366 | `0x91` | `0x3C` | Ch 2 (Note) | `[Channel2]` | `PioneerDDJFLX6.deckControlRPressed` | DeckControl CH2 |
@@ -763,4 +727,4 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 
 ## 7. Kesimpulan & Panduan Integrasi Lanjutan
 
-Dokumen ini mencatat total **552 Register MIDI** (158 Terimplementasi [No. 1 - 158] + 394 Belum Terimplementasi [No. 1 - 394]) secara lengkap dengan penomoran counter eksplisit dan breakdown range channel MIDI.
+Dokumen ini mencatat total **552 Register MIDI** (158 Terimplementasi [No. 1 - 158] + 394 Belum Terimplementasi [No. 1 - 394]) secara presisi tanpa ada kesalahan syntax bracket atau pemutusan baris tabel markdown.
