@@ -234,7 +234,7 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
     bool hasTrack = (ds && ds->LoadedTrack) || (audio && audio->TotalSamples > 0);
     bool isTouch = (ds && ds->IsTouching) || (audio && audio->IsTouching);
 
-    // Jog Outer/Inner Ring LED (0x9F, note = deck index 0..3)
+    // Jog Outer/Inner Ring LED (0x9F, data1 = deck index 0..3)
     uint8_t jogRingVal = 0x00;
     if (hasTrack) {
       jogRingVal = isTouch ? 0x7F : (isPlaying ? 0x7F : 0x40);
@@ -244,19 +244,29 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
       lastJogRingVal[i] = jogRingVal;
     }
 
-    // Jog Ring Position Rotation LED (0xB0 + i, CC 0x2A)
-    uint8_t jogPosVal = 0x00;
+    // Jog Ring Position Rotation LED (0xBB, data1 = deck index 0..3, data2 = 1..72)
+    uint8_t jogPos72 = 1;
+    uint8_t jogPos127 = 0;
+
     if (hasTrack && audio && audio->SampleRate > 0) {
       double posSec = (double)audio->Position / (double)audio->SampleRate;
       double rotAngle = fmod(posSec / 1.8, 1.0); // 1.8 sec per 33 1/3 RPM revolution
       if (rotAngle < 0) rotAngle += 1.0;
-      jogPosVal = (uint8_t)(rotAngle * 127.0);
+      jogPos72 = 1 + (uint8_t)(rotAngle * 71.0f); // 1..72 range for Pioneer 0xBB ring
+      if (jogPos72 > 72) jogPos72 = 72;
+      jogPos127 = (uint8_t)(rotAngle * 127.0f);
     }
-    if (forceSend || jogPosVal != lastJogPosVal[i]) {
+
+    if (forceSend || jogPos72 != lastJogPosVal[i]) {
+      // Send 0xBB (Pioneer DDJ-FLX6 / DDJ-1000 Hardware Jog Ring Status)
+      MIDI_SendShortMsg(0xBB, (uint8_t)i, jogPos72);
+      
+      // Also send CC 0x2A & 0x2B (Pioneer DDJ-400 / FLX4 CC Ring Status)
       uint8_t ccStatus = 0xB0 | (i & 0x0F);
-      MIDI_SendShortMsg(ccStatus, 0x2A, jogPosVal); // Primary Jog Ring Position
-      MIDI_SendShortMsg(ccStatus, 0x2B, jogRingVal); // Secondary Jog Ring Outer LED
-      lastJogPosVal[i] = jogPosVal;
+      MIDI_SendShortMsg(ccStatus, 0x2A, jogPos127);
+      MIDI_SendShortMsg(ccStatus, 0x2B, jogRingVal);
+
+      lastJogPosVal[i] = jogPos72;
     }
   }
 }
@@ -280,7 +290,8 @@ void MIDI_ResetAllLEDs(void) {
     MIDI_SendShortMsg(ms, 0x1A, 0); // Master Tempo
 
     MIDI_SendShortMsg(0x9F, (uint8_t)i, 0); // Jog Ring OFF
-    MIDI_SendShortMsg(0xB0 | (i & 0x0F), 0x2A, 0); // Jog Pos OFF
+    MIDI_SendShortMsg(0xBB, (uint8_t)i, 0); // Jog Pos 0xBB OFF
+    MIDI_SendShortMsg(0xB0 | (i & 0x0F), 0x2A, 0); // Jog Pos CC OFF
     MIDI_SendShortMsg(0xB0 | (i & 0x0F), 0x2B, 0);
 
     lastLoopInVal[i] = 0;
