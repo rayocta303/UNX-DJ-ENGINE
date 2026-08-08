@@ -2807,7 +2807,7 @@ void UpdateDrawFrame(App *app) {
 
     // Sync & Master
     if (ds->MidiRequestSync) {
-      ds->SyncMode = (ds->SyncMode == 0) ? 1 : 0;
+      ds->SyncMode = (ds->SyncMode + 1) % 3;
       ds->MidiRequestSync = false;
     }
     if (ds->MidiRequestMaster) {
