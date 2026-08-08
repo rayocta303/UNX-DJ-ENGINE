@@ -15,6 +15,23 @@ void MIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2);
 void MIDI_SendSysEx(const uint8_t *data, uint32_t length);
 
 typedef struct {
+    uint8_t playStatus;
+    uint8_t playNote;
+    uint8_t cueStatus;
+    uint8_t cueNote;
+    uint8_t vinylStatus;
+    uint8_t vinylNote;
+    uint8_t loopInStatus;
+    uint8_t loopInNote;
+    uint8_t loopOutStatus;
+    uint8_t loopOutNote;
+    uint8_t reloopStatus;
+    uint8_t reloopNote;
+    uint8_t vuStatus;
+    uint8_t vuControl;
+} MidiDeckAddresses;
+
+typedef struct {
     uint8_t lastPlay[4];
     uint8_t lastCue[4];
     uint8_t lastVinyl[4];
@@ -25,6 +42,9 @@ typedef struct {
     uint8_t lastMasterR;
     uint8_t lastFxOn;
     
+    MidiDeckAddresses deckAddr[4];
+    const void *resolvedMapping;
+
     double lastSendTime;
     double lastFullRefresh;
     double lastBlinkTime;

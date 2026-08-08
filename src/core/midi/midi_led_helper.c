@@ -16,6 +16,52 @@ void MidiLed_Reset(MidiLedCache *cache) {
     cache->lastMasterL = 255;
     cache->lastMasterR = 255;
     cache->lastFxOn = 255;
+    cache->resolvedMapping = NULL;
+}
+
+static void MidiLed_ResolveMappingAddresses(MidiLedCache *cache, const MidiMapping *map) {
+    if (!cache) return;
+    cache->resolvedMapping = map;
+    
+    for (int i = 0; i < 4; i++) {
+        MidiDeckAddresses *addr = &cache->deckAddr[i];
+        addr->playStatus = 0x90 + i;  addr->playNote = 0x0B;
+        addr->cueStatus = 0x90 + i;   addr->cueNote = 0x0C;
+        addr->vinylStatus = 0x90 + i; addr->vinylNote = 0x0E;
+        addr->loopInStatus = 0x90 + i;  addr->loopInNote = 0x10;
+        addr->loopOutStatus = 0x90 + i; addr->loopOutNote = 0x11;
+        addr->reloopStatus = 0x90 + i;  addr->reloopNote = 0x4D;
+        addr->vuStatus = 0xB0 + i;     addr->vuControl = 0x02;
+
+        if (map) {
+            const char *groupNames[4] = {"[Channel1]", "[Channel2]", "[Channel3]", "[Channel4]"};
+            const char *group = groupNames[i];
+            uint8_t s, m;
+            if (MIDI_GetRegisterAddress(map, group, "vuMeterUpdate", &s, &m) ||
+                MIDI_GetRegisterAddress(map, group, "vu", &s, &m)) {
+                addr->vuStatus = s; addr->vuControl = m;
+            }
+            if (MIDI_GetRegisterAddress(map, group, "play", &s, &m)) {
+                addr->playStatus = s; addr->playNote = m;
+            }
+            if (MIDI_GetRegisterAddress(map, group, "cue_default", &s, &m) ||
+                MIDI_GetRegisterAddress(map, group, "cue", &s, &m)) {
+                addr->cueStatus = s; addr->cueNote = m;
+            }
+            if (MIDI_GetRegisterAddress(map, group, "vinyl", &s, &m)) {
+                addr->vinylStatus = s; addr->vinylNote = m;
+            }
+            if (MIDI_GetRegisterAddress(map, group, "loop_in", &s, &m)) {
+                addr->loopInStatus = s; addr->loopInNote = m;
+            }
+            if (MIDI_GetRegisterAddress(map, group, "loop_out", &s, &m)) {
+                addr->loopOutStatus = s; addr->loopOutNote = m;
+            }
+            if (MIDI_GetRegisterAddress(map, group, "reloop", &s, &m)) {
+                addr->reloopStatus = s; addr->reloopNote = m;
+            }
+        }
+    }
 }
 
 uint8_t MidiLed_CalcJogPosition(double posSec) {
@@ -41,24 +87,17 @@ void MidiLed_UpdateVUMeters(MidiLedCache *cache, DeckState *d1, DeckState *d2, A
     if (!cache || !engine) return;
 
     MidiMapping *map = MIDI_GetGlobalMapping();
+    if (map != (const MidiMapping *)cache->resolvedMapping) {
+        MidiLed_ResolveMappingAddresses(cache, map);
+    }
 
-    // 1. Channel 1 & 2 VU Meters (Exact 1:1 parity with UI Mixer)
+    // 1. Channel 1 & 2 VU Meters (Fast pre-cached 1:1 parity with UI Mixer)
     for (int i = 0; i < 2; i++) {
         DeckAudioState *deckAudio = &engine->Decks[i];
         DeckState *deckState = (i == 0) ? d1 : d2;
 
-        uint8_t vuStatus = 0xB0 + i;
-        uint8_t vuControl = 0x02;
-
-        if (map) {
-            uint8_t s, m;
-            const char *groupNames[2] = {"[Channel1]", "[Channel2]"};
-            if (MIDI_GetRegisterAddress(map, groupNames[i], "vuMeterUpdate", &s, &m) ||
-                MIDI_GetRegisterAddress(map, groupNames[i], "vu", &s, &m)) {
-                vuStatus = s;
-                vuControl = m;
-            }
-        }
+        uint8_t vuStatus = cache->deckAddr[i].vuStatus;
+        uint8_t vuControl = cache->deckAddr[i].vuControl;
 
         bool cueActive = deckState ? deckState->IsCueActive : false;
         uint8_t meterVal = MidiLed_CalcVuLevel(deckAudio->VuMeterL, deckAudio->VuMeterR, deckAudio->Fader, cueActive);
@@ -88,6 +127,11 @@ void MidiLed_UpdateVUMeters(MidiLedCache *cache, DeckState *d1, DeckState *d2, A
 
 void MidiLed_Update(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngine *engine, double nowTime) {
     if (!cache || !d1 || !d2) return;
+
+    MidiMapping *map = MIDI_GetGlobalMapping();
+    if (map != (const MidiMapping *)cache->resolvedMapping) {
+        MidiLed_ResolveMappingAddresses(cache, map);
+    }
 
     // 1. Connection Handshake (Wakeup hardware drivers on connect - Channels 1 & 2)
     if (!cache->connectionHandshakeDone) {
@@ -126,8 +170,6 @@ void MidiLed_Update(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngi
     if (!forceRefresh && (nowTime - cache->lastSendTime < 0.005)) return;
     cache->lastSendTime = nowTime;
 
-    MidiMapping *map = MIDI_GetGlobalMapping();
-
     // 7. Deck 1 & 2 Transport & Pad Signal Mapping (Channels 1 & 2 only)
     for (int i = 0; i < 2; i++) {
         DeckState *deck = (i == 0) ? d1 : d2;
@@ -140,26 +182,7 @@ void MidiLed_Update(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngi
             }
         }
 
-        const char *groupNames[2] = {"[Channel1]", "[Channel2]"};
-        const char *group = groupNames[i];
-
-        uint8_t playStatus = 0x90 + i, playNote = 0x0B;
-        uint8_t cueStatus = 0x90 + i, cueNote = 0x0C;
-        uint8_t vinylStatus = 0x90 + i, vinylNote = 0x0E;
-        uint8_t loopInStatus = 0x90 + i, loopInNote = 0x10;
-        uint8_t loopOutStatus = 0x90 + i, loopOutNote = 0x11;
-        uint8_t reloopStatus = 0x90 + i, reloopNote = 0x4D;
-
-        if (map) {
-            uint8_t s, m;
-            if (MIDI_GetRegisterAddress(map, group, "play", &s, &m)) { playStatus = s; playNote = m; }
-            if (MIDI_GetRegisterAddress(map, group, "cue_default", &s, &m) ||
-                MIDI_GetRegisterAddress(map, group, "cue", &s, &m)) { cueStatus = s; cueNote = m; }
-            if (MIDI_GetRegisterAddress(map, group, "vinyl", &s, &m)) { vinylStatus = s; vinylNote = m; }
-            if (MIDI_GetRegisterAddress(map, group, "loop_in", &s, &m)) { loopInStatus = s; loopInNote = m; }
-            if (MIDI_GetRegisterAddress(map, group, "loop_out", &s, &m)) { loopOutStatus = s; loopOutNote = m; }
-            if (MIDI_GetRegisterAddress(map, group, "reloop", &s, &m)) { reloopStatus = s; reloopNote = m; }
-        }
+        MidiDeckAddresses *addr = &cache->deckAddr[i];
 
         // Play LED
         uint8_t playVal = 0x00;
@@ -169,7 +192,7 @@ void MidiLed_Update(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngi
             playVal = cache->blinkState ? 0x7F : 0x00;
         }
         if (forceRefresh || playVal != cache->lastPlay[i]) {
-            MIDI_SendShortMsg(playStatus, playNote, playVal);
+            MIDI_SendShortMsg(addr->playStatus, addr->playNote, playVal);
             cache->lastPlay[i] = playVal;
         }
 
@@ -182,14 +205,14 @@ void MidiLed_Update(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngi
             cueVal = cache->blinkState ? 0x7F : 0x00;
         }
         if (forceRefresh || cueVal != cache->lastCue[i]) {
-            MIDI_SendShortMsg(cueStatus, cueNote, cueVal);
+            MIDI_SendShortMsg(addr->cueStatus, addr->cueNote, cueVal);
             cache->lastCue[i] = cueVal;
         }
 
         // Vinyl LED
         uint8_t vinylVal = deck->VinylModeEnabled ? 0x7F : 0x00;
         if (forceRefresh || vinylVal != cache->lastVinyl[i]) {
-            MIDI_SendShortMsg(vinylStatus, vinylNote, vinylVal);
+            MIDI_SendShortMsg(addr->vinylStatus, addr->vinylNote, vinylVal);
             cache->lastVinyl[i] = vinylVal;
         }
 
@@ -200,11 +223,11 @@ void MidiLed_Update(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngi
         } else if (deck->IsLooping) {
             loopVal = 0x7F;
         }
-        MIDI_SendShortMsg(loopInStatus, loopInNote, loopVal);
-        MIDI_SendShortMsg(loopOutStatus, loopOutNote, loopVal);
-        MIDI_SendShortMsg(loopInStatus, 0x4C, loopVal);
-        MIDI_SendShortMsg(loopOutStatus, 0x4E, loopVal);
-        MIDI_SendShortMsg(reloopStatus, reloopNote, deck->IsLooping ? 0x7F : 0x00);
+        MIDI_SendShortMsg(addr->loopInStatus, addr->loopInNote, loopVal);
+        MIDI_SendShortMsg(addr->loopOutStatus, addr->loopOutNote, loopVal);
+        MIDI_SendShortMsg(addr->loopInStatus, 0x4C, loopVal);
+        MIDI_SendShortMsg(addr->loopOutStatus, 0x4E, loopVal);
+        MIDI_SendShortMsg(addr->reloopStatus, addr->reloopNote, deck->IsLooping ? 0x7F : 0x00);
 
         // HotCue Pad LEDs (Deck 1=0x97, Deck 2=0x99)
         uint8_t padStatus = (i == 0) ? 0x97 : 0x99;
