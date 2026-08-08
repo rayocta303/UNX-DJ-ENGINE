@@ -12,8 +12,8 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
                         uint8_t midino, uint8_t value) {
   (void)midino;
   int deck = (status & 0x0F) % 4;
-  const char *groupNames[4] = {"[Channel1]", "[Channel2]", "[Channel1]",
-                               "[Channel2]"};
+  const char *groupNames[4] = {"[Channel1]", "[Channel2]", "[Channel3]",
+                               "[Channel4]"};
   const char *group = groupNames[deck];
   int targetDeckIdx = deck % 2; // 0 for Deck A (Ch 1/3), 1 for Deck B (Ch 2/4)
 
