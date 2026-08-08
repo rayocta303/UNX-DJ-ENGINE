@@ -440,9 +440,7 @@ void Browser_Back(BrowserState *s) {
     s->VisualScroll = 0.0f;
     Browser_UpdateActiveTracks(s);
   } else if (s->BrowseLevel == 2) {
-    if (s->StorageCount > 1) {
-      s->BrowseLevel = 3; // Return to Storage Selection (USB)
-    }
+    s->BrowseLevel = 3; // Return to Storage Selection (USB)
     s->CursorPos = s->ScrollOffset = 0;
     s->VisualScroll = 0.0f;
   } else if (s->BrowseLevel == 3) {
