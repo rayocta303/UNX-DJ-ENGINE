@@ -2878,8 +2878,8 @@ void UpdateDrawFrame(App *app) {
     double deltaSamples = app->deckA.JogDelta * (trackSR / 400.0);
     double newStart = audioEngine->Decks[0].LoopStartPos + deltaSamples;
     if (newStart < 0) newStart = 0;
-    if (newStart > audioEngine->Decks[0].LoopEndPos - 2.0) {
-      newStart = audioEngine->Decks[0].LoopEndPos - 2.0;
+    if (newStart > audioEngine->Decks[0].LoopEndPos - 16.0) {
+      newStart = audioEngine->Decks[0].LoopEndPos - 16.0;
     }
     audioEngine->Decks[0].LoopStartPos = newStart;
     DeckAudio_SetLoop(&audioEngine->Decks[0], true, audioEngine->Decks[0].LoopStartPos, audioEngine->Decks[0].LoopEndPos);
@@ -2889,8 +2889,8 @@ void UpdateDrawFrame(App *app) {
     if (trackSR < 100) trackSR = 44100.0;
     double deltaSamples = app->deckA.JogDelta * (trackSR / 400.0);
     double newEnd = audioEngine->Decks[0].LoopEndPos + deltaSamples;
-    if (newEnd < audioEngine->Decks[0].LoopStartPos + 2.0) {
-      newEnd = audioEngine->Decks[0].LoopStartPos + 2.0;
+    if (newEnd < audioEngine->Decks[0].LoopStartPos + 16.0) {
+      newEnd = audioEngine->Decks[0].LoopStartPos + 16.0;
     }
     audioEngine->Decks[0].LoopEndPos = newEnd;
     DeckAudio_SetLoop(&audioEngine->Decks[0], true, audioEngine->Decks[0].LoopStartPos, audioEngine->Decks[0].LoopEndPos);
@@ -2945,8 +2945,8 @@ void UpdateDrawFrame(App *app) {
     double deltaSamples = app->deckB.JogDelta * (trackSR / 400.0);
     double newStart = audioEngine->Decks[1].LoopStartPos + deltaSamples;
     if (newStart < 0) newStart = 0;
-    if (newStart > audioEngine->Decks[1].LoopEndPos - 2.0) {
-      newStart = audioEngine->Decks[1].LoopEndPos - 2.0;
+    if (newStart > audioEngine->Decks[1].LoopEndPos - 16.0) {
+      newStart = audioEngine->Decks[1].LoopEndPos - 16.0;
     }
     audioEngine->Decks[1].LoopStartPos = newStart;
     DeckAudio_SetLoop(&audioEngine->Decks[1], true, audioEngine->Decks[1].LoopStartPos, audioEngine->Decks[1].LoopEndPos);
@@ -2956,8 +2956,8 @@ void UpdateDrawFrame(App *app) {
     if (trackSR < 100) trackSR = 44100.0;
     double deltaSamples = app->deckB.JogDelta * (trackSR / 400.0);
     double newEnd = audioEngine->Decks[1].LoopEndPos + deltaSamples;
-    if (newEnd < audioEngine->Decks[1].LoopStartPos + 2.0) {
-      newEnd = audioEngine->Decks[1].LoopStartPos + 2.0;
+    if (newEnd < audioEngine->Decks[1].LoopStartPos + 16.0) {
+      newEnd = audioEngine->Decks[1].LoopStartPos + 16.0;
     }
     audioEngine->Decks[1].LoopEndPos = newEnd;
     DeckAudio_SetLoop(&audioEngine->Decks[1], true, audioEngine->Decks[1].LoopStartPos, audioEngine->Decks[1].LoopEndPos);

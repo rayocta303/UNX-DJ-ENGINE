@@ -271,14 +271,16 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
           double newStart = audio->LoopStartPos + (delta * 500.0);
           if (newStart < 0)
             newStart = 0;
-          if (newStart < audio->LoopEndPos - 4410) {
+          if (newStart < audio->LoopEndPos - 16.0) {
             audio->LoopStartPos = newStart;
+            DeckAudio_SetLoop(audio, true, audio->LoopStartPos, audio->LoopEndPos);
           }
         } else if (adjOut && *adjOut) {
           adjusting = true;
           double newEnd = audio->LoopEndPos + (delta * 500.0);
-          if (newEnd > audio->LoopStartPos + 4410) {
+          if (newEnd > audio->LoopStartPos + 16.0) {
             audio->LoopEndPos = newEnd;
+            DeckAudio_SetLoop(audio, true, audio->LoopStartPos, audio->LoopEndPos);
           }
         }
       }
