@@ -226,12 +226,12 @@ static void Mixer_Draw(Component *base) {
   float fxY = panelY + S(12);
   DrawCentredText("SOUND COLOR FX", fTiny, leftX, colFXW, fxY, S(7), ColorShadow);
   
-  float cfy = fxY + S(18);
+  float cfy = fxY + S(14);
   char *cfxNames[] = {"SPACE", "DUB ECHO", "SWEEP", "NOISE", "FILTER", "JET"};
   ColorFXType cfxTypes[] = {COLORFX_SPACE, COLORFX_DUBECHO, COLORFX_SWEEP, COLORFX_NOISE, COLORFX_FILTER, COLORFX_JET};
   float cbtnW = colFXW - S(16);
-  float cbtnH = S(26);
-  float cbtnGap = S(6);
+  float cbtnH = S(20);
+  float cbtnGap = S(4);
   for (int i = 0; i < 6; i++) {
     float bx = leftX + S(8);
     float by = cfy + i * (cbtnH + cbtnGap);
