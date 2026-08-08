@@ -222,12 +222,20 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
         uint8_t playStatus = 0x90 + i, playNote = 0x0B;
         uint8_t cueStatus  = 0x90 + i, cueNote  = 0x0C;
         uint8_t vinylStatus= 0x90 + i, vinylNote= 0x0E;
+        uint8_t loopInStatus = 0x90 + i, loopInNote = 0x10;
+        uint8_t loopOutStatus = 0x90 + i, loopOutNote = 0x11;
+        uint8_t reloopStatus = 0x90 + i, reloopNote = 0x4D;
+        uint8_t vuStatus = 0xB0 + i, vuControl = 0x02;
 
         if (map) {
             uint8_t s, m;
             if (MIDI_GetRegisterAddress(map, group, "play", &s, &m)) { playStatus = s; playNote = m; }
-            if (MIDI_GetRegisterAddress(map, group, "cue", &s, &m)) { cueStatus = s; cueNote = m; }
+            if (MIDI_GetRegisterAddress(map, group, "cue_default", &s, &m) || MIDI_GetRegisterAddress(map, group, "cue", &s, &m)) { cueStatus = s; cueNote = m; }
             if (MIDI_GetRegisterAddress(map, group, "vinyl", &s, &m)) { vinylStatus = s; vinylNote = m; }
+            if (MIDI_GetRegisterAddress(map, group, "loop_in", &s, &m)) { loopInStatus = s; loopInNote = m; }
+            if (MIDI_GetRegisterAddress(map, group, "loop_out", &s, &m)) { loopOutStatus = s; loopOutNote = m; }
+            if (MIDI_GetRegisterAddress(map, group, "reloop", &s, &m)) { reloopStatus = s; reloopNote = m; }
+            if (MIDI_GetRegisterAddress(map, group, "vuMeterUpdate", &s, &m) || MIDI_GetRegisterAddress(map, group, "vu", &s, &m)) { vuStatus = s; vuControl = m; }
         }
 
         // Play/Pause LED: Solid ON when playing; Blinking when paused at Cue; OFF when stopped
@@ -268,12 +276,11 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
         } else if (deck->IsLooping) {
             loopVal = 0x7F;
         }
-        uint8_t loopStatus = 0x90 + i;
-        MIDI_SendShortMsg(loopStatus, 0x10, loopVal); // Loop In
-        MIDI_SendShortMsg(loopStatus, 0x11, loopVal); // Loop Out
-        MIDI_SendShortMsg(loopStatus, 0x4C, loopVal); // Shift Loop In
-        MIDI_SendShortMsg(loopStatus, 0x4E, loopVal); // Shift Loop Out
-        MIDI_SendShortMsg(loopStatus, 0x4D, deck->IsLooping ? 0x7F : 0x00); // Reloop
+        MIDI_SendShortMsg(loopInStatus, loopInNote, loopVal); // Loop In
+        MIDI_SendShortMsg(loopOutStatus, loopOutNote, loopVal); // Loop Out
+        MIDI_SendShortMsg(loopInStatus, 0x4C, loopVal); // Shift Loop In
+        MIDI_SendShortMsg(loopOutStatus, 0x4E, loopVal); // Shift Loop Out
+        MIDI_SendShortMsg(reloopStatus, reloopNote, deck->IsLooping ? 0x7F : 0x00); // Reloop
 
         // Channel VU Meter Level (Channel 1 = 0xB0, Channel 2 = 0xB1, Channel 3 = 0xB2, Channel 4 = 0xB3, CC 0x02)
         if (engine && i < 2) {
@@ -284,7 +291,7 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
             if (rms >= 0.98f) meterVal += 9;
             if (meterVal > 127) meterVal = 127;
             if (forceRefresh || meterVal != lastVu[i]) {
-                MIDI_SendShortMsg(0xB0 + i, 0x02, meterVal);
+                MIDI_SendShortMsg(vuStatus, vuControl, meterVal);
                 lastVu[i] = meterVal;
             }
         }

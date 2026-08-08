@@ -462,24 +462,39 @@ void MIDI_CreateTemplate(MidiMapping *out) {
 bool MIDI_GetRegisterAddress(const MidiMapping *map, const char *group, const char *keySubstr, uint8_t *outStatus, uint8_t *outMidino) {
     if (!map || !keySubstr) return false;
 
-    // 1. Check in <control> entries
+    // 1. Check for exact match in <control> entries
     for (int i = 0; i < map->count; i++) {
-        if (group && group[0] != '\0' && strstr(map->entries[i].group, group) == NULL) {
-            continue;
-        }
-        if (strstr(map->entries[i].key, keySubstr) != NULL ||
-            strstr(map->entries[i].scriptFunction, keySubstr) != NULL) {
+        if (group && group[0] != '\0' && strstr(map->entries[i].group, group) == NULL) continue;
+        if (strcmp(map->entries[i].key, keySubstr) == 0 || strcmp(map->entries[i].scriptFunction, keySubstr) == 0) {
             if (outStatus) *outStatus = map->entries[i].status;
             if (outMidino) *outMidino = map->entries[i].midino;
             return true;
         }
     }
 
-    // 2. Check in <output> entries
+    // 2. Check for exact match in <output> entries
     for (int i = 0; i < map->outputCount; i++) {
-        if (group && group[0] != '\0' && strstr(map->outputs[i].group, group) == NULL) {
-            continue;
+        if (group && group[0] != '\0' && strstr(map->outputs[i].group, group) == NULL) continue;
+        if (strcmp(map->outputs[i].key, keySubstr) == 0) {
+            if (outStatus) *outStatus = map->outputs[i].status;
+            if (outMidino) *outMidino = map->outputs[i].midino;
+            return true;
         }
+    }
+
+    // 3. Fallback to substring match in <control> entries
+    for (int i = 0; i < map->count; i++) {
+        if (group && group[0] != '\0' && strstr(map->entries[i].group, group) == NULL) continue;
+        if (strstr(map->entries[i].key, keySubstr) != NULL || strstr(map->entries[i].scriptFunction, keySubstr) != NULL) {
+            if (outStatus) *outStatus = map->entries[i].status;
+            if (outMidino) *outMidino = map->entries[i].midino;
+            return true;
+        }
+    }
+
+    // 4. Fallback to substring match in <output> entries
+    for (int i = 0; i < map->outputCount; i++) {
+        if (group && group[0] != '\0' && strstr(map->outputs[i].group, group) == NULL) continue;
         if (strstr(map->outputs[i].key, keySubstr) != NULL) {
             if (outStatus) *outStatus = map->outputs[i].status;
             if (outMidino) *outMidino = map->outputs[i].midino;
