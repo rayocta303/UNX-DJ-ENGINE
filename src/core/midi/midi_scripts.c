@@ -96,6 +96,8 @@ static uint8_t lastCueVal[4] = {0, 0, 0, 0};
 static uint8_t lastSyncVal[4] = {0, 0, 0, 0};
 static uint8_t lastMasterTempoVal[4] = {0, 0, 0, 0};
 static uint8_t lastPadVals[4][16] = {{0}};
+static uint8_t lastJogRingVal[4] = {0, 0, 0, 0};
+static uint8_t lastJogPosVal[4] = {0, 0, 0, 0};
 
 void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
                                AudioEngine *engine, bool forceSend) {
@@ -225,6 +227,37 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
         lastPadVals[i][p + 8] = beatLoopPadVal;
       }
     }
+
+    // -------------------------------------------------------------
+    // 4. JOG RING LEDs (Jog Wheel Ring Illumination & Position Indicator)
+    // -------------------------------------------------------------
+    bool hasTrack = (ds && ds->LoadedTrack) || (audio && audio->TotalSamples > 0);
+    bool isTouch = (ds && ds->IsTouching) || (audio && audio->IsTouching);
+
+    // Jog Outer/Inner Ring LED (0x9F, note = deck index 0..3)
+    uint8_t jogRingVal = 0x00;
+    if (hasTrack) {
+      jogRingVal = isTouch ? 0x7F : (isPlaying ? 0x7F : 0x40);
+    }
+    if (forceSend || jogRingVal != lastJogRingVal[i]) {
+      MIDI_SendShortMsg(0x9F, (uint8_t)i, jogRingVal);
+      lastJogRingVal[i] = jogRingVal;
+    }
+
+    // Jog Ring Position Rotation LED (0xB0 + i, CC 0x2A)
+    uint8_t jogPosVal = 0x00;
+    if (hasTrack && audio && audio->SampleRate > 0) {
+      double posSec = (double)audio->Position / (double)audio->SampleRate;
+      double rotAngle = fmod(posSec / 1.8, 1.0); // 1.8 sec per 33 1/3 RPM revolution
+      if (rotAngle < 0) rotAngle += 1.0;
+      jogPosVal = (uint8_t)(rotAngle * 127.0);
+    }
+    if (forceSend || jogPosVal != lastJogPosVal[i]) {
+      uint8_t ccStatus = 0xB0 | (i & 0x0F);
+      MIDI_SendShortMsg(ccStatus, 0x2A, jogPosVal); // Primary Jog Ring Position
+      MIDI_SendShortMsg(ccStatus, 0x2B, jogRingVal); // Secondary Jog Ring Outer LED
+      lastJogPosVal[i] = jogPosVal;
+    }
   }
 }
 
@@ -246,6 +279,10 @@ void MIDI_ResetAllLEDs(void) {
     MIDI_SendShortMsg(ms, 0x58, 0); // Sync
     MIDI_SendShortMsg(ms, 0x1A, 0); // Master Tempo
 
+    MIDI_SendShortMsg(0x9F, (uint8_t)i, 0); // Jog Ring OFF
+    MIDI_SendShortMsg(0xB0 | (i & 0x0F), 0x2A, 0); // Jog Pos OFF
+    MIDI_SendShortMsg(0xB0 | (i & 0x0F), 0x2B, 0);
+
     lastLoopInVal[i] = 0;
     lastLoopOutVal[i] = 0;
     lastReloopVal[i] = 0;
@@ -253,6 +290,8 @@ void MIDI_ResetAllLEDs(void) {
     lastCueVal[i] = 0;
     lastSyncVal[i] = 0;
     lastMasterTempoVal[i] = 0;
+    lastJogRingVal[i] = 0;
+    lastJogPosVal[i] = 0;
 
     for (int p = 0; p < 8; p++) {
       MIDI_SendShortMsg(ps, (uint8_t)p, 0);
