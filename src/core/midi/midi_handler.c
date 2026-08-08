@@ -148,7 +148,9 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2,
   if (engine) {
     MIDI_UpdateVuMeters(engine, false);
   }
-  MIDI_UpdateLoopAndPadLEDs(d1, d2, engine, false);
+  // forceSend=true ensures blink-phase transitions (Play/Cue LEDs) are always
+  // dispatched to hardware, even when other states haven't changed.
+  MIDI_UpdateLoopAndPadLEDs(d1, d2, engine, true);
 }
 
 

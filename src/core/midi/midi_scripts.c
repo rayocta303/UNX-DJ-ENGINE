@@ -99,11 +99,23 @@ static uint8_t lastPadVals[4][16] = {{0}};
 static uint8_t lastJogRingVal[4] = {0, 0, 0, 0};
 static uint8_t lastJogPosVal[4] = {0, 0, 0, 0};
 
+// Blink state: toggles every BLINK_INTERVAL calls (60fps -> ~4Hz blink)
+#define BLINK_INTERVAL 8
+static int blinkCounter = 0;
+static bool blinkPhase = false; // true = LED on, false = LED off
+
 void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
                                AudioEngine *engine, bool forceSend) {
   DeckState *decks[4] = {d1, d2, NULL, NULL};
   uint8_t mainStatuses[4] = {0x90, 0x91, 0x92, 0x93};
   uint8_t padStatuses[4] = {0x97, 0x99, 0x98, 0x9A};
+
+  // Advance global blink timer
+  blinkCounter++;
+  if (blinkCounter >= BLINK_INTERVAL) {
+    blinkCounter = 0;
+    blinkPhase = !blinkPhase;
+  }
 
   for (int i = 0; i < 4; i++) {
     DeckState *ds = decks[i];
@@ -156,27 +168,53 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
     // -------------------------------------------------------------
     bool isPlaying = false;
     bool isCueHeld = false;
+    bool isCueActive = false;
     bool isSync = false;
     bool isMasterTempo = false;
+    bool hasTrackLoaded = false;
 
     if (audio) {
       isPlaying = audio->IsPlaying;
       isMasterTempo = audio->MasterTempoActive;
     }
     if (ds) {
-      if (ds->IsPlaying)
-        isPlaying = true;
-      if (ds->IsCueHeld)
-        isCueHeld = true;
-      if (ds->SyncMode > 0)
-        isSync = true;
-      if (ds->MasterTempo)
-        isMasterTempo = true;
+      if (ds->IsPlaying)    isPlaying = true;
+      if (ds->IsCueHeld)    isCueHeld = true;
+      if (ds->IsCueActive)  isCueActive = true;
+      if (ds->SyncMode > 0) isSync = true;
+      if (ds->MasterTempo)  isMasterTempo = true;
+      if (ds->LoadedTrack)  hasTrackLoaded = true;
+    }
+    if (audio && audio->TotalSamples > 0) hasTrackLoaded = true;
+
+    // ---- PLAY LED ----
+    // Solid ON  = playing
+    // Blink     = paused with track loaded  (hardware visual cue)
+    // OFF       = no track loaded
+    uint8_t playVal;
+    if (isPlaying) {
+      playVal = 0x7F; // Solid green
+    } else if (hasTrackLoaded) {
+      playVal = blinkPhase ? 0x7F : 0x00; // Blink when paused
+    } else {
+      playVal = 0x00; // Off
     }
 
-    uint8_t playVal = isPlaying ? 0x7F : 0x00;
-    uint8_t cueVal =
-        (isCueHeld || (!isPlaying && ds && ds->LoadedTrack)) ? 0x7F : 0x00;
+    // ---- CUE LED ----
+    // Solid ON  = cue button held / track paused exactly at cue point
+    // Dim ON    = track has cue set but not held
+    // OFF       = no track / playing past cue
+    uint8_t cueVal;
+    if (isCueHeld) {
+      cueVal = 0x7F; // Solid while held
+    } else if (!isPlaying && isCueActive) {
+      cueVal = blinkPhase ? 0x7F : 0x20; // Blink between bright and dim when paused at cue
+    } else if (!isPlaying && hasTrackLoaded) {
+      cueVal = 0x20; // Dim — track paused, cue available
+    } else {
+      cueVal = 0x00; // Off while playing or no track
+    }
+
     uint8_t syncVal = isSync ? 0x7F : 0x00;
     uint8_t mtVal = isMasterTempo ? 0x7F : 0x00;
 
