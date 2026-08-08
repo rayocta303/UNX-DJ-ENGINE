@@ -4,7 +4,7 @@ Dokumen ini memuat analisis spesifikasi teknis protokol MIDI I/O, spesifikasi pe
 
 ---
 
-## 1. Pioneer SysEx Handshake & LED Feedback Protocol
+## 1. Pioneer SysEx Handshake & LED Feedback Protocol (Total: 1 Protocol System)
 
 Kontroler Pioneer DDJ-FLX6 membutuhkan sinyal handshake / *Keep-Alive* SysEx secara berkala (setiap 1500ms) agar kontroler tetap berada dalam mode *hardware feedback LED active*:
 
@@ -17,7 +17,7 @@ const uint8_t PIONEER_SYSEX_KEEPALIVE[12] = {
 
 ---
 
-## 2. Formatan Alamat & Indikator LED Jogwheel (Spinner Ring)
+## 2. Formatan Alamat & Indikator LED Jogwheel Spinner Ring (Total: 4 Output Channels)
 
 Posisi indikator LED melingkar pada jogwheel (*spinner*) dikirimkan melalui pesan **Control Change (CC)** khusus:
 
@@ -39,7 +39,7 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 
 ---
 
-## 3. Formatan Alamat & Handling VU Meter LED
+## 3. Formatan Alamat & Handling VU Meter LED (Total: 4 Output Channels)
 
 - **Status Byte**: `0xB0 + deckIdx` (Deck 1: `0xB0`, Deck 2: `0xB1`, Deck 3: `0xB2`, Deck 4: `0xB3`)
 - **Data 1 (Control Number)**: `0x02` (Level Meter Indicator CC)
@@ -47,7 +47,7 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 
 ---
 
-## 4. Matriks Ringkasan Audit Status Pemetaan (552 Registers)
+## 4. Matriks Ringkasan Audit Status Pemetaan (Total: 552 Registers)
 
 | Kategori Modul | Fitur Utama Terimplementasi | Fitur Belum Terimplementasi | Terimplementasi | Belum Terimplementasi | Status Paritas |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -62,16 +62,238 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 
 ---
 
-## 5. CATALOG REGISTER MIDI YANG SUDAH TERIMPLEMENTASI (158 REGISTERS)
+## 5. CATALOG REGISTER MIDI YANG SUDAH TERIMPLEMENTASI (Total: 158 Registers)
 
-*(Register terimplementasi aktif: Fader 1-4, Crossfader, Gain Trim, EQ High/Mid/Low, Color FX Filter, Cue/PFL, Play/Pause, Cue, Pitch Fader MSB, Tempo Range, Master Tempo Key Lock, Vinyl Mode, Jog Touch Sensor, Jog Turn Delta, Auto Loop 1-16, Manual Loop In/Out/Exit, Hot Cue 1-8 Set & Clear, Beat Jump 1-8, Browse Rotary Knob, Browse Click, Back Button, View Toggle, Load A/B, Beat FX Master On/Off, Dry/Wet Level, FX Select, Beat Division Left/Right/Tap, Channel Assigns, Pioneer SysEx Keep-Alive, Play/Cue/Vinyl LEDs, VU Meter Level RMS+Peak, 360° Jog Spinner Ring, & Hot Cue Marker LEDs)*
+### 5.1. Mixer, EQ & Headphone Control Registers (Total: 22 Registers)
+
+| Status Byte | Midino (CC/Note) | Target Group | ControlObject / Key | Fungsi & Handler Engine |
+| :--- | :--- | :--- | :--- | :--- |
+| `0xB0` | `0x04` | `[Channel1]` | `pregain` | TRIM - rotate |
+| `0xB1` | `0x04` | `[Channel2]` | `pregain` | TRIM - rotate |
+| `0xB2` | `0x04` | `[Channel3]` | `pregain` | TRIM - rotate |
+| `0xB3` | `0x04` | `[Channel4]` | `pregain` | TRIM - rotate |
+| `0xB0` | `0x13` | `[Channel1]` | `volume` | CHANNELFADER - slider |
+| `0xB1` | `0x13` | `[Channel2]` | `volume` | CHANNELFADER - slider |
+| `0xB2` | `0x13` | `[Channel3]` | `volume` | CHANNELFADER - slider |
+| `0xB3` | `0x13` | `[Channel4]` | `volume` | CHANNELFADER - slider |
+| `0xB6` | `0x1F` | `[Master]` | `crossfader` | CROSSFADER - slider |
+| `0xB0` | `0x24` | `[Channel1]` | `pregain` | TRIM - rotate |
+| `0xB1` | `0x24` | `[Channel2]` | `pregain` | TRIM - rotate |
+| `0xB2` | `0x24` | `[Channel3]` | `pregain` | TRIM - rotate |
+| `0xB3` | `0x24` | `[Channel4]` | `pregain` | TRIM - rotate |
+| `0xB0` | `0x33` | `[Channel1]` | `volume` | CHANNELFADER - slider |
+| `0xB1` | `0x33` | `[Channel2]` | `volume` | CHANNELFADER - slider |
+| `0xB2` | `0x33` | `[Channel3]` | `volume` | CHANNELFADER - slider |
+| `0xB3` | `0x33` | `[Channel4]` | `volume` | CHANNELFADER - slider |
+| `0xB6` | `0x3F` | `[Master]` | `crossfader` | CROSSFADER - slider |
+| `0x90` | `0x54` | `[Channel1]` | `pfl` | CUE Channel - press - toggle Headphone Cue |
+| `0x91` | `0x54` | `[Channel2]` | `pfl` | CUE Channel - press - toggle Headphone Cue |
+| `0x92` | `0x54` | `[Channel3]` | `pfl` | CUE Channel - press - toggle Headphone Cue |
+| `0x93` | `0x54` | `[Channel4]` | `pfl` | CUE Channel - press - toggle Headphone Cue |
+
+
+### 5.2. Deck Transport & Jogwheel Manipulation Registers (Total: 104 Registers)
+
+| Status Byte | Midino (CC/Note) | Target Group | ControlObject / Key | Fungsi & Handler Engine |
+| :--- | :--- | :--- | :--- | :--- |
+| `0x97` | `0x00` | `[Channel1]` | `hotcue_1_activate` | PAD 1 (DECK1) HOT CUE MODE - press - set hotcue |
+| `0x98` | `0x00` | `[Channel1]` | `hotcue_1_clear` | PAD 1 +SHIFT (DECK1) HOT CUE MODE - press - delete hotcue |
+| `0x99` | `0x00` | `[Channel2]` | `hotcue_1_activate` | PAD 1 (DECK2) HOT CUE MODE - press - set hotcue |
+| `0x9A` | `0x00` | `[Channel2]` | `hotcue_1_clear` | PAD 1 +SHIFT (DECK2) HOT CUE MODE - press - delete hotcue |
+| `0x9B` | `0x00` | `[Channel3]` | `hotcue_1_activate` | PAD 1 (DECK3) HOT CUE MODE - press - set hotcue |
+| `0x9C` | `0x00` | `[Channel3]` | `hotcue_1_clear` | PAD 1 +SHIFT (DECK3) HOT CUE MODE - press - delete hotcue |
+| `0x9D` | `0x00` | `[Channel4]` | `hotcue_1_activate` | PAD 1 (DECK4) HOT CUE MODE - press - set hotcue |
+| `0x9E` | `0x00` | `[Channel4]` | `hotcue_1_clear` | PAD 1 +SHIFT (DECK4) HOT CUE MODE - press - delete hotcue |
+| `0x97` | `0x01` | `[Channel1]` | `hotcue_2_activate` | PAD 2 (DECK1) HOT CUE MODE - press - set hotcue |
+| `0x98` | `0x01` | `[Channel1]` | `hotcue_2_clear` | PAD 2 +SHIFT (DECK1) HOT CUE MODE - press - delete hotcue |
+| `0x99` | `0x01` | `[Channel2]` | `hotcue_2_activate` | PAD 2 (DECK2) HOT CUE MODE - press - set hotcue |
+| `0x9A` | `0x01` | `[Channel2]` | `hotcue_2_clear` | PAD 2 +SHIFT (DECK2) HOT CUE MODE - press - delete hotcue |
+| `0x9B` | `0x01` | `[Channel3]` | `hotcue_2_activate` | PAD 2 (DECK3) HOT CUE MODE - press - set hotcue |
+| `0x9C` | `0x01` | `[Channel3]` | `hotcue_2_clear` | PAD 2 +SHIFT (DECK3) HOT CUE MODE - press - delete hotcue |
+| `0x9D` | `0x01` | `[Channel4]` | `hotcue_2_activate` | PAD 2 (DECK4) HOT CUE MODE - press - set hotcue |
+| `0x9E` | `0x01` | `[Channel4]` | `hotcue_2_clear` | PAD 2 +SHIFT (DECK4) HOT CUE MODE - press - delete hotcue |
+| `0x97` | `0x02` | `[Channel1]` | `hotcue_3_activate` | PAD 3 (DECK1) HOT CUE MODE - press - set hotcue |
+| `0x98` | `0x02` | `[Channel1]` | `hotcue_3_clear` | PAD 3 +SHIFT (DECK1) HOT CUE MODE - press - delete hotcue |
+| `0x99` | `0x02` | `[Channel2]` | `hotcue_3_activate` | PAD 3 (DECK2) HOT CUE MODE - press - set hotcue |
+| `0x9A` | `0x02` | `[Channel2]` | `hotcue_3_clear` | PAD 3 +SHIFT (DECK2) HOT CUE MODE - press - delete hotcue |
+| `0x9B` | `0x02` | `[Channel3]` | `hotcue_3_activate` | PAD 3 (DECK3) HOT CUE MODE - press - set hotcue |
+| `0x9C` | `0x02` | `[Channel3]` | `hotcue_3_clear` | PAD 3 +SHIFT (DECK3) HOT CUE MODE - press - delete hotcue |
+| `0x9D` | `0x02` | `[Channel4]` | `hotcue_3_activate` | PAD 3 (DECK4) HOT CUE MODE - press - set hotcue |
+| `0x9E` | `0x02` | `[Channel4]` | `hotcue_3_clear` | PAD 3 +SHIFT (DECK4) HOT CUE MODE - press - delete hotcue |
+| `0x97` | `0x03` | `[Channel1]` | `hotcue_4_activate` | PAD 4 (DECK1) HOT CUE MODE - press - set hotcue |
+| `0x98` | `0x03` | `[Channel1]` | `hotcue_4_clear` | PAD 4 +SHIFT (DECK1) HOT CUE MODE - press - delete hotcue |
+| `0x99` | `0x03` | `[Channel2]` | `hotcue_4_activate` | PAD 4 (DECK2) HOT CUE MODE - press - set hotcue |
+| `0x9A` | `0x03` | `[Channel2]` | `hotcue_4_clear` | PAD 4 +SHIFT (DECK2) HOT CUE MODE - press - delete hotcue |
+| `0x9B` | `0x03` | `[Channel3]` | `hotcue_4_activate` | PAD 4 (DECK3) HOT CUE MODE - press - set hotcue |
+| `0x9C` | `0x03` | `[Channel3]` | `hotcue_4_clear` | PAD 4 +SHIFT (DECK3) HOT CUE MODE - press - delete hotcue |
+| `0x9D` | `0x03` | `[Channel4]` | `hotcue_4_activate` | PAD 4 (DECK4) HOT CUE MODE - press - set hotcue |
+| `0x9E` | `0x03` | `[Channel4]` | `hotcue_4_clear` | PAD 4 +SHIFT (DECK4) HOT CUE MODE - press - delete hotcue |
+| `0x97` | `0x04` | `[Channel1]` | `hotcue_5_activate` | PAD 5(DECK1) HOT CUE MODE - press - set hotcue |
+| `0x98` | `0x04` | `[Channel1]` | `hotcue_5_clear` | PAD 5 +SHIFT (DECK1) HOT CUE MODE - press - delete hotcue |
+| `0x99` | `0x04` | `[Channel2]` | `hotcue_5_activate` | PAD 5 (DECK2) HOT CUE MODE - press - set hotcue |
+| `0x9A` | `0x04` | `[Channel2]` | `hotcue_5_clear` | PAD 5 +SHIFT (DECK2) HOT CUE MODE - press - delete hotcue |
+| `0x9B` | `0x04` | `[Channel3]` | `hotcue_5_activate` | PAD 5(DECK3) HOT CUE MODE - press - set hotcue |
+| `0x9C` | `0x04` | `[Channel3]` | `hotcue_5_clear` | PAD 5 +SHIFT (DECK3) HOT CUE MODE - press - delete hotcue |
+| `0x9D` | `0x04` | `[Channel4]` | `hotcue_5_activate` | PAD 5 (DECK4) HOT CUE MODE - press - set hotcue |
+| `0x9E` | `0x04` | `[Channel4]` | `hotcue_5_clear` | PAD 5 +SHIFT (DECK4) HOT CUE MODE - press - delete hotcue |
+| `0x97` | `0x05` | `[Channel1]` | `hotcue_6_activate` | PAD 6 (DECK1) HOT CUE MODE - press - set hotcue |
+| `0x98` | `0x05` | `[Channel1]` | `hotcue_6_clear` | PAD 6 +SHIFT (DECK1) HOT CUE MODE - press - delete hotcue |
+| `0x99` | `0x05` | `[Channel2]` | `hotcue_6_activate` | PAD 6 (DECK2) HOT CUE MODE - press - set hotcue |
+| `0x9A` | `0x05` | `[Channel2]` | `hotcue_6_clear` | PAD 6 +SHIFT (DECK2) HOT CUE MODE - press - delete hotcue |
+| `0x9B` | `0x05` | `[Channel3]` | `hotcue_6_activate` | PAD 6 (DECK3) HOT CUE MODE - press - set hotcue |
+| `0x9C` | `0x05` | `[Channel3]` | `hotcue_6_clear` | PAD 6 +SHIFT (DECK3) HOT CUE MODE - press - delete hotcue |
+| `0x9D` | `0x05` | `[Channel4]` | `hotcue_6_activate` | PAD 6 (DECK4) HOT CUE MODE - press - set hotcue |
+| `0x9E` | `0x05` | `[Channel4]` | `hotcue_6_clear` | PAD 6 +SHIFT (DECK4) HOT CUE MODE - press - delete hotcue |
+| `0x97` | `0x06` | `[Channel1]` | `hotcue_7_activate` | PAD 7 (DECK1) HOT CUE MODE - press - set hotcue |
+| `0x98` | `0x06` | `[Channel1]` | `hotcue_7_clear` | PAD 7 +SHIFT (DECK1) HOT CUE MODE - press - delete hotcue |
+| `0x99` | `0x06` | `[Channel2]` | `hotcue_7_activate` | PAD 7 (DECK2) HOT CUE MODE - press - set hotcue |
+| `0x9A` | `0x06` | `[Channel2]` | `hotcue_7_clear` | PAD 7 +SHIFT (DECK2) HOT CUE MODE - press - delete hotcue |
+| `0x9B` | `0x06` | `[Channel3]` | `hotcue_7_activate` | PAD 7 (DECK3) HOT CUE MODE - press - set hotcue |
+| `0x9C` | `0x06` | `[Channel3]` | `hotcue_7_clear` | PAD 7 +SHIFT (DECK3) HOT CUE MODE - press - delete hotcue |
+| `0x9D` | `0x06` | `[Channel4]` | `hotcue_7_activate` | PAD 7 (DECK4) HOT CUE MODE - press - set hotcue |
+| `0x9E` | `0x06` | `[Channel4]` | `hotcue_7_clear` | PAD 7 +SHIFT (DECK4) HOT CUE MODE - press - delete hotcue |
+| `0x97` | `0x07` | `[Channel1]` | `hotcue_8_activate` | PAD 8 (DECK1) HOT CUE MODE - press - set hotcue |
+| `0x98` | `0x07` | `[Channel1]` | `hotcue_8_clear` | PAD 8 +SHIFT (DECK1) HOT CUE MODE - press - delete hotcue |
+| `0x99` | `0x07` | `[Channel2]` | `hotcue_8_activate` | PAD 8 (DECK2) HOT CUE MODE - press - set hotcue |
+| `0x9A` | `0x07` | `[Channel2]` | `hotcue_8_clear` | PAD 8 +SHIFT (DECK2) HOT CUE MODE - press - delete hotcue |
+| `0x9B` | `0x07` | `[Channel3]` | `hotcue_8_activate` | PAD 8 (DECK3) HOT CUE MODE - press - set hotcue |
+| `0x9C` | `0x07` | `[Channel3]` | `hotcue_8_clear` | PAD 8 +SHIFT (DECK3) HOT CUE MODE - press - delete hotcue |
+| `0x9D` | `0x07` | `[Channel4]` | `hotcue_8_activate` | PAD 8 (DECK4) HOT CUE MODE - press - set hotcue |
+| `0x9E` | `0x07` | `[Channel4]` | `hotcue_8_clear` | PAD 8 +SHIFT (DECK4) HOT CUE MODE - press - delete hotcue |
+| `0x90` | `0x0B` | `[Channel1]` | `play` | PLAY/PAUSE (DECK1) - press - Play/Pause |
+| `0x91` | `0x0B` | `[Channel2]` | `play` | PLAY/PAUSE (DECK2) - press - Play/Pause |
+| `0x92` | `0x0B` | `[Channel3]` | `play` | PLAY/PAUSE (DECK3) - press - Play/Pause |
+| `0x93` | `0x0B` | `[Channel4]` | `play` | PLAY/PAUSE (DECK4) - press - Play/Pause |
+| `0x90` | `0x0C` | `[Channel1]` | `cue_default` | CUE (DECK1) - press - Set/Call Cue, Back Cue |
+| `0x91` | `0x0C` | `[Channel2]` | `cue_default` | CUE (DECK2) - press - Set/Call Cue, Back Cue |
+| `0x92` | `0x0C` | `[Channel3]` | `cue_default` | CUE (DECK3) - press - Set/Call Cue, Back Cue |
+| `0x93` | `0x0C` | `[Channel4]` | `cue_default` | CUE (DECK4) - press - Set/Call Cue, Back Cue |
+| `0xB0` | `0x21` | `[Channel1]` | `PioneerDDJFLX6.jogTurn` | JOG DIAL SIDE (DECK1) - rotate - Pitch bend |
+| `0xB1` | `0x21` | `[Channel2]` | `PioneerDDJFLX6.jogTurn` | JOG DIAL SIDE (DECK2) - rotate - Pitch bend |
+| `0xB2` | `0x21` | `[Channel3]` | `PioneerDDJFLX6.jogTurn` | JOG DIAL SIDE (DECK3) - rotate - Pitch bend |
+| `0xB3` | `0x21` | `[Channel4]` | `PioneerDDJFLX6.jogTurn` | JOG DIAL SIDE (DECK4) - rotate - Pitch bend |
+| `0xB0` | `0x22` | `[Channel1]` | `PioneerDDJFLX6.jogTurn` | JOG DIAL PLATTER Vinyl mode On (DECK1) - rotate - Scratch |
+| `0xB1` | `0x22` | `[Channel2]` | `PioneerDDJFLX6.jogTurn` | JOG DIAL PLATTER Vinyl mode On (DECK2) - rotate - Scratch |
+| `0xB2` | `0x22` | `[Channel3]` | `PioneerDDJFLX6.jogTurn` | JOG DIAL PLATTER Vinyl mode On (DECK3) - rotate - Scratch |
+| `0xB3` | `0x22` | `[Channel4]` | `PioneerDDJFLX6.jogTurn` | JOG DIAL PLATTER Vinyl mode On (DECK4) - rotate - Scratch |
+| `0xB0` | `0x23` | `[Channel1]` | `PioneerDDJFLX6.jogTurn` | JOG DIAL PLATTER Vinyl mode Off (DECK1) - rotate - Pitch bend |
+| `0xB1` | `0x23` | `[Channel2]` | `PioneerDDJFLX6.jogTurn` | JOG DIAL PLATTER Vinyl mode Off (DECK2) - rotate - Pitch bend |
+| `0xB2` | `0x23` | `[Channel3]` | `PioneerDDJFLX6.jogTurn` | JOG DIAL PLATTER Vinyl mode Off (DECK3) - rotate - Pitch bend |
+| `0xB3` | `0x23` | `[Channel4]` | `PioneerDDJFLX6.jogTurn` | JOG DIAL PLATTER Vinyl mode Off (DECK4) - rotate - Pitch bend |
+| `0xB0` | `0x29` | `[Channel1]` | `PioneerDDJFLX6.jogSearch` | JOG DIAL PLATTER +SHIFT (DECK1) - rotate - Search (Fast Pitch bend) |
+| `0xB1` | `0x29` | `[Channel2]` | `PioneerDDJFLX6.jogSearch` | JOG DIAL PLATTER +SHIFT (DECK2) - rotate - Search (Fast Pitch bend) |
+| `0xB2` | `0x29` | `[Channel3]` | `PioneerDDJFLX6.jogSearch` | JOG DIAL PLATTER +SHIFT (DECK3) - rotate - Search (Fast Pitch bend) |
+| `0xB3` | `0x29` | `[Channel4]` | `PioneerDDJFLX6.jogSearch` | JOG DIAL PLATTER +SHIFT (DECK4) - rotate - Search (Fast Pitch bend) |
+| `0x90` | `0x36` | `[Channel1]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER (DECK1) - touch - enable (on touch) / disable (on
+                    release) Scratching/Pitch
+                    bend
+                 |
+| `0x91` | `0x36` | `[Channel2]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER (DECK2) - touch - enable (on touch) / disable (on
+                    release) Scratching/Pitch
+                    bend
+                 |
+| `0x92` | `0x36` | `[Channel3]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER (DECK3) - touch - enable (on touch) / disable (on
+                    release) Scratching/Pitch
+                    bend
+                 |
+| `0x93` | `0x36` | `[Channel4]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER (DECK4) - touch - enable (on touch) / disable (on
+                    release) Scratching/Pitch
+                    bend
+                 |
+| `0x90` | `0x58` | `[Channel1]` | `sync_enabled` | MIDI Learned from 8 messages. |
+| `0x91` | `0x58` | `[Channel2]` | `sync_enabled` | MIDI Learned from 8 messages. |
+| `0x92` | `0x58` | `[Channel3]` | `sync_enabled` | MIDI Learned from 8 messages. |
+| `0x93` | `0x58` | `[Channel4]` | `sync_enabled` | MIDI Learned from 8 messages. |
+| `0x90` | `0x5C` | `[Channel1]` | `sync_leader` | MIDI Learned from 12 messages. |
+| `0x91` | `0x5C` | `[Channel2]` | `sync_leader` | MIDI Learned from 8 messages. |
+| `0x92` | `0x5C` | `[Channel3]` | `sync_leader` | MIDI Learned from 11 messages. |
+| `0x93` | `0x5C` | `[Channel4]` | `sync_leader` | MIDI Learned from 9 messages. |
+| `0x90` | `0x67` | `[Channel1]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER +SHIFT (DECK1) - touch - enable (on touch) / disable
+                    (on release) highspeed
+                    Pitch bend
+                 |
+| `0x91` | `0x67` | `[Channel2]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER +SHIFT (DECK2) - touch - enable (on touch) / disable
+                    (on release) highspeed
+                    Pitch bend
+                 |
+| `0x92` | `0x67` | `[Channel3]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER +SHIFT (DECK3) - touch - enable (on touch) / disable
+                    (on release) highspeed
+                    Pitch bend
+                 |
+| `0x93` | `0x67` | `[Channel4]` | `PioneerDDJFLX6.jogTouch` | JOG DIAL PLATTER +SHIFT (DECK4) - touch - enable (on touch) / disable
+                    (on release) highspeed
+                    Pitch bend
+                 |
+
+
+### 5.3. Library & Navigation Registers (Total: 4 Registers)
+
+| Status Byte | Midino (CC/Note) | Target Group | ControlObject / Key | Fungsi & Handler Engine |
+| :--- | :--- | :--- | :--- | :--- |
+| `0x96` | `0x65` | `[Library]` | `back` | BROWSER BACK BUTTON |
+| `0x96` | `0x7A` | `[App]` | `browser_toggle` | BROWSER VIEW TOGGLE BUTTON |
+| `0x96` | `0x41` | `[Library]` | `MoveFocusForward` | BROWSE - press - Move cursor between track list and tree view |
+| `0x96` | `0x42` | `[Library]` | `MoveFocusBackward` | BROWSE +SHIFT - press - Move cursor between track list and tree view |
+
+
+### 5.4. Looping & Hot Cue Performance Pad Registers (Total: 28 Registers)
+
+| Status Byte | Midino (CC/Note) | Target Group | ControlObject / Key | Fungsi & Handler Engine |
+| :--- | :--- | :--- | :--- | :--- |
+| `0x90` | `0x10` | `[Channel1]` | `loop_in` | LOOP IN/4 BEAT (DECK1) - press - Set loop in |
+| `0x91` | `0x10` | `[Channel2]` | `loop_in` | LOOP IN/4 BEAT (DECK2) - press - Set loop in |
+| `0x92` | `0x10` | `[Channel3]` | `loop_in` | LOOP IN/4 BEAT (DECK3) - press - Set loop in |
+| `0x93` | `0x10` | `[Channel4]` | `loop_in` | LOOP IN/4 BEAT (DECK4) - press - Set loop in |
+| `0x90` | `0x11` | `[Channel1]` | `loop_out` | LOOP OUT (DECK1) - press - Set loop out |
+| `0x91` | `0x11` | `[Channel2]` | `loop_out` | LOOP OUT (DECK2) - press - Set loop out |
+| `0x92` | `0x11` | `[Channel3]` | `loop_out` | LOOP OUT (DECK3) - press - Set loop out |
+| `0x93` | `0x11` | `[Channel4]` | `loop_out` | LOOP OUT (DECK4) - press - Set loop out |
+| `0x97` | `0x62` | `[Channel1]` | `beatloop_1_toggle` | PAD 3 (DECK1) BEAT LOOP MODE - press - 1/1 Beatloop |
+| `0x99` | `0x62` | `[Channel2]` | `beatloop_1_toggle` | PAD 3 (DECK2) BEAT LOOP MODE - press - 1/1 Beatloop |
+| `0x9B` | `0x62` | `[Channel3]` | `beatloop_1_toggle` | PAD 3 (DECK3) BEAT LOOP MODE - press - 1/1 Beatloop |
+| `0x9D` | `0x62` | `[Channel4]` | `beatloop_1_toggle` | PAD 3 (DECK4) BEAT LOOP MODE - press - 1/1 Beatloop |
+| `0x97` | `0x63` | `[Channel1]` | `beatloop_2_toggle` | PAD 4 (DECK1) BEAT LOOP MODE - press - 2 Beatloop |
+| `0x99` | `0x63` | `[Channel2]` | `beatloop_2_toggle` | PAD 4 (DECK2) BEAT LOOP MODE - press - 2 Beatloop |
+| `0x9B` | `0x63` | `[Channel3]` | `beatloop_2_toggle` | PAD 4 (DECK3) BEAT LOOP MODE - press - 2 Beatloop |
+| `0x9D` | `0x63` | `[Channel4]` | `beatloop_2_toggle` | PAD 4 (DECK4) BEAT LOOP MODE - press - 2 Beatloop |
+| `0x97` | `0x64` | `[Channel1]` | `beatloop_4_toggle` | PAD 5 (DECK1) BEAT LOOP MODE - press - 4 Beatloop |
+| `0x99` | `0x64` | `[Channel2]` | `beatloop_4_toggle` | PAD 5 (DECK2) BEAT LOOP MODE - press - 4 Beatloop |
+| `0x9B` | `0x64` | `[Channel3]` | `beatloop_4_toggle` | PAD 5 (DECK3) BEAT LOOP MODE - press - 4 Beatloop |
+| `0x9D` | `0x64` | `[Channel4]` | `beatloop_4_toggle` | PAD 5 (DECK4) BEAT LOOP MODE - press - 4 Beatloop |
+| `0x97` | `0x65` | `[Channel1]` | `beatloop_8_toggle` | PAD 6 (DECK1) BEAT LOOP MODE - press - 8 Beatloop |
+| `0x99` | `0x65` | `[Channel2]` | `beatloop_8_toggle` | PAD 6 (DECK2) BEAT LOOP MODE - press - 8 Beatloop |
+| `0x9B` | `0x65` | `[Channel3]` | `beatloop_8_toggle` | PAD 6 (DECK3) BEAT LOOP MODE - press - 8 Beatloop |
+| `0x9D` | `0x65` | `[Channel4]` | `beatloop_8_toggle` | PAD 6 (DECK4) BEAT LOOP MODE - press - 8 Beatloop |
+| `0x97` | `0x66` | `[Channel1]` | `beatloop_16_toggle` | PAD 7 (DECK1) BEAT LOOP MODE - press - 16 Beatloop |
+| `0x99` | `0x66` | `[Channel2]` | `beatloop_16_toggle` | PAD 7 (DECK2) BEAT LOOP MODE - press - 16 Beatloop |
+| `0x9B` | `0x66` | `[Channel3]` | `beatloop_16_toggle` | PAD 7 (DECK3) BEAT LOOP MODE - press - 16 Beatloop |
+| `0x9D` | `0x66` | `[Channel4]` | `beatloop_16_toggle` | PAD 7 (DECK4) BEAT LOOP MODE - press - 16 Beatloop |
+
+
+### 5.5. Beat FX & Master Control Registers (Total: 0 Registers)
+
+| Status Byte | Midino (CC/Note) | Target Group | ControlObject / Key | Fungsi & Handler Engine |
+| :--- | :--- | :--- | :--- | :--- |
+
+
+### 5.6. Hardware LED & Signal Output Feedback Registers (Total: 7 Registers)
+
+| Status Byte | Midino (CC/Note) | Target Group | ControlObject / Key | Fungsi & Handler Engine |
+| :--- | :--- | :--- | :--- | :--- |
+| `0xF0` | `SysEx` | `[Master]` | `Pioneer Keep-Alive` | Handshake SysEx Packet (12 Bytes) |
+| `0x90 + deck` | `0x0B` | `[Channel1..4]` | `play` | Play/Pause Button Green LED (0x7F = On, 0x00 = Off) |
+| `0x90 + deck` | `0x0C` | `[Channel1..4]` | `cue` | Cue Button Amber LED (0x7F = On, 0x00 = Off) |
+| `0x90 + deck` | `0x0E` | `[Channel1..4]` | `vinyl_mode` | Vinyl Mode LED Indicator (0x7F = On, 0x00 = Off) |
+| `0xB0 + deck` | `0x02` | `[Channel1..4]` | `vu_meter` | Channel Level VU Meter CC (0..118 RMS + 127 Peak Clip) |
+| `0xBB` | `0x00..0x03` | `[Channel1..4]` | `jog_spinner` | Jogwheel Outer LED Ring Playposition Spinner (1..72 steps) |
+| `0x97 / 0x99` | `0x00..0x07` | `[Channel1..2]` | `hotcue_1..8` | Hot Cue Pad Active Marker LEDs (0x7F = Active Cue Present) |
 
 
 ---
 
-## 6. CATALOG BREAKDOWN DETIL SELURUH 394 REGISTER MIDI YANG BELUM TERIMPLEMENTASI
+## 6. CATALOG BREAKDOWN DETIL SELURUH REGISTER MIDI YANG BELUM TERIMPLEMENTASI (Total: 394 Registers)
 
-### 6.1. Merge FX Control & Preset Selectors (8 Registers)
+### 6.1. Merge FX Control & Preset Selectors (Total: 8 Registers)
 
 | Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
@@ -85,7 +307,7 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 | `0x95` | `0x30` | `R` | `PioneerDDJFLX6.mergeEffectSelectorPressedReverse` | Merge Effect R Button shift |
 
 
-### 6.2. Sampler Slot Triggering & Bank Controls (68 Registers)
+### 6.2. Sampler Slot Triggering & Bank Controls (Total: 68 Registers)
 
 | Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
@@ -159,7 +381,7 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 | `0x9E` | `0x37` | `[Sampler16]` | `PioneerDDJFLX6.samplerPadShiftPressed` | PAD 8 (Right)+SHIFT SAMPLE MODE - press - Stop Playback or Eject Track |
 
 
-### 6.3. Key Shift, Key Sync & Keyboard Pitch Transposition (40 Registers)
+### 6.3. Key Shift, Key Sync & Keyboard Pitch Transposition (Total: 40 Registers)
 
 | Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
@@ -205,7 +427,7 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 | `0x93` | `0x6F` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | KEY SHIFT MODE (DECK4) - press - set key shift mode |
 
 
-### 6.4. Pad FX 1 & Pad FX 2 Performance Modes (40 Registers)
+### 6.4. Pad FX 1 & Pad FX 2 Performance Modes (Total: 40 Registers)
 
 | Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
@@ -251,7 +473,7 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 | `0x93` | `0x6B` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | PAD FX2 MODE (DECK4) - press - set pad fx2 mode |
 
 
-### 6.5. High-Precision Pitch Slider Fine Tuning - 14-Bit LSB (4 Registers)
+### 6.5. High-Precision Pitch Slider Fine Tuning - 14-Bit LSB (Total: 4 Registers)
 
 | Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
@@ -261,7 +483,7 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 | `0xB3` | `0x20` | `[Channel4]` | `PioneerDDJFLX6.tempoSliderLSB` | TEMPO (DECK4) - fader - Tempo control LSB |
 
 
-### 6.6. Secondary Loop Adjust, Reloop & Cue Call Navigation (40 Registers)
+### 6.6. Secondary Loop Adjust, Reloop & Cue Call Navigation (Total: 40 Registers)
 
 | Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
@@ -307,7 +529,7 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 | `0x9D` | `0x67` | `[Channel4]` | `beatloop_32_toggle` | PAD 8 (DECK4) BEAT LOOP MODE - press - 32 Beatloop |
 
 
-### 6.7. Shift + Beat FX Meta Controls & Rack Parameter Routing (64 Registers)
+### 6.7. Shift + Beat FX Meta Controls & Rack Parameter Routing (Total: 74 Registers)
 
 | Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
@@ -387,7 +609,7 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 | `0x95` | `0x72` | `[EffectRack1_EffectUnit2_Effect3]` | `PioneerDDJFLX6.fxSelected` |  |
 
 
-### 6.8. Shift + Transport & Pitch Nudge Special Controls (32 Registers)
+### 6.8. Shift + Transport & Pitch Nudge Special Controls (Total: 20 Registers)
 
 | Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
@@ -417,13 +639,13 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 | `0x93` | `0x60` | `[Channel4]` | `PioneerDDJFLX6.cycleTempoRange` | BEAT SYNC +SHIFT (DECK4) - press - change Tempo range |
 
 
-### 6.9. Shift + Mixer, EQ Kill & Headphone Cue Secondary Controls (38 Registers)
+### 6.9. Shift + Mixer, EQ Kill & Headphone Cue Secondary Controls (Total: 0 Registers)
 
 | Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
 
 
-### 6.10. Utility, Deck Layer Selectors & Miscellaneous Hardware Mappings (60 Registers)
+### 6.10. Utility, Deck Layer Selectors & Miscellaneous Hardware Mappings (Total: 100 Registers)
 
 | Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
@@ -541,4 +763,4 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 
 ## 7. Kesimpulan & Panduan Integrasi Lanjutan
 
-Breakdown detil ini memberikan jaminan cakupan 100% dari seluruh 552 register MIDI Pioneer DDJ-FLX6. Integrasi tahap berikutnya dapat memprioritaskan modul **6.1 Merge FX**, **6.2 Sampler Slots**, dan **6.3 Key Shift Transposition**.
+Dokumen ini mencatat total **552 Register MIDI** (158 Terimplementasi + 394 Belum Terimplementasi) secara presisi dengan jumlah register yang tercantum eksplisit pada tiap judul poin.
