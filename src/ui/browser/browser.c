@@ -440,7 +440,9 @@ void Browser_Back(BrowserState *s) {
     s->VisualScroll = 0.0f;
     Browser_UpdateActiveTracks(s);
   } else if (s->BrowseLevel == 2) {
-    s->BrowseLevel = 3; // Return to Storage Selection (USB)
+    if (s->StorageCount > 1) {
+      s->BrowseLevel = 3; // Return to Storage Selection (USB)
+    }
     s->CursorPos = s->ScrollOffset = 0;
     s->VisualScroll = 0.0f;
   } else if (s->BrowseLevel == 3) {
@@ -723,14 +725,17 @@ void Browser_RefreshStorages(BrowserState *s) {
         if (dir->d_name[0] == '.')
           continue;
 
-        // Skip system folders and internal mount points
+        // Skip system folders, internal mount points, and system partitions
         bool skip = false;
-        const char* toSkip[] = {"self", "emulated", "knox-emulated", "container", "secure", "asec", "obb", "runtime", "appfuse", "shared", "user", "media_rw", "temp", "expand", "legacy"};
-        for(int k=0; k<15; k++) {
+        const char* toSkip[] = {"self", "emulated", "knox-emulated", "container", "secure", "asec", "obb", "runtime", "appfuse", "shared", "user", "media_rw", "temp", "expand", "legacy", "boot", "root", "system", "etc", "usr", "var", "dev", "proc", "sys"};
+        for(int k=0; k<24; k++) {
             if(strcmp(dir->d_name, toSkip[k]) == 0) { skip = true; break; }
         }
+        if (strncmp(dir->d_name, "nand-sata", 9) == 0 ||
+            strncmp(dir->d_name, "mmcblk", 6) == 0) {
+            skip = true;
+        }
         if (skip) continue;
-
 
         char fullPath[512];
         snprintf(fullPath, sizeof(fullPath), "%s/%s", dirToScan, dir->d_name);
@@ -779,11 +784,22 @@ void Browser_RefreshStorages(BrowserState *s) {
           type = "Rekordbox";
         else if (hasSerato)
           type = "Serato";
-        else if (strchr(dir->d_name, '-') != NULL)
-          type = "SD";
+
+        // Display name formatting (e.g. sda1 -> USB1)
+        char displayName[64];
+        if (strncmp(dir->d_name, "sd", 2) == 0 && strlen(dir->d_name) >= 3) {
+            int driveNum = dir->d_name[2] - 'a' + 1;
+            if (driveNum >= 1 && driveNum <= 9) {
+                snprintf(displayName, sizeof(displayName), "USB%d (%s)", driveNum, type);
+            } else {
+                snprintf(displayName, sizeof(displayName), "USB %s (%s)", dir->d_name, type);
+            }
+        } else {
+            snprintf(displayName, sizeof(displayName), "%s (%s)", dir->d_name, type);
+        }
 
         snprintf(s->AvailableStorages[s->StorageCount].Name,
-                 sizeof(s->AvailableStorages[0].Name), "%s", dir->d_name);
+                 sizeof(s->AvailableStorages[0].Name), "%s", displayName);
         snprintf(s->AvailableStorages[s->StorageCount].Path,
                  sizeof(s->AvailableStorages[0].Path), "%s", fullPath);
         strcpy(s->AvailableStorages[s->StorageCount].Type, type);
@@ -1212,6 +1228,22 @@ static int Browser_Update(Component *base) {
       s->ScrollVelocity = 0;
   }
 
+  // Strict Bounds Clamping for Cursor and ScrollOffset
+  if (totalItems > 0) {
+    if (s->ScrollOffset > totalItems - 1) s->ScrollOffset = totalItems - 1;
+    if (s->ScrollOffset < 0) s->ScrollOffset = 0;
+
+    int maxCursor = totalItems - 1 - s->ScrollOffset;
+    if (maxCursor > totalVisible - 1) maxCursor = totalVisible - 1;
+    if (maxCursor < 0) maxCursor = 0;
+
+    if (s->CursorPos > maxCursor) s->CursorPos = maxCursor;
+    if (s->CursorPos < 0) s->CursorPos = 0;
+  } else {
+    s->CursorPos = 0;
+    s->ScrollOffset = 0;
+  }
+
   // 3. Touch Kinetic Scrolling & Interactive Scrollbar Logic
   if (!s->ShowLoadPopup) {
     float maxScroll = (totalItems - totalVisible) * rowH;
@@ -1440,25 +1472,36 @@ static int Browser_Update(Component *base) {
 
       }
     } else if (s->BrowseLevel == 2) {
-      if (s->CursorPos == 5 && s->HasBothDatabases) {
+      int catIdx = s->ScrollOffset + s->CursorPos;
+      if (catIdx == 5 && s->HasBothDatabases) {
         // TOGGLE DATABASE
         s->DatabaseType = (s->DatabaseType == 0) ? 1 : 0;
         printf("[BROWSER] Switched database to %s\n",
                s->DatabaseType == 0 ? "Rekordbox" : "Serato");
         s->CurrentPlaylistIdx = -1; // Reset playlist selection on switch
         s->CursorPos = s->ScrollOffset = 0;
-        s->VisualScroll = 0;
-        s->ScrollVelocity = 0;
+        s->VisualScroll = 0.0f;
+        s->ScrollVelocity = 0.0f;
         Browser_UpdateActiveTracks(s);
-      } else if (s->CursorPos == 2) {
+      } else if (catIdx == 2) {
         s->BrowseLevel = 1; // Categories to Playlists
-      } else if (s->CursorPos == 0 || s->CursorPos == 1 || s->CursorPos == 3 || s->CursorPos == 4) {
-        s->BrowseLevel = 0; // Categories to Tracks/Folders/Search
+        s->CursorPos = s->ScrollOffset = 0;
+        s->VisualScroll = 0.0f;
+        s->ScrollVelocity = 0.0f;
+      } else if (catIdx == 4) {
+        s->IsSearching = true; // Categories to Search/OSK
+        s->ShowOSK = true;
+        s->CursorPos = s->ScrollOffset = 0;
+        s->VisualScroll = 0.0f;
+        s->ScrollVelocity = 0.0f;
+      } else {
+        s->BrowseLevel = 0; // Categories to Tracks (0: FILENAME, 1: FOLDER, 3: TRACK)
         s->CurrentPlaylistIdx = -1;
-
+        s->CursorPos = s->ScrollOffset = 0;
+        s->VisualScroll = 0.0f;
+        s->ScrollVelocity = 0.0f;
         Browser_UpdateActiveTracks(s);
       }
-      s->CursorPos = s->ScrollOffset = 0;
     } else if (s->BrowseLevel == 1) {
 
       int idx = s->ScrollOffset + s->CursorPos;
@@ -1871,18 +1914,8 @@ static int Browser_Update(Component *base) {
     }
   }
 
-  if (!s->IsSearching && (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_ESCAPE)) &&
-      !s->ShowLoadPopup) {
-    if (s->BrowseLevel == 0) {
-      if (s->CurrentPlaylistIdx >= 0)
-        s->BrowseLevel = 1;
-      else
-        s->BrowseLevel = 2;
-    } else if (s->BrowseLevel == 1)
-      s->BrowseLevel = 2;
-    else if (s->BrowseLevel == 2)
-      s->BrowseLevel = 3;
-    s->CursorPos = s->ScrollOffset = 0;
+  if ((IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_ESCAPE))) {
+    Browser_Back(s);
   }
 
   return 0;
