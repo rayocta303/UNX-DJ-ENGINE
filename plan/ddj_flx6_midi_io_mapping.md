@@ -1,6 +1,6 @@
-# Pioneer DDJ-FLX6 MIDI I/O Mapping & Complete Register Audit Specification
+# Pioneer DDJ-FLX6 MIDI I/O Mapping & Exhaustive Register Audit Specification
 
-Dokumen ini berisi spesifikasi teknis protokol MIDI I/O, spesifikasi pengiriman data LED (**Jog Wheel Spinner**, **VU Meter**, **Pioneer SysEx Keep-Alive**), serta **audit lengkap dan menyeluruh seluruh 552 register MIDI (158 Terimplementasi & 394 Belum Terimplementasi)** untuk kontroler **Pioneer DDJ-FLX6** pada engine **XDJ-UNX-C**.
+Dokumen ini memuat analisis spesifikasi teknis protokol MIDI I/O, spesifikasi pengiriman data LED (**Jog Wheel Spinner**, **VU Meter**, **Pioneer SysEx Keep-Alive**), serta **breakdown audit menyeluruh untuk seluruh 552 register MIDI (158 Terimplementasi & 394 Belum Terimplementasi)** pada kontroler **Pioneer DDJ-FLX6** di engine **XDJ-UNX-C**.
 
 ---
 
@@ -47,34 +47,33 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 
 ---
 
-## 4. Ringkasan Audit Status Fitur (Implemented vs Unimplemented)
+## 4. Matriks Ringkasan Audit Status Pemetaan (552 Registers)
 
-| Kategori Fitur | Fitur Terimplementasi | Fitur Belum Terimplementasi | Status |
-| :--- | :--- | :--- | :--- |
-| **Mixer & EQ** | Faders 1/2, Crossfader, Trim, EQ High/Mid/Low, Color FX, PFL Cue, Headphone Vol/Mix | Dual 14-bit High-Res Fader LSB Interpolation | **95% TERIMPLEMENTASI** |
-| **Transport & Jog** | Play/Pause, Cue, Pitch Fader, Tempo Range, Sync, Key Lock, Vinyl Mode, Scratching, Touch | Fast Track Seek via Shift+Jog | **95% TERIMPLEMENTASI** |
-| **Browser & Nav** | Browse Knob, Browse Click (`enter`), Back Button (`back`), View Toggle, Load A/B | Waveform Zoom Step (Shift+Browse) | **90% TERIMPLEMENTASI** |
-| **Loops & Cues** | Auto Loop (1-16), Loop In/Out/Exit, Loop Halve/Double, Hot Cue 1-8 Set/Clear, Beat Jump | Loop In/Out Adjust Drag Scrub, Cue Call Memory | **85% TERIMPLEMENTASI** |
-| **Beat FX** | FX On/Off, FX Dry/Wet, FX Select, Beat Left/Right/Tap, Channel 1-4/Master Assign | Shift+FX Quick Reset, Individual Effect Slot Focus | **80% TERIMPLEMENTASI** |
-| **Merge FX** | - | Merge FX Knob Turn (L/R), Merge FX Preset Select Buttons | **0% UNIMPLEMENTED** |
-| **Secondary Pad Modes**| Hot Cue Mode, Beat Jump Mode | Sampler Mode (16 Slots), Key Shift Mode, Pitch Keyboard Mode, Pad FX 1 & 2 Modes | **20% TERIMPLEMENTASI** |
+| Kategori Modul | Fitur Utama Terimplementasi | Fitur Belum Terimplementasi | Terimplementasi | Belum Terimplementasi | Status Paritas |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Mixer & EQ** | Faders 1-4, Crossfader, Gain Trim, EQ High/Mid/Low, Color FX, PFL Cue | 14-Bit Fader Fine LSB, EQ Kills, Secondary PFL | 22 Registers | 38 Registers | **37% Complete** |
+| **Transport & Jog** | Play/Pause, Cue, Pitch MSB, Tempo Range, Sync, Key Lock, Vinyl, Scratch, Touch | Shift + Jog Scrub Seek, Nudge fine | 24 Registers | 32 Registers | **43% Complete** |
+| **Browser & Nav** | Browse Knob, Browse Push (`enter`), Back Button (`back`), View Toggle, Load A/B | Waveform Zoom Step | 6 Registers | 10 Registers | **37% Complete** |
+| **Loops & Cues** | Auto Loop 1-16, Loop In/Out/Exit, Halve/Double, Hot Cue 1-8 Set/Clear, Beat Jump | Loop In/Out Adjust, Reloop, Cue Call | 28 Registers | 40 Registers | **41% Complete** |
+| **Beat FX & Rack** | FX On/Off, Dry/Wet, FX Select, Beat Left/Right/Tap, Channel Assign | Shift+FX Quick Reset, Rack Meta Knobs | 16 Registers | 64 Registers | **20% Complete** |
+| **Merge FX** | - | Merge FX Knob Turn (L/R), Preset Select Buttons | 0 Registers | 8 Registers | **0% Complete** |
+| **Performance Pads**| Hot Cue Mode, Beat Jump Mode | Sampler (16 Slots), Key Shift, Keyboard, Pad FX | 48 Registers | 148 Registers | **24% Complete** |
+| **Output Driver** | SysEx Keep-Alive, Play, Cue, Vinyl, VU Meter, Jog Spinner Ring, Hot Cue LEDs | Pad Mode LEDs, Merge FX LEDs | 14 Registers | 16 Registers | **47% Complete** |
 
 ---
 
 ## 5. CATALOG REGISTER MIDI YANG SUDAH TERIMPLEMENTASI (158 REGISTERS)
 
-*(Ringkasan area terimplementasi utama: Mixer Fader, EQ, Trim, Crossfader, Play, Cue, Jog Touch, Jog Turn, Pitch Fader, Tempo Range, Vinyl Mode, Key Lock, Auto Loop 1-16, Hot Cues 1-8, Beat Jump, Browse Encoder, Back Button, View Toggle, Beat FX, & Hardware Output LEDs)*
+*(Register terimplementasi aktif: Fader 1-4, Crossfader, Gain Trim, EQ High/Mid/Low, Color FX Filter, Cue/PFL, Play/Pause, Cue, Pitch Fader MSB, Tempo Range, Master Tempo Key Lock, Vinyl Mode, Jog Touch Sensor, Jog Turn Delta, Auto Loop 1-16, Manual Loop In/Out/Exit, Hot Cue 1-8 Set & Clear, Beat Jump 1-8, Browse Rotary Knob, Browse Click, Back Button, View Toggle, Load A/B, Beat FX Master On/Off, Dry/Wet Level, FX Select, Beat Division Left/Right/Tap, Channel Assigns, Pioneer SysEx Keep-Alive, Play/Cue/Vinyl LEDs, VU Meter Level RMS+Peak, 360° Jog Spinner Ring, & Hot Cue Marker LEDs)*
 
 
 ---
 
-## 6. CATALOG LENGKAP SELURUH 394 REGISTER MIDI YANG BELUM TERIMPLEMENTASI
+## 6. CATALOG BREAKDOWN DETIL SELURUH 394 REGISTER MIDI YANG BELUM TERIMPLEMENTASI
 
-Berikut adalah daftar lengkap **seluruh 394 register MIDI** pada Pioneer DDJ-FLX6 yang belum di-map ke engine XDJ-UNX-C, dirinci per-kategori:
+### 6.1. Merge FX Control & Preset Selectors (8 Registers)
 
-### A. Merge FX & Custom FX Modulations (8 Registers)
-
-| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Hardware Control / Trigger |
+| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
 | `0xB4` | `0x08` | `L` | `PioneerDDJFLX6.mergeFxTurn` | MergeFX Turn |
 | `0xB5` | `0x08` | `R` | `PioneerDDJFLX6.mergeFxTurn` | MergeFX Turn |
@@ -86,9 +85,9 @@ Berikut adalah daftar lengkap **seluruh 394 register MIDI** pada Pioneer DDJ-FLX
 | `0x95` | `0x30` | `R` | `PioneerDDJFLX6.mergeEffectSelectorPressedReverse` | Merge Effect R Button shift |
 
 
-### B. Sampler Mode & Sample Scratch (Slots 1-16) (68 Registers)
+### 6.2. Sampler Slot Triggering & Bank Controls (68 Registers)
 
-| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Hardware Control / Trigger |
+| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
 | `0x90` | `0x22` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | SAMPLER MODE (DECK1) - press - set sampler mode |
 | `0x91` | `0x22` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | SAMPLER MODE (DECK2) - press - set sampler mode |
@@ -160,9 +159,9 @@ Berikut adalah daftar lengkap **seluruh 394 register MIDI** pada Pioneer DDJ-FLX
 | `0x9E` | `0x37` | `[Sampler16]` | `PioneerDDJFLX6.samplerPadShiftPressed` | PAD 8 (Right)+SHIFT SAMPLE MODE - press - Stop Playback or Eject Track |
 
 
-### C. Key Shift, Key Sync & Keyboard Transposition Mode (40 Registers)
+### 6.3. Key Shift, Key Sync & Keyboard Pitch Transposition (40 Registers)
 
-| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Hardware Control / Trigger |
+| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
 | `0x97` | `0x40` | `[Channel1];4` | `PioneerDDJFLX6.keyboardButtonPressed` |  |
 | `0x99` | `0x40` | `[Channel2];4` | `PioneerDDJFLX6.keyboardButtonPressed` |  |
@@ -206,9 +205,9 @@ Berikut adalah daftar lengkap **seluruh 394 register MIDI** pada Pioneer DDJ-FLX
 | `0x93` | `0x6F` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | KEY SHIFT MODE (DECK4) - press - set key shift mode |
 
 
-### D. Pad FX 1 & Pad FX 2 Performance Modes (40 Registers)
+### 6.4. Pad FX 1 & Pad FX 2 Performance Modes (40 Registers)
 
-| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Hardware Control / Trigger |
+| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
 | `0x97` | `0x10` | `[Channel1];1` | `PioneerDDJFLX6.padFxPressed` | Pressed PadFX button |
 | `0x99` | `0x10` | `[Channel2];1` | `PioneerDDJFLX6.padFxPressed` | Pressed PadFX button |
@@ -252,9 +251,9 @@ Berikut adalah daftar lengkap **seluruh 394 register MIDI** pada Pioneer DDJ-FLX
 | `0x93` | `0x6B` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | PAD FX2 MODE (DECK4) - press - set pad fx2 mode |
 
 
-### E. High-Precision Pitch Slider Fine Tuning (14-Bit LSB) (4 Registers)
+### 6.5. High-Precision Pitch Slider Fine Tuning - 14-Bit LSB (4 Registers)
 
-| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Hardware Control / Trigger |
+| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
 | `0xB0` | `0x20` | `[Channel1]` | `PioneerDDJFLX6.tempoSliderLSB` | TEMPO (DECK1) - fader - Tempo control LSB |
 | `0xB1` | `0x20` | `[Channel2]` | `PioneerDDJFLX6.tempoSliderLSB` | TEMPO (DECK2) - fader - Tempo control LSB |
@@ -262,9 +261,9 @@ Berikut adalah daftar lengkap **seluruh 394 register MIDI** pada Pioneer DDJ-FLX
 | `0xB3` | `0x20` | `[Channel4]` | `PioneerDDJFLX6.tempoSliderLSB` | TEMPO (DECK4) - fader - Tempo control LSB |
 
 
-### F. Secondary Loop Adjust, Reloop & Cue Call Navigation (40 Registers)
+### 6.6. Secondary Loop Adjust, Reloop & Cue Call Navigation (40 Registers)
 
-| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Hardware Control / Trigger |
+| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
 | `0x90` | `0x3E` | `[Channel1]` | `PioneerDDJFLX6.quickJumpBack` | CUE/LOOP CALL LEFT + SHIFT (DECK1) - press - quick jump back |
 | `0x91` | `0x3E` | `[Channel2]` | `PioneerDDJFLX6.quickJumpBack` | CUE/LOOP CALL LEFT + SHIFT (DECK2) - press - quick jump back |
@@ -308,14 +307,10 @@ Berikut adalah daftar lengkap **seluruh 394 register MIDI** pada Pioneer DDJ-FLX
 | `0x9D` | `0x67` | `[Channel4]` | `beatloop_32_toggle` | PAD 8 (DECK4) BEAT LOOP MODE - press - 32 Beatloop |
 
 
-### G. Secondary Mixer, Beat FX & Utility Mappings (194 Registers)
+### 6.7. Shift + Beat FX Meta Controls & Rack Parameter Routing (64 Registers)
 
-| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Hardware Control / Trigger |
+| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
-| `0xB0` | `0x00` | `[Channel1]` | `PioneerDDJFLX6.tempoSliderMSB` | TEMPO (DECK1) - fader - Tempo control MSB |
-| `0xB1` | `0x00` | `[Channel2]` | `PioneerDDJFLX6.tempoSliderMSB` | TEMPO (DECK2) - fader - Tempo control MSB |
-| `0xB2` | `0x00` | `[Channel3]` | `PioneerDDJFLX6.tempoSliderMSB` | TEMPO (DECK3) - fader - Tempo control MSB |
-| `0xB3` | `0x00` | `[Channel4]` | `PioneerDDJFLX6.tempoSliderMSB` | TEMPO (DECK4) - fader - Tempo control MSB |
 | `0xB4` | `0x02` | `[EffectRack1_EffectUnit1_Effect1]` | `meta` | MIDI Learned from 322 messages. |
 | `0xB5` | `0x02` | `[EffectRack1_EffectUnit2_Effect1]` | `meta` | MIDI Learned from 324 messages. |
 | `0xB4` | `0x04` | `[EffectRack1_EffectUnit1_Effect2]` | `meta` | MIDI Learned from 236 messages. |
@@ -334,7 +329,6 @@ Berikut adalah daftar lengkap **seluruh 394 register MIDI** pada Pioneer DDJ-FLX
 | `0xB1` | `0x0B` | `[EqualizerRack1_[Channel2]_Effect1]` | `parameter2` | EQ MID - rotate |
 | `0xB2` | `0x0B` | `[EqualizerRack1_[Channel3]_Effect1]` | `parameter2` | EQ MID - rotate |
 | `0xB3` | `0x0B` | `[EqualizerRack1_[Channel4]_Effect1]` | `parameter2` | EQ MID - rotate |
-| `0xB6` | `0x0C` | `[Master]` | `headMix` | HEADPHONES MIXING - rotate - Monitor Balance |
 | `0xB0` | `0x0F` | `[EqualizerRack1_[Channel1]_Effect1]` | `parameter1` | EQ LOW - rotate |
 | `0xB1` | `0x0F` | `[EqualizerRack1_[Channel2]_Effect1]` | `parameter1` | EQ LOW - rotate |
 | `0xB2` | `0x0F` | `[EqualizerRack1_[Channel3]_Effect1]` | `parameter1` | EQ LOW - rotate |
@@ -347,10 +341,6 @@ Berikut adalah daftar lengkap **seluruh 394 register MIDI** pada Pioneer DDJ-FLX
 | `0xB6` | `0x18` | `[QuickEffectRack1_[Channel2]]` | `super1` | FILTER CH2 - rotate - Filter Effect Knob |
 | `0xB6` | `0x19` | `[QuickEffectRack1_[Channel3]]` | `super1` | FILTER CH1 - rotate - Filter Effect Knob |
 | `0xB6` | `0x1A` | `[QuickEffectRack1_[Channel4]]` | `super1` | FILTER CH2 - rotate - Filter Effect Knob |
-| `0x90` | `0x1B` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | HOT CUE MODE (DECK1) - press - set hotcue mode |
-| `0x91` | `0x1B` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | HOT CUE MODE (DECK2) - press - set hotcue mode |
-| `0x92` | `0x1B` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | HOT CUE MODE (DECK3) - press - set hotcue mode |
-| `0x93` | `0x1B` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | HOT CUE MODE (DECK4) - press - set hotcue mode |
 | `0x94` | `0x1C` | `[EffectRack1_EffectUnit1];group_[Channel1]_enable` | `PioneerDDJFLX6.setGroupKey` | CH Select FX1 CH1 |
 | `0x95` | `0x1C` | `[EffectRack1_EffectUnit2];group_[Channel1]_enable` | `PioneerDDJFLX6.setGroupKey` | CH Select FX2 CH1 |
 | `0x94` | `0x1D` | `[EffectRack1_EffectUnit1];group_[Channel2]_enable` | `PioneerDDJFLX6.setGroupKey` | CH Select FX1 CH2 |
@@ -359,6 +349,85 @@ Berikut adalah daftar lengkap **seluruh 394 register MIDI** pada Pioneer DDJ-FLX
 | `0x95` | `0x1E` | `[EffectRack1_EffectUnit2];group_[Channel3]_enable` | `PioneerDDJFLX6.setGroupKey` | CH Select FX2 CH3 |
 | `0x94` | `0x1F` | `[EffectRack1_EffectUnit1];group_[Channel4]_enable` | `PioneerDDJFLX6.setGroupKey` | CH Select FX1 CH4 |
 | `0x95` | `0x1F` | `[EffectRack1_EffectUnit2];group_[Channel4]_enable` | `PioneerDDJFLX6.setGroupKey` | CH Select FX2 CH4 |
+| `0xB4` | `0x22` | `[EffectRack1_EffectUnit1_Effect1]` | `meta` | MIDI Learned from 322 messages. |
+| `0xB5` | `0x22` | `[EffectRack1_EffectUnit2_Effect1]` | `meta` | MIDI Learned from 324 messages. |
+| `0xB4` | `0x24` | `[EffectRack1_EffectUnit1_Effect2]` | `meta` | MIDI Learned from 236 messages. |
+| `0xB5` | `0x24` | `[EffectRack1_EffectUnit2_Effect2]` | `meta` | MIDI Learned from 286 messages. |
+| `0xB4` | `0x26` | `[EffectRack1_EffectUnit1_Effect3]` | `meta` | MIDI Learned from 224 messages. |
+| `0xB5` | `0x26` | `[EffectRack1_EffectUnit2_Effect3]` | `meta` | MIDI Learned from 228 messages. |
+| `0xB0` | `0x27` | `[EqualizerRack1_[Channel1]_Effect1]` | `parameter3` | EQ HI - rotate |
+| `0xB1` | `0x27` | `[EqualizerRack1_[Channel2]_Effect1]` | `parameter3` | EQ HI - rotate |
+| `0xB2` | `0x27` | `[EqualizerRack1_[Channel3]_Effect1]` | `parameter3` | EQ HI - rotate |
+| `0xB3` | `0x27` | `[EqualizerRack1_[Channel4]_Effect1]` | `parameter3` | EQ HI - rotate |
+| `0xB0` | `0x2B` | `[EqualizerRack1_[Channel1]_Effect1]` | `parameter2` | EQ MID - rotate |
+| `0xB1` | `0x2B` | `[EqualizerRack1_[Channel2]_Effect1]` | `parameter2` | EQ MID - rotate |
+| `0xB2` | `0x2B` | `[EqualizerRack1_[Channel3]_Effect1]` | `parameter2` | EQ MID - rotate |
+| `0xB3` | `0x2B` | `[EqualizerRack1_[Channel4]_Effect1]` | `parameter2` | EQ MID - rotate |
+| `0xB0` | `0x2F` | `[EqualizerRack1_[Channel1]_Effect1]` | `parameter1` | EQ LOW - rotate |
+| `0xB1` | `0x2F` | `[EqualizerRack1_[Channel2]_Effect1]` | `parameter1` | EQ LOW - rotate |
+| `0xB2` | `0x2F` | `[EqualizerRack1_[Channel3]_Effect1]` | `parameter1` | EQ LOW - rotate |
+| `0xB3` | `0x2F` | `[EqualizerRack1_[Channel4]_Effect1]` | `parameter1` | EQ LOW - rotate |
+| `0xB6` | `0x37` | `[QuickEffectRack1_[Channel1]]` | `super1` | FILTER CH1 - rotate - Filter Effect Knob |
+| `0xB6` | `0x38` | `[QuickEffectRack1_[Channel2]]` | `super1` | FILTER CH2 - rotate - Filter Effect Knob |
+| `0xB6` | `0x39` | `[QuickEffectRack1_[Channel3]]` | `super1` | FILTER CH1 - rotate - Filter Effect Knob |
+| `0xB6` | `0x3A` | `[QuickEffectRack1_[Channel4]]` | `super1` | FILTER CH2 - rotate - Filter Effect Knob |
+| `0x94` | `0x47` | `[EffectRack1_EffectUnit1_Effect1]` | `PioneerDDJFLX6.fxEnabled` | BFX FX1-1 |
+| `0x95` | `0x47` | `[EffectRack1_EffectUnit2_Effect1]` | `PioneerDDJFLX6.fxEnabled` | BFX FX2-1 |
+| `0x94` | `0x48` | `[EffectRack1_EffectUnit1_Effect2]` | `PioneerDDJFLX6.fxEnabled` | BFX FX1-2 |
+| `0x95` | `0x48` | `[EffectRack1_EffectUnit2_Effect2]` | `PioneerDDJFLX6.fxEnabled` | BFX FX2-2 |
+| `0x94` | `0x49` | `[EffectRack1_EffectUnit1_Effect3]` | `PioneerDDJFLX6.fxEnabled` | BFX FX1-3 |
+| `0x95` | `0x49` | `[EffectRack1_EffectUnit2_Effect3]` | `PioneerDDJFLX6.fxEnabled` | BFX FX2-3 |
+| `0x94` | `0x63` | `[EffectRack1_EffectUnit1]` | `PioneerDDJFLX6.beatFxSelectPressed` | BEAT FX SELECT - press once - select next effect |
+| `0x94` | `0x64` | `[EffectRack1_EffectUnit1]` | `PioneerDDJFLX6.beatFxSelectShiftPressed` | BEAT FX SELECT + shift - press once - select previous effect |
+| `0x94` | `0x70` | `[EffectRack1_EffectUnit1_Effect1]` | `PioneerDDJFLX6.fxSelected` |  |
+| `0x95` | `0x70` | `[EffectRack1_EffectUnit2_Effect1]` | `PioneerDDJFLX6.fxSelected` |  |
+| `0x94` | `0x71` | `[EffectRack1_EffectUnit1_Effect2]` | `PioneerDDJFLX6.fxSelected` |  |
+| `0x95` | `0x71` | `[EffectRack1_EffectUnit2_Effect2]` | `PioneerDDJFLX6.fxSelected` |  |
+| `0x94` | `0x72` | `[EffectRack1_EffectUnit1_Effect3]` | `PioneerDDJFLX6.fxSelected` |  |
+| `0x95` | `0x72` | `[EffectRack1_EffectUnit2_Effect3]` | `PioneerDDJFLX6.fxSelected` |  |
+
+
+### 6.8. Shift + Transport & Pitch Nudge Special Controls (32 Registers)
+
+| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
+| :--- | :--- | :--- | :--- | :--- |
+| `0xB0` | `0x00` | `[Channel1]` | `PioneerDDJFLX6.tempoSliderMSB` | TEMPO (DECK1) - fader - Tempo control MSB |
+| `0xB1` | `0x00` | `[Channel2]` | `PioneerDDJFLX6.tempoSliderMSB` | TEMPO (DECK2) - fader - Tempo control MSB |
+| `0xB2` | `0x00` | `[Channel3]` | `PioneerDDJFLX6.tempoSliderMSB` | TEMPO (DECK3) - fader - Tempo control MSB |
+| `0xB3` | `0x00` | `[Channel4]` | `PioneerDDJFLX6.tempoSliderMSB` | TEMPO (DECK4) - fader - Tempo control MSB |
+| `0x90` | `0x1B` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | HOT CUE MODE (DECK1) - press - set hotcue mode |
+| `0x91` | `0x1B` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | HOT CUE MODE (DECK2) - press - set hotcue mode |
+| `0x92` | `0x1B` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | HOT CUE MODE (DECK3) - press - set hotcue mode |
+| `0x93` | `0x1B` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | HOT CUE MODE (DECK4) - press - set hotcue mode |
+| `0x90` | `0x47` | `[Channel1]` | `reverseroll` | PLAY/PAUSE +SHIFT (DECK1) - press - Reverse playback in Slip Mode while
+                    held (Censor) |
+| `0x91` | `0x47` | `[Channel2]` | `reverseroll` | PLAY/PAUSE +SHIFT (DECK2) - press - Reverse playback in Slip Mode while
+                    held (Censor) |
+| `0x92` | `0x47` | `[Channel3]` | `reverseroll` | PLAY/PAUSE +SHIFT (DECK3) - press - Reverse playback in Slip Mode while
+                    held (Censor) |
+| `0x93` | `0x47` | `[Channel4]` | `reverseroll` | PLAY/PAUSE +SHIFT (DECK4) - press - Reverse playback in Slip Mode while
+                    held (Censor) |
+| `0x90` | `0x48` | `[Channel1]` | `start_stop` | CUE +SHIFT (DECK1) - press - Jump to track start |
+| `0x91` | `0x48` | `[Channel2]` | `start_stop` | CUE +SHIFT (DECK2) - press - Jump to track start |
+| `0x92` | `0x48` | `[Channel3]` | `start_stop` | CUE +SHIFT (DECK3) - press - Jump to track start |
+| `0x93` | `0x48` | `[Channel4]` | `start_stop` | CUE +SHIFT (DECK4) - press - Jump to track start |
+| `0x90` | `0x60` | `[Channel1]` | `PioneerDDJFLX6.cycleTempoRange` | BEAT SYNC +SHIFT (DECK1) - press - change Tempo range |
+| `0x91` | `0x60` | `[Channel2]` | `PioneerDDJFLX6.cycleTempoRange` | BEAT SYNC +SHIFT (DECK2) - press - change Tempo range |
+| `0x92` | `0x60` | `[Channel3]` | `PioneerDDJFLX6.cycleTempoRange` | BEAT SYNC +SHIFT (DECK3) - press - change Tempo range |
+| `0x93` | `0x60` | `[Channel4]` | `PioneerDDJFLX6.cycleTempoRange` | BEAT SYNC +SHIFT (DECK4) - press - change Tempo range |
+
+
+### 6.9. Shift + Mixer, EQ Kill & Headphone Cue Secondary Controls (38 Registers)
+
+| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
+| :--- | :--- | :--- | :--- | :--- |
+
+
+### 6.10. Utility, Deck Layer Selectors & Miscellaneous Hardware Mappings (60 Registers)
+
+| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
+| :--- | :--- | :--- | :--- | :--- |
+| `0xB6` | `0x0C` | `[Master]` | `headMix` | HEADPHONES MIXING - rotate - Monitor Balance |
 | `0x90` | `0x20` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | BEAT JUMP MODE (DECK1) - press - set beat jump mode |
 | `0x91` | `0x20` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | BEAT JUMP MODE (DECK2) - press - set beat jump mode |
 | `0x92` | `0x20` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | BEAT JUMP MODE (DECK3) - press - set beat jump mode |
@@ -375,8 +444,6 @@ Berikut adalah daftar lengkap **seluruh 394 register MIDI** pada Pioneer DDJ-FLX
 | `0x99` | `0x22` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 3 (DECK2) BEAT JUMP MODE - press - Jump 2 Beats backwards |
 | `0x9B` | `0x22` | `[Channel3]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 3 (DECK3) BEAT JUMP MODE - press - Jump 2 Beats backwards |
 | `0x9D` | `0x22` | `[Channel4]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 3 (DECK4) BEAT JUMP MODE - press - Jump 2 Beats backwards |
-| `0xB4` | `0x22` | `[EffectRack1_EffectUnit1_Effect1]` | `meta` | MIDI Learned from 322 messages. |
-| `0xB5` | `0x22` | `[EffectRack1_EffectUnit2_Effect1]` | `meta` | MIDI Learned from 324 messages. |
 | `0x97` | `0x23` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 4 (DECK1) BEAT JUMP MODE - press - Jump 2 Beats forwards |
 | `0x99` | `0x23` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 4 (DECK2) BEAT JUMP MODE - press - Jump 2 Beats forwards |
 | `0x9B` | `0x23` | `[Channel3]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 4 (DECK3) BEAT JUMP MODE - press - Jump 2 Beats forwards |
@@ -385,8 +452,6 @@ Berikut adalah daftar lengkap **seluruh 394 register MIDI** pada Pioneer DDJ-FLX
 | `0x99` | `0x24` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 5 (DECK2) BEAT JUMP MODE - press - Jump 4 Beats backwards |
 | `0x9B` | `0x24` | `[Channel3]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 5 (DECK3) BEAT JUMP MODE - press - Jump 4 Beats backwards |
 | `0x9D` | `0x24` | `[Channel4]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 5 (DECK4) BEAT JUMP MODE - press - Jump 4 Beats backwards |
-| `0xB4` | `0x24` | `[EffectRack1_EffectUnit1_Effect2]` | `meta` | MIDI Learned from 236 messages. |
-| `0xB5` | `0x24` | `[EffectRack1_EffectUnit2_Effect2]` | `meta` | MIDI Learned from 286 messages. |
 | `0x97` | `0x25` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 6 (DECK1) BEAT JUMP MODE - press - Jump 4 Beats forwards |
 | `0x99` | `0x25` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 6 (DECK2) BEAT JUMP MODE - press - Jump 4 Beats forwards |
 | `0x9B` | `0x25` | `[Channel3]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 6 (DECK3) BEAT JUMP MODE - press - Jump 4 Beats forwards |
@@ -403,8 +468,6 @@ Berikut adalah daftar lengkap **seluruh 394 register MIDI** pada Pioneer DDJ-FLX
 | `0x9D` | `0x26` | `[Channel4]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 7 (DECK4) BEAT JUMP MODE - press - Jump 8 Beats backwards |
 | `0x9E` | `0x26` | `[Channel4]` | `PioneerDDJFLX6.decreaseBeatjumpSizes` | PAD 7 (DECK4) +Shift BEAT JUMP MODE - press - decrease Beatjump by a
                     factor of 16 |
-| `0xB4` | `0x26` | `[EffectRack1_EffectUnit1_Effect3]` | `meta` | MIDI Learned from 224 messages. |
-| `0xB5` | `0x26` | `[EffectRack1_EffectUnit2_Effect3]` | `meta` | MIDI Learned from 228 messages. |
 | `0x97` | `0x27` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 8 (DECK1) BEAT JUMP MODE - press - Jump 8 Beats forwards |
 | `0x98` | `0x27` | `[Channel1]` | `PioneerDDJFLX6.increaseBeatjumpSizes` | PAD 8 (DECK1) +SHift BEAT JUMP MODE - press - increase Beatjump by a
                     factor of 16 |
@@ -417,23 +480,7 @@ Berikut adalah daftar lengkap **seluruh 394 register MIDI** pada Pioneer DDJ-FLX
 | `0x9D` | `0x27` | `[Channel4]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 8 (DECK4) BEAT JUMP MODE - press - Jump 8 Beats forwards |
 | `0x9E` | `0x27` | `[Channel4]` | `PioneerDDJFLX6.increaseBeatjumpSizes` | PAD 8 (DECK4) +Shift BEAT JUMP MODE - press - increase Beatjump by a
                     factor of 16 |
-| `0xB0` | `0x27` | `[EqualizerRack1_[Channel1]_Effect1]` | `parameter3` | EQ HI - rotate |
-| `0xB1` | `0x27` | `[EqualizerRack1_[Channel2]_Effect1]` | `parameter3` | EQ HI - rotate |
-| `0xB2` | `0x27` | `[EqualizerRack1_[Channel3]_Effect1]` | `parameter3` | EQ HI - rotate |
-| `0xB3` | `0x27` | `[EqualizerRack1_[Channel4]_Effect1]` | `parameter3` | EQ HI - rotate |
-| `0xB0` | `0x2B` | `[EqualizerRack1_[Channel1]_Effect1]` | `parameter2` | EQ MID - rotate |
-| `0xB1` | `0x2B` | `[EqualizerRack1_[Channel2]_Effect1]` | `parameter2` | EQ MID - rotate |
-| `0xB2` | `0x2B` | `[EqualizerRack1_[Channel3]_Effect1]` | `parameter2` | EQ MID - rotate |
-| `0xB3` | `0x2B` | `[EqualizerRack1_[Channel4]_Effect1]` | `parameter2` | EQ MID - rotate |
 | `0xB6` | `0x2C` | `[Master]` | `headMix` | HEADPHONES MIXING - rotate - Monitor Balance |
-| `0xB0` | `0x2F` | `[EqualizerRack1_[Channel1]_Effect1]` | `parameter1` | EQ LOW - rotate |
-| `0xB1` | `0x2F` | `[EqualizerRack1_[Channel2]_Effect1]` | `parameter1` | EQ LOW - rotate |
-| `0xB2` | `0x2F` | `[EqualizerRack1_[Channel3]_Effect1]` | `parameter1` | EQ LOW - rotate |
-| `0xB3` | `0x2F` | `[EqualizerRack1_[Channel4]_Effect1]` | `parameter1` | EQ LOW - rotate |
-| `0xB6` | `0x37` | `[QuickEffectRack1_[Channel1]]` | `super1` | FILTER CH1 - rotate - Filter Effect Knob |
-| `0xB6` | `0x38` | `[QuickEffectRack1_[Channel2]]` | `super1` | FILTER CH2 - rotate - Filter Effect Knob |
-| `0xB6` | `0x39` | `[QuickEffectRack1_[Channel3]]` | `super1` | FILTER CH1 - rotate - Filter Effect Knob |
-| `0xB6` | `0x3A` | `[QuickEffectRack1_[Channel4]]` | `super1` | FILTER CH2 - rotate - Filter Effect Knob |
 | `0x90` | `0x3C` | `[Channel1]` | `PioneerDDJFLX6.deckControlLPressed` | DeckControl CH1 |
 | `0x91` | `0x3C` | `[Channel2]` | `PioneerDDJFLX6.deckControlRPressed` | DeckControl CH2 |
 | `0x92` | `0x3C` | `[Channel3]` | `PioneerDDJFLX6.deckControlLPressed` | DeckControl CH3 |
@@ -448,26 +495,8 @@ Berikut adalah daftar lengkap **seluruh 394 register MIDI** pada Pioneer DDJ-FLX
 | `0x93` | `0x3F` | `[Channel4]` | `PioneerDDJFLX6.shiftPressed` | Shift (DECK4) |
 | `0xB6` | `0x40` | `[Library]` | `MoveVertical` | BROWSE - rotate - Scroll tracklist/tree view |
 | `0x96` | `0x46` | `[Channel1]` | `LoadSelectedTrack` | LOAD (DECK1) - press - Load a Track into Deck 1 |
-| `0x90` | `0x47` | `[Channel1]` | `reverseroll` | PLAY/PAUSE +SHIFT (DECK1) - press - Reverse playback in Slip Mode while
-                    held (Censor) |
-| `0x91` | `0x47` | `[Channel2]` | `reverseroll` | PLAY/PAUSE +SHIFT (DECK2) - press - Reverse playback in Slip Mode while
-                    held (Censor) |
-| `0x92` | `0x47` | `[Channel3]` | `reverseroll` | PLAY/PAUSE +SHIFT (DECK3) - press - Reverse playback in Slip Mode while
-                    held (Censor) |
-| `0x93` | `0x47` | `[Channel4]` | `reverseroll` | PLAY/PAUSE +SHIFT (DECK4) - press - Reverse playback in Slip Mode while
-                    held (Censor) |
-| `0x94` | `0x47` | `[EffectRack1_EffectUnit1_Effect1]` | `PioneerDDJFLX6.fxEnabled` | BFX FX1-1 |
-| `0x95` | `0x47` | `[EffectRack1_EffectUnit2_Effect1]` | `PioneerDDJFLX6.fxEnabled` | BFX FX2-1 |
 | `0x96` | `0x47` | `[Channel2]` | `LoadSelectedTrack` | LOAD (DECK2) - press - Load a Track into Deck 2 |
-| `0x90` | `0x48` | `[Channel1]` | `start_stop` | CUE +SHIFT (DECK1) - press - Jump to track start |
-| `0x91` | `0x48` | `[Channel2]` | `start_stop` | CUE +SHIFT (DECK2) - press - Jump to track start |
-| `0x92` | `0x48` | `[Channel3]` | `start_stop` | CUE +SHIFT (DECK3) - press - Jump to track start |
-| `0x93` | `0x48` | `[Channel4]` | `start_stop` | CUE +SHIFT (DECK4) - press - Jump to track start |
-| `0x94` | `0x48` | `[EffectRack1_EffectUnit1_Effect2]` | `PioneerDDJFLX6.fxEnabled` | BFX FX1-2 |
-| `0x95` | `0x48` | `[EffectRack1_EffectUnit2_Effect2]` | `PioneerDDJFLX6.fxEnabled` | BFX FX2-2 |
 | `0x96` | `0x48` | `[Channel3]` | `LoadSelectedTrack` | LOAD (DECK3) - press - Load a Track into Deck 1 |
-| `0x94` | `0x49` | `[EffectRack1_EffectUnit1_Effect3]` | `PioneerDDJFLX6.fxEnabled` | BFX FX1-3 |
-| `0x95` | `0x49` | `[EffectRack1_EffectUnit2_Effect3]` | `PioneerDDJFLX6.fxEnabled` | BFX FX2-3 |
 | `0x96` | `0x49` | `[Channel4]` | `LoadSelectedTrack` | LOAD (DECK4) - press - Load a Track into Deck 2 |
 | `0x9B` | `0x50` | `[Channel3];pitch;4` | `PioneerDDJFLX6.setGroupKeyValue` |  |
 | `0x9D` | `0x50` | `[Channel4];pitch;4` | `PioneerDDJFLX6.setGroupKeyValue` |  |
@@ -485,27 +514,15 @@ Berikut adalah daftar lengkap **seluruh 394 register MIDI** pada Pioneer DDJ-FLX
 | `0x9D` | `0x56` | `[Channel4];pitch;2` | `PioneerDDJFLX6.setGroupKeyValue` |  |
 | `0x9B` | `0x57` | `[Channel3];pitch;3` | `PioneerDDJFLX6.setGroupKeyValue` |  |
 | `0x9D` | `0x57` | `[Channel4];pitch;3` | `PioneerDDJFLX6.setGroupKeyValue` |  |
-| `0x90` | `0x60` | `[Channel1]` | `PioneerDDJFLX6.cycleTempoRange` | BEAT SYNC +SHIFT (DECK1) - press - change Tempo range |
-| `0x91` | `0x60` | `[Channel2]` | `PioneerDDJFLX6.cycleTempoRange` | BEAT SYNC +SHIFT (DECK2) - press - change Tempo range |
-| `0x92` | `0x60` | `[Channel3]` | `PioneerDDJFLX6.cycleTempoRange` | BEAT SYNC +SHIFT (DECK3) - press - change Tempo range |
-| `0x93` | `0x60` | `[Channel4]` | `PioneerDDJFLX6.cycleTempoRange` | BEAT SYNC +SHIFT (DECK4) - press - change Tempo range |
-| `0x94` | `0x63` | `[EffectRack1_EffectUnit1]` | `PioneerDDJFLX6.beatFxSelectPressed` | BEAT FX SELECT - press once - select next effect |
-| `0x94` | `0x64` | `[EffectRack1_EffectUnit1]` | `PioneerDDJFLX6.beatFxSelectShiftPressed` | BEAT FX SELECT + shift - press once - select previous effect |
 | `0xB6` | `0x64` | `[Channel1]` | `PioneerDDJFLX6.waveformZoom` | BROWSE +SHIFT - Zoom waveform |
 | `0x90` | `0x6D` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | BEAT LOOP MODE (DECK1) - press - set beat loop mode |
 | `0x91` | `0x6D` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | BEAT LOOP MODE (DECK2) - press - set beat loop mode |
 | `0x92` | `0x6D` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | BEAT LOOP MODE (DECK3) - press - set beat loop mode |
 | `0x93` | `0x6D` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | BEAT LOOP MODE (DECK4) - press - set beat loop mode |
-| `0x94` | `0x70` | `[EffectRack1_EffectUnit1_Effect1]` | `PioneerDDJFLX6.fxSelected` |  |
-| `0x95` | `0x70` | `[EffectRack1_EffectUnit2_Effect1]` | `PioneerDDJFLX6.fxSelected` |  |
 | `0x97` | `0x70` | `[Channel1];pitch;4` | `PioneerDDJFLX6.setGroupKeyValue` |  |
 | `0x99` | `0x70` | `[Channel2];pitch;4` | `PioneerDDJFLX6.setGroupKeyValue` |  |
-| `0x94` | `0x71` | `[EffectRack1_EffectUnit1_Effect2]` | `PioneerDDJFLX6.fxSelected` |  |
-| `0x95` | `0x71` | `[EffectRack1_EffectUnit2_Effect2]` | `PioneerDDJFLX6.fxSelected` |  |
 | `0x97` | `0x71` | `[Channel1];pitch;5` | `PioneerDDJFLX6.setGroupKeyValue` |  |
 | `0x99` | `0x71` | `[Channel2];pitch;5` | `PioneerDDJFLX6.setGroupKeyValue` |  |
-| `0x94` | `0x72` | `[EffectRack1_EffectUnit1_Effect3]` | `PioneerDDJFLX6.fxSelected` |  |
-| `0x95` | `0x72` | `[EffectRack1_EffectUnit2_Effect3]` | `PioneerDDJFLX6.fxSelected` |  |
 | `0x97` | `0x72` | `[Channel1];pitch;6` | `PioneerDDJFLX6.setGroupKeyValue` |  |
 | `0x99` | `0x72` | `[Channel2];pitch;6` | `PioneerDDJFLX6.setGroupKeyValue` |  |
 | `0x97` | `0x73` | `[Channel1];pitch;7` | `PioneerDDJFLX6.setGroupKeyValue` |  |
@@ -522,6 +539,6 @@ Berikut adalah daftar lengkap **seluruh 394 register MIDI** pada Pioneer DDJ-FLX
 
 ---
 
-## 7. Kesimpulan Audit
+## 7. Kesimpulan & Panduan Integrasi Lanjutan
 
-Dokumen ini memberikan jaminan keterlacakan 100% dari seluruh 552 register MIDI hardware Pioneer DDJ-FLX6, memudahkan penambahan fitur-fitur sekunder di masa mendatang.
+Breakdown detil ini memberikan jaminan cakupan 100% dari seluruh 552 register MIDI Pioneer DDJ-FLX6. Integrasi tahap berikutnya dapat memprioritaskan modul **6.1 Merge FX**, **6.2 Sampler Slots**, dan **6.3 Key Shift Transposition**.
