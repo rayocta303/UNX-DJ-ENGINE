@@ -26,7 +26,7 @@ static int dest_port = -1;
 
 static void LinuxMIDI_AutoConnectPorts(char *outDetectedName) {
 #ifdef HAS_ALSA
-    if (!seq_handle || dest_client >= 0) return;
+    if (!seq_handle) return;
     snd_seq_t *seq = (snd_seq_t*)seq_handle;
     snd_seq_client_info_t *cinfo;
     snd_seq_port_info_t *pinfo;
@@ -48,7 +48,7 @@ static void LinuxMIDI_AutoConnectPorts(char *outDetectedName) {
             int port = snd_seq_port_info_get_port(pinfo);
             unsigned int caps = snd_seq_port_info_get_capability(pinfo);
 
-            if ((caps & (SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ)) == (SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ)) {
+            if ((caps & SND_SEQ_PORT_CAP_READ) || (caps & SND_SEQ_PORT_CAP_SUBS_READ)) {
                 if (in_port >= 0) {
                     int err1 = snd_seq_connect_from(seq, in_port, client, port);
                     printf("[MIDI] ALSA connect_from (in_port %d <- client %d:%d): %d (%s)\n",
@@ -58,15 +58,13 @@ static void LinuxMIDI_AutoConnectPorts(char *outDetectedName) {
                     }
                 }
             }
-            if ((caps & (SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE)) == (SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE)) {
+            if ((caps & SND_SEQ_PORT_CAP_WRITE) || (caps & SND_SEQ_PORT_CAP_SUBS_WRITE)) {
                 if (out_port >= 0) {
                     int err2 = snd_seq_connect_to(seq, out_port, client, port);
                     printf("[MIDI] ALSA connect_to (out_port %d -> client %d:%d): %d (%s)\n",
                            out_port, client, port, err2, cName);
-                    if (dest_client < 0 || port == 0) {
-                        dest_client = client;
-                        dest_port = port;
-                    }
+                    dest_client = client;
+                    dest_port = port;
                 }
             }
         }
@@ -102,6 +100,10 @@ void MIDI_SendSysEx(const uint8_t *data, uint32_t length) {
         snd_seq_ev_clear(&ev);
         snd_seq_ev_set_source(&ev, out_port);
         snd_seq_ev_set_subs(&ev);
+        if (dest_client >= 0 && dest_port >= 0) {
+            ev.dest.client = (uint8_t)dest_client;
+            ev.dest.port = (uint8_t)dest_port;
+        }
         snd_seq_ev_set_direct(&ev);
         snd_seq_ev_set_sysex(&ev, length, (void*)data);
 
@@ -122,6 +124,10 @@ void MIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
         snd_seq_ev_clear(&ev);
         snd_seq_ev_set_source(&ev, out_port);
         snd_seq_ev_set_subs(&ev);
+        if (dest_client >= 0 && dest_port >= 0) {
+            ev.dest.client = (uint8_t)dest_client;
+            ev.dest.port = (uint8_t)dest_port;
+        }
         snd_seq_ev_set_direct(&ev);
 
         uint8_t type = status & 0xF0;
