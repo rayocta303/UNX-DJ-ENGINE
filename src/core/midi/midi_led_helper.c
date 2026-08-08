@@ -25,7 +25,7 @@ static void MidiLed_ResolveMappingAddresses(MidiLedCache *cache, const MidiMappi
     
     for (int i = 0; i < 4; i++) {
         MidiDeckAddresses *addr = &cache->deckAddr[i];
-        // Pioneer Default Standard MIDI Addresses (Mixxx parity)
+        // Pioneer Standard Hardware MIDI Addresses (Mixxx script parity)
         addr->playStatus    = 0x90 + i;  addr->playNote   = 0x0B;
         addr->cueStatus     = 0x90 + i;  addr->cueNote    = 0x0C;
         addr->vinylStatus   = 0x90 + i;  addr->vinylNote  = 0x0E;
@@ -79,7 +79,7 @@ uint8_t MidiLed_CalcJogPosition(double posSec) {
 }
 
 /**
- * Ported Mixxx vuMeterUpdate formula: value * 127
+ * Mixxx vuMeterUpdate formula: value * 127
  */
 uint8_t MidiLed_CalcVuLevel(float peakL, float peakR, float fader, bool isCueActive) {
     float rawPeak = (peakL > peakR) ? peakL : peakR;
@@ -110,7 +110,6 @@ void MidiLed_UpdateVUMeters(MidiLedCache *cache, DeckState *d1, DeckState *d2, A
         bool cueActive = deckState ? deckState->IsCueActive : false;
         uint8_t meterVal = MidiLed_CalcVuLevel(deckAudio->VuMeterL, deckAudio->VuMeterR, deckAudio->Fader, cueActive);
 
-        // Send ONLY on state change (differential caching for zero latency and zero bus contention)
         if (forceRefresh || meterVal != cache->lastVu[i]) {
             MIDI_SendShortMsg(vuStatus, vuControl, meterVal);
             cache->lastVu[i] = meterVal;
@@ -171,7 +170,7 @@ void MidiLed_Update(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngi
         MIDI_SendSysEx(PIONEER_SYSEX_KEEPALIVE, 12);
     }
 
-    // 5. Rate Limit for LED updates (~60 FPS / 16ms delta) to prevent thread/bus saturation
+    // 5. Rate Limit for LED updates (~60 FPS / 16ms delta)
     if (!forceRefresh && (nowTime - cache->lastSendTime < 0.016)) return;
     cache->lastSendTime = nowTime;
 
