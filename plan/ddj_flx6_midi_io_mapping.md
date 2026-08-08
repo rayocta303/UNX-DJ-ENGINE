@@ -639,62 +639,27 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 | `0x93` | `0x60` | `[Channel4]` | `PioneerDDJFLX6.cycleTempoRange` | BEAT SYNC +SHIFT (DECK4) - press - change Tempo range |
 
 
-### 6.9. Shift + Mixer, EQ Kill & Headphone Cue Secondary Controls (Total: 0 Registers)
+### 6.9. Deck 3 & Deck 4 Hardware Layer Selection Controls (Total: 44 Registers)
 
 | Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
 | :--- | :--- | :--- | :--- | :--- |
-
-
-### 6.10. Utility, Deck Layer Selectors & Miscellaneous Hardware Mappings (Total: 100 Registers)
-
-| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
-| :--- | :--- | :--- | :--- | :--- |
-| `0xB6` | `0x0C` | `[Master]` | `headMix` | HEADPHONES MIXING - rotate - Monitor Balance |
-| `0x90` | `0x20` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | BEAT JUMP MODE (DECK1) - press - set beat jump mode |
-| `0x91` | `0x20` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | BEAT JUMP MODE (DECK2) - press - set beat jump mode |
-| `0x92` | `0x20` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | BEAT JUMP MODE (DECK3) - press - set beat jump mode |
-| `0x93` | `0x20` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | BEAT JUMP MODE (DECK4) - press - set beat jump mode |
-| `0x97` | `0x20` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 1 (DECK1) BEAT JUMP MODE - press - Jump 1 Beat backwards |
-| `0x99` | `0x20` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 1 (DECK2) BEAT JUMP MODE - press - Jump 1 Beat backwards |
 | `0x9B` | `0x20` | `[Channel3]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 1 (DECK3) BEAT JUMP MODE - press - Jump 1 Beat backwards |
 | `0x9D` | `0x20` | `[Channel4]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 1 (DECK4) BEAT JUMP MODE - press - Jump 1 Beat backwards |
-| `0x97` | `0x21` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 2 (DECK1) BEAT JUMP MODE - press - Jump 1 Beat forwards |
-| `0x99` | `0x21` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 2 (DECK2) BEAT JUMP MODE - press - Jump 1 Beat forwards |
 | `0x9B` | `0x21` | `[Channel3]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 2 (DECK3) BEAT JUMP MODE - press - Jump 1 Beat forwards |
 | `0x9D` | `0x21` | `[Channel4]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 2 (DECK4) BEAT JUMP MODE - press - Jump 1 Beat forwards |
-| `0x97` | `0x22` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 3 (DECK1) BEAT JUMP MODE - press - Jump 2 Beats backwards |
-| `0x99` | `0x22` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 3 (DECK2) BEAT JUMP MODE - press - Jump 2 Beats backwards |
 | `0x9B` | `0x22` | `[Channel3]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 3 (DECK3) BEAT JUMP MODE - press - Jump 2 Beats backwards |
 | `0x9D` | `0x22` | `[Channel4]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 3 (DECK4) BEAT JUMP MODE - press - Jump 2 Beats backwards |
-| `0x97` | `0x23` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 4 (DECK1) BEAT JUMP MODE - press - Jump 2 Beats forwards |
-| `0x99` | `0x23` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 4 (DECK2) BEAT JUMP MODE - press - Jump 2 Beats forwards |
 | `0x9B` | `0x23` | `[Channel3]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 4 (DECK3) BEAT JUMP MODE - press - Jump 2 Beats forwards |
 | `0x9D` | `0x23` | `[Channel4]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 4 (DECK4) BEAT JUMP MODE - press - Jump 2 Beats forwards |
-| `0x97` | `0x24` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 5 (DECK1) BEAT JUMP MODE - press - Jump 4 Beats backwards |
-| `0x99` | `0x24` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 5 (DECK2) BEAT JUMP MODE - press - Jump 4 Beats backwards |
 | `0x9B` | `0x24` | `[Channel3]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 5 (DECK3) BEAT JUMP MODE - press - Jump 4 Beats backwards |
 | `0x9D` | `0x24` | `[Channel4]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 5 (DECK4) BEAT JUMP MODE - press - Jump 4 Beats backwards |
-| `0x97` | `0x25` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 6 (DECK1) BEAT JUMP MODE - press - Jump 4 Beats forwards |
-| `0x99` | `0x25` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 6 (DECK2) BEAT JUMP MODE - press - Jump 4 Beats forwards |
 | `0x9B` | `0x25` | `[Channel3]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 6 (DECK3) BEAT JUMP MODE - press - Jump 4 Beats forwards |
 | `0x9D` | `0x25` | `[Channel4]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 6 (DECK4) BEAT JUMP MODE - press - Jump 4 Beats forwards |
-| `0x97` | `0x26` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 7 (DECK1) BEAT JUMP MODE - press - Jump 8 Beats backwards |
-| `0x98` | `0x26` | `[Channel1]` | `PioneerDDJFLX6.decreaseBeatjumpSizes` | PAD 7 (DECK1) +SHift BEAT JUMP MODE - press - decrease Beatjump by a
-                    factor of 16 |
-| `0x99` | `0x26` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 7 (DECK2) BEAT JUMP MODE - press - Jump 8 Beats backwards |
-| `0x9A` | `0x26` | `[Channel2]` | `PioneerDDJFLX6.decreaseBeatjumpSizes` | PAD 7 (DECK2) +Shift BEAT JUMP MODE - press - decrease Beatjump by a
-                    factor of 16 |
 | `0x9B` | `0x26` | `[Channel3]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 7 (DECK3) BEAT JUMP MODE - press - Jump 8 Beats backwards |
 | `0x9C` | `0x26` | `[Channel3]` | `PioneerDDJFLX6.decreaseBeatjumpSizes` | PAD 7 (DECK3) +SHift BEAT JUMP MODE - press - decrease Beatjump by a
                     factor of 16 |
 | `0x9D` | `0x26` | `[Channel4]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 7 (DECK4) BEAT JUMP MODE - press - Jump 8 Beats backwards |
 | `0x9E` | `0x26` | `[Channel4]` | `PioneerDDJFLX6.decreaseBeatjumpSizes` | PAD 7 (DECK4) +Shift BEAT JUMP MODE - press - decrease Beatjump by a
-                    factor of 16 |
-| `0x97` | `0x27` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 8 (DECK1) BEAT JUMP MODE - press - Jump 8 Beats forwards |
-| `0x98` | `0x27` | `[Channel1]` | `PioneerDDJFLX6.increaseBeatjumpSizes` | PAD 8 (DECK1) +SHift BEAT JUMP MODE - press - increase Beatjump by a
-                    factor of 16 |
-| `0x99` | `0x27` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 8 (DECK2) BEAT JUMP MODE - press - Jump 8 Beats forwards |
-| `0x9A` | `0x27` | `[Channel2]` | `PioneerDDJFLX6.increaseBeatjumpSizes` | PAD 8 (DECK2) +Shift BEAT JUMP MODE - press - increase Beatjump by a
                     factor of 16 |
 | `0x9B` | `0x27` | `[Channel3]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 8 (DECK3) BEAT JUMP MODE - press - Jump 8 Beats forwards |
 | `0x9C` | `0x27` | `[Channel3]` | `PioneerDDJFLX6.increaseBeatjumpSizes` | PAD 8 (DECK3) +SHift BEAT JUMP MODE - press - increase Beatjump by a
@@ -702,22 +667,12 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 | `0x9D` | `0x27` | `[Channel4]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 8 (DECK4) BEAT JUMP MODE - press - Jump 8 Beats forwards |
 | `0x9E` | `0x27` | `[Channel4]` | `PioneerDDJFLX6.increaseBeatjumpSizes` | PAD 8 (DECK4) +Shift BEAT JUMP MODE - press - increase Beatjump by a
                     factor of 16 |
-| `0xB6` | `0x2C` | `[Master]` | `headMix` | HEADPHONES MIXING - rotate - Monitor Balance |
-| `0x90` | `0x3C` | `[Channel1]` | `PioneerDDJFLX6.deckControlLPressed` | DeckControl CH1 |
-| `0x91` | `0x3C` | `[Channel2]` | `PioneerDDJFLX6.deckControlRPressed` | DeckControl CH2 |
 | `0x92` | `0x3C` | `[Channel3]` | `PioneerDDJFLX6.deckControlLPressed` | DeckControl CH3 |
 | `0x93` | `0x3C` | `[Channel4]` | `PioneerDDJFLX6.deckControlRPressed` | DeckControl CH4 |
-| `0x90` | `0x3D` | `[Channel1]` | `slip_enabled` | MIDI Learned from 2 messages. |
-| `0x91` | `0x3D` | `[Channel2]` | `slip_enabled` | MIDI Learned from 10 messages. |
 | `0x92` | `0x3D` | `[Channel3]` | `slip_enabled` | MIDI Learned from 8 messages. |
 | `0x93` | `0x3D` | `[Channel4]` | `slip_enabled` | MIDI Learned from 6 messages. |
-| `0x90` | `0x3F` | `[Channel1]` | `PioneerDDJFLX6.shiftPressed` | Shift (DECK1) |
-| `0x91` | `0x3F` | `[Channel2]` | `PioneerDDJFLX6.shiftPressed` | Shift (DECK2) |
 | `0x92` | `0x3F` | `[Channel3]` | `PioneerDDJFLX6.shiftPressed` | Shift (DECK3) |
 | `0x93` | `0x3F` | `[Channel4]` | `PioneerDDJFLX6.shiftPressed` | Shift (DECK4) |
-| `0xB6` | `0x40` | `[Library]` | `MoveVertical` | BROWSE - rotate - Scroll tracklist/tree view |
-| `0x96` | `0x46` | `[Channel1]` | `LoadSelectedTrack` | LOAD (DECK1) - press - Load a Track into Deck 1 |
-| `0x96` | `0x47` | `[Channel2]` | `LoadSelectedTrack` | LOAD (DECK2) - press - Load a Track into Deck 2 |
 | `0x96` | `0x48` | `[Channel3]` | `LoadSelectedTrack` | LOAD (DECK3) - press - Load a Track into Deck 1 |
 | `0x96` | `0x49` | `[Channel4]` | `LoadSelectedTrack` | LOAD (DECK4) - press - Load a Track into Deck 2 |
 | `0x9B` | `0x50` | `[Channel3];pitch;4` | `PioneerDDJFLX6.setGroupKeyValue` |  |
@@ -736,6 +691,51 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 | `0x9D` | `0x56` | `[Channel4];pitch;2` | `PioneerDDJFLX6.setGroupKeyValue` |  |
 | `0x9B` | `0x57` | `[Channel3];pitch;3` | `PioneerDDJFLX6.setGroupKeyValue` |  |
 | `0x9D` | `0x57` | `[Channel4];pitch;3` | `PioneerDDJFLX6.setGroupKeyValue` |  |
+
+
+### 6.10. Secondary Mixer, Utility & Miscellaneous Hardware Mappings (Total: 56 Registers)
+
+| Status Byte | Midino (CC/Note) | Target Group | Mixxx Key / Function | Deskripsi Detail Trigger Hardware |
+| :--- | :--- | :--- | :--- | :--- |
+| `0xB6` | `0x0C` | `[Master]` | `headMix` | HEADPHONES MIXING - rotate - Monitor Balance |
+| `0x90` | `0x20` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | BEAT JUMP MODE (DECK1) - press - set beat jump mode |
+| `0x91` | `0x20` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | BEAT JUMP MODE (DECK2) - press - set beat jump mode |
+| `0x92` | `0x20` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | BEAT JUMP MODE (DECK3) - press - set beat jump mode |
+| `0x93` | `0x20` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | BEAT JUMP MODE (DECK4) - press - set beat jump mode |
+| `0x97` | `0x20` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 1 (DECK1) BEAT JUMP MODE - press - Jump 1 Beat backwards |
+| `0x99` | `0x20` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 1 (DECK2) BEAT JUMP MODE - press - Jump 1 Beat backwards |
+| `0x97` | `0x21` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 2 (DECK1) BEAT JUMP MODE - press - Jump 1 Beat forwards |
+| `0x99` | `0x21` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 2 (DECK2) BEAT JUMP MODE - press - Jump 1 Beat forwards |
+| `0x97` | `0x22` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 3 (DECK1) BEAT JUMP MODE - press - Jump 2 Beats backwards |
+| `0x99` | `0x22` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 3 (DECK2) BEAT JUMP MODE - press - Jump 2 Beats backwards |
+| `0x97` | `0x23` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 4 (DECK1) BEAT JUMP MODE - press - Jump 2 Beats forwards |
+| `0x99` | `0x23` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 4 (DECK2) BEAT JUMP MODE - press - Jump 2 Beats forwards |
+| `0x97` | `0x24` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 5 (DECK1) BEAT JUMP MODE - press - Jump 4 Beats backwards |
+| `0x99` | `0x24` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 5 (DECK2) BEAT JUMP MODE - press - Jump 4 Beats backwards |
+| `0x97` | `0x25` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 6 (DECK1) BEAT JUMP MODE - press - Jump 4 Beats forwards |
+| `0x99` | `0x25` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 6 (DECK2) BEAT JUMP MODE - press - Jump 4 Beats forwards |
+| `0x97` | `0x26` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 7 (DECK1) BEAT JUMP MODE - press - Jump 8 Beats backwards |
+| `0x98` | `0x26` | `[Channel1]` | `PioneerDDJFLX6.decreaseBeatjumpSizes` | PAD 7 (DECK1) +SHift BEAT JUMP MODE - press - decrease Beatjump by a
+                    factor of 16 |
+| `0x99` | `0x26` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 7 (DECK2) BEAT JUMP MODE - press - Jump 8 Beats backwards |
+| `0x9A` | `0x26` | `[Channel2]` | `PioneerDDJFLX6.decreaseBeatjumpSizes` | PAD 7 (DECK2) +Shift BEAT JUMP MODE - press - decrease Beatjump by a
+                    factor of 16 |
+| `0x97` | `0x27` | `[Channel1]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 8 (DECK1) BEAT JUMP MODE - press - Jump 8 Beats forwards |
+| `0x98` | `0x27` | `[Channel1]` | `PioneerDDJFLX6.increaseBeatjumpSizes` | PAD 8 (DECK1) +SHift BEAT JUMP MODE - press - increase Beatjump by a
+                    factor of 16 |
+| `0x99` | `0x27` | `[Channel2]` | `PioneerDDJFLX6.beatjumpPadPressed` | PAD 8 (DECK2) BEAT JUMP MODE - press - Jump 8 Beats forwards |
+| `0x9A` | `0x27` | `[Channel2]` | `PioneerDDJFLX6.increaseBeatjumpSizes` | PAD 8 (DECK2) +Shift BEAT JUMP MODE - press - increase Beatjump by a
+                    factor of 16 |
+| `0xB6` | `0x2C` | `[Master]` | `headMix` | HEADPHONES MIXING - rotate - Monitor Balance |
+| `0x90` | `0x3C` | `[Channel1]` | `PioneerDDJFLX6.deckControlLPressed` | DeckControl CH1 |
+| `0x91` | `0x3C` | `[Channel2]` | `PioneerDDJFLX6.deckControlRPressed` | DeckControl CH2 |
+| `0x90` | `0x3D` | `[Channel1]` | `slip_enabled` | MIDI Learned from 2 messages. |
+| `0x91` | `0x3D` | `[Channel2]` | `slip_enabled` | MIDI Learned from 10 messages. |
+| `0x90` | `0x3F` | `[Channel1]` | `PioneerDDJFLX6.shiftPressed` | Shift (DECK1) |
+| `0x91` | `0x3F` | `[Channel2]` | `PioneerDDJFLX6.shiftPressed` | Shift (DECK2) |
+| `0xB6` | `0x40` | `[Library]` | `MoveVertical` | BROWSE - rotate - Scroll tracklist/tree view |
+| `0x96` | `0x46` | `[Channel1]` | `LoadSelectedTrack` | LOAD (DECK1) - press - Load a Track into Deck 1 |
+| `0x96` | `0x47` | `[Channel2]` | `LoadSelectedTrack` | LOAD (DECK2) - press - Load a Track into Deck 2 |
 | `0xB6` | `0x64` | `[Channel1]` | `PioneerDDJFLX6.waveformZoom` | BROWSE +SHIFT - Zoom waveform |
 | `0x90` | `0x6D` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | BEAT LOOP MODE (DECK1) - press - set beat loop mode |
 | `0x91` | `0x6D` | `[PadMode]` | `PioneerDDJFLX6.padModeKeyPressed` | BEAT LOOP MODE (DECK2) - press - set beat loop mode |
