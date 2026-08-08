@@ -706,6 +706,25 @@ MIDI_SendShortMsg(0xBB, deckIdx, wheelPos);
 
 ---
 
-## 7. Kesimpulan & Panduan Integrasi Lanjutan
+## 7. Catatan Progress & Milestones Integrasi Terkini (Terakhir Diperbarui: 9 Agustus 2026)
 
-Dokumen ini mencatat total **559 Register MIDI** (420 Terimplementasi [No. 1 - 420] + 139 Belum Terimplementasi [No. 1 - 139]) secara presisi dengan penomoran counter ter-update.
+### 7.1. Implementasi Jogwheel Physics & Config UI (SELESAI)
+- **Modularisasi Konfigurasi Jogwheel**: Seluruh parameter fisika jogwheel dipisahkan secara modular ke `src/core/logic/jog_config.h` & `jog_config.c` dengan dukungan persitensi JSON (`jog_config.json`).
+- **Release Inertia & Backspin Physics**: Penyempurnaan logika sentuhan jogwheel (`IsTouching`) dengan efek inersia pelepasan (*release inertia*). Putaran cepat yang dilepas (*backspin* / *forward spin*) melambat secara bertahap menuju kecepatan normal 1.0x tanpa terjadinya efek *abrupt halt* / *instant freeze*.
+- **Tab Pengaturan "JOG" Pada UI (`SETTING_CAT_JOG`)**:
+  - Menambahkan tab dedicated **JOG** pada menu Settings (`settings.h` / `settings.c`).
+  - Menyediakan 13 parameter `SETTING_TYPE_KNOB` real-time (Default RPM, Ticks/Rev PPR, Vinyl Release Friction & Cutoff, Pitch Bend Friction & Cutoff, Sensitivity Scales, EMA Filter Weight, Backspin Short/Long Speed, Backspin Decay Rate).
+  - Menyediakan tombol aksi **"LOAD DEFAULT JOG SETTINGS"** (`SETTING_TYPE_ACTION`) untuk mengembalikan parameter fisika ke preset pabrik dan memperbarui UI secara langsung dengan feedback Toast notification.
+- **Sinkronisasi Real-Time**: Callback `OnSettingsValueChanged` dan `OnSettingsApply` terhubung langsung ke `g_JogConfig` dan `JogConfig_Save`, sehingga penyesuaian parameter dapat dirasakan seketika pada engine audio tanpa perlunya restart aplikasi.
+
+### 7.2. Perbaikan & Penyesuaian Logika Navigasi Browser (SELESAI)
+- **Perbaikan Bug Browsing**: Mengeliminasi bug navigasi dan pergeseran fokus pada `src/ui/browser/browser.c` & `browser.h`.
+- **Smoothing Touch & Rotary Encoder**: Menyesuaikan akumulator kinetic scrolling dan sensitivitas touchscreen drag/scrub untuk membedakan antara *tap* (pilih track) dan *swipe* (scroll daftar track).
+- **Integrasi Hardware Navigation**: Pemetaan tombol `BROWSE Knob`, `Push (enter)`, `Back`, dan `View` berjalan 100% responsif pada daftar tracklist maupun folder tree.
+
+### 7.3. Beat Sync Engine & State Machine (SELESAI)
+- **Siklus 3 Mode Sync**: Tombol hardware `SYNC` mendukun siklus state `OFF` -> `BPM Sync` -> `Beat Sync`.
+- **Pitch Bend & Phase Correction**: Algoritma pelacakan pitch bend yang halus tanpa lonjakan audio, dengan *graceful downgrade* otomatis dari Beat Sync ke BPM Sync ketika jogwheel disentuh/di-nudge.
+
+### 7.4. Ringkasan Audit Status Pemetaan Register
+Dokumen ini mencatat total **559 Register MIDI** (420 Terimplementasi [No. 1 - 420] + 139 Belum Terimplementasi [No. 1 - 139]) secara presisi dengan penomoran counter ter-update dan seluruh fitur inti hardware telah terverifikasi stabil.

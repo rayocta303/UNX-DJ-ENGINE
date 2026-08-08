@@ -249,6 +249,29 @@ void OnSettingsApply(void *ctx) {
   a->deckA.Waveform.JogCalibRPM = (a->settingsState.Items[8].Current == 1) ? 45.0f : 33.3f;
   a->deckB.Waveform = a->deckA.Waveform;
 
+  // Save/Sync JogConfig from JOG tab items
+  for (int i = 0; i < a->settingsState.ItemsCount; i++) {
+    SettingItem *item = &a->settingsState.Items[i];
+    if (item->Category != SETTING_CAT_JOG) continue;
+    if (strcmp(item->Label, "DEFAULT RPM") == 0) g_JogConfig.DefaultRPM = item->Value;
+    else if (strcmp(item->Label, "ENCODER TICKS/REV") == 0) g_JogConfig.TicksPerRev = item->Value;
+    else if (strcmp(item->Label, "VINYL RELEASE FRICTION") == 0) g_JogConfig.VinylReleaseFriction = item->Value;
+    else if (strcmp(item->Label, "VINYL RELEASE CUTOFF") == 0) g_JogConfig.VinylReleaseCutoff = item->Value;
+    else if (strcmp(item->Label, "VINYL MIN VELOCITY") == 0) g_JogConfig.VinylReleaseMinVelocity = item->Value;
+    else if (strcmp(item->Label, "PITCH BEND FRICTION") == 0) g_JogConfig.PitchBendFriction = item->Value;
+    else if (strcmp(item->Label, "PITCH BEND CUTOFF") == 0) g_JogConfig.PitchBendCutoff = item->Value;
+    else if (strcmp(item->Label, "PITCH BEND SENSITIVITY") == 0) g_JogConfig.PitchBendScale = item->Value;
+    else if (strcmp(item->Label, "WAVEFORM DRAG SENSITIVITY") == 0) g_JogConfig.WaveformNudgeScale = item->Value;
+    else if (strcmp(item->Label, "FILTER RESPONSE (RAW)") == 0) {
+      g_JogConfig.EmaRawWeight = item->Value;
+      g_JogConfig.EmaPrevWeight = 1.0f - item->Value;
+    }
+    else if (strcmp(item->Label, "BACKSPIN SHORT SPEED") == 0) g_JogConfig.BackspinShortSpeed = item->Value;
+    else if (strcmp(item->Label, "BACKSPIN LONG SPEED") == 0) g_JogConfig.BackspinLongSpeed = item->Value;
+    else if (strcmp(item->Label, "BACKSPIN DECAY RATE") == 0) g_JogConfig.BackspinDecay = item->Value;
+  }
+  JogConfig_Save(&g_JogConfig, "jog_config.json");
+
   UNX_LOG_INFO(
       "[SETTINGS] Applied Style: %d, Gains: L%.2f M%.2f H%.2f, Start: %.0f, "
       "Stop: %.0f, Lock: %d, JogRPM: %.1f",
@@ -371,10 +394,31 @@ void UpdateChannelOptions(App *a, int deviceIdx) {
   a->settingsState.Items[13].Current = (channels > 1) ? 2 : 1; // Cue R -> CH 2
 }
 
+void PopulateJogSettings(App *a);
+void UpdateJogSettingsUI(App *a);
+
 void OnSettingsValueChanged(void *ctx, int idx) {
   App *a = (App *)ctx;
   SettingItem *item = &a->settingsState.Items[idx];
-  if (strcmp(item->Label, "AUDIO DEVICE") == 0) {
+  if (item->Category == SETTING_CAT_JOG) {
+    if (strcmp(item->Label, "DEFAULT RPM") == 0) g_JogConfig.DefaultRPM = item->Value;
+    else if (strcmp(item->Label, "ENCODER TICKS/REV") == 0) g_JogConfig.TicksPerRev = item->Value;
+    else if (strcmp(item->Label, "VINYL RELEASE FRICTION") == 0) g_JogConfig.VinylReleaseFriction = item->Value;
+    else if (strcmp(item->Label, "VINYL RELEASE CUTOFF") == 0) g_JogConfig.VinylReleaseCutoff = item->Value;
+    else if (strcmp(item->Label, "VINYL MIN VELOCITY") == 0) g_JogConfig.VinylReleaseMinVelocity = item->Value;
+    else if (strcmp(item->Label, "PITCH BEND FRICTION") == 0) g_JogConfig.PitchBendFriction = item->Value;
+    else if (strcmp(item->Label, "PITCH BEND CUTOFF") == 0) g_JogConfig.PitchBendCutoff = item->Value;
+    else if (strcmp(item->Label, "PITCH BEND SENSITIVITY") == 0) g_JogConfig.PitchBendScale = item->Value;
+    else if (strcmp(item->Label, "WAVEFORM DRAG SENSITIVITY") == 0) g_JogConfig.WaveformNudgeScale = item->Value;
+    else if (strcmp(item->Label, "FILTER RESPONSE (RAW)") == 0) {
+      g_JogConfig.EmaRawWeight = item->Value;
+      g_JogConfig.EmaPrevWeight = 1.0f - item->Value;
+    }
+    else if (strcmp(item->Label, "BACKSPIN SHORT SPEED") == 0) g_JogConfig.BackspinShortSpeed = item->Value;
+    else if (strcmp(item->Label, "BACKSPIN LONG SPEED") == 0) g_JogConfig.BackspinLongSpeed = item->Value;
+    else if (strcmp(item->Label, "BACKSPIN DECAY RATE") == 0) g_JogConfig.BackspinDecay = item->Value;
+    JogConfig_Save(&g_JogConfig, "jog_config.json");
+  } else if (strcmp(item->Label, "AUDIO DEVICE") == 0) {
     UpdateChannelOptions(a, item->Current - 1);
   } else if (strcmp(item->Label, "CONNECTED DEVICE") == 0) {
     int devChoice = item->Current;
@@ -406,7 +450,13 @@ void OnSettingsValueChanged(void *ctx, int idx) {
 void OnSettingsAction(void *ctx, int idx) {
   App *a = (App *)ctx;
   SettingItem *item = &a->settingsState.Items[idx];
-  if (strcmp(item->Label, "ABOUT") == 0) {
+  if (strcmp(item->Label, "LOAD DEFAULT JOG SETTINGS") == 0) {
+    JogConfig_InitDefaults(&g_JogConfig);
+    JogConfig_Save(&g_JogConfig, "jog_config.json");
+    UpdateJogSettingsUI(a);
+    Toast_Show("JOG SETTINGS RESET TO DEFAULT", 3.0f, (Color){255, 140, 0, 255});
+    UNX_LOG_INFO("[JOG_CONFIG] Reset jog configuration parameters to defaults.");
+  } else if (strcmp(item->Label, "ABOUT") == 0) {
     a->screen = ScreenAbout;
     a->aboutState.IsActive = true;
   } else if (strcmp(item->Label, "CREDITS") == 0) {
@@ -415,6 +465,181 @@ void OnSettingsAction(void *ctx, int idx) {
   } else if (strcmp(item->Label, "EXIT APPLICATION") == 0) {
     a->showExitConfirm = true;
   }
+}
+
+void UpdateJogSettingsUI(App *a) {
+  for (int i = 0; i < a->settingsState.ItemsCount; i++) {
+    SettingItem *item = &a->settingsState.Items[i];
+    if (item->Category != SETTING_CAT_JOG) continue;
+    if (strcmp(item->Label, "DEFAULT RPM") == 0) item->Value = g_JogConfig.DefaultRPM;
+    else if (strcmp(item->Label, "ENCODER TICKS/REV") == 0) item->Value = g_JogConfig.TicksPerRev;
+    else if (strcmp(item->Label, "VINYL RELEASE FRICTION") == 0) item->Value = g_JogConfig.VinylReleaseFriction;
+    else if (strcmp(item->Label, "VINYL RELEASE CUTOFF") == 0) item->Value = g_JogConfig.VinylReleaseCutoff;
+    else if (strcmp(item->Label, "VINYL MIN VELOCITY") == 0) item->Value = g_JogConfig.VinylReleaseMinVelocity;
+    else if (strcmp(item->Label, "PITCH BEND FRICTION") == 0) item->Value = g_JogConfig.PitchBendFriction;
+    else if (strcmp(item->Label, "PITCH BEND CUTOFF") == 0) item->Value = g_JogConfig.PitchBendCutoff;
+    else if (strcmp(item->Label, "PITCH BEND SENSITIVITY") == 0) item->Value = g_JogConfig.PitchBendScale;
+    else if (strcmp(item->Label, "WAVEFORM DRAG SENSITIVITY") == 0) item->Value = g_JogConfig.WaveformNudgeScale;
+    else if (strcmp(item->Label, "FILTER RESPONSE (RAW)") == 0) item->Value = g_JogConfig.EmaRawWeight;
+    else if (strcmp(item->Label, "BACKSPIN SHORT SPEED") == 0) item->Value = g_JogConfig.BackspinShortSpeed;
+    else if (strcmp(item->Label, "BACKSPIN LONG SPEED") == 0) item->Value = g_JogConfig.BackspinLongSpeed;
+    else if (strcmp(item->Label, "BACKSPIN DECAY RATE") == 0) item->Value = g_JogConfig.BackspinDecay;
+  }
+}
+
+void PopulateJogSettings(App *a) {
+  int writeIdx = a->settingsState.ItemsCount;
+
+  // 1. Default RPM
+  strcpy(a->settingsState.Items[writeIdx].Label, "DEFAULT RPM");
+  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
+  a->settingsState.Items[writeIdx].Min = 1.0f;
+  a->settingsState.Items[writeIdx].Max = 100.0f;
+  a->settingsState.Items[writeIdx].Step = 0.1f;
+  a->settingsState.Items[writeIdx].Value = g_JogConfig.DefaultRPM;
+  strcpy(a->settingsState.Items[writeIdx].Unit, "RPM");
+  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
+  writeIdx++;
+
+  // 2. Encoder Ticks/Rev
+  strcpy(a->settingsState.Items[writeIdx].Label, "ENCODER TICKS/REV");
+  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
+  a->settingsState.Items[writeIdx].Min = 100.0f;
+  a->settingsState.Items[writeIdx].Max = 4096.0f;
+  a->settingsState.Items[writeIdx].Step = 10.0f;
+  a->settingsState.Items[writeIdx].Value = g_JogConfig.TicksPerRev;
+  strcpy(a->settingsState.Items[writeIdx].Unit, "PPR");
+  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
+  writeIdx++;
+
+  // 3. Vinyl Release Friction
+  strcpy(a->settingsState.Items[writeIdx].Label, "VINYL RELEASE FRICTION");
+  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
+  a->settingsState.Items[writeIdx].Min = 0.800f;
+  a->settingsState.Items[writeIdx].Max = 0.999f;
+  a->settingsState.Items[writeIdx].Step = 0.005f;
+  a->settingsState.Items[writeIdx].Value = g_JogConfig.VinylReleaseFriction;
+  a->settingsState.Items[writeIdx].Unit[0] = '\0';
+  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
+  writeIdx++;
+
+  // 4. Vinyl Release Cutoff
+  strcpy(a->settingsState.Items[writeIdx].Label, "VINYL RELEASE CUTOFF");
+  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
+  a->settingsState.Items[writeIdx].Min = 0.001f;
+  a->settingsState.Items[writeIdx].Max = 0.050f;
+  a->settingsState.Items[writeIdx].Step = 0.001f;
+  a->settingsState.Items[writeIdx].Value = g_JogConfig.VinylReleaseCutoff;
+  a->settingsState.Items[writeIdx].Unit[0] = '\0';
+  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
+  writeIdx++;
+
+  // 5. Vinyl Min Velocity
+  strcpy(a->settingsState.Items[writeIdx].Label, "VINYL MIN VELOCITY");
+  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
+  a->settingsState.Items[writeIdx].Min = 0.001f;
+  a->settingsState.Items[writeIdx].Max = 0.100f;
+  a->settingsState.Items[writeIdx].Step = 0.005f;
+  a->settingsState.Items[writeIdx].Value = g_JogConfig.VinylReleaseMinVelocity;
+  a->settingsState.Items[writeIdx].Unit[0] = '\0';
+  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
+  writeIdx++;
+
+  // 6. Pitch Bend Friction
+  strcpy(a->settingsState.Items[writeIdx].Label, "PITCH BEND FRICTION");
+  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
+  a->settingsState.Items[writeIdx].Min = 0.800f;
+  a->settingsState.Items[writeIdx].Max = 0.999f;
+  a->settingsState.Items[writeIdx].Step = 0.005f;
+  a->settingsState.Items[writeIdx].Value = g_JogConfig.PitchBendFriction;
+  a->settingsState.Items[writeIdx].Unit[0] = '\0';
+  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
+  writeIdx++;
+
+  // 7. Pitch Bend Cutoff
+  strcpy(a->settingsState.Items[writeIdx].Label, "PITCH BEND CUTOFF");
+  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
+  a->settingsState.Items[writeIdx].Min = 0.001f;
+  a->settingsState.Items[writeIdx].Max = 0.050f;
+  a->settingsState.Items[writeIdx].Step = 0.001f;
+  a->settingsState.Items[writeIdx].Value = g_JogConfig.PitchBendCutoff;
+  a->settingsState.Items[writeIdx].Unit[0] = '\0';
+  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
+  writeIdx++;
+
+  // 8. Pitch Bend Sensitivity
+  strcpy(a->settingsState.Items[writeIdx].Label, "PITCH BEND SENSITIVITY");
+  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
+  a->settingsState.Items[writeIdx].Min = 0.10f;
+  a->settingsState.Items[writeIdx].Max = 5.00f;
+  a->settingsState.Items[writeIdx].Step = 0.10f;
+  a->settingsState.Items[writeIdx].Value = g_JogConfig.PitchBendScale;
+  strcpy(a->settingsState.Items[writeIdx].Unit, "x");
+  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
+  writeIdx++;
+
+  // 9. Waveform Drag Sensitivity
+  strcpy(a->settingsState.Items[writeIdx].Label, "WAVEFORM DRAG SENSITIVITY");
+  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
+  a->settingsState.Items[writeIdx].Min = 0.10f;
+  a->settingsState.Items[writeIdx].Max = 5.00f;
+  a->settingsState.Items[writeIdx].Step = 0.10f;
+  a->settingsState.Items[writeIdx].Value = g_JogConfig.WaveformNudgeScale;
+  strcpy(a->settingsState.Items[writeIdx].Unit, "x");
+  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
+  writeIdx++;
+
+  // 10. Filter Response
+  strcpy(a->settingsState.Items[writeIdx].Label, "FILTER RESPONSE (RAW)");
+  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
+  a->settingsState.Items[writeIdx].Min = 0.05f;
+  a->settingsState.Items[writeIdx].Max = 1.00f;
+  a->settingsState.Items[writeIdx].Step = 0.05f;
+  a->settingsState.Items[writeIdx].Value = g_JogConfig.EmaRawWeight;
+  a->settingsState.Items[writeIdx].Unit[0] = '\0';
+  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
+  writeIdx++;
+
+  // 11. Backspin Short Speed
+  strcpy(a->settingsState.Items[writeIdx].Label, "BACKSPIN SHORT SPEED");
+  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
+  a->settingsState.Items[writeIdx].Min = -30.0f;
+  a->settingsState.Items[writeIdx].Max = -1.0f;
+  a->settingsState.Items[writeIdx].Step = 0.5f;
+  a->settingsState.Items[writeIdx].Value = g_JogConfig.BackspinShortSpeed;
+  a->settingsState.Items[writeIdx].Unit[0] = '\0';
+  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
+  writeIdx++;
+
+  // 12. Backspin Long Speed
+  strcpy(a->settingsState.Items[writeIdx].Label, "BACKSPIN LONG SPEED");
+  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
+  a->settingsState.Items[writeIdx].Min = -50.0f;
+  a->settingsState.Items[writeIdx].Max = -1.0f;
+  a->settingsState.Items[writeIdx].Step = 0.5f;
+  a->settingsState.Items[writeIdx].Value = g_JogConfig.BackspinLongSpeed;
+  a->settingsState.Items[writeIdx].Unit[0] = '\0';
+  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
+  writeIdx++;
+
+  // 13. Backspin Decay Rate
+  strcpy(a->settingsState.Items[writeIdx].Label, "BACKSPIN DECAY RATE");
+  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
+  a->settingsState.Items[writeIdx].Min = 0.800f;
+  a->settingsState.Items[writeIdx].Max = 0.999f;
+  a->settingsState.Items[writeIdx].Step = 0.005f;
+  a->settingsState.Items[writeIdx].Value = g_JogConfig.BackspinDecay;
+  a->settingsState.Items[writeIdx].Unit[0] = '\0';
+  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
+  writeIdx++;
+
+  // 14. Action: Load Defaults
+  strcpy(a->settingsState.Items[writeIdx].Label, "LOAD DEFAULT JOG SETTINGS");
+  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_ACTION;
+  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
+  writeIdx++;
+
+  a->settingsState.ItemsCount = writeIdx;
 }
 
 void PopulateMidiSettings(App *a) {
@@ -461,6 +686,7 @@ void PopulateMidiSettings(App *a) {
   }
 
   a->settingsState.ItemsCount = 23;
+  PopulateJogSettings(a);
 }
 
 static void App_DeactivateAllViews(App *a) {

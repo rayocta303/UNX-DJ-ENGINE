@@ -729,7 +729,7 @@ static void Settings_Draw(Component *base) {
 
   // Draw Tabs with state-of-the-art visual style
   DrawRectangle(0, TOP_BAR_H, SCREEN_WIDTH, tabH, ColorDark3);
-  const char *tabs[] = { "DECK", "AUDIO", "VIEW", "SYSTEM", "CONTROLLERS" };
+  const char *tabs[] = { "DECK", "AUDIO", "VIEW", "SYSTEM", "CONTROLLERS", "JOG" };
   float tabW = SCREEN_WIDTH / (float)SETTING_CAT_COUNT;
   for (int i = 0; i < SETTING_CAT_COUNT; i++) {
       Rectangle tRect = { i * tabW, TOP_BAR_H, tabW, tabH };
@@ -842,7 +842,8 @@ static void Settings_Draw(Component *base) {
                  
       char valBuf[32];
       if (item->Value == (int)item->Value) sprintf(valBuf, "%d", (int)item->Value);
-      else if (fabsf(item->Value * 4.0f - roundf(item->Value * 4.0f)) < 0.01f) sprintf(valBuf, "%.2f", item->Value);
+      else if (item->Step < 0.01f || fabsf(item->Value) < 0.1f) sprintf(valBuf, "%.3f", item->Value);
+      else if (fabsf(item->Value * 4.0f - roundf(item->Value * 4.0f)) < 0.01f || item->Step < 0.1f) sprintf(valBuf, "%.2f", item->Value);
       else sprintf(valBuf, "%.1f", item->Value);
       
       if (item->Unit[0] != '\0') {
@@ -934,6 +935,7 @@ static void Settings_Draw(Component *base) {
           } else if (selectedItem->Type == SETTING_TYPE_KNOB) {
               char valBuf[32];
               if (selectedItem->Value == (int)selectedItem->Value) sprintf(valBuf, "%d", (int)selectedItem->Value);
+              else if (selectedItem->Step < 0.01f || fabsf(selectedItem->Value) < 0.1f) sprintf(valBuf, "%.3f", selectedItem->Value);
               else sprintf(valBuf, "%.2f", selectedItem->Value);
               if (selectedItem->Unit[0] != '\0') {
                   snprintf(detailBuf, sizeof(detailBuf), "Selected: %s  |  Value: %s %s  |  Type: KNOB/SLIDER", selectedItem->Label, valBuf, selectedItem->Unit);
