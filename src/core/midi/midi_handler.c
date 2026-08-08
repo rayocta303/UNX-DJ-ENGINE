@@ -164,6 +164,8 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
     static double lastFullRefresh = 0;
     static double lastBlinkTime = 0;
     static bool blinkState = false;
+    static bool connectionHandshakeDone = false;
+    static void *lastLoadedTrack[4] = { NULL, NULL, NULL, NULL };
     double now = GetTime();
 
     if (now - lastBlinkTime > 0.300) {
@@ -171,21 +173,22 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
         blinkState = !blinkState;
     }
 
+    // 1. One-time Connection Handshake when device connects
+    if (!connectionHandshakeDone) {
+        connectionHandshakeDone = true;
+        MIDI_SendShortMsgNamed(0x90, 0x7F, 0x7F, "Connect Handshake Ch 1");
+        MIDI_SendShortMsgNamed(0x91, 0x7F, 0x7F, "Connect Handshake Ch 2");
+        MIDI_SendShortMsgNamed(0x92, 0x7F, 0x7F, "Connect Handshake Ch 3");
+        MIDI_SendShortMsgNamed(0x93, 0x7F, 0x7F, "Connect Handshake Ch 4");
+    }
+
     bool forceRefresh = false;
     if (now - lastFullRefresh > 2.0) {
         lastFullRefresh = now;
         forceRefresh = true;
-
-        // Pioneer DDJ Hardware Keep-Alive / LED Enable Handshake
-        MIDI_SendShortMsgNamed(0x9F, 0x00, 0x7F, "Handshake Deck 1");
-        MIDI_SendShortMsgNamed(0x9F, 0x01, 0x7F, "Handshake Deck 2");
-        MIDI_SendShortMsgNamed(0x90, 0x7F, 0x7F, "Handshake Ch 1");
-        MIDI_SendShortMsgNamed(0x91, 0x7F, 0x7F, "Handshake Ch 2");
-        MIDI_SendShortMsgNamed(0x92, 0x7F, 0x7F, "Handshake Ch 3");
-        MIDI_SendShortMsgNamed(0x93, 0x7F, 0x7F, "Handshake Ch 4");
     }
 
-    // 1. Pioneer SysEx Keep-Alive every 1.5 seconds
+    // 2. Pioneer SysEx Keep-Alive every 1.5 seconds
     static double lastSysEx = 0;
     if (now - lastSysEx > 1.5) {
         lastSysEx = now;
@@ -211,7 +214,7 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
         {255, 255, 255, 255, 255, 255, 255, 255}
     };
 
-    // 2. Deck State LEDs for up to 4 Decks (Channel 1..4)
+    // 3. Deck State LEDs for up to 4 Decks (Channel 1..4)
     MidiMapping *map = MIDI_GetGlobalMapping();
 
     for (int i = 0; i < 4; i++) {
@@ -222,6 +225,16 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
             deck = d1; // fallback pointer
         }
         if (!deck) continue;
+
+        // Trigger Handshake Deck ONCE when track loaded on this deck
+        if (deck->LoadedTrack != lastLoadedTrack[i]) {
+            lastLoadedTrack[i] = deck->LoadedTrack;
+            if (deck->LoadedTrack != NULL) {
+                char lblDeckHs[64];
+                snprintf(lblDeckHs, sizeof(lblDeckHs), "Handshake Deck %d (Track Loaded)", i + 1);
+                MIDI_SendShortMsgNamed(0x9F, (uint8_t)i, 0x7F, lblDeckHs);
+            }
+        }
 
         const char *groupNames[4] = { "[Channel1]", "[Channel2]", "[Channel3]", "[Channel4]" };
         const char *group = groupNames[i];
