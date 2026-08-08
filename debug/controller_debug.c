@@ -273,6 +273,84 @@ static void SendShortMidi(uint8_t status, uint8_t data1, uint8_t data2) {
 #endif
 }
 
+static void TestVUMeters(void) {
+    printf("\n[TEST] Running VU Meter LED Ramp Test (Channels 1-4 & Master L/R)...\n");
+    // Handshake
+    SendShortMidi(0x9F, 0x00, 0x7F);
+    SendShortMidi(0x90, 0x7F, 0x7F);
+    SendShortMidi(0x91, 0x7F, 0x7F);
+
+    // Ramp Up 0 -> 127
+    for (int v = 0; v <= 127; v += 4) {
+        SendShortMidi(0xB0, 0x02, (uint8_t)v); // Ch 1
+        SendShortMidi(0xB1, 0x02, (uint8_t)v); // Ch 2
+        SendShortMidi(0xB2, 0x02, (uint8_t)v); // Ch 3
+        SendShortMidi(0xB3, 0x02, (uint8_t)v); // Ch 4
+        SendShortMidi(0xBA, 0x00, (uint8_t)v); // Master L
+        SendShortMidi(0xBA, 0x01, (uint8_t)v); // Master R
+#if defined(_WIN32)
+        Sleep(20);
+#endif
+    }
+    // Ramp Down 127 -> 0
+    for (int v = 127; v >= 0; v -= 4) {
+        SendShortMidi(0xB0, 0x02, (uint8_t)v);
+        SendShortMidi(0xB1, 0x02, (uint8_t)v);
+        SendShortMidi(0xB2, 0x02, (uint8_t)v);
+        SendShortMidi(0xB3, 0x02, (uint8_t)v);
+        SendShortMidi(0xBA, 0x00, (uint8_t)v);
+        SendShortMidi(0xBA, 0x01, (uint8_t)v);
+#if defined(_WIN32)
+        Sleep(20);
+#endif
+    }
+    printf("[TEST] VU Meter Test Completed.\n\n");
+}
+
+static void TestJogRings(void) {
+    printf("\n[TEST] Running Jog Wheel Ring Animation Test (Decks 1-4, Status 0xBB)...\n");
+    // Send 3 full 360-degree revolutions (72 positions each)
+    for (int cycle = 0; cycle < 3; cycle++) {
+        for (int p = 1; p <= 72; p++) {
+            uint8_t pos = (uint8_t)p;
+            SendShortMidi(0xBB, 0x00, pos); // Deck 1
+            SendShortMidi(0xBB, 0x01, pos); // Deck 2
+            SendShortMidi(0xBB, 0x02, pos); // Deck 3
+            SendShortMidi(0xBB, 0x03, pos); // Deck 4
+#if defined(_WIN32)
+            Sleep(15);
+#endif
+        }
+    }
+    printf("[TEST] Jog Wheel Ring Test Completed.\n\n");
+}
+
+static void TestPadLEDs(void) {
+    printf("\n[TEST] Running HotCue Pad LED Chase Test (Decks 1-4)...\n");
+    uint8_t deckStatuses[4] = { 0x97, 0x99, 0x98, 0x9A };
+    
+    // Light up pads 1-8 sequentially per deck
+    for (int d = 0; d < 4; d++) {
+        uint8_t st = deckStatuses[d];
+        printf("  Testing Deck %d (Status 0x%02X)...\n", d + 1, st);
+        for (int p = 0; p < 8; p++) {
+            SendShortMidi(st, (uint8_t)p, 0x7F);
+            SendShortMidi(st, 0x30 + (uint8_t)p, 0x7F);
+#if defined(_WIN32)
+            Sleep(50);
+#endif
+        }
+        for (int p = 0; p < 8; p++) {
+            SendShortMidi(st, (uint8_t)p, 0x00);
+            SendShortMidi(st, 0x30 + (uint8_t)p, 0x00);
+#if defined(_WIN32)
+            Sleep(25);
+#endif
+        }
+    }
+    printf("[TEST] Pad LED Test Completed.\n\n");
+}
+
 static void PrintHelp(void) {
     printf("\n--- CONTROLLER DEBUG TERMINAL COMMANDS ---\n");
     printf("  list                          : List available MIDI Input & Output devices\n");
@@ -280,6 +358,10 @@ static void PrintHelp(void) {
     printf("  load <path_to_xml>            : Load XML mapping preset (e.g. load ../controllers/Pioneer-DDJ-FLX6.midi.xml)\n");
     printf("  monitor                       : Toggle real-time incoming MIDI message logging\n");
     printf("  send <status_hex> <b2> <b3>   : Send short MIDI msg to output (e.g. send 90 0B 7F)\n");
+    printf("  test_vu                       : Run automated VU Meter LED ramp test (Ch 1-4 & Master)\n");
+    printf("  test_jog                      : Run automated Jog Wheel Ring LED rotation test (Decks 1-4)\n");
+    printf("  test_pads                     : Run automated HotCue Pad LED chase test (Decks 1-4)\n");
+    printf("  test_all                      : Run full hardware LED diagnostic suite\n");
     printf("  sysex_flx6_keepalive          : Send Pioneer DDJ-FLX6 keep-alive SysEx\n");
     printf("  clear                         : Clear screen\n");
     printf("  help                          : Show this menu\n");
@@ -370,6 +452,16 @@ int main(int argc, char *argv[]) {
                 sscanf(arg3, "%x", &b3);
                 SendShortMidi((uint8_t)s, (uint8_t)b2, (uint8_t)b3);
             }
+        } else if (strcmp(cmd, "test_vu") == 0) {
+            TestVUMeters();
+        } else if (strcmp(cmd, "test_jog") == 0) {
+            TestJogRings();
+        } else if (strcmp(cmd, "test_pads") == 0) {
+            TestPadLEDs();
+        } else if (strcmp(cmd, "test_all") == 0) {
+            TestVUMeters();
+            TestJogRings();
+            TestPadLEDs();
         } else if (strcmp(cmd, "sysex_flx6_keepalive") == 0) {
             printf("[SYSEX] DDJ-FLX6 Keep-Alive SysEx string: F0 00 40 05 00 00 04 05 00 50 02 F7\n");
             // Sending raw SysEx string demonstration
