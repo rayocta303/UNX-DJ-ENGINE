@@ -414,7 +414,7 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
               : false;
       bool isSearch =
           (strstr(function, "jogSearch") != NULL) || map->modifiers[0];
-      float scale = isSearch ? 2.0f : (touching ? 0.1f : 0.005f);
+      float scale = isSearch ? 2.0f : (touching ? 1.0f : 0.05f);
       CO_AddValue(group, "jog", delta * scale);
     }
   } else if (strstr(function, "jogTouch") || strstr(function, "JogTouch")) {

@@ -2994,8 +2994,12 @@ void UpdateDrawFrame(App *app) {
       // Exponential Moving Average filter to smooth MIDI packet jitter
       audioEngine->Decks[0].JogRate = audioEngine->Decks[0].JogRate * 0.25 + rawRate * 0.75;
     } else if (effTouchA && app->deckA.VinylModeEnabled) {
-      // Touch hold in Vinyl mode (vinyl platter held stationary under hand)
-      audioEngine->Decks[0].JogRate = 0.0;
+      // Touch hold in Vinyl mode: decay rapidly if hand stopped, preserving velocity during fast spin & release
+      if (fabs(audioEngine->Decks[0].JogRate) > 0.1) {
+        audioEngine->Decks[0].JogRate *= 0.5;
+      } else {
+        audioEngine->Decks[0].JogRate = 0.0;
+      }
     }
   } else {
     // Pitch bend release decay (Frame-rate independent scaled by dt)
@@ -3060,8 +3064,12 @@ void UpdateDrawFrame(App *app) {
       // Exponential Moving Average filter to smooth MIDI packet jitter
       audioEngine->Decks[1].JogRate = audioEngine->Decks[1].JogRate * 0.25 + rawRate * 0.75;
     } else if (effTouchB && app->deckB.VinylModeEnabled) {
-      // Touch hold in Vinyl mode (vinyl platter held stationary under hand)
-      audioEngine->Decks[1].JogRate = 0.0;
+      // Touch hold in Vinyl mode: decay rapidly if hand stopped, preserving velocity during fast spin & release
+      if (fabs(audioEngine->Decks[1].JogRate) > 0.1) {
+        audioEngine->Decks[1].JogRate *= 0.5;
+      } else {
+        audioEngine->Decks[1].JogRate = 0.0;
+      }
     }
   } else {
     // Pitch bend release decay (Frame-rate independent scaled by dt)
