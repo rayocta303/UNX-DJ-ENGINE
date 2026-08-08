@@ -203,6 +203,23 @@ void AudioProcessCallback(float *buffer, unsigned int frames) {
   }
 }
 
+void App_SaveSettings(App *a) {
+  if (!a)
+    return;
+  if (globalAudioEngine) {
+    a->colorFxDeckA = globalAudioEngine->Decks[0].ColorFX;
+    a->colorFxDeckB = globalAudioEngine->Decks[1].ColorFX;
+    a->fxState.SelectedFX = globalAudioEngine->BeatFX.activeFX;
+    a->fxState.SelectedChannel = globalAudioEngine->BeatFX.targetChannel;
+    a->fxState.LevelDepth = globalAudioEngine->BeatFX.levelDepth;
+    a->fxState.IsFXOn = globalAudioEngine->BeatFX.isFxOn;
+  }
+  Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig,
+                a->fxState, a->colorFxDeckA, a->colorFxDeckB,
+                a->activeControllerPath, a->deckA.QuantizeEnabled,
+                a->deckB.QuantizeEnabled);
+}
+
 void OnSettingsClose(void *ctx) {
   App *a = (App *)ctx;
   a->screen = ScreenPlayer;
@@ -299,8 +316,7 @@ void OnSettingsApply(void *ctx) {
     a->activeAudioConfig.CrossfaderCurve = aconf.CrossfaderCurve;
   }
 
-  Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig,
-                a->fxState, a->colorFxDeckA, a->colorFxDeckB, a->activeControllerPath);
+  App_SaveSettings(a);
 }
 
 void UpdateChannelOptions(App *a, int deviceIdx) {
@@ -370,8 +386,7 @@ void OnSettingsValueChanged(void *ctx, int idx) {
       strncpy(a->activeControllerPath, autoPresetPath, 255);
     }
     PopulateMidiSettings(a);
-    Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig,
-                  a->fxState, a->colorFxDeckA, a->colorFxDeckB, a->activeControllerPath);
+    App_SaveSettings(a);
   } else if (strcmp(item->Label, "MAPPING PRESET") == 0) {
     int presetIdx = item->Current;
     if (presetIdx < a->midiPresetCount) {
@@ -380,8 +395,7 @@ void OnSettingsValueChanged(void *ctx, int idx) {
       // Refresh the MIDI mapping tab items
       PopulateMidiSettings(a);
       // Save immediately when preset changes
-      Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig,
-                    a->fxState, a->colorFxDeckA, a->colorFxDeckB, a->activeControllerPath);
+      App_SaveSettings(a);
     }
   }
 }
@@ -918,7 +932,9 @@ void App_Init(App *a) {
 
   // Load persisted settings
   Settings_Load(&a->deckA.Waveform, &a->deckB.Waveform, &a->activeAudioConfig,
-                &a->fxState, &a->colorFxDeckA, &a->colorFxDeckB, a->activeControllerPath);
+                &a->fxState, &a->colorFxDeckA, &a->colorFxDeckB,
+                a->activeControllerPath, &a->deckA.QuantizeEnabled,
+                &a->deckB.QuantizeEnabled);
   if (a->activeControllerPath[0] != '\0') {
     MIDI_RefreshMapping(a->activeControllerPath);
   }
@@ -1592,6 +1608,14 @@ Log_LogDeviceInfo(gpuModel);
   }
   AudioEngine_Init(audioEngine, initialAudioCfg.SampleRate);
   audioEngine->CrossfaderCurve = initialAudioCfg.CrossfaderCurve;
+
+  // Restore saved Color FX and Beat FX state into Audio Engine
+  audioEngine->Decks[0].ColorFX = app->colorFxDeckA;
+  audioEngine->Decks[1].ColorFX = app->colorFxDeckB;
+  BeatFXManager_SetFX(&audioEngine->BeatFX, app->fxState.SelectedFX);
+  audioEngine->BeatFX.targetChannel = app->fxState.SelectedChannel;
+  audioEngine->BeatFX.levelDepth = app->fxState.LevelDepth;
+  audioEngine->BeatFX.isFxOn = app->fxState.IsFXOn;
   app->browserState.AudioPlugin = (struct AudioEngine *)audioEngine;
   app->browserState.DeckA = (struct DeckState *)&app->deckA;
   app->browserState.DeckB = (struct DeckState *)&app->deckB;
@@ -2015,9 +2039,7 @@ Log_LogDeviceInfo(gpuModel);
   }
 
   UNX_LOG_INFO("[MAIN] Shutting down...");
-  Settings_Save(app->deckA.Waveform, app->deckB.Waveform,
-                app->activeAudioConfig, app->fxState, app->colorFxDeckA, app->colorFxDeckB,
-                app->activeControllerPath);
+  App_SaveSettings(app);
   UIFonts_Unload();
 
   // Browser Cleanup (Inline to reduce external functions)

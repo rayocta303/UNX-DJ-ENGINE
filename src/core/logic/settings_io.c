@@ -31,7 +31,7 @@ static void EnsureControllersExist(const char* baseDir) {
     }
 }
 
-static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB) {
+static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB, bool *quantizeA, bool *quantizeB) {
     if (!json) return;
     
     const char* p = json;
@@ -94,6 +94,7 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         if (sscanf(strstr(p, "\"depth\""), "\"depth\": %f", &val) == 1) fx->LevelDepth = val;
         if (sscanf(strstr(p, "\"q\""), "\"q\": %d", &ival) == 1) fx->Quantize = (bool)ival;
         if (sscanf(strstr(p, "\"tab\""), "\"tab\": %d", &ival) == 1) fx->ShowBeatFXTab = (bool)ival;
+        if (sscanf(strstr(p, "\"on\""), "\"on\": %d", &ival) == 1) fx->IsFXOn = (bool)ival;
     }
 
     // Color FX
@@ -109,9 +110,15 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         if (sscanf(strstr(p, "\"valA\""), "\"valA\": %f", &val) == 1 && cfxA) cfxA->colorValue = val;
         if (sscanf(strstr(p, "\"valB\""), "\"valB\": %f", &val) == 1 && cfxB) cfxB->colorValue = val;
     }
+
+    // Quantize
+    if ((p = strstr(json, "\"quantize\""))) {
+        if (sscanf(strstr(p, "\"qA\""), "\"qA\": %d", &ival) == 1 && quantizeA) *quantizeA = (bool)ival;
+        if (sscanf(strstr(p, "\"qB\""), "\"qB\": %d", &ival) == 1 && quantizeB) *quantizeB = (bool)ival;
+    }
 }
 
-void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB, char *controllerPath) {
+void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB, char *controllerPath, bool *quantizeA, bool *quantizeB) {
     // Defaults
     controllerPath[0] = '\0';
     wfmA->Style = WAVEFORM_STYLE_RGB;
@@ -131,6 +138,10 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     fx->SelectedChannel = 0; // Master
     fx->LevelDepth = 0.5f;
     fx->Quantize = true;
+    fx->IsFXOn = false;
+
+    if (quantizeA) *quantizeA = true;
+    if (quantizeB) *quantizeB = true;
 
     if (cfxA) ColorFXManager_Init(cfxA);
     if (cfxB) ColorFXManager_Init(cfxB);
@@ -174,7 +185,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
 
     if (!f) {
         EnsureControllersExist("."); // Fallback to current dir if nothing else
-        Settings_Save(*wfmA, *wfmB, *audio, *fx, *cfxA, *cfxB, controllerPath);
+        Settings_Save(*wfmA, *wfmB, *audio, *fx, *cfxA, *cfxB, controllerPath, quantizeA ? *quantizeA : true, quantizeB ? *quantizeB : true);
         return;
     }
 
@@ -186,7 +197,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     if (buf) {
         fread(buf, 1, size, f);
         buf[size] = '\0';
-        LoadFromJSON(buf, wfmA, wfmB, audio, fx, cfxA, cfxB);
+        LoadFromJSON(buf, wfmA, wfmB, audio, fx, cfxA, cfxB, quantizeA, quantizeB);
         
         // Extract controller path manually to avoid changing too many signatures
         const char *p;
@@ -208,7 +219,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     fclose(f);
 }
 
-void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendConfig audio, BeatFXState fx, ColorFXManager cfxA, ColorFXManager cfxB, const char *controllerPath) {
+void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendConfig audio, BeatFXState fx, ColorFXManager cfxA, ColorFXManager cfxB, const char *controllerPath, bool quantizeA, bool quantizeB) {
     char path[512];
 
 #if defined(__ANDROID__)
@@ -245,10 +256,11 @@ void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendCon
             wfmB.Style, wfmB.GainLow, wfmB.GainMid, wfmB.GainHigh, wfmB.VinylStartMs, wfmB.VinylStopMs, wfmB.LoadLock ? 1 : 0, wfmB.JogCalibRPM);
     fprintf(f, "  \"audio\": { \"devIdx\": %d, \"mastL\": %d, \"mastR\": %d, \"cueL\": %d, \"cueR\": %d, \"sr\": %d, \"buf\": %d, \"bitdepth\": %d, \"xfader\": %d },\n",
             audio.DeviceIndex, audio.MasterOutL, audio.MasterOutR, audio.CueOutL, audio.CueOutR, audio.SampleRate, audio.BufferSizeFrames, audio.PCMBitDepth, audio.CrossfaderCurve);
-    fprintf(f, "  \"beatfx\": { \"fx\": %d, \"pad\": %d, \"ch\": %d, \"depth\": %.2f, \"q\": %d, \"tab\": %d },\n",
-            fx.SelectedFX, fx.SelectedPad, fx.SelectedChannel, fx.LevelDepth, fx.Quantize ? 1 : 0, fx.ShowBeatFXTab ? 1 : 0);
+    fprintf(f, "  \"beatfx\": { \"fx\": %d, \"pad\": %d, \"ch\": %d, \"depth\": %.2f, \"q\": %d, \"tab\": %d, \"on\": %d },\n",
+            fx.SelectedFX, fx.SelectedPad, fx.SelectedChannel, fx.LevelDepth, fx.Quantize ? 1 : 0, fx.ShowBeatFXTab ? 1 : 0, fx.IsFXOn ? 1 : 0);
     fprintf(f, "  \"colorfx\": { \"active\": %d, \"param\": %.2f, \"valA\": %.2f, \"valB\": %.2f },\n",
             (int)cfxA.activeFX, cfxA.parameter, cfxA.colorValue, cfxB.colorValue);
+    fprintf(f, "  \"quantize\": { \"qA\": %d, \"qB\": %d },\n", quantizeA ? 1 : 0, quantizeB ? 1 : 0);
     fprintf(f, "  \"controllers\": { \"path\": \"%s\" }\n", controllerPath ? controllerPath : "");
     fprintf(f, "}\n");
 

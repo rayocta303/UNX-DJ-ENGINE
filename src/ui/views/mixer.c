@@ -99,8 +99,8 @@ static bool DrawFXButton(const char *label, float x, float y, float w, float h,
   Color fg = active ? ColorWhite : ColorOrange;
   DrawRectangle(x, y, w, h, bg);
   DrawRectangleLines(x, y, w, h, active ? ColorWhite : ColorOrange);
-  Font f = UIFonts_GetFace(S(8));
-  int fontSize = S(8);
+  int fontSize = (h > S(18)) ? S(9.5f) : S(8);
+  Font f = UIFonts_GetFace(fontSize);
   DrawCentredText(label, f, x, w, y + (h - fontSize) / 2.0f, fontSize, fg);
   return pressed;
 }
@@ -226,14 +226,15 @@ static void Mixer_Draw(Component *base) {
   float fxY = panelY + S(12);
   DrawCentredText("SOUND COLOR FX", fTiny, leftX, colFXW, fxY, S(7), ColorShadow);
   
-  float cfy = fxY + S(14);
+  float cfy = fxY + S(16);
   char *cfxNames[] = {"SPACE", "DUB ECHO", "SWEEP", "NOISE", "CRUSH", "FILTER", "JET"};
   ColorFXType cfxTypes[] = {COLORFX_SPACE, COLORFX_DUBECHO, COLORFX_SWEEP, COLORFX_NOISE, COLORFX_CRUSH, COLORFX_FILTER, COLORFX_JET};
   float cbtnW = colFXW - S(16);
-  float cbtnH = S(14);
+  float cbtnH = S(24);
+  float cbtnGap = S(5);
   for (int i = 0; i < 7; i++) {
     float bx = leftX + S(8);
-    float by = cfy + i * (cbtnH + S(4));
+    float by = cfy + i * (cbtnH + cbtnGap);
     if (DrawFXButton(cfxNames[i], bx, by, cbtnW, cbtnH, eng->Decks[0].ColorFX.activeFX == cfxTypes[i])) {
       ColorFXType next = (eng->Decks[0].ColorFX.activeFX == cfxTypes[i]) ? COLORFX_NONE : cfxTypes[i];
       ColorFXManager_SetFX(&eng->Decks[0].ColorFX, next);

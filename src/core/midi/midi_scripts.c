@@ -1,8 +1,8 @@
 #include "core/midi/midi_scripts.h"
 #include "audio/engine.h"
-#include "ui/player/player_state.h"
 #include "core/logic/control_object.h"
 #include "core/midi/midi_handler.h"
+#include "ui/player/player_state.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -18,8 +18,9 @@ void MIDI_UpdateVuMeters(AudioEngine *engine, bool forceSend) {
   if (!engine)
     return;
 
-  // Gain multiplier to map linear engine audio peaks to Pioneer DDJ hardware LED calibration
-  const float VU_GAIN = 2.8f;
+  // Gain multiplier to map linear engine audio peaks to Pioneer DDJ hardware
+  // LED calibration
+  const float VU_GAIN = 2.1f;
 
   // 1. Channel VU Meters (Deck 1 - 4)
   for (int i = 0; i < 4; i++) {
@@ -52,8 +53,14 @@ void MIDI_UpdateVuMeters(AudioEngine *engine, bool forceSend) {
   float masterVol = (engine->MasterVolume > 0.0f) ? engine->MasterVolume : 1.0f;
   float masterL = engine->MasterVuL * masterVol * VU_GAIN;
   float masterR = engine->MasterVuR * masterVol * VU_GAIN;
-  if (masterL > 1.0f) masterL = 1.0f; if (masterL < 0.0f) masterL = 0.0f;
-  if (masterR > 1.0f) masterR = 1.0f; if (masterR < 0.0f) masterR = 0.0f;
+  if (masterL > 1.0f)
+    masterL = 1.0f;
+  if (masterL < 0.0f)
+    masterL = 0.0f;
+  if (masterR > 1.0f)
+    masterR = 1.0f;
+  if (masterR < 0.0f)
+    masterR = 0.0f;
 
   uint8_t mValL = (uint8_t)(masterL * 127.0f);
   uint8_t mValR = (uint8_t)(masterR * 127.0f);
@@ -90,17 +97,19 @@ static uint8_t lastSyncVal[4] = {0, 0, 0, 0};
 static uint8_t lastMasterTempoVal[4] = {0, 0, 0, 0};
 static uint8_t lastPadVals[4][16] = {{0}};
 
-void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2, AudioEngine *engine, bool forceSend) {
-  DeckState *decks[4] = { d1, d2, NULL, NULL };
-  uint8_t mainStatuses[4] = { 0x90, 0x91, 0x92, 0x93 };
-  uint8_t padStatuses[4]  = { 0x97, 0x99, 0x98, 0x9A };
+void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
+                               AudioEngine *engine, bool forceSend) {
+  DeckState *decks[4] = {d1, d2, NULL, NULL};
+  uint8_t mainStatuses[4] = {0x90, 0x91, 0x92, 0x93};
+  uint8_t padStatuses[4] = {0x97, 0x99, 0x98, 0x9A};
 
   for (int i = 0; i < 4; i++) {
     DeckState *ds = decks[i];
-    DeckAudioState *audio = (engine && i < MAX_DECKS) ? &engine->Decks[i] : NULL;
+    DeckAudioState *audio =
+        (engine && i < MAX_DECKS) ? &engine->Decks[i] : NULL;
 
     uint8_t mainStatus = mainStatuses[i];
-    uint8_t padStatus  = padStatuses[i];
+    uint8_t padStatus = padStatuses[i];
 
     // -------------------------------------------------------------
     // 1. LOOP BUTTON LEDs (Loop In, Loop Out, Reloop/Exit)
@@ -115,14 +124,17 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2, AudioEngine *engine
       hasLoopOut = (audio->LoopEndPos > 0);
     }
     if (ds) {
-      if (ds->IsLooping) isLooping = true;
-      if (ds->LoopAdjustIn) hasLoopIn = true;
-      if (ds->LoopAdjustOut) hasLoopOut = true;
+      if (ds->IsLooping)
+        isLooping = true;
+      if (ds->LoopAdjustIn)
+        hasLoopIn = true;
+      if (ds->LoopAdjustOut)
+        hasLoopOut = true;
     }
 
-    uint8_t loopInVal  = (hasLoopIn || isLooping) ? 0x7F : 0x00;
+    uint8_t loopInVal = (hasLoopIn || isLooping) ? 0x7F : 0x00;
     uint8_t loopOutVal = (hasLoopOut || isLooping) ? 0x7F : 0x00;
-    uint8_t reloopVal  = isLooping ? 0x7F : 0x00;
+    uint8_t reloopVal = isLooping ? 0x7F : 0x00;
 
     if (forceSend || loopInVal != lastLoopInVal[i]) {
       MIDI_SendShortMsg(mainStatus, 0x10, loopInVal); // LOOP IN / 4 BEAT
@@ -150,16 +162,21 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2, AudioEngine *engine
       isMasterTempo = audio->MasterTempoActive;
     }
     if (ds) {
-      if (ds->IsPlaying) isPlaying = true;
-      if (ds->IsCueHeld) isCueHeld = true;
-      if (ds->SyncMode > 0) isSync = true;
-      if (ds->MasterTempo) isMasterTempo = true;
+      if (ds->IsPlaying)
+        isPlaying = true;
+      if (ds->IsCueHeld)
+        isCueHeld = true;
+      if (ds->SyncMode > 0)
+        isSync = true;
+      if (ds->MasterTempo)
+        isMasterTempo = true;
     }
 
     uint8_t playVal = isPlaying ? 0x7F : 0x00;
-    uint8_t cueVal  = (isCueHeld || (!isPlaying && ds && ds->LoadedTrack)) ? 0x7F : 0x00;
+    uint8_t cueVal =
+        (isCueHeld || (!isPlaying && ds && ds->LoadedTrack)) ? 0x7F : 0x00;
     uint8_t syncVal = isSync ? 0x7F : 0x00;
-    uint8_t mtVal   = isMasterTempo ? 0x7F : 0x00;
+    uint8_t mtVal = isMasterTempo ? 0x7F : 0x00;
 
     if (forceSend || playVal != lastPlayVal[i]) {
       MIDI_SendShortMsg(mainStatus, 0x0B, playVal); // PLAY / PAUSE
@@ -201,7 +218,8 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2, AudioEngine *engine
       }
 
       // Beat Loop Mode Pad LED (0x30 .. 0x37)
-      uint8_t beatLoopPadVal = (isLooping && p == 2) ? 0x7F : (padVal > 0 ? 0x20 : 0x00);
+      uint8_t beatLoopPadVal =
+          (isLooping && p == 2) ? 0x7F : (padVal > 0 ? 0x20 : 0x00);
       if (forceSend || beatLoopPadVal != lastPadVals[i][p + 8]) {
         MIDI_SendShortMsg(padStatus, (uint8_t)(0x30 + p), beatLoopPadVal);
         lastPadVals[i][p + 8] = beatLoopPadVal;
@@ -213,8 +231,8 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2, AudioEngine *engine
 void MIDI_ResetAllLEDs(void) {
   MIDI_ResetVuMeters();
 
-  uint8_t mainStatuses[4] = { 0x90, 0x91, 0x92, 0x93 };
-  uint8_t padStatuses[4]  = { 0x97, 0x99, 0x98, 0x9A };
+  uint8_t mainStatuses[4] = {0x90, 0x91, 0x92, 0x93};
+  uint8_t padStatuses[4] = {0x97, 0x99, 0x98, 0x9A};
 
   for (int i = 0; i < 4; i++) {
     uint8_t ms = mainStatuses[i];
@@ -244,7 +262,6 @@ void MIDI_ResetAllLEDs(void) {
     }
   }
 }
-
 
 void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
                         uint8_t midino, uint8_t value) {
@@ -276,14 +293,16 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
             newStart = 0;
           if (newStart < audio->LoopEndPos - 16.0) {
             audio->LoopStartPos = newStart;
-            DeckAudio_SetLoop(audio, true, audio->LoopStartPos, audio->LoopEndPos);
+            DeckAudio_SetLoop(audio, true, audio->LoopStartPos,
+                              audio->LoopEndPos);
           }
         } else if (adjOut && *adjOut) {
           adjusting = true;
           double newEnd = audio->LoopEndPos + (delta * 500.0);
           if (newEnd > audio->LoopStartPos + 16.0) {
             audio->LoopEndPos = newEnd;
-            DeckAudio_SetLoop(audio, true, audio->LoopStartPos, audio->LoopEndPos);
+            DeckAudio_SetLoop(audio, true, audio->LoopStartPos,
+                              audio->LoopEndPos);
           }
         }
       }
