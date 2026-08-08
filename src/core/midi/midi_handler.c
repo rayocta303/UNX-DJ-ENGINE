@@ -154,7 +154,14 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
 
     static double lastSendTime = 0;
     static double lastFullRefresh = 0;
+    static double lastBlinkTime = 0;
+    static bool blinkState = false;
     double now = GetTime();
+
+    if (now - lastBlinkTime > 0.300) {
+        lastBlinkTime = now;
+        blinkState = !blinkState;
+    }
 
     bool forceRefresh = false;
     if (now - lastFullRefresh > 2.0) {
@@ -166,6 +173,8 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
         MIDI_SendShortMsg(0x9F, 0x01, 0x7F);
         MIDI_SendShortMsg(0x90, 0x7F, 0x7F);
         MIDI_SendShortMsg(0x91, 0x7F, 0x7F);
+        MIDI_SendShortMsg(0x92, 0x7F, 0x7F);
+        MIDI_SendShortMsg(0x93, 0x7F, 0x7F);
     }
 
     // 1. Pioneer SysEx Keep-Alive every 1.5 seconds
@@ -182,66 +191,97 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
     if (!forceRefresh && (now - lastSendTime < 0.016)) return;
     lastSendTime = now;
 
-    static uint8_t lastPlay[2] = { 255, 255 };
-    static uint8_t lastCue[2]  = { 255, 255 };
-    static uint8_t lastVinyl[2]= { 255, 255 };
-    static uint8_t lastVu[2]   = { 255, 255 };
-    static uint8_t lastJog[2]  = { 255, 255 };
-    static uint8_t lastHotCue[2][8] = {
+    static uint8_t lastPlay[4]  = { 255, 255, 255, 255 };
+    static uint8_t lastCue[4]   = { 255, 255, 255, 255 };
+    static uint8_t lastVinyl[4] = { 255, 255, 255, 255 };
+    static uint8_t lastVu[4]    = { 255, 255, 255, 255 };
+    static uint8_t lastJog[4]   = { 255, 255, 255, 255 };
+    static uint8_t lastHotCue[4][8] = {
+        {255, 255, 255, 255, 255, 255, 255, 255},
+        {255, 255, 255, 255, 255, 255, 255, 255},
         {255, 255, 255, 255, 255, 255, 255, 255},
         {255, 255, 255, 255, 255, 255, 255, 255}
     };
 
-    // 2. Deck A & B State LEDs (Play, Cue, Vinyl, VU Meter, Hot Cue Pads)
-    DeckState *decks[2] = { d1, d2 };
+    // 2. Deck State LEDs for up to 4 Decks (Channel 1..4)
     MidiMapping *map = MIDI_GetGlobalMapping();
 
-    for (int i = 0; i < 2; i++) {
-        const char *group = (i == 0) ? "[Channel1]" : "[Channel2]";
+    for (int i = 0; i < 4; i++) {
+        DeckState *deck = NULL;
+        if (i == 0) deck = d1;
+        else if (i == 1) deck = d2;
+        else if (engine && i < 4) {
+            // Virtual deck pointers if engine active
+            deck = d1; // fallback
+        }
+        if (!deck) continue;
 
-        // Default Pioneer fallback register addresses
+        const char *groupNames[4] = { "[Channel1]", "[Channel2]", "[Channel3]", "[Channel4]" };
+        const char *group = groupNames[i];
+
         uint8_t playStatus = 0x90 + i, playNote = 0x0B;
         uint8_t cueStatus  = 0x90 + i, cueNote  = 0x0C;
         uint8_t vinylStatus= 0x90 + i, vinylNote= 0x0E;
-        uint8_t vuStatus   = 0xB0 + i, vuControl= 0x02;
 
-        // Dynamically resolve addresses from loaded mapping template if available
         if (map) {
             uint8_t s, m;
             if (MIDI_GetRegisterAddress(map, group, "play", &s, &m)) { playStatus = s; playNote = m; }
             if (MIDI_GetRegisterAddress(map, group, "cue", &s, &m)) { cueStatus = s; cueNote = m; }
             if (MIDI_GetRegisterAddress(map, group, "vinyl", &s, &m)) { vinylStatus = s; vinylNote = m; }
-            if (MIDI_GetRegisterAddress(map, group, "vu", &s, &m) || MIDI_GetRegisterAddress(map, group, "level", &s, &m)) { vuStatus = s; vuControl = m; }
         }
 
-        // Play/Pause LED
-        uint8_t playVal = decks[i]->IsPlaying ? 0x7F : 0x00;
+        // Play/Pause LED: Solid ON when playing; Blinking when paused at Cue; OFF when stopped
+        uint8_t playVal = 0x00;
+        if (deck->IsPlaying) {
+            playVal = 0x7F;
+        } else if (deck->PositionMs <= deck->MainCueMs + 50 && deck->LoadedTrack) {
+            playVal = blinkState ? 0x7F : 0x00;
+        }
         if (forceRefresh || playVal != lastPlay[i]) {
             MIDI_SendShortMsg(playStatus, playNote, playVal);
             lastPlay[i] = playVal;
         }
 
-        // Cue LED
-        uint8_t cueVal = (decks[i]->IsCueActive || !decks[i]->IsPlaying) ? 0x7F : 0x00;
+        // Cue LED: Solid ON when holding cue / paused at Cue; Blinking when playing; OFF when empty
+        uint8_t cueVal = 0x00;
+        if (deck->IsCueActive || deck->IsCueHeld || (!deck->IsPlaying && deck->PositionMs <= deck->MainCueMs + 50)) {
+            cueVal = 0x7F;
+        } else if (deck->IsPlaying && deck->LoadedTrack) {
+            cueVal = blinkState ? 0x7F : 0x00;
+        }
         if (forceRefresh || cueVal != lastCue[i]) {
             MIDI_SendShortMsg(cueStatus, cueNote, cueVal);
             lastCue[i] = cueVal;
         }
 
         // Vinyl Mode LED
-        uint8_t vinylVal = decks[i]->VinylModeEnabled ? 0x7F : 0x00;
+        uint8_t vinylVal = deck->VinylModeEnabled ? 0x7F : 0x00;
         if (forceRefresh || vinylVal != lastVinyl[i]) {
             MIDI_SendShortMsg(vinylStatus, vinylNote, vinylVal);
             lastVinyl[i] = vinylVal;
         }
 
-        // VU Meter Level (Channel 1 = 0xB0, Channel 2 = 0xB1, CC 0x02)
-        if (engine) {
+        // Loop In / Out & Reloop LEDs
+        uint8_t loopVal = 0x00;
+        if (deck->LoopAdjustIn || deck->LoopAdjustOut) {
+            loopVal = blinkState ? 0x7F : 0x00;
+        } else if (deck->IsLooping) {
+            loopVal = 0x7F;
+        }
+        uint8_t loopStatus = 0x90 + i;
+        MIDI_SendShortMsg(loopStatus, 0x10, loopVal); // Loop In
+        MIDI_SendShortMsg(loopStatus, 0x11, loopVal); // Loop Out
+        MIDI_SendShortMsg(loopStatus, 0x4C, loopVal); // Shift Loop In
+        MIDI_SendShortMsg(loopStatus, 0x4E, loopVal); // Shift Loop Out
+        MIDI_SendShortMsg(loopStatus, 0x4D, deck->IsLooping ? 0x7F : 0x00); // Reloop
+
+        // Channel VU Meter Level (Channel 1 = 0xB0, Channel 2 = 0xB1, Channel 3 = 0xB2, Channel 4 = 0xB3, CC 0x02)
+        if (engine && i < 2) {
             float vuL = engine->Decks[i].VuMeterL;
             float vuR = engine->Decks[i].VuMeterR;
             float rms = (vuL > vuR ? vuL : vuR);
-            uint8_t meterVal = (uint8_t)(rms * 118.0f); // 0x76 = 118
-            if (rms >= 0.98f) meterVal += 9; // Peak/clip indicator -> 127
+            uint8_t meterVal = (uint8_t)(rms * 118.0f);
+            if (rms >= 0.98f) meterVal += 9;
             if (meterVal > 127) meterVal = 127;
             if (forceRefresh || meterVal != lastVu[i]) {
                 MIDI_SendShortMsg(0xB0 + i, 0x02, meterVal);
@@ -249,25 +289,10 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
             }
         }
 
-        // Jogwheel LED Ring Output (Pioneer 0xBB, Control 0x00 for Deck 1, 0x01 for Deck 2)
-        if (engine && decks[i]->LoadedTrack && engine->Decks[i].SampleRate > 0) {
-            double currentSec = engine->Decks[i].Position / (double)engine->Decks[i].SampleRate;
-            if (currentSec < 0.0) currentSec = 0.0;
-            // 72 steps per 360deg circle (0x48), 0.6075 rotation speed multiplier (33.33 RPM)
-            double jogStep = fmod(currentSec * 72.0 * 0.6075, 72.0);
-            if (jogStep < 0.0) jogStep += 72.0;
-            uint8_t jogVal = (uint8_t)(jogStep) + 1; // 1..72
-            if (forceRefresh || jogVal != lastJog[i]) {
-                MIDI_SendShortMsg(0xBB, i, jogVal);
-                lastJog[i] = jogVal;
-            }
-        }
-
         // Hot Cue Pad LEDs
+        uint8_t padStatus = (i == 0) ? 0x97 : (i == 1 ? 0x99 : (i == 2 ? 0x98 : 0x9A));
         for (int p = 0; p < 8; p++) {
-            uint8_t padStatus = (i == 0) ? 0x97 : 0x99;
             uint8_t padNote = (uint8_t)p;
-
             char hcKey[32];
             snprintf(hcKey, sizeof(hcKey), "hotcue_%d", p + 1);
             if (map) {
@@ -279,16 +304,16 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
             }
 
             bool hasHotCue = false;
-            if (decks[i]->LoadedTrack) {
-                for (int h = 0; h < decks[i]->LoadedTrack->HotCuesCount; h++) {
-                    if (decks[i]->LoadedTrack->HotCues[h].ID == (unsigned int)(p + 1)) {
+            if (deck->LoadedTrack) {
+                for (int h = 0; h < deck->LoadedTrack->HotCuesCount; h++) {
+                    if (deck->LoadedTrack->HotCues[h].ID == (unsigned int)(p + 1)) {
                         hasHotCue = true;
                         break;
                     }
                 }
-                if (!hasHotCue && decks[i]->LoadedTrack->Analysis.CueCount > 0) {
-                    for (uint32_t c = 0; c < decks[i]->LoadedTrack->Analysis.CueCount; c++) {
-                        if (decks[i]->LoadedTrack->Analysis.Cues[c].ID == (unsigned int)(p + 1)) {
+                if (!hasHotCue && deck->LoadedTrack->Analysis.CueCount > 0) {
+                    for (uint32_t c = 0; c < deck->LoadedTrack->Analysis.CueCount; c++) {
+                        if (deck->LoadedTrack->Analysis.Cues[c].ID == (unsigned int)(p + 1)) {
                             hasHotCue = true;
                             break;
                         }
@@ -299,40 +324,52 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2, AudioEngine
             if (forceRefresh || padVal != lastHotCue[i][p]) {
                 MIDI_SendShortMsg(padStatus, padNote, padVal);
                 MIDI_SendShortMsg(padStatus, 0x30 + p, padVal);
-                if (i == 0) {
-                    MIDI_SendShortMsg(0x97, padNote, padVal);
-                    MIDI_SendShortMsg(0x97, 0x30 + p, padVal);
-                    MIDI_SendShortMsg(0x98, padNote, padVal);
-                } else {
-                    MIDI_SendShortMsg(0x99, padNote, padVal);
-                    MIDI_SendShortMsg(0x99, 0x30 + p, padVal);
-                    MIDI_SendShortMsg(0x9A, padNote, padVal);
-                }
                 lastHotCue[i][p] = padVal;
             }
         }
     }
 
-    // 3. Jog Wheel Rings (Pioneer DDJ-FLX6 status 0xBB, control 0x00/0x01, value 0x01..0x48)
-    uint8_t jogStatusA = 0xBB, jogNoteA = 0x00;
-    uint8_t jogStatusB = 0xBB, jogNoteB = 0x01;
-
-    float stepA = fmodf((d1->JogPointerAngle / 360.0f) * 72.0f, 72.0f);
-    if (stepA < 0.0f) stepA += 72.0f;
-    uint8_t posA = 0x01 + (uint8_t)stepA;
-    if (posA > 0x48) posA = 0x48;
-    if (forceRefresh || posA != lastJog[0]) {
-        MIDI_SendShortMsg(jogStatusA, jogNoteA, posA);
-        lastJog[0] = posA;
+    // 3. Beat FX On/Off LED
+    if (engine) {
+        static uint8_t lastFxOn = 255;
+        uint8_t fxVal = engine->BeatFX.isFxOn ? 0x7F : 0x00;
+        if (forceRefresh || fxVal != lastFxOn) {
+            MIDI_SendShortMsg(0x94, 0x47, fxVal); // Beat FX On/Off LED
+            MIDI_SendShortMsg(0x94, 0x43, fxVal); // Shift Beat FX On/Off LED
+            lastFxOn = fxVal;
+        }
     }
 
-    float stepB = fmodf((d2->JogPointerAngle / 360.0f) * 72.0f, 72.0f);
-    if (stepB < 0.0f) stepB += 72.0f;
-    uint8_t posB = 0x01 + (uint8_t)stepB;
-    if (posB > 0x48) posB = 0x48;
-    if (forceRefresh || posB != lastJog[1]) {
-        MIDI_SendShortMsg(jogStatusB, jogNoteB, posB);
-        lastJog[1] = posB;
+    // 4. Master VU Meter Level (Master L = 0xBA CC 0x00, Master R = 0xBA CC 0x01)
+    if (engine) {
+        static uint8_t lastMasterL = 255, lastMasterR = 255;
+        float rmsL = (engine->Decks[0].VuMeterL + engine->Decks[1].VuMeterL) * 0.5f;
+        float rmsR = (engine->Decks[0].VuMeterR + engine->Decks[1].VuMeterR) * 0.5f;
+        uint8_t mL = (uint8_t)(rmsL * 127.0f);
+        uint8_t mR = (uint8_t)(rmsR * 127.0f);
+        if (mL > 127) mL = 127;
+        if (mR > 127) mR = 127;
+        if (forceRefresh || mL != lastMasterL) {
+            MIDI_SendShortMsg(0xBA, 0x00, mL);
+            lastMasterL = mL;
+        }
+        if (forceRefresh || mR != lastMasterR) {
+            MIDI_SendShortMsg(0xBA, 0x01, mR);
+            lastMasterR = mR;
+        }
+    }
+
+    // 5. Jog Wheel Rings (Pioneer DDJ-FLX6 status 0xBB, control 0x00..0x03, value 0x01..0x48)
+    for (int i = 0; i < 2; i++) {
+        DeckState *deck = (i == 0) ? d1 : d2;
+        float step = fmodf((deck->JogPointerAngle / 360.0f) * 72.0f, 72.0f);
+        if (step < 0.0f) step += 72.0f;
+        uint8_t pos = 0x01 + (uint8_t)step;
+        if (pos > 0x48) pos = 0x48;
+        if (forceRefresh || pos != lastJog[i]) {
+            MIDI_SendShortMsg(0xBB, i, pos);
+            lastJog[i] = pos;
+        }
     }
 }
 
