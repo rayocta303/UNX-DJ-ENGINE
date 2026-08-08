@@ -589,6 +589,18 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     received = st->receiveSamples(outBuf, frames);
     deck->Position += (double)received * targetRate * (double)sampleRateRatio;
 
+    if (deck->IsLooping) {
+      double loopLen = deck->LoopEndPos - deck->LoopStartPos;
+      if (loopLen > 1.0) {
+        int safety = 0;
+        while (deck->Position >= deck->LoopEndPos && ++safety < 10)
+          deck->Position -= loopLen;
+        safety = 0;
+        while (deck->Position < deck->LoopStartPos && ++safety < 10)
+          deck->Position += loopLen;
+      }
+    }
+
     if (deck->SlipActive) {
       deck->SlipPosition +=
           (double)received * deck->BaseRate * (double)sampleRateRatio;
