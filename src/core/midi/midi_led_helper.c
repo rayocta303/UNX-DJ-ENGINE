@@ -170,12 +170,12 @@ void MidiLed_Update(MidiLedCache *cache, DeckState *d1, DeckState *d2, AudioEngi
         MIDI_SendSysEx(PIONEER_SYSEX_KEEPALIVE, 12);
     }
 
-    // 5. Rate Limit for LED updates (~60 FPS / 16ms delta)
+    // 5. PRIORITY 1: Update Channel 1 & 2 & Master VU Meters (Evaluated every frame for 1:1 sync with UI)
+    MidiLed_UpdateVUMeters(cache, d1, d2, engine, nowTime, forceRefresh);
+
+    // 6. Rate Limit for button LEDs and jog ring (~60 FPS / 16ms delta)
     if (!forceRefresh && (nowTime - cache->lastSendTime < 0.016)) return;
     cache->lastSendTime = nowTime;
-
-    // 6. Channel 1 & 2 & Master VU Meters Update
-    MidiLed_UpdateVUMeters(cache, d1, d2, engine, nowTime, forceRefresh);
 
     // 7. Deck 1 & 2 Transport & Pad Signal Mapping (Channels 1 & 2 only)
     for (int i = 0; i < 2; i++) {
