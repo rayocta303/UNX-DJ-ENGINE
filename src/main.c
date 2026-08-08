@@ -2567,7 +2567,11 @@ void UpdateDrawFrame(App *app) {
   if (app->screen == ScreenSplash) {
     static float splashTime = 0;
     splashTime += GetFrameTime();
-    if (splashTime >= 2.0f) { // 2 Seconds splash
+#if defined(PLATFORM_DRM) || (defined(__linux__) && !defined(__ANDROID__))
+    if (splashTime >= 0.8f) { // 0.8 Seconds fast boot splash on DRM
+#else
+    if (splashTime >= 1.5f) { // 1.5 Seconds splash
+#endif
       SplashRenderer_Unload(&app->splash);
       app->screen = ScreenPlayer;
     }
