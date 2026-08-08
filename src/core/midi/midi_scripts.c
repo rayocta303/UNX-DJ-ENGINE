@@ -18,6 +18,9 @@ void MIDI_UpdateVuMeters(AudioEngine *engine, bool forceSend) {
   if (!engine)
     return;
 
+  // Gain multiplier to map linear engine audio peaks to Pioneer DDJ hardware LED calibration
+  const float VU_GAIN = 2.8f;
+
   // 1. Channel VU Meters (Deck 1 - 4)
   for (int i = 0; i < 4; i++) {
     float peak = 0.0f;
@@ -26,7 +29,7 @@ void MIDI_UpdateVuMeters(AudioEngine *engine, bool forceSend) {
       DeckAudioState *audio = &engine->Decks[i];
       float rawPeak = fmaxf(audio->VuMeterL, audio->VuMeterR);
       float trimVal = (audio->Trim > 0.0f) ? audio->Trim : 1.0f;
-      peak = rawPeak * trimVal;
+      peak = rawPeak * trimVal * VU_GAIN;
       if (peak > 1.0f)
         peak = 1.0f;
       if (peak < 0.0f)
@@ -47,8 +50,8 @@ void MIDI_UpdateVuMeters(AudioEngine *engine, bool forceSend) {
 
   // 2. Master VU Meters (Master L & R)
   float masterVol = (engine->MasterVolume > 0.0f) ? engine->MasterVolume : 1.0f;
-  float masterL = engine->MasterVuL * masterVol;
-  float masterR = engine->MasterVuR * masterVol;
+  float masterL = engine->MasterVuL * masterVol * VU_GAIN;
+  float masterR = engine->MasterVuR * masterVol * VU_GAIN;
   if (masterL > 1.0f) masterL = 1.0f; if (masterL < 0.0f) masterL = 0.0f;
   if (masterR > 1.0f) masterR = 1.0f; if (masterR < 0.0f) masterR = 0.0f;
 
