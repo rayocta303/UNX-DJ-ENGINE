@@ -966,20 +966,20 @@ void App_Init(App *a) {
 
   strcpy(a->settingsState.Items[6].Label, "JOG RELEASE TIME");
   a->settingsState.Items[6].Type = SETTING_TYPE_KNOB;
-  a->settingsState.Items[6].Min = 0;
-  a->settingsState.Items[6].Max = 10000;
-  a->settingsState.Items[6].Step = 100.0f;
+  a->settingsState.Items[6].Min = 0.0f;
+  a->settingsState.Items[6].Max = 8.0f;
+  a->settingsState.Items[6].Step = 0.25f;
   a->settingsState.Items[6].Value = a->deckA.Waveform.VinylStartMs;
-  strcpy(a->settingsState.Items[6].Unit, "ms");
+  strcpy(a->settingsState.Items[6].Unit, "Bar");
   a->settingsState.Items[6].Category = SETTING_CAT_DECK;
 
   strcpy(a->settingsState.Items[7].Label, "TOUCH BRAKE");
   a->settingsState.Items[7].Type = SETTING_TYPE_KNOB;
-  a->settingsState.Items[7].Min = 0;
-  a->settingsState.Items[7].Max = 10000;
-  a->settingsState.Items[7].Step = 100.0f;
+  a->settingsState.Items[7].Min = 0.0f;
+  a->settingsState.Items[7].Max = 8.0f;
+  a->settingsState.Items[7].Step = 0.25f;
   a->settingsState.Items[7].Value = a->deckA.Waveform.VinylStopMs;
-  strcpy(a->settingsState.Items[7].Unit, "ms");
+  strcpy(a->settingsState.Items[7].Unit, "Bar");
   a->settingsState.Items[7].Category = SETTING_CAT_DECK;
 
   strcpy(a->settingsState.Items[8].Label, "JOG RPM");
@@ -3049,13 +3049,16 @@ void UpdateDrawFrame(App *app) {
     float blockSize = 1024.0f;
     float blocksPerSec = (float)sr / blockSize;
 
-    // Accel is the increment per block to reach pitch 1.0 in N seconds
-    // Since we want linear ramp: delta = (TargetRate - 0) / TotalBlocks
-    // TotalBlocks = DurationSeconds * blocksPerSec
+    // Convert Bar duration settings to seconds using deck BPM (default 120.0 BPM if unanalyzed)
+    float bpm = (audioEngine->Decks[i].BPM > 10.0) ? (float)audioEngine->Decks[i].BPM : 120.0f;
+    float barSec = (4.0f * 60.0f) / bpm;
+    float startSec = ds->Waveform.VinylStartMs * barSec;
+    float stopSec = ds->Waveform.VinylStopMs * barSec;
+
     audioEngine->Decks[i].VinylStartAccel =
-        1.0f / ((ds->Waveform.VinylStartMs / 1000.0f) * blocksPerSec + 1.0f);
+        (startSec > 0.001f) ? (1.0f / (startSec * blocksPerSec + 1.0f)) : 1.0f;
     audioEngine->Decks[i].VinylStopAccel =
-        1.0f / ((ds->Waveform.VinylStopMs / 1000.0f) * blocksPerSec + 1.0f);
+        (stopSec > 0.001f) ? (1.0f / (stopSec * blocksPerSec + 1.0f)) : 1.0f;
   }
 
   bool browserSearchFocused = app->browserState.IsActive && app->browserState.IsSearching;

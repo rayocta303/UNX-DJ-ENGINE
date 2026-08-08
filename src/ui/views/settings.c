@@ -842,11 +842,13 @@ static void Settings_Draw(Component *base) {
                  
       char valBuf[32];
       if (item->Value == (int)item->Value) sprintf(valBuf, "%d", (int)item->Value);
+      else if (fabsf(item->Value * 4.0f - roundf(item->Value * 4.0f)) < 0.01f) sprintf(valBuf, "%.2f", item->Value);
       else sprintf(valBuf, "%.1f", item->Value);
       
       if (item->Unit[0] != '\0') {
         char fullBuf[64];
-        sprintf(fullBuf, "%s %s", valBuf, item->Unit);
+        const char *uStr = (strcmp(item->Unit, "Bar") == 0 && item->Value > 1.0f) ? "Bars" : item->Unit;
+        sprintf(fullBuf, "%s %s", valBuf, uStr);
         UIDrawText(fullBuf, faceMd, valueX + valueWidth - S(80), ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
       } else {
         UIDrawText(valBuf, faceMd, valueX + valueWidth - S(80), ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);

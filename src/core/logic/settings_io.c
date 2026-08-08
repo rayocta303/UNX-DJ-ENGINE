@@ -44,8 +44,14 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         if (sscanf(strstr(p, "\"low\""), "\"low\": %f", &val) == 1) wfmA->GainLow = val;
         if (sscanf(strstr(p, "\"mid\""), "\"mid\": %f", &val) == 1) wfmA->GainMid = val;
         if (sscanf(strstr(p, "\"high\""), "\"high\": %f", &val) == 1) wfmA->GainHigh = val;
-        if (sscanf(strstr(p, "\"start\""), "\"start\": %f", &val) == 1) wfmA->VinylStartMs = val;
-        if (sscanf(strstr(p, "\"stop\""), "\"stop\": %f", &val) == 1) wfmA->VinylStopMs = val;
+        if (sscanf(strstr(p, "\"start\""), "\"start\": %f", &val) == 1) {
+            if (val > 8.0f) val = 0.5f; // Convert legacy millisecond settings to Bar
+            wfmA->VinylStartMs = val;
+        }
+        if (sscanf(strstr(p, "\"stop\""), "\"stop\": %f", &val) == 1) {
+            if (val > 8.0f) val = 1.0f; // Convert legacy millisecond settings to Bar
+            wfmA->VinylStopMs = val;
+        }
         if (sscanf(strstr(p, "\"lock\""), "\"lock\": %d", &ival) == 1) wfmA->LoadLock = (bool)ival;
         if (sscanf(strstr(p, "\"rpm\""), "\"rpm\": %f", &val) == 1) wfmA->JogCalibRPM = val;
     }
@@ -56,8 +62,14 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         if (sscanf(strstr(p, "\"low\""), "\"low\": %f", &val) == 1) wfmB->GainLow = val;
         if (sscanf(strstr(p, "\"mid\""), "\"mid\": %f", &val) == 1) wfmB->GainMid = val;
         if (sscanf(strstr(p, "\"high\""), "\"high\": %f", &val) == 1) wfmB->GainHigh = val;
-        if (sscanf(strstr(p, "\"start\""), "\"start\": %f", &val) == 1) wfmB->VinylStartMs = val;
-        if (sscanf(strstr(p, "\"stop\""), "\"stop\": %f", &val) == 1) wfmB->VinylStopMs = val;
+        if (sscanf(strstr(p, "\"start\""), "\"start\": %f", &val) == 1) {
+            if (val > 8.0f) val = 0.5f;
+            wfmB->VinylStartMs = val;
+        }
+        if (sscanf(strstr(p, "\"stop\""), "\"stop\": %f", &val) == 1) {
+            if (val > 8.0f) val = 1.0f;
+            wfmB->VinylStopMs = val;
+        }
         if (sscanf(strstr(p, "\"lock\""), "\"lock\": %d", &ival) == 1) wfmB->LoadLock = (bool)ival;
         if (sscanf(strstr(p, "\"rpm\""), "\"rpm\": %f", &val) == 1) wfmB->JogCalibRPM = val;
     }
@@ -104,7 +116,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     controllerPath[0] = '\0';
     wfmA->Style = WAVEFORM_STYLE_RGB;
     wfmA->GainLow = 0.4f; wfmA->GainMid = 0.4f; wfmA->GainHigh = 0.4f;
-    wfmA->VinylStartMs = 500.0f; wfmA->VinylStopMs = 1200.0f; wfmA->LoadLock = true;
+    wfmA->VinylStartMs = 0.5f; wfmA->VinylStopMs = 1.0f; wfmA->LoadLock = true;
     wfmA->JogCalibRPM = 33.3f;
     *wfmB = *wfmA;
     
