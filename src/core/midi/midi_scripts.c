@@ -1,5 +1,6 @@
 #include "core/midi/midi_scripts.h"
 #include "audio/engine.h"
+#include "ui/player/player_state.h"
 #include "core/logic/control_object.h"
 #include "core/midi/midi_handler.h"
 #include <math.h>
@@ -75,6 +76,170 @@ void MIDI_ResetVuMeters(void) {
   MIDI_SendShortMsg(0xBA, 0x01, 0);
   lastMasterVuL = 0;
   lastMasterVuR = 0;
+}
+
+static uint8_t lastLoopInVal[4] = {0, 0, 0, 0};
+static uint8_t lastLoopOutVal[4] = {0, 0, 0, 0};
+static uint8_t lastReloopVal[4] = {0, 0, 0, 0};
+static uint8_t lastPlayVal[4] = {0, 0, 0, 0};
+static uint8_t lastCueVal[4] = {0, 0, 0, 0};
+static uint8_t lastSyncVal[4] = {0, 0, 0, 0};
+static uint8_t lastMasterTempoVal[4] = {0, 0, 0, 0};
+static uint8_t lastPadVals[4][16] = {{0}};
+
+void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2, AudioEngine *engine, bool forceSend) {
+  DeckState *decks[4] = { d1, d2, NULL, NULL };
+  uint8_t mainStatuses[4] = { 0x90, 0x91, 0x92, 0x93 };
+  uint8_t padStatuses[4]  = { 0x97, 0x99, 0x98, 0x9A };
+
+  for (int i = 0; i < 4; i++) {
+    DeckState *ds = decks[i];
+    DeckAudioState *audio = (engine && i < MAX_DECKS) ? &engine->Decks[i] : NULL;
+
+    uint8_t mainStatus = mainStatuses[i];
+    uint8_t padStatus  = padStatuses[i];
+
+    // -------------------------------------------------------------
+    // 1. LOOP BUTTON LEDs (Loop In, Loop Out, Reloop/Exit)
+    // -------------------------------------------------------------
+    bool isLooping = false;
+    bool hasLoopIn = false;
+    bool hasLoopOut = false;
+
+    if (audio) {
+      isLooping = audio->IsLooping;
+      hasLoopIn = (audio->LoopStartPos > 0);
+      hasLoopOut = (audio->LoopEndPos > 0);
+    }
+    if (ds) {
+      if (ds->IsLooping) isLooping = true;
+      if (ds->LoopAdjustIn) hasLoopIn = true;
+      if (ds->LoopAdjustOut) hasLoopOut = true;
+    }
+
+    uint8_t loopInVal  = (hasLoopIn || isLooping) ? 0x7F : 0x00;
+    uint8_t loopOutVal = (hasLoopOut || isLooping) ? 0x7F : 0x00;
+    uint8_t reloopVal  = isLooping ? 0x7F : 0x00;
+
+    if (forceSend || loopInVal != lastLoopInVal[i]) {
+      MIDI_SendShortMsg(mainStatus, 0x10, loopInVal); // LOOP IN / 4 BEAT
+      lastLoopInVal[i] = loopInVal;
+    }
+    if (forceSend || loopOutVal != lastLoopOutVal[i]) {
+      MIDI_SendShortMsg(mainStatus, 0x11, loopOutVal); // LOOP OUT
+      lastLoopOutVal[i] = loopOutVal;
+    }
+    if (forceSend || reloopVal != lastReloopVal[i]) {
+      MIDI_SendShortMsg(mainStatus, 0x12, reloopVal); // RELOOP / EXIT
+      lastReloopVal[i] = reloopVal;
+    }
+
+    // -------------------------------------------------------------
+    // 2. PLAY / CUE / SYNC / MASTER TEMPO LEDs
+    // -------------------------------------------------------------
+    bool isPlaying = false;
+    bool isCueHeld = false;
+    bool isSync = false;
+    bool isMasterTempo = false;
+
+    if (audio) {
+      isPlaying = audio->IsPlaying;
+      isMasterTempo = audio->MasterTempoActive;
+    }
+    if (ds) {
+      if (ds->IsPlaying) isPlaying = true;
+      if (ds->IsCueHeld) isCueHeld = true;
+      if (ds->SyncMode > 0) isSync = true;
+      if (ds->MasterTempo) isMasterTempo = true;
+    }
+
+    uint8_t playVal = isPlaying ? 0x7F : 0x00;
+    uint8_t cueVal  = (isCueHeld || (!isPlaying && ds && ds->LoadedTrack)) ? 0x7F : 0x00;
+    uint8_t syncVal = isSync ? 0x7F : 0x00;
+    uint8_t mtVal   = isMasterTempo ? 0x7F : 0x00;
+
+    if (forceSend || playVal != lastPlayVal[i]) {
+      MIDI_SendShortMsg(mainStatus, 0x0B, playVal); // PLAY / PAUSE
+      lastPlayVal[i] = playVal;
+    }
+    if (forceSend || cueVal != lastCueVal[i]) {
+      MIDI_SendShortMsg(mainStatus, 0x0C, cueVal); // CUE
+      lastCueVal[i] = cueVal;
+    }
+    if (forceSend || syncVal != lastSyncVal[i]) {
+      MIDI_SendShortMsg(mainStatus, 0x58, syncVal); // SYNC
+      lastSyncVal[i] = syncVal;
+    }
+    if (forceSend || mtVal != lastMasterTempoVal[i]) {
+      MIDI_SendShortMsg(mainStatus, 0x1A, mtVal); // MASTER TEMPO
+      lastMasterTempoVal[i] = mtVal;
+    }
+
+    // -------------------------------------------------------------
+    // 3. PADS LEDs (HotCues 1-8 & Beat Loops)
+    // -------------------------------------------------------------
+    for (int p = 0; p < 8; p++) {
+      uint8_t padVal = 0x00; // Default OFF
+
+      if (ds && ds->LoadedTrack) {
+        // Check HotCue presence for Pad p (ID = p + 1)
+        for (int h = 0; h < ds->LoadedTrack->HotCuesCount; h++) {
+          if (ds->LoadedTrack->HotCues[h].ID == (unsigned int)(p + 1)) {
+            padVal = 0x7F; // Lit up HotCue Pad
+            break;
+          }
+        }
+      }
+
+      // HotCue Mode Pad LED (0x00 .. 0x07)
+      if (forceSend || padVal != lastPadVals[i][p]) {
+        MIDI_SendShortMsg(padStatus, (uint8_t)p, padVal);
+        lastPadVals[i][p] = padVal;
+      }
+
+      // Beat Loop Mode Pad LED (0x30 .. 0x37)
+      uint8_t beatLoopPadVal = (isLooping && p == 2) ? 0x7F : (padVal > 0 ? 0x20 : 0x00);
+      if (forceSend || beatLoopPadVal != lastPadVals[i][p + 8]) {
+        MIDI_SendShortMsg(padStatus, (uint8_t)(0x30 + p), beatLoopPadVal);
+        lastPadVals[i][p + 8] = beatLoopPadVal;
+      }
+    }
+  }
+}
+
+void MIDI_ResetAllLEDs(void) {
+  MIDI_ResetVuMeters();
+
+  uint8_t mainStatuses[4] = { 0x90, 0x91, 0x92, 0x93 };
+  uint8_t padStatuses[4]  = { 0x97, 0x99, 0x98, 0x9A };
+
+  for (int i = 0; i < 4; i++) {
+    uint8_t ms = mainStatuses[i];
+    uint8_t ps = padStatuses[i];
+
+    MIDI_SendShortMsg(ms, 0x10, 0); // Loop In
+    MIDI_SendShortMsg(ms, 0x11, 0); // Loop Out
+    MIDI_SendShortMsg(ms, 0x12, 0); // Reloop/Exit
+    MIDI_SendShortMsg(ms, 0x0B, 0); // Play
+    MIDI_SendShortMsg(ms, 0x0C, 0); // Cue
+    MIDI_SendShortMsg(ms, 0x58, 0); // Sync
+    MIDI_SendShortMsg(ms, 0x1A, 0); // Master Tempo
+
+    lastLoopInVal[i] = 0;
+    lastLoopOutVal[i] = 0;
+    lastReloopVal[i] = 0;
+    lastPlayVal[i] = 0;
+    lastCueVal[i] = 0;
+    lastSyncVal[i] = 0;
+    lastMasterTempoVal[i] = 0;
+
+    for (int p = 0; p < 8; p++) {
+      MIDI_SendShortMsg(ps, (uint8_t)p, 0);
+      MIDI_SendShortMsg(ps, (uint8_t)(0x30 + p), 0);
+      lastPadVals[i][p] = 0;
+      lastPadVals[i][p + 8] = 0;
+    }
+  }
 }
 
 

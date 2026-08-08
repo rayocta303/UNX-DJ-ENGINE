@@ -144,10 +144,11 @@ void MIDI_FlushDebugLogs(void) {
 
 void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2,
                      AudioEngine *engine, void *appPtr) {
-  (void)ctx; (void)d1; (void)d2; (void)appPtr;
-  if (!engine)
-    return;
-  MIDI_UpdateVuMeters(engine, false);
+  (void)ctx; (void)appPtr;
+  if (engine) {
+    MIDI_UpdateVuMeters(engine, false);
+  }
+  MIDI_UpdateLoopAndPadLEDs(d1, d2, engine, false);
 }
 
 

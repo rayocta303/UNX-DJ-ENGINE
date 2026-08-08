@@ -7,6 +7,8 @@
 #include "core/midi/midi_mapper.h"
 #include "audio/engine.h"
 
+typedef struct DeckState DeckState;
+
 void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status, uint8_t midino, uint8_t value);
 
 /**
@@ -16,9 +18,20 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status, 
 void MIDI_UpdateVuMeters(AudioEngine *engine, bool forceSend);
 
 /**
+ * Updates MIDI OUT Loop Button LEDs, HotCue Pad LEDs, and Play/Cue/Sync status LEDs for hardware controllers.
+ */
+void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2, AudioEngine *engine, bool forceSend);
+
+/**
  * Resets all MIDI OUT VU meters to 0 (off state).
  */
 void MIDI_ResetVuMeters(void);
 
+/**
+ * Resets all hardware LEDs (VU meters, Loop LEDs, Pad LEDs, Play/Cue/Sync) to off state.
+ */
+void MIDI_ResetAllLEDs(void);
+
 #endif
+
 
