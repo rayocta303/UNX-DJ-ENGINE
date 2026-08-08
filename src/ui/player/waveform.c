@@ -364,6 +364,17 @@ static void Waveform_Draw(Component *base) {
     effectiveZoom = 0.1f;
   double elapsedHalfFrames = r->State->Position;
 
+  extern AudioEngine *globalAudioEngine;
+  if (globalAudioEngine != NULL && r->ID >= 0 && r->ID < 2) {
+    DeckAudioState *audio = &globalAudioEngine->Decks[r->ID];
+    double ratioHF = (audio->SampleRate > 0) ? ((double)audio->SampleRate / 150.0) : 294.0;
+    if (r->State->LoopAdjustIn && audio->LoopStartPos > 0) {
+      elapsedHalfFrames = audio->LoopStartPos / ratioHF;
+    } else if (r->State->LoopAdjustOut && audio->LoopEndPos > 0) {
+      elapsedHalfFrames = audio->LoopEndPos / ratioHF;
+    }
+  }
+
   float centerX = SCREEN_WIDTH / 2.0f;
   float playheadX = centerX;
 
@@ -809,14 +820,16 @@ static void Waveform_Draw(Component *base) {
     }
   }
 
-  // Playhead — solid bright line with subtle glow shadow behind it
-  Color playheadColor = colorHigh;
-  // Shadow (slightly wider, low alpha)
-  DrawLineEx((Vector2){playheadX, wfY}, (Vector2){playheadX, wfY + waveH}, 3.0f,
-             Fade(colorHigh, 0.18f));
-  // Main hairline
-  DrawLineEx((Vector2){playheadX, wfY}, (Vector2){playheadX, wfY + waveH}, 1.0f,
-             playheadColor);
+  // Playhead — solid bright line with subtle glow shadow behind it (only when not editing loop)
+  if (!r->State->LoopAdjustIn && !r->State->LoopAdjustOut) {
+    Color playheadColor = colorHigh;
+    // Shadow (slightly wider, low alpha)
+    DrawLineEx((Vector2){playheadX, wfY}, (Vector2){playheadX, wfY + waveH}, 3.0f,
+               Fade(colorHigh, 0.18f));
+    // Main hairline
+    DrawLineEx((Vector2){playheadX, wfY}, (Vector2){playheadX, wfY + waveH}, 1.0f,
+               playheadColor);
+  }
 
   if (r->ID == 0) {
     DrawLineEx((Vector2){wfLeft, wfY + waveH - 1},
