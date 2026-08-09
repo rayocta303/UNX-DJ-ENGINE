@@ -14,3 +14,4 @@ struct BeatFXPanel {
 };
 
 void BeatFXPanel_Init(BeatFXPanel *b, BeatFXState *state, DeckState *a, DeckState *b_state, struct AudioEngine *audioPlugin);
+void BeatFXPanel_DrawOverlays(BeatFXPanel *b);

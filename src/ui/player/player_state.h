@@ -79,6 +79,7 @@ typedef struct DeckState {
   bool MasterTempo;
   int TempoRange; // 0=6%, 1=10%, 2=16%, 3=WIDE
   float TempoPercent;
+  double LastJogActiveTime;
 
   // Hardware integration
   float HardwarePitchPercent;

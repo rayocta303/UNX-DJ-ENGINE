@@ -68,12 +68,14 @@ static int BeatFX_Update(Component *base) {
                 b->State->SelectedFX = i;
                 if (b->AudioPlugin) BeatFXManager_SetFX(&b->AudioPlugin->BeatFX, i);
                 b->State->FXDropdownOpen = false;
+                UI_ConsumeTouch();
                 break;
             }
         }
         
         if (clickedOutside || IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
             b->State->FXDropdownOpen = false;
+            UI_ConsumeTouch();
         }
         return 0; // Block other interactions
     } else if (b->State->ChannelDropdownOpen) {
@@ -96,12 +98,14 @@ static int BeatFX_Update(Component *base) {
                 b->State->SelectedChannel = i;
                 if (b->AudioPlugin) b->AudioPlugin->BeatFX.targetChannel = i;
                 b->State->ChannelDropdownOpen = false;
+                UI_ConsumeTouch();
                 break;
             }
         }
         
         if (clickedOutside || IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
             b->State->ChannelDropdownOpen = false;
+            UI_ConsumeTouch();
         }
         return 0; // Block other interactions
     } else {
@@ -378,7 +382,15 @@ static void BeatFX_Draw(Component *base) {
     DrawRectangleLines(x + S(6) + tabW, cy, tabW, S(14), ColorShadow);
     DrawCentredText("BEAT FX", faceXXS, x + S(6) + tabW, tabW, cy + S(3.5f), S(7), beatFxActive ? ColorWhite : ColorShadow);
 
-    // --- OVERLAYS (Draw at bottom for highest Z-index) ---
+}
+
+void BeatFXPanel_DrawOverlays(BeatFXPanel *b) {
+    if (!b->State->FXDropdownOpen && !b->State->ChannelDropdownOpen) return;
+    
+    Font faceSm = UIFonts_GetFace(S(9));
+    Font faceMd = UIFonts_GetFace(S(10));
+    Font faceLg = UIFonts_GetFace(S(12));
+    
     Vector2 mouse = UIGetMousePosition();
     if (b->State->FXDropdownOpen) {
         DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, 200});

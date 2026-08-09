@@ -337,7 +337,7 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
   if (deck->IsTouching && deck->VinylModeEnabled) {
     // Vinyl Scratch Mode: 1:1 platter rate lock when scrubbing, Touch Brake when held
     targetRate = deck->JogRate;
-    accel = (fabs(deck->JogRate) > 0.001) ? 1.0f : (deck->VinylStopAccel > 0 ? deck->VinylStopAccel : 0.12f);
+    accel = (fabs(deck->JogRate) > 0.001) ? 100.0f : (deck->VinylStopAccel > 0 ? deck->VinylStopAccel : 0.12f);
   } else {
     // CDJ Pitch Bend Mode or Vinyl Release Inertia
     double base = deck->IsMotorOn ? deck->BaseRate : 0.0;
@@ -345,7 +345,7 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
 
     if (fabs(deck->JogRate) > 0.001f) {
       // Active vinyl/waveform spin release inertia: follow decay curve directly without linear lag
-      accel = 1.0f;
+      accel = 100.0f;
     } else if (deck->IsMotorOn) {
       accel = (deck->VinylStartAccel > 0 ? deck->VinylStartAccel : 0.12f);
     } else {
@@ -363,7 +363,7 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
       deck->IsMotorOn = false;
     }
     targetRate = deck->JogRate;
-    accel = 1.0f;
+    accel = 100.0f;
   }
 
   if (deck->ReleaseFXTimer > 0) {

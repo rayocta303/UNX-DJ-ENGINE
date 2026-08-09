@@ -3277,9 +3277,12 @@ void UpdateDrawFrame(App *app) {
       double ticksPerSecAtNormalSpeed = (double)g_JogConfig.TicksPerRev * (calibRPM / 60.0);
       double rawRate = app->deckA.JogDelta / (ticksPerSecAtNormalSpeed * dt);
       app->deckA.JogDelta = 0;
-      audioEngine->Decks[0].JogRate = audioEngine->Decks[0].JogRate * (double)g_JogConfig.EmaPrevWeight + rawRate * (double)g_JogConfig.EmaRawWeight;
+      audioEngine->Decks[0].JogRate = rawRate;
+      app->deckA.LastJogActiveTime = GetTime();
     } else {
-      audioEngine->Decks[0].JogRate = 0.0;
+      if (GetTime() - app->deckA.LastJogActiveTime > 0.05) {
+          audioEngine->Decks[0].JogRate = 0.0;
+      }
     }
   } else if (audioEngine->Decks[0].VinylReleaseActive) {
     // Vinyl touch release inertia in progress: consume leftover physical wheel ticks
@@ -3363,9 +3366,12 @@ void UpdateDrawFrame(App *app) {
       double ticksPerSecAtNormalSpeed = (double)g_JogConfig.TicksPerRev * (calibRPM / 60.0);
       double rawRate = app->deckB.JogDelta / (ticksPerSecAtNormalSpeed * dt);
       app->deckB.JogDelta = 0;
-      audioEngine->Decks[1].JogRate = audioEngine->Decks[1].JogRate * (double)g_JogConfig.EmaPrevWeight + rawRate * (double)g_JogConfig.EmaRawWeight;
+      audioEngine->Decks[1].JogRate = rawRate;
+      app->deckB.LastJogActiveTime = GetTime();
     } else {
-      audioEngine->Decks[1].JogRate = 0.0;
+      if (GetTime() - app->deckB.LastJogActiveTime > 0.05) {
+          audioEngine->Decks[1].JogRate = 0.0;
+      }
     }
   } else if (audioEngine->Decks[1].VinylReleaseActive) {
     // Vinyl touch release inertia in progress: consume leftover physical wheel ticks
@@ -3681,6 +3687,11 @@ void UpdateDrawFrame(App *app) {
     app->stripA.base.Draw((Component *)&app->stripA);
     app->stripB.base.Draw((Component *)&app->stripB);
     app->topbar.base.Draw((Component *)&app->topbar);
+    
+    if (app->screen == ScreenPlayer) {
+        BeatFXPanel_DrawOverlays(&app->player.BeatFX);
+    }
+    
     Toast_UpdateAndDraw(GetFrameTime());
   }
 
