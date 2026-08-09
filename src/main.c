@@ -3521,11 +3521,9 @@ void UpdateDrawFrame(App *app) {
   // ESC / Back logic
   if (!browserSearchFocused && IsKeyPressed(app->keyMap.back)) {
     if (app->screen == ScreenBrowser) {
-      if (app->browserState.BrowseLevel == 3 && !app->browserState.IsTagList) {
+      Browser_Back(&app->browserState);
+      if (!app->browserState.IsActive) {
         app->screen = ScreenPlayer;
-        app->browserState.IsActive = false;
-      } else {
-        Browser_Back(&app->browserState);
       }
     } else if (app->screen != ScreenPlayer && app->screen != ScreenSplash) {
       app->screen = ScreenPlayer;
@@ -3543,8 +3541,12 @@ void UpdateDrawFrame(App *app) {
     app->splash.base.Update((Component *)&app->splash);
   if (app->screen == ScreenPlayer)
     app->player.base.Update((Component *)&app->player);
-  if (app->screen == ScreenBrowser)
+  if (app->screen == ScreenBrowser) {
     app->browser.base.Update((Component *)&app->browser);
+    if (!app->browserState.IsActive) {
+      app->screen = ScreenPlayer;
+    }
+  }
   if (app->screen == ScreenInfo)
     app->info.base.Update((Component *)&app->info);
   if (app->screen == ScreenSettings)

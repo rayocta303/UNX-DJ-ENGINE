@@ -17,6 +17,8 @@ typedef struct {
     int CursorPos;
     int ScrollOffset;
     int BrowseLevel; // 0=Tracks, 1=Playlists, 2=Categories, 3=Source
+    int FocusArea;   // 0=Content List, 1=Sidebar Focus
+    int SidebarCursorPos; // 0..6 (0: Tracks, 1: Categories, 2: Playlists, 3: Devices/Source, 4..6: P1..P3)
     bool InfoEnabled;
     int CurrentPlaylistIdx;
     bool IsTagList;

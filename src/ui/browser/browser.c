@@ -424,32 +424,37 @@ void Browser_Back(BrowserState *s) {
     return;
   }
 
-  if (s->BrowseLevel == 0) {
-    // NAV-03: if entered via Playlist list → return there; if via bank/category shortcut → skip to Categories
-    if (s->CurrentPlaylistIdx >= 0 && !s->CameFromBank) {
-      s->CurrentPlaylistIdx = -1;
-      s->BrowseLevel = 1; // Return to Playlists List
-    } else {
-      s->CurrentPlaylistIdx = -1;
-      s->CameFromBank = false;
-      s->BrowseLevel = 2; // Return directly to Categories (skip Playlists)
+  if (s->FocusArea == 0) {
+    if (s->BrowseLevel == 0) {
+      // NAV-03: if entered via Playlist list → return there; if via bank/category shortcut → skip to Categories
+      if (s->CurrentPlaylistIdx >= 0 && !s->CameFromBank) {
+        s->CurrentPlaylistIdx = -1;
+        s->BrowseLevel = 1; // Return to Playlists List
+      } else {
+        s->CurrentPlaylistIdx = -1;
+        s->CameFromBank = false;
+        s->BrowseLevel = 2; // Return directly to Categories (skip Playlists)
+      }
+      s->CursorPos = s->ScrollOffset = 0;
+      s->VisualScroll = 0.0f;
+      Browser_UpdateActiveTracks(s);
+    } else if (s->BrowseLevel == 1) {
+      s->BrowseLevel = 2; // Return to Categories
+      s->CursorPos = s->ScrollOffset = 0;
+      s->VisualScroll = 0.0f;
+      Browser_UpdateActiveTracks(s);
+    } else if (s->BrowseLevel == 2) {
+      s->BrowseLevel = 3; // Return to Storage Selection (USB)
+      s->CursorPos = s->ScrollOffset = 0;
+      s->VisualScroll = 0.0f;
+    } else if (s->BrowseLevel == 3) {
+      s->FocusArea = 1; // Level 2a (Device) backspace -> Level 1 (Sidebar focus)
+      s->SidebarCursorPos = 3; // Source icon
     }
-    s->CursorPos = s->ScrollOffset = 0;
-    s->VisualScroll = 0.0f;
-    Browser_UpdateActiveTracks(s);
-  } else if (s->BrowseLevel == 1) {
-    s->BrowseLevel = 2; // Return to Categories
-    s->CursorPos = s->ScrollOffset = 0;
-    s->VisualScroll = 0.0f;
-    Browser_UpdateActiveTracks(s);
-  } else if (s->BrowseLevel == 2) {
-    s->BrowseLevel = 3; // Return to Storage Selection (USB)
-    s->CursorPos = s->ScrollOffset = 0;
-    s->VisualScroll = 0.0f;
-  } else if (s->BrowseLevel == 3) {
-    s->IsActive = false; // Exit browser -> Return to Player
+  } else {
+    // Level 1 (Sidebar) backspace -> Exit browser view to Player
+    s->IsActive = false;
   }
-
 }
 
 void Browser_CheckStorageConnection(BrowserState *s) {
@@ -1092,10 +1097,22 @@ static int Browser_Update(Component *base) {
     if (loadToDeck == -1)
       return 0;
   } else {
-    if (IsKeyPressed(KEY_LEFT))
-      loadToDeck = 0;
-    if (IsKeyPressed(KEY_RIGHT))
-      loadToDeck = 1;
+    if (!s->IsSearching && !s->ShowOSK) {
+      if (IsKeyPressed(KEY_LEFT)) {
+        if (s->FocusArea == 0) {
+          s->FocusArea = 1; // Move focus from Content List to Sidebar
+          if (s->BrowseLevel == 0) s->SidebarCursorPos = 0; // Tracks
+          else if (s->BrowseLevel == 2) s->SidebarCursorPos = 1; // Categories
+          else if (s->BrowseLevel == 1) s->SidebarCursorPos = 2; // Playlists
+          else if (s->BrowseLevel == 3) s->SidebarCursorPos = 3; // Source
+        } else {
+          Browser_Back(s);
+        }
+      }
+      if (IsKeyPressed(KEY_RIGHT)) {
+        triggerEnter = true;
+      }
+    }
   }
 
   int totalVisible = (s->BrowseLevel == 0) ? 9 : 10;
@@ -1110,6 +1127,8 @@ static int Browser_Update(Component *base) {
         lastBrowserListTapTime = GetTime();
         s->TouchDragAccumulator = 999.0f;
         s->ShowOSK = false;
+        s->FocusArea = 0;
+        s->SidebarCursorPos = i;
         if (i < 4) {
           s->ScrollOffset = 0;
           s->VisualScroll = 0;
@@ -1215,21 +1234,27 @@ static int Browser_Update(Component *base) {
       float itemRowH = S(28.0f);
       int delta = s->MidiBrowseDelta;
       s->MidiBrowseDelta = 0;
-      if (delta > 0) {
-          for (int i = 0; i < delta; i++) {
-              if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
-                  if (s->CursorPos < totalVisible - 1) s->CursorPos++;
-                  else s->ScrollOffset++;
+      if (s->FocusArea == 1) {
+          s->SidebarCursorPos += delta;
+          if (s->SidebarCursorPos < 0) s->SidebarCursorPos = 0;
+          if (s->SidebarCursorPos > 6) s->SidebarCursorPos = 6;
+      } else {
+          if (delta > 0) {
+              for (int i = 0; i < delta; i++) {
+                  if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
+                      if (s->CursorPos < totalVisible - 1) s->CursorPos++;
+                      else s->ScrollOffset++;
+                  }
+              }
+          } else if (delta < 0) {
+              for (int i = 0; i < -delta; i++) {
+                  if (s->CursorPos > 0) s->CursorPos--;
+                  else if (s->ScrollOffset > 0) s->ScrollOffset--;
               }
           }
-      } else if (delta < 0) {
-          for (int i = 0; i < -delta; i++) {
-              if (s->CursorPos > 0) s->CursorPos--;
-              else if (s->ScrollOffset > 0) s->ScrollOffset--;
-          }
+          s->VisualScroll = (float)(s->ScrollOffset * itemRowH);
+          s->ScrollVelocity = 0;
       }
-      s->VisualScroll = (float)(s->ScrollOffset * itemRowH);
-      s->ScrollVelocity = 0;
   }
 
   // Strict Bounds Clamping for Cursor and ScrollOffset
@@ -1408,24 +1433,30 @@ static int Browser_Update(Component *base) {
   // 4. Keyboard Navigation (Sync with VisualScroll)
   if (!s->IsSearching && !s->ShowLoadPopup) {
     if (IsKeyPressed(KEY_DOWN)) {
-      if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
-        s->CursorPos++;
-        // Keep cursor in view
-        if (s->CursorPos >= totalVisible) {
-            s->CursorPos = totalVisible - 1;
-            s->VisualScroll += rowH;
-            s->ScrollVelocity = 0;
+      if (s->FocusArea == 1) {
+        if (s->SidebarCursorPos < 6) s->SidebarCursorPos++;
+      } else {
+        if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
+          s->CursorPos++;
+          if (s->CursorPos >= totalVisible) {
+              s->CursorPos = totalVisible - 1;
+              s->VisualScroll += rowH;
+              s->ScrollVelocity = 0;
+          }
         }
       }
     }
     if (IsKeyPressed(KEY_UP)) {
-      if (s->CursorPos + s->ScrollOffset > 0) {
-        s->CursorPos--;
-        // Keep cursor in view
-        if (s->CursorPos < 0) {
-            s->CursorPos = 0;
-            s->VisualScroll -= rowH;
-            s->ScrollVelocity = 0;
+      if (s->FocusArea == 1) {
+        if (s->SidebarCursorPos > 0) s->SidebarCursorPos--;
+      } else {
+        if (s->CursorPos + s->ScrollOffset > 0) {
+          s->CursorPos--;
+          if (s->CursorPos < 0) {
+              s->CursorPos = 0;
+              s->VisualScroll -= rowH;
+              s->ScrollVelocity = 0;
+          }
         }
       }
     }
@@ -1434,7 +1465,46 @@ static int Browser_Update(Component *base) {
   if (IsKeyPressed(KEY_ENTER) || triggerEnter) {
     lastBrowserListTapTime = GetTime();
     s->TouchDragAccumulator = 999.0f; // Consume touch drag distance to prevent re-triggering sub-level
-    if (s->BrowseLevel == 3) {
+    if (s->FocusArea == 1) {
+      int i = s->SidebarCursorPos;
+      s->FocusArea = 0;
+      s->ShowOSK = false;
+      if (i < 4) {
+        s->ScrollOffset = 0;
+        s->VisualScroll = 0;
+        s->ScrollVelocity = 0;
+        if (i == 3) {
+          s->BrowseLevel = 3; // Source / Devices
+          s->CursorPos = 0;
+        } else if (i == 2) {
+          s->BrowseLevel = 1; // Playlists level
+          s->CursorPos = 0;
+        } else if (i == 1) {
+          s->BrowseLevel = 2; // Categories level
+          s->CursorPos = 0;
+        } else {
+          s->BrowseLevel = 0; // Tracks
+          s->CurrentPlaylistIdx = -1;
+          s->CameFromBank = false;
+          s->CursorPos = 0;
+          Browser_UpdateActiveTracks(s);
+        }
+      } else {
+        int bankIdx = i - 4;
+        if (s->PlaylistBank[bankIdx].PlaylistIdx >= 0) {
+          if (s->SelectedStorage && strcmp(s->PlaylistBank[bankIdx].StoragePath, s->SelectedStorage->Path) != 0) {
+            Browser_SwitchStorageByPath(s, s->PlaylistBank[bankIdx].StoragePath);
+          }
+          s->CurrentPlaylistIdx = s->PlaylistBank[bankIdx].PlaylistIdx;
+          s->CameFromBank = true;
+          s->BrowseLevel = 0;
+          Browser_UpdateActiveTracks(s);
+          s->CursorPos = s->ScrollOffset = 0;
+          s->VisualScroll = 0;
+          s->ScrollVelocity = 0;
+        }
+      }
+    } else if (s->BrowseLevel == 3) {
       int idx = s->ScrollOffset + s->CursorPos;
       if (idx < s->StorageCount) {
         s->SelectedStorage = &s->AvailableStorages[idx];
@@ -2204,21 +2274,28 @@ static void Browser_Draw(Component *base) {
         isActiveNav = true; // Source
     }
 
+    bool isSidebarFocused = (s->FocusArea == 1 && s->SidebarCursorPos == i);
+
     // Background
     Color bg = ColorDark2;
     if (isHovered)
       bg = ColorDark1;
     if (isActiveNav)
       bg = (Color){30, 30, 60, 255};
-    if (isBank)
+    if (isSidebarFocused)
+      bg = (Color){20, 70, 140, 255};
+    if (isBank && !isSidebarFocused)
       bg = isAssigned ? ColorDGreen : ColorDark3;
 
     DrawRectangle(0, boxY, sidebarW, sidebarW, bg);
     if (isActiveNav)
       DrawRectangle(0, boxY, S(3), sidebarW, ColorBlue);
-
-    // Inner separation lines
-    DrawRectangleLinesEx(boxRect, 1.0f, ColorDark1);
+    if (isSidebarFocused) {
+      DrawRectangleLinesEx(boxRect, 2.0f, (Color){0, 220, 255, 255});
+      DrawSelectionTriangle(sidebarW - S(4), boxY + (sidebarW / 2.0f), (Color){0, 220, 255, 255});
+    } else {
+      DrawRectangleLinesEx(boxRect, 1.0f, ColorDark1);
+    }
 
     if (!isBank) {
       const char *sidIcons[] = {"\uf03a", "\uf07b", "\uf5c0",
