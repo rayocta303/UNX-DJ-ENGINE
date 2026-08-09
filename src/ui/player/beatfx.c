@@ -5,6 +5,7 @@
 #include "core/logic/quantize.h"
 #include "audio/engine.h"
 #include "ui/player/waveform.h"
+#include "ui/components/touch_utility.h"
 #include <stdio.h>
 #include <math.h>
 
@@ -44,33 +45,65 @@ static int BeatFX_Update(Component *base) {
     }
 
     if (b->State->FXDropdownOpen) {
-        if (UI_IsReleased()) {
-            float dy = fxSelectY + S(18);
-            for (int i = 0; i < ALL_FX_COUNT; i++) {
-                Rectangle optRect = { x + S(4), dy, w - S(8), S(14) };
-                if (CheckCollisionPointRec(mouse, optRect)) {
-                    b->State->SelectedFX = i;
-                    if (b->AudioPlugin) BeatFXManager_SetFX(&b->AudioPlugin->BeatFX, i);
-                    break;
-                }
-                dy += S(14);
+        float modalW = S(360);
+        float modalH = S(220);
+        float modalX = (SCREEN_WIDTH - modalW) / 2.0f;
+        float modalY = (SCREEN_HEIGHT - modalH) / 2.0f;
+        
+        bool clickedOutside = Touch_CheckClick((Rectangle){0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}, 0) && !CheckCollisionPointRec(mouse, (Rectangle){modalX, modalY, modalW, modalH});
+        
+        float cols = 3;
+        float rows = 5;
+        float pad = S(10);
+        float btnW = (modalW - pad * 4) / cols;
+        float btnH = (modalH - S(40) - pad * 6) / rows;
+        
+        for (int i = 0; i < ALL_FX_COUNT; i++) {
+            int row = i / (int)cols;
+            int col = i % (int)cols;
+            float bx = modalX + pad + col * (btnW + pad);
+            float by = modalY + S(40) + row * (btnH + pad);
+            
+            if (Touch_CheckClick((Rectangle){bx, by, btnW, btnH}, S(2))) {
+                b->State->SelectedFX = i;
+                if (b->AudioPlugin) BeatFXManager_SetFX(&b->AudioPlugin->BeatFX, i);
+                b->State->FXDropdownOpen = false;
+                break;
             }
+        }
+        
+        if (clickedOutside || IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
             b->State->FXDropdownOpen = false;
         }
+        return 0; // Block other interactions
     } else if (b->State->ChannelDropdownOpen) {
-        if (UI_IsReleased()) {
-            float dy = cy + S(14);
-            for (int i = 0; i < 3; i++) {
-                Rectangle optRect = { x + S(4), dy, w - S(8), S(14) };
-                if (CheckCollisionPointRec(mouse, optRect)) {
-                    b->State->SelectedChannel = i;
-                    if (b->AudioPlugin) b->AudioPlugin->BeatFX.targetChannel = i;
-                    break;
-                }
-                dy += S(14);
+        float modalW = S(240);
+        float modalH = S(180);
+        float modalX = (SCREEN_WIDTH - modalW) / 2.0f;
+        float modalY = (SCREEN_HEIGHT - modalH) / 2.0f;
+        
+        bool clickedOutside = Touch_CheckClick((Rectangle){0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}, 0) && !CheckCollisionPointRec(mouse, (Rectangle){modalX, modalY, modalW, modalH});
+        
+        float pad = S(10);
+        float btnW = modalW - pad * 2;
+        float btnH = S(36);
+        
+        for (int i = 0; i < 3; i++) {
+            float bx = modalX + pad;
+            float by = modalY + S(40) + i * (btnH + pad);
+            
+            if (Touch_CheckClick((Rectangle){bx, by, btnW, btnH}, S(2))) {
+                b->State->SelectedChannel = i;
+                if (b->AudioPlugin) b->AudioPlugin->BeatFX.targetChannel = i;
+                b->State->ChannelDropdownOpen = false;
+                break;
             }
+        }
+        
+        if (clickedOutside || IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
             b->State->ChannelDropdownOpen = false;
         }
+        return 0; // Block other interactions
     } else {
         if (fxHovered && UI_IsReleased()) {
             b->State->FXDropdownOpen = true;
@@ -183,8 +216,6 @@ static void BeatFX_Draw(Component *base) {
     DrawCentredText(fxName, faceLg, x + S(4), w - S(8), cy + S(3), S(12), ColorWhite);
     DrawTriangle((Vector2){x + w - S(14), cy + S(7)}, (Vector2){x + w - S(8), cy + S(7)}, (Vector2){x + w - S(11), cy + S(12)}, ColorWhite);
     
-    float fxDropdownY = cy + S(18); // Save for later drawing overlay
-    
     cy += S(22);
 
     // 2. CH SELECT
@@ -200,7 +231,6 @@ static void BeatFX_Draw(Component *base) {
     DrawCentredText(chName, faceSm, x + S(4), w - S(8), cy + S(2), S(9), ColorWhite);
     DrawTriangle((Vector2){x + w - S(12), cy + S(5)}, (Vector2){x + w - S(6), cy + S(5)}, (Vector2){x + w - S(9), cy + S(10)}, ColorWhite);
     
-    float dropdownY = cy; // Save for drawing overlay
     cy += S(20);
 
 
@@ -351,29 +381,67 @@ static void BeatFX_Draw(Component *base) {
     // --- OVERLAYS (Draw at bottom for highest Z-index) ---
     Vector2 mouse = UIGetMousePosition();
     if (b->State->FXDropdownOpen) {
-        float dy = fxDropdownY;
+        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, 200});
+        
+        float modalW = S(360);
+        float modalH = S(220);
+        float modalX = (SCREEN_WIDTH - modalW) / 2.0f;
+        float modalY = (SCREEN_HEIGHT - modalH) / 2.0f;
+        
+        DrawRectangleRounded((Rectangle){modalX, modalY, modalW, modalH}, 0.1f, 4, ColorDark1);
+        DrawRectangleRoundedLines((Rectangle){modalX, modalY, modalW, modalH}, 0.1f, 4, 1.5f, ColorOrange);
+        DrawCentredText("SELECT BEAT FX", faceLg, modalX, modalW, modalY + S(12), S(12), ColorWhite);
+        DrawLine(modalX + S(10), modalY + S(30), modalX + modalW - S(10), modalY + S(30), ColorDark2);
+        
+        float cols = 3;
+        float rows = 5;
+        float pad = S(10);
+        float btnW = (modalW - pad * 4) / cols;
+        float btnH = (modalH - S(40) - pad * 6) / rows;
+        
         for (int i = 0; i < ALL_FX_COUNT; i++) {
-            Rectangle optRect = { x + S(4), dy, w - S(8), S(14) };
-            Color bg = (b->State->SelectedFX == i) ? ColorBlue : ColorDark3;
+            int row = i / (int)cols;
+            int col = i % (int)cols;
+            float bx = modalX + pad + col * (btnW + pad);
+            float by = modalY + S(40) + row * (btnH + pad);
+            Rectangle optRect = { bx, by, btnW, btnH };
+            
+            Color bg = (b->State->SelectedFX == i) ? ColorBlue : ColorDark2;
             if (CheckCollisionPointRec(mouse, optRect)) bg = ColorGray;
             
-            DrawRectangleRec(optRect, bg);
-            DrawRectangleLinesEx(optRect, 1, ColorDark1);
-            DrawCentredText(AllFXNames[i], faceSm, optRect.x, optRect.width, optRect.y + S(2), S(9), ColorWhite);
-            dy += S(14);
+            DrawRectangleRounded(optRect, 0.2f, 4, bg);
+            DrawRectangleRoundedLines(optRect, 0.2f, 4, 1.0f, ColorShadow);
+            DrawCentredText(AllFXNames[i], faceSm, optRect.x, optRect.width, optRect.y + (btnH - S(9)) / 2.0f, S(9), ColorWhite);
         }
     } else if (b->State->ChannelDropdownOpen) {
+        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, 200});
+        
+        float modalW = S(240);
+        float modalH = S(180);
+        float modalX = (SCREEN_WIDTH - modalW) / 2.0f;
+        float modalY = (SCREEN_HEIGHT - modalH) / 2.0f;
+        
+        DrawRectangleRounded((Rectangle){modalX, modalY, modalW, modalH}, 0.1f, 4, ColorDark1);
+        DrawRectangleRoundedLines((Rectangle){modalX, modalY, modalW, modalH}, 0.1f, 4, 1.5f, ColorOrange);
+        DrawCentredText("SELECT CHANNEL", faceLg, modalX, modalW, modalY + S(12), S(12), ColorWhite);
+        DrawLine(modalX + S(10), modalY + S(30), modalX + modalW - S(10), modalY + S(30), ColorDark2);
+        
         const char* chNames[] = { "MASTER", "DECK 1", "DECK 2" };
-        float dy = dropdownY + S(14);
+        float pad = S(10);
+        float btnW = modalW - pad * 2;
+        float btnH = S(36);
+        
         for (int i = 0; i < 3; i++) {
-            Rectangle optRect = { x + S(4), dy, w - S(8), S(14) };
-            Color bg = (b->State->SelectedChannel == i) ? ColorBlue : ColorDark3;
+            float bx = modalX + pad;
+            float by = modalY + S(40) + i * (btnH + pad);
+            Rectangle optRect = { bx, by, btnW, btnH };
+            
+            Color bg = (b->State->SelectedChannel == i) ? ColorBlue : ColorDark2;
             if (CheckCollisionPointRec(mouse, optRect)) bg = ColorGray;
             
-            DrawRectangleRec(optRect, bg);
-            DrawRectangleLinesEx(optRect, 1, ColorDark1);
-            DrawCentredText(chNames[i], faceSm, optRect.x, optRect.width, optRect.y + S(2), S(9), ColorWhite);
-            dy += S(14);
+            DrawRectangleRounded(optRect, 0.2f, 4, bg);
+            DrawRectangleRoundedLines(optRect, 0.2f, 4, 1.0f, ColorShadow);
+            DrawCentredText(chNames[i], faceMd, optRect.x, optRect.width, optRect.y + (btnH - S(10)) / 2.0f, S(12), ColorWhite);
         }
     }
 }

@@ -3,31 +3,83 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
+#include "ui/components/touch_utility.h"
 #include <stdio.h>
+#include <math.h>
 
 static int Credits_Update(Component *base) {
   CreditsRenderer *r = (CreditsRenderer *)base;
   if (!r->State->IsActive)
     return 0;
 
-  // Handle Scrolling
+  // View bounds for max scroll calculation (approximate)
+  float viewH = SCREEN_HEIGHT - DECK_STR_H - TOP_BAR_H;
+  float cardH = viewH - S(20);
+  float contentH = cardH - S(30);
+  // Estimate content height based on number of rows
+  float totalContentH = S(14)*3 + S(16)*2 + S(15) + S(14) + S(16)*9 + S(15) + S(14) + S(16)*7;
+  float maxScroll = totalContentH - contentH;
+  if (maxScroll < 0) maxScroll = 0;
+
+  // Touch drag integration
+  Vector2 mouse = UIGetMousePosition();
+  if (UI_IsPressed()) {
+      r->State->ScrollPhysics.DragStartPos = mouse.y;
+      r->State->ScrollPhysics.DragStartScroll = r->State->ScrollPhysics.Scroll;
+      r->State->ScrollPhysics.IsDragging = false;
+  }
+  
+  if (UI_IsDown()) {
+      float dy = mouse.y - r->State->ScrollPhysics.DragStartPos;
+      if (!r->State->ScrollPhysics.IsDragging && fabsf(dy) > S(4.0f)) {
+          r->State->ScrollPhysics.IsDragging = true;
+          r->State->ScrollPhysics.DragStartPos = mouse.y;
+          r->State->ScrollPhysics.DragStartScroll = r->State->ScrollPhysics.Scroll;
+      }
+      
+      if (r->State->ScrollPhysics.IsDragging) {
+          float newDy = mouse.y - r->State->ScrollPhysics.DragStartPos;
+          r->State->ScrollPhysics.Scroll = r->State->ScrollPhysics.DragStartScroll - newDy;
+          r->State->ScrollPhysics.Velocity = -GetMouseDelta().y / (GetFrameTime() > 0 ? GetFrameTime() : 0.016f);
+      }
+  } else if (UI_IsReleased()) {
+      r->State->ScrollPhysics.IsDragging = false;
+  }
+
+  // Handle Wheel
   float wheel = GetMouseWheelMove();
   if (wheel != 0) {
-    r->State->Scroll -= wheel * S(20.0f);
+    r->State->ScrollPhysics.Scroll -= wheel * S(20.0f);
+    r->State->ScrollPhysics.Velocity = 0;
   }
 
-  if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-    Vector2 delta = GetMouseDelta();
-    r->State->Scroll -= delta.y;
+  TouchScroll_Update(&r->State->ScrollPhysics, maxScroll, GetFrameTime());
+  r->State->Scroll = r->State->ScrollPhysics.Scroll;
+
+  // Allow closing by tapping anywhere outside the card or the back button
+  float cardW = S(420);
+  float cardX = (SCREEN_WIDTH - cardW) / 2.0f;
+  float startY = TOP_BAR_H;
+  float cardY = startY + S(10);
+  Rectangle cardRect = {cardX, cardY, cardW, cardH};
+  
+  bool closeClicked = false;
+  if (Touch_CheckClick((Rectangle){0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}, 0) && !CheckCollisionPointRec(mouse, cardRect)) {
+      closeClicked = true;
+  }
+  
+  float btnW = S(120);
+  float btnH = S(30);
+  float btnX = cardX + (cardW - btnW) / 2.0f;
+  float btnY = cardY + cardH - btnH - S(10);
+  if (Touch_CheckClick((Rectangle){btnX, btnY, btnW, btnH}, S(5))) {
+      closeClicked = true;
   }
 
-  // Boundaries check (Max scroll will be calculated in Draw, but we can cap it
-  // roughly here)
-  if (r->State->Scroll < 0)
-    r->State->Scroll = 0;
-
-  if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
+  if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) || closeClicked) {
     r->State->IsActive = false;
+    r->State->ScrollPhysics.Scroll = 0;
+    r->State->ScrollPhysics.VisualScroll = 0;
     r->State->Scroll = 0;
   }
 
@@ -80,7 +132,7 @@ static void Credits_Draw(Component *base) {
 
   BeginScissorMode((int)contentX, (int)contentY, (int)contentW, (int)contentH);
 
-  float ly = contentY - r->State->Scroll;
+  float ly = contentY - r->State->ScrollPhysics.VisualScroll;
   float rowH = S(16);
 
   // --- SECTION: GITHUB CONTRIBUTORS ---
@@ -126,11 +178,9 @@ static void Credits_Draw(Component *base) {
   EndScissorMode();
 
   // Cap Scroll
-  float maxScroll = (ly - (contentY - r->State->Scroll)) - contentH;
+  float maxScroll = (ly - (contentY - r->State->ScrollPhysics.VisualScroll)) - contentH;
   if (maxScroll < 0)
     maxScroll = 0;
-  if (r->State->Scroll > maxScroll)
-    r->State->Scroll = maxScroll;
 
   // Scrollbar
   if (maxScroll > 0) {
@@ -138,13 +188,19 @@ static void Credits_Draw(Component *base) {
     float sbX = cardX + cardW - sbW - S(2);
     float sbH = (contentH / (maxScroll + contentH)) * contentH;
     float sbY =
-        contentY + (r->State->Scroll / (maxScroll + contentH)) * contentH;
+        contentY + (r->State->ScrollPhysics.VisualScroll / maxScroll) * (contentH - sbH);
     DrawRectangleRounded((Rectangle){sbX, sbY, sbW, sbH}, 1.0f, 4, ColorOrange);
   }
 
-  // Footer Hint
-  DrawCentredText("ESC/BACK to return", faceXS, cardX + sideW, cardW - sideW,
-                  cardY + cardH - S(12), S(8), ColorShadow);
+  // Draw Touch-Friendly CLOSE Button
+  float btnW = S(120);
+  float btnH = S(30);
+  float btnX = cardX + (cardW - btnW) / 2.0f;
+  float btnY = cardY + cardH - btnH - S(10);
+  
+  DrawRectangleRounded((Rectangle){btnX, btnY, btnW, btnH}, 0.2f, 4, ColorDark2);
+  DrawRectangleRoundedLines((Rectangle){btnX, btnY, btnW, btnH}, 0.2f, 4, 1.5f, ColorGray);
+  DrawCentredText("CLOSE", faceSm, btnX, btnW, btnY + (btnH - S(10)) / 2.0f, S(10), ColorWhite);
 }
 
 void CreditsRenderer_Init(CreditsRenderer *r, CreditsState *state) {
@@ -152,4 +208,5 @@ void CreditsRenderer_Init(CreditsRenderer *r, CreditsState *state) {
   r->base.Draw = Credits_Draw;
   r->State = state;
   r->State->Scroll = 0;
+  TouchScroll_Init(&r->State->ScrollPhysics);
 }

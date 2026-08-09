@@ -3,6 +3,7 @@
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
 #include "version.h"
+#include "ui/components/touch_utility.h"
 #include <stdio.h>
 
 static int About_Update(Component *base) {
@@ -10,7 +11,34 @@ static int About_Update(Component *base) {
   if (!r->State->IsActive)
     return 0;
 
-  if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
+  float viewH = SCREEN_HEIGHT - DECK_STR_H;
+  float centerX = SCREEN_WIDTH / 2.0f;
+  float centerY = viewH / 2.0f;
+
+  float cardW = S(380);
+  float cardH = S(240);
+  float cardX = centerX - (cardW / 2.0f);
+  float cardY = centerY - (cardH / 2.0f) + (TOP_BAR_H / 2.0f);
+  Rectangle cardRect = {cardX, cardY, cardW, cardH};
+
+  Vector2 mouse = UIGetMousePosition();
+  bool closeClicked = false;
+
+  // Tap outside card to close
+  if (Touch_CheckClick((Rectangle){0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}, 0) && !CheckCollisionPointRec(mouse, cardRect)) {
+      closeClicked = true;
+  }
+
+  // Close button hitbox
+  float btnW = S(90);
+  float btnH = S(24);
+  float btnX = cardX + cardW - btnW - S(20);
+  float btnY = cardY + cardH - btnH - S(10);
+  if (Touch_CheckClick((Rectangle){btnX, btnY, btnW, btnH}, S(5))) {
+      closeClicked = true;
+  }
+
+  if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) || closeClicked) {
     r->State->IsActive = false;
   }
   return 0;
@@ -119,11 +147,19 @@ static void About_Draw(Component *base) {
   UIDrawText(audioBuf, faceSm, contentX + S(18), detailsY + rowH * 3 + S(6),
              S(9), ColorGray);
 
-  // Footer Hints (Inside the card now)
+  // Footer Hint
   UIDrawText("The Sound of Nusantara, For Everyone.", faceXS, contentX,
-             cardY + cardH - S(15), S(7), ColorShadow);
-  // UIDrawText("BACK to exit", faceXS, cardX + cardW - S(60),
-  //            cardY + cardH - S(15), S(7), ColorShadow);
+             cardY + cardH - S(18), S(7), ColorShadow);
+             
+  // Draw Touch-Friendly CLOSE Button
+  float btnW = S(90);
+  float btnH = S(24);
+  float btnX = cardX + cardW - btnW - S(20);
+  float btnY = cardY + cardH - btnH - S(10);
+  
+  DrawRectangleRounded((Rectangle){btnX, btnY, btnW, btnH}, 0.2f, 4, ColorDark2);
+  DrawRectangleRoundedLines((Rectangle){btnX, btnY, btnW, btnH}, 0.2f, 4, 1.0f, ColorGray);
+  DrawCentredText("CLOSE", faceSm, btnX, btnW, btnY + (btnH - S(10)) / 2.0f, S(10), ColorWhite);
 }
 
 void AboutRenderer_Init(AboutRenderer *r, AboutState *state) {

@@ -890,11 +890,9 @@ static void Settings_Draw(Component *base) {
       DrawRectangleRounded((Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)}, 0.15f, 4, (Color){18, 18, 18, 255});
     }
 
-    // Label with clipping
+    // Label with clipping (using software truncation to avoid nested scissor bugs)
     float labelLimit = valueX - S(10);
-    BeginScissorMode((int)labelX, (int)ry, (int)(labelLimit - labelX), (int)rowH);
-    UIDrawText(item->Label, faceMd, labelX + S(12), ry + (rowH / 2.0f) - S(7), S(13), ColorWhite);
-    EndScissorMode();
+    UIDrawTextTruncated(item->Label, faceMd, labelX + S(12), ry + (rowH / 2.0f) - S(7), S(13), ColorWhite, labelLimit - (labelX + S(12)));
 
     if (item->Type == SETTING_TYPE_LIST) {
       const char *valStr = "";
@@ -914,9 +912,8 @@ static void Settings_Draw(Component *base) {
           DrawRectangle(valueX, ry + S(4), valueWidth, rowH - S(8), ColorDark2);
           DrawCentredText(valStr, faceMd, valueX, valueWidth, ry + (rowH / 2.0f) - S(7), S(12), ColorOrange);
       } else {
-          BeginScissorMode((int)innerValX, (int)ry, (int)innerValW, (int)rowH);
+          // DrawCentredText internally uses UIDrawTextTruncated, so we don't need scissor mode
           DrawCentredText(valStr, faceMd, innerValX, innerValW, ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
-          EndScissorMode();
       }
 
     } else if (item->Type == SETTING_TYPE_KNOB) {
@@ -1091,7 +1088,7 @@ static void Settings_Draw(Component *base) {
               if (item->Current == i) DrawRectangleRec(opRect, ColorGray);
               else DrawRectangleRec(opRect, ColorDark1);
               DrawRectangleLinesEx(opRect, 1, ColorShadow);
-              UIDrawText(item->Options[i], faceMd, dropdownX + S(20), cy + S(12), S(15), (item->Current == i) ? ColorOrange : ColorWhite);
+              UIDrawTextTruncated(item->Options[i], faceMd, dropdownX + S(20), cy + S(12), S(15), (item->Current == i) ? ColorOrange : ColorWhite, dropdownW - S(40));
           }
           cy += opHeight;
       }
