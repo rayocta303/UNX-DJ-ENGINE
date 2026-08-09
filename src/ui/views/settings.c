@@ -587,24 +587,7 @@ static int Settings_Update(Component *base) {
           }
       }
 
-      // DONE Button
-      Rectangle doneBtnRect = { S(15), divY + S(5), S(90), S(18) };
-      if (Touch_CheckClick(doneBtnRect, S(6.0f))) {
-        g_lastSettingsClickTime = now;
-        if (r->OnApply)
-          r->OnApply(r->callbackCtx);
-        if (r->OnClose)
-          r->OnClose(r->callbackCtx);
-        return 1;
-      }
-      // CLOSE Button
-      Rectangle closeBtnRect = { SCREEN_WIDTH - S(105), divY + S(5), S(90), S(18) };
-      if (Touch_CheckClick(closeBtnRect, S(6.0f))) {
-        g_lastSettingsClickTime = now;
-        if (r->OnClose)
-          r->OnClose(r->callbackCtx);
-        return 1;
-      }
+
 
       // List Item Selection & Action Clicking with pixelOffset
       float pixelOffset = fmodf(r->State->VisualScroll, rowH);
@@ -1033,20 +1016,9 @@ static void Settings_Draw(Component *base) {
   UIDrawText(detailBuf[0] != '\0' ? detailBuf : "No item selected", faceXS, S(15), divY + S(5), S(9.5f), ColorOrange);
   DrawLine(0, divY + S(18), SCREEN_WIDTH, divY + S(18), ColorGray);
 
-  // DONE / CLOSE Buttons (Offset by details strip height)
-  Rectangle doneRect = { S(15), divY + S(23), S(90), S(18) };
-  DrawRectangleRounded(doneRect, 0.5f, 4, ColorBlue);
-  DrawRectangleRoundedLines(doneRect, 0.5f, 4, 1.0f, ColorWhite);
-  DrawCentredText("DONE", faceSm, doneRect.x, doneRect.width, divY + S(26), S(11), ColorWhite);
-
   char countStr[32];
   sprintf(countStr, "%d / %d", r->State->Scroll + r->State->CursorPos + 1, filteredCount);
   UIDrawText(countStr, faceXS, SCREEN_WIDTH / 2.0f - S(24.0f), divY + S(26), S(9), ColorGray);
-
-  Rectangle closeRect = { SCREEN_WIDTH - S(105), divY + S(23), S(90), S(18) };
-  DrawRectangleRounded(closeRect, 0.5f, 4, ColorDark2);
-  DrawRectangleRoundedLines(closeRect, 0.5f, 4, 1.0f, ColorGray);
-  DrawCentredText("CLOSE", faceSm, closeRect.x, closeRect.width, divY + S(26), S(11), ColorWhite);
 
   // MIDI Monitor & Tip Label
   if (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) {

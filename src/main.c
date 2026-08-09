@@ -2816,7 +2816,18 @@ void UpdateDrawFrame(App *app) {
         app->screen = ScreenPlayer;
         app->settingsState.IsActive = false;
       }
-      app->browserState.MidiRequestBack = false;
+    }
+    app->browserState.MidiRequestBack = false;
+  } else if (app->screen == ScreenPlayer) {
+    if (app->browserState.MidiBrowseDelta != 0) {
+      if (app->browserState.MidiBrowseDelta > 0) {
+        Waveform_AdjustZoom(&app->deckA, -1);
+        Waveform_AdjustZoom(&app->deckB, -1);
+      } else {
+        Waveform_AdjustZoom(&app->deckA, 1);
+        Waveform_AdjustZoom(&app->deckB, 1);
+      }
+      app->browserState.MidiBrowseDelta = 0;
     }
   }
 

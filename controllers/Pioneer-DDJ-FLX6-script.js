@@ -1248,7 +1248,7 @@ PioneerDDJFLX6.tempoSliderLSB = function(channel, control, value, status, group)
     engine.setValue(
         group,
         "rate",
-        1 - (fullValue / 0x2000)
+        (fullValue / 0x2000) - 1
     );
 };
 

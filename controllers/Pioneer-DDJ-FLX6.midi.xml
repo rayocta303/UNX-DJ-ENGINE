@@ -12,6 +12,16 @@
         </scriptfiles>
         <controls>
             <control>
+                <group>[Master]</group>
+                <key>browse_back</key>
+                <description>FLX6 BACK Button</description>
+                <status>0x96</status>
+                <midino>0x65</midino>
+                <options>
+                    <normal/>
+                </options>
+            </control>
+            <control>
                 <group>[Channel1]</group>
                 <key>hotcue_1_activate</key>
                 <description>PAD 1 (DECK1) HOT CUE MODE - press - set hotcue</description>
