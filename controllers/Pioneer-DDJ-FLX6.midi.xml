@@ -12,6 +12,16 @@
         </scriptfiles>
         <controls>
             <control>
+                <group>[App]</group>
+                <key>browser_toggle</key>
+                <description>FLX6 VIEW Button</description>
+                <status>0x96</status>
+                <midino>0x7A</midino>
+                <options>
+                    <normal/>
+                </options>
+            </control>
+            <control>
                 <group>[Library]</group>
                 <key>back</key>
                 <description>FLX6 BACK Button</description>
