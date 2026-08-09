@@ -61,10 +61,15 @@ static int Settings_Update(Component *base) {
           return 1;
       }
 
-      Vector2 mouseReq = GetMouseDelta();
-      r->State->DropdownScroll -= GetMouseWheelMove() * S(30.0f);
+      // BUG-13 FIX: Use drag accumulator to avoid dropdown jump on initial tap
+      static float dropDragAccum = 0.0f;
+      if (UI_IsPressed()) dropDragAccum = 0.0f;
       if (UI_IsDown()) {
-          r->State->DropdownScroll -= mouseReq.y;
+          float dy = GetMouseDelta().y;
+          dropDragAccum += fabsf(dy);
+          if (dropDragAccum > S(3.0f)) {
+              r->State->DropdownScroll -= dy;
+          }
       }
       
       float maxScroll = contentH - dropdownH;
@@ -298,6 +303,35 @@ static int Settings_Update(Component *base) {
           return 1;
       }
       
+      // BUG-14 FIX: Touch swipe scroll for mapping list
+      static float mapDragStartY = 0.0f;
+      static float mapDragAccum = 0.0f;
+      static bool mapIsDragging = false;
+      Vector2 mapMouse = UIGetMousePosition();
+      if (UI_IsPressed()) {
+          mapDragStartY = mapMouse.y;
+          mapDragAccum = 0.0f;
+          mapIsDragging = false;
+      }
+      if (UI_IsDown()) {
+          float dy = mapMouse.y - mapDragStartY;
+          mapDragAccum += fabsf(mapMouse.y - mapDragStartY);
+          mapDragStartY = mapMouse.y;
+          if (mapDragAccum > S(4.0f)) mapIsDragging = true;
+          if (mapIsDragging) {
+              float scrollPx = -dy;
+              int scrollRows = (int)(scrollPx / rowH);
+              if (scrollRows != 0) {
+                  r->State->MappingListScroll += scrollRows;
+                  if (r->State->MappingListScroll < 0) r->State->MappingListScroll = 0;
+                  int maxMapScroll = mapCount - visibleRows;
+                  if (maxMapScroll < 0) maxMapScroll = 0;
+                  if (r->State->MappingListScroll > maxMapScroll) r->State->MappingListScroll = maxMapScroll;
+              }
+          }
+      }
+      if (UI_IsReleased()) { mapIsDragging = false; }
+      
       return 1; // block background interaction
   }
 
@@ -514,7 +548,8 @@ static int Settings_Update(Component *base) {
       }
   }
 
-  if (UI_IsDown()) {
+  // BUG-19 FIX: Block mouse drag knob when dropdown is open
+  if (!r->State->IsDropdownOpen && UI_IsDown()) {
       Vector2 mouseDelta = GetMouseDelta();
       if (hoveredItemIdx >= 0 && r->State->Items[hoveredItemIdx].Type == SETTING_TYPE_KNOB) {
           if (fabsf(mouseDelta.x) > 0.001f || fabsf(mouseDelta.y) > 0.001f) {
@@ -614,35 +649,44 @@ static int Settings_Update(Component *base) {
     }
   }
 
-  if (IsKeyPressed(KEY_UP)) {
-    if (r->State->CursorPos > 0) {
-      r->State->CursorPos--;
-    } else if (r->State->Scroll > 0) {
-      r->State->Scroll--;
+  // BUG-11 FIX: KEY_UP/DOWN only move cursor when FocusLevel >= 1 (item mode)
+  if (r->State->FocusLevel >= 1) {
+    if (IsKeyPressed(KEY_UP)) {
+      if (r->State->CursorPos > 0) {
+        r->State->CursorPos--;
+      } else if (r->State->Scroll > 0) {
+        r->State->Scroll--;
+      }
     }
-  }
-  if (IsKeyPressed(KEY_DOWN)) {
-    float viewH = SCREEN_HEIGHT - DECK_STR_H;
-    float bottomH = S(46.0f);
-    float divY = viewH - bottomH;
-    float tabH = S(28.0f);
-    float rowH = (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) ? S(38.0f) : S(32.0f); // Match Settings_Draw
-    float listY = TOP_BAR_H + tabH;
-    if (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) listY += S(20);
-    int visibleRows = (int)((divY - listY) / rowH);
-
-    if (r->State->CursorPos < visibleRows - 1 &&
-        r->State->Scroll + r->State->CursorPos < filteredCount - 1) {
-      r->State->CursorPos++;
-    } else if (r->State->Scroll + visibleRows < filteredCount) {
-      r->State->Scroll++;
+    // BUG-12 FIX: Use the same visibleRows already calculated above, not a duplicate
+    if (IsKeyPressed(KEY_DOWN)) {
+      if (r->State->CursorPos < visibleRows - 1 &&
+          r->State->Scroll + r->State->CursorPos < filteredCount - 1) {
+        r->State->CursorPos++;
+      } else if (r->State->Scroll + visibleRows < filteredCount) {
+        r->State->Scroll++;
+      }
+    }
+  } else {
+    // FocusLevel == 0: UP/DOWN cycle through tabs
+    if (IsKeyPressed(KEY_UP)) {
+      int nextTab = r->State->SelectedTab - 1;
+      if (nextTab < 0) nextTab = SETTING_CAT_COUNT - 1;
+      r->State->SelectedTab = nextTab;
+      r->State->Scroll = 0; r->State->CursorPos = 0; r->State->VisualScroll = 0;
+    }
+    if (IsKeyPressed(KEY_DOWN)) {
+      int nextTab = (r->State->SelectedTab + 1) % SETTING_CAT_COUNT;
+      r->State->SelectedTab = nextTab;
+      r->State->Scroll = 0; r->State->CursorPos = 0; r->State->VisualScroll = 0;
     }
   }
 
   int idx_f = r->State->Scroll + r->State->CursorPos;
-  if (idx_f < filteredCount) {
+  if (idx_f < filteredCount && r->State->FocusLevel >= 1) {
     int idx = filteredIndices[idx_f];
     SettingItem *item = &r->State->Items[idx];
+    // BUG-09 FIX: KEY_LEFT/RIGHT value editing only when FocusLevel >= 1
     if (item->Type == SETTING_TYPE_LIST) {
       if (IsKeyPressed(KEY_LEFT)) {
         if (item->Current > 0)
@@ -664,7 +708,8 @@ static int Settings_Update(Component *base) {
           r->State->IsDropdownOpen = true;
           r->State->DropdownItemIdx = idx;
           r->State->DropdownScroll = 0;
-          return 0;
+          r->State->FocusLevel = 2;
+          return 0; // BUG-10 FIX: return here to prevent global ENTER OnApply double-fire
       }
     } else if (item->Type == SETTING_TYPE_KNOB) {
       float step = (item->Step > 0) ? item->Step : (item->Max - item->Min) / 20.0f;
@@ -714,22 +759,32 @@ static int Settings_Update(Component *base) {
     }
   }
 
-  // Horizontal Tab Switch with Page Up/Down or similar if needed?
-  // User might like Tab key to cycle tabs
+  // BUG-17 FIX: Reset FocusLevel and scroll on tab switch
   if (IsKeyPressed(KEY_TAB)) {
       r->State->SelectedTab = (r->State->SelectedTab + 1) % SETTING_CAT_COUNT;
       r->State->Scroll = 0;
       r->State->CursorPos = 0;
+      r->State->VisualScroll = 0;
+      r->State->FocusLevel = 0;
   }
 
   if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
-    if (r->OnClose)
-      r->OnClose(r->callbackCtx);
+    if (r->State->FocusLevel > 0) {
+      // BUG-10 FIX: Backspace steps back through focus levels before closing
+      r->State->FocusLevel--;
+      if (r->State->IsDropdownOpen) { r->State->IsDropdownOpen = false; }
+    } else {
+      if (r->OnClose)
+        r->OnClose(r->callbackCtx);
+    }
   }
 
-  if (IsKeyPressed(KEY_ENTER)) {
-    if (r->OnApply)
-      r->OnApply(r->callbackCtx);
+  // BUG-10 FIX: Global ENTER only applies when FocusLevel == 0 (tab mode)
+  if (r->State->FocusLevel == 0 && IsKeyPressed(KEY_ENTER)) {
+    r->State->FocusLevel = 1;
+    r->State->CursorPos = 0;
+    r->State->Scroll = 0;
+    r->State->VisualScroll = 0;
   }
   return 0;
 }

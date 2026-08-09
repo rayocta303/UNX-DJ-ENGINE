@@ -727,6 +727,9 @@ void TopBar_OnBrowse(void *ctx) {
     App_DeactivateAllViews(a);
     a->screen = ScreenBrowser;
     a->browserState.IsActive = true;
+    // BUG-08 FIX: Reset focus state each time browser is opened
+    a->browserState.FocusArea = 0;
+    a->browserState.SidebarCursorPos = 0;
   }
 }
 

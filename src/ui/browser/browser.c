@@ -1010,6 +1010,13 @@ static int Browser_Update(Component *base) {
         s->SearchQuery[len-1] = '\0';
         queryChanged = true;
       }
+      // BUG-15 FIX: Always return after processing backspace in search mode.
+      // Prevents the same KEY_BACKSPACE from reaching Browser_Back in the same frame.
+      if (queryChanged) {
+        s->CursorPos = s->ScrollOffset = 0;
+        Browser_UpdateActiveTracks(s);
+      }
+      return 0;
     }
     
     if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_ESCAPE)) {
@@ -1097,22 +1104,9 @@ static int Browser_Update(Component *base) {
     if (loadToDeck == -1)
       return 0;
   } else {
-    if (!s->IsSearching && !s->ShowOSK) {
-      if (IsKeyPressed(KEY_LEFT)) {
-        if (s->FocusArea == 0) {
-          s->FocusArea = 1; // Move focus from Content List to Sidebar
-          if (s->BrowseLevel == 0) s->SidebarCursorPos = 0; // Tracks
-          else if (s->BrowseLevel == 2) s->SidebarCursorPos = 1; // Categories
-          else if (s->BrowseLevel == 1) s->SidebarCursorPos = 2; // Playlists
-          else if (s->BrowseLevel == 3) s->SidebarCursorPos = 3; // Source
-        } else {
-          Browser_Back(s);
-        }
-      }
-      if (IsKeyPressed(KEY_RIGHT)) {
-        triggerEnter = true;
-      }
-    }
+    // BUG-01 FIX: KEY_LEFT/RIGHT removed per design - navigation uses only UP/DOWN, Backspace, Enter
+    // No load deck shortcut via keyboard in browser view
+    (void)0;
   }
 
   int totalVisible = (s->BrowseLevel == 0) ? 9 : 10;
@@ -1123,9 +1117,14 @@ static int Browser_Update(Component *base) {
     float boxY = TOP_BAR_H + i * sidebarW;
     Rectangle boxRect = {0, boxY, sidebarW, sidebarW};
 
-    if (UICheckClick(boxRect)) {
-        lastBrowserListTapTime = GetTime();
+    // BUG-03 FIX: Debounce sidebar click to prevent double-trigger
+    double sidebarNow = GetTime();
+    if (UICheckClick(boxRect) && (sidebarNow - lastBrowserListTapTime) >= 0.14) {
+        lastBrowserListTapTime = sidebarNow;
         s->TouchDragAccumulator = 999.0f;
+        // BUG-05 FIX: Reset scroll velocity when switching categories via sidebar
+        s->ScrollVelocity = 0.0f;
+        s->TouchVelocityY = 0.0f;
         s->ShowOSK = false;
         s->FocusArea = 0;
         s->SidebarCursorPos = i;
@@ -1148,11 +1147,15 @@ static int Browser_Update(Component *base) {
               s->CurrentPlaylistIdx = -1;
               s->CameFromBank = false;
               s->CursorPos = 0;
+              // BUG-06 FIX: Reset SortMode when switching category from sidebar
+              s->SortMode = 0;
+              s->SortAscending = true;
               Browser_UpdateActiveTracks(s);
             }
           }
         } else {
           // Playlist Bank Jump
+          // BUG-18 FIX: Show toast if bank slot is empty
           int bankIdx = i - 4;
           if (s->PlaylistBank[bankIdx].PlaylistIdx >= 0) {
             // Check if we need to switch storage
@@ -1167,6 +1170,8 @@ static int Browser_Update(Component *base) {
             s->CursorPos = s->ScrollOffset = 0;
             s->VisualScroll = 0;
             s->ScrollVelocity = 0;
+          } else {
+            Toast_Show("Bank slot empty. Drag a playlist to assign.", 2.0f, (Color){180, 130, 0, 255});
           }
         }
       }
@@ -1402,9 +1407,9 @@ static int Browser_Update(Component *base) {
               s->MarqueeScrollX = 0; 
             }
             if (s->BrowseLevel == 0) {
-              // Double Tap on Track to open Load Option Popup
+              // BUG-07 FIX: Double tap window minimum raised from 50ms to 80ms for reliable touch
               double dt = now - lastTrackTapTime;
-              if (idx == lastTrackTapIdx && dt <= 0.38 && dt >= 0.05) {
+              if (idx == lastTrackTapIdx && dt <= 0.38 && dt >= 0.08) {
                 s->ShowLoadPopup = true;
                 lastPopupOpenedTime = now;
                 s->PopupTrackIdx = idx;
@@ -1463,6 +1468,8 @@ static int Browser_Update(Component *base) {
   }
 
   if (IsKeyPressed(KEY_ENTER) || triggerEnter) {
+    // BUG-04 FIX: Do not trigger enter during active drag
+    if (s->IsDragging) goto skip_enter;
     lastBrowserListTapTime = GetTime();
     s->TouchDragAccumulator = 999.0f; // Consume touch drag distance to prevent re-triggering sub-level
     if (s->FocusArea == 1) {
@@ -1571,11 +1578,14 @@ static int Browser_Update(Component *base) {
         s->VisualScroll = 0.0f;
         s->ScrollVelocity = 0.0f;
       } else {
+        // BUG-06 FIX: Reset SortMode when entering tracks from category selection
         s->BrowseLevel = 0; // Categories to Tracks (0: FILENAME, 1: FOLDER, 3: TRACK)
         s->CurrentPlaylistIdx = -1;
         s->CursorPos = s->ScrollOffset = 0;
         s->VisualScroll = 0.0f;
         s->ScrollVelocity = 0.0f;
+        s->SortMode = 0;
+        s->SortAscending = true;
         Browser_UpdateActiveTracks(s);
       }
     } else if (s->BrowseLevel == 1) {
@@ -1609,6 +1619,7 @@ static int Browser_Update(Component *base) {
       }
     }
   }
+  skip_enter:;
 
   if (!s->IsSearching && IsKeyPressed(KEY_BACKSPACE)) {
     Browser_Back(s);
