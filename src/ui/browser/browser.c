@@ -1660,10 +1660,7 @@ static int Browser_Update(Component *base) {
                    s->SelectedStorage->Path, relPath);
 
           if (s->AudioPlugin) {
-            if (!DeckAudio_LoadTrack(&s->AudioPlugin->Decks[loadToDeck], trackFullPath)) {
-              s->ShowLoadPopup = false;
-              return 0;
-            }
+            DeckAudio_LoadTrackAsync(&s->AudioPlugin->Decks[loadToDeck], trackFullPath);
           }
 
           // NAV-05 FIX: targetDeck is already declared above, do not shadow
@@ -1868,10 +1865,7 @@ static int Browser_Update(Component *base) {
                    s->SelectedStorage->Path, relPath);
 
           if (s->AudioPlugin) {
-            if (!DeckAudio_LoadTrack(&s->AudioPlugin->Decks[loadToDeck], trackFullPath)) {
-              s->ShowLoadPopup = false;
-              return 0;
-            }
+            DeckAudio_LoadTrackAsync(&s->AudioPlugin->Decks[loadToDeck], trackFullPath);
           }
 
           // NAV-05 FIX: targetDeck is already declared above

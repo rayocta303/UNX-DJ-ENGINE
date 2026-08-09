@@ -896,6 +896,9 @@ static void Waveform_Draw(Component *base) {
   if (r->State->IsLoading) {
       float pulse = (sinf(GetTime() * 10.0f) * 0.5f + 0.5f); // 0.0 to 1.0
       DrawRectangle(wfLeft, wfY, wfRight - wfLeft, waveH, Fade(ColorOrange, 0.1f + pulse * 0.2f));
+      
+      Font faceBPM = UIFonts_GetFace(S(20));
+      DrawCentredText("LOADING TRACK...", faceBPM, wfLeft, wfW, wfY + waveCenter - S(10), S(20), Fade(ColorWhite, 0.6f + pulse * 0.4f));
   }
 }
 
