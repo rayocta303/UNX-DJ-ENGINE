@@ -12,7 +12,7 @@
         </scriptfiles>
         <controls>
             <control>
-                <group>[App]</group>
+                <group>[Library]</group>
                 <key>browser_toggle</key>
                 <description>FLX6 VIEW Button</description>
                 <status>0x96</status>

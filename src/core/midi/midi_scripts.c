@@ -600,10 +600,12 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
              strstr(function, "browsePush") ||
              strstr(function, "SelectTrack") ||
              strstr(function, "DirectoryPush") ||
-             strstr(function, "LibraryPush") || strstr(function, "knobClick") ||
-             strstr(function, "browseToggle")) {
+             strstr(function, "LibraryPush") || strstr(function, "knobClick")) {
     if (value > 0)
       CO_SetValue("[Library]", "enter", 1.0f);
+  } else if (strstr(function, "browseToggle")) {
+    if (value > 0)
+      CO_SetValue("[Library]", "browser_toggle", 1.0f);
   } else if (strstr(function, "headMix") || strstr(function, "headphone_mix") ||
              strstr(function, "headMixRotate")) {
     float normVal = (float)value / 127.0f;

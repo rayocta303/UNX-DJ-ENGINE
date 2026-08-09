@@ -1178,7 +1178,8 @@ static int Browser_Update(Component *base) {
       }
 
       // Handle Dropping into Bank
-      if (s->IsDragging && UI_IsReleased()) {
+      bool isHovered = CheckCollisionPointRec(mousePos, boxRect);
+      if (s->IsDragging && UI_IsReleased() && isHovered) {
         if (i >= 4) {
           int bankIdx = i - 4;
           if (s->DraggingType == 1) { // Only playlists can be banked
@@ -1196,7 +1197,6 @@ static int Browser_Update(Component *base) {
             UNX_LOG_INFO("[BROWSER] Banked Playlist '%s' to Slot %d", s->PlaylistBank[bankIdx].Name, bankIdx + 1);
           }
         }
-        s->IsDragging = false;
       }
   }
 
@@ -1292,6 +1292,7 @@ static int Browser_Update(Component *base) {
     if (UI_IsPressed()) {
       s->TouchDragAccumulator = 0.0f;
       s->TouchVelocityY = 0.0f;
+      s->LastTouchX = mousePos.x;
       s->LastTouchY = mousePos.y;
 
       if (CheckCollisionPointRec(mousePos, sbRect)) {
@@ -1312,9 +1313,11 @@ static int Browser_Update(Component *base) {
       } else {
         float frameTime = GetFrameTime();
         if (frameTime < 0.001f) frameTime = 0.016f;
+        float dx = mousePos.x - s->LastTouchX;
         float dy = mousePos.y - s->LastTouchY;
+        s->LastTouchX = mousePos.x;
         s->LastTouchY = mousePos.y;
-        s->TouchDragAccumulator += fabsf(dy);
+        s->TouchDragAccumulator += sqrtf(dx * dx + dy * dy);
 
         if (!s->IsDragging && s->TouchDragAccumulator > S(4.0f)) {
           s->IsDragging = true;
@@ -2294,6 +2297,9 @@ static void Browser_Draw(Component *base) {
     if (isBank && !isSidebarFocused)
       bg = isAssigned ? ColorDGreen : ColorDark3;
 
+    if (isBank && isHovered && s->IsDragging && s->DraggingType == 1)
+      bg = (Color){255, 120, 0, 255}; // Highlight Drop Target
+
     DrawRectangle(0, boxY, sidebarW, sidebarW, bg);
     if (isActiveNav)
       DrawRectangle(0, boxY, S(3), sidebarW, ColorBlue);
@@ -2569,6 +2575,10 @@ static void Browser_Draw(Component *base) {
     float maxTitleW = listW - (textX - listX) - S(115);
     Rectangle titleRect = { textX, textY, maxTitleW, rowH };
     UIDrawScrollingText(title, faceSm, titleRect, S(13), ColorWhite, isCursor ? s->MarqueeScrollX : 0.0f);
+
+    // BUG FIX: UIDrawScrollingText terminates ScissorMode internally when active.
+    // We must restore the main list's ScissorMode so subsequent items and text don't bleed over the table header!
+    BeginScissorMode((int)listX, (int)listYOffset, (int)listW + S(10), (int)listAreaH);
 
     if (artist[0] != '\0' && s->BrowseLevel == 0 && !s->InfoEnabled) {
       UIDrawText(artist, faceXS, textX, ry + S(15), S(10),

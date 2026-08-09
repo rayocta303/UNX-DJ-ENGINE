@@ -60,7 +60,7 @@ typedef struct {
     bool ShowLoadPopup;
     int PopupTrackIdx;
 
-    // Touch kinetic & Scrollbar interaction
+    float LastTouchX;
     float LastTouchY;
     float TouchVelocityY;
     bool IsScrollbarDragging;
@@ -83,6 +83,7 @@ typedef struct {
     int MidiBrowseDelta;
     bool MidiRequestLoadA;
     bool MidiRequestLoadB;
+    bool MidiRequestBrowserToggle;
     bool CameFromBank; // NAV-03: true if entered track list via playlist bank shortcut
 
     // Search & On-Screen Keyboard (OSK) functionality

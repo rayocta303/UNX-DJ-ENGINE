@@ -139,7 +139,7 @@ typedef struct {
   bool MidiRequestSettings;
   bool MidiRequestInfo;
   bool MidiRequestMixer;
-  bool MidiRequestBrowser;
+
   int MidiWaveformZoomStep;
   bool MidiWaveformZoomIn;
   bool MidiWaveformZoomOut;
@@ -2250,7 +2250,7 @@ Log_LogDeviceInfo(gpuModel);
               1);
   CO_Register("[App]", "mixer_toggle", CO_TYPE_BOOL, &app->MidiRequestMixer, 0,
               1);
-  CO_Register("[App]", "browser_toggle", CO_TYPE_BOOL, &app->MidiRequestBrowser,
+  CO_Register("[Library]", "browser_toggle", CO_TYPE_BOOL, &app->browserState.MidiRequestBrowserToggle,
               0, 1);
   CO_Register("[Master]", "waveform_zoom_step", CO_TYPE_INT,
               &app->MidiWaveformZoomStep, -10, 10);
@@ -2833,9 +2833,12 @@ void UpdateDrawFrame(App *app) {
 
   // --- MIDI UI Navigation (Only processed if not consumed by Settings) ---
   bool _searchFocused = app->browserState.IsActive && app->browserState.IsSearching;
-  if (app->MidiRequestBrowser || (!_searchFocused && IsKeyPressed(app->keyMap.toggleBrowser))) {
+  if (!_searchFocused && IsKeyPressed(app->keyMap.toggleBrowser)) {
     TopBar_OnBrowse(app);
-    app->MidiRequestBrowser = false;
+  }
+  if (app->browserState.MidiRequestBrowserToggle) {
+    TopBar_OnBrowse(app);
+    app->browserState.MidiRequestBrowserToggle = false;
   }
   if (app->browserState.MidiRequestEnter) {
     if (app->screen != ScreenBrowser) {
