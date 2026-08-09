@@ -2847,16 +2847,10 @@ void UpdateDrawFrame(App *app) {
     }
   }
   if (app->browserState.MidiRequestBack) {
-    if (app->screen == ScreenBrowser) {
-      if (app->browserState.BrowseLevel > 0) {
-        app->browserState.BrowseLevel--;
-      } else {
-        TopBar_OnBrowse(app);
-      }
-    } else {
+    if (app->screen != ScreenBrowser) {
       TopBar_OnBrowse(app);
+      app->browserState.MidiRequestBack = false;
     }
-    app->browserState.MidiRequestBack = false;
   }
   if (app->MidiRequestSettings) {
     TopBar_OnSettings(app);

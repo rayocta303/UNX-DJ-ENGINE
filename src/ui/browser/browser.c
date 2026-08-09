@@ -1048,9 +1048,8 @@ static int Browser_Update(Component *base) {
       s->MidiRequestMoveFocusForward = false;
   }
   
-  if (s->MidiRequestBack || s->MidiRequestMoveFocusBackward) {
+  if (s->MidiRequestMoveFocusBackward) {
       Browser_Back(s);
-      s->MidiRequestBack = false;
       s->MidiRequestMoveFocusBackward = false;
   }
 
@@ -1095,14 +1094,16 @@ static int Browser_Update(Component *base) {
         s->ShowLoadPopup = false;
       }
     }
-    if (!s->IsSearching && (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE))) {
+    if (!s->IsSearching && (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) || s->MidiRequestBack)) {
       s->ShowLoadPopup = false;
     }
 
     // If we made a choice, continue to the loading logic at the bottom
     // Otherwise, block other inputs for this frame
-    if (loadToDeck == -1)
+    if (loadToDeck == -1) {
+      s->MidiRequestBack = false;
       return 0;
+    }
   } else {
     // BUG-01 FIX: KEY_LEFT/RIGHT removed per design - navigation uses only UP/DOWN, Backspace, Enter
     // No load deck shortcut via keyboard in browser view
@@ -1621,7 +1622,7 @@ static int Browser_Update(Component *base) {
   }
   skip_enter:;
 
-  if (!s->IsSearching && IsKeyPressed(KEY_BACKSPACE)) {
+  if (!s->IsSearching && (IsKeyPressed(KEY_BACKSPACE) || s->MidiRequestBack)) {
     Browser_Back(s);
   }
 
@@ -2002,6 +2003,7 @@ static int Browser_Update(Component *base) {
     Browser_Back(s);
   }
 
+  s->MidiRequestBack = false;
   return 0;
 }
 
