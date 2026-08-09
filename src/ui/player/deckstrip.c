@@ -653,7 +653,6 @@ static void DeckStrip_Draw(Component *base) {
   if (d->State->IsLoading) {
       float pulse = (sinf(GetTime() * 10.0f) * 0.5f + 0.5f);
       DrawRectangle(x, y, stripW, DECK_STR_H, Fade(ColorOrange, 0.1f + pulse * 0.2f));
-      DrawCentredText("LOADING...", faceBPM, x, stripW, y + DECK_STR_H * 0.5f - S(10), S(20), Fade(ColorWhite, 0.6f + pulse * 0.4f));
   }
 
   // Draw Bottom Borders

@@ -12,8 +12,8 @@
         </scriptfiles>
         <controls>
             <control>
-                <group>[Master]</group>
-                <key>browse_back</key>
+                <group>[Library]</group>
+                <key>back</key>
                 <description>FLX6 BACK Button</description>
                 <status>0x96</status>
                 <midino>0x65</midino>
