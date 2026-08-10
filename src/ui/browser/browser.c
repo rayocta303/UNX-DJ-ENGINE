@@ -939,7 +939,8 @@ static int Browser_Update(Component *base) {
     // Table Header Column Rectangles (Row 2)
     float headerH = S(24.0f);
     float headerY = TOP_BAR_H + rowH;
-    Rectangle headTitleRect = {sidebarW, headerY, listW - S(110), headerH};
+    Rectangle headNoRect    = {sidebarW, headerY, S(46), headerH};
+    Rectangle headTitleRect = {sidebarW + S(46), headerY, listW - S(110) - S(46), headerH};
     Rectangle headBpmRect   = {sidebarW + listW - S(110), headerY, S(55), headerH};
     Rectangle headKeyRect   = {sidebarW + listW - S(55), headerY, S(55), headerH};
 
@@ -1006,11 +1007,25 @@ static int Browser_Update(Component *base) {
           return 0;
         }
 
+        if (CheckCollisionPointRec(mousePos, headNoRect)) {
+          lastBrowserListTapTime = now;
+          if (s->SortMode == 0) {
+            s->SortAscending = !s->SortAscending;
+          } else {
+            s->SortMode = 0; // Number/Default
+            s->SortAscending = true;
+          }
+          s->CursorPos = s->ScrollOffset = 0;
+          s->VisualScroll = 0;
+          s->ScrollVelocity = 0;
+          Browser_UpdateActiveTracks(s);
+          return 0;
+        }
+
         if (CheckCollisionPointRec(mousePos, headTitleRect)) {
           lastBrowserListTapTime = now;
-          if (s->SortMode == 3 || s->SortMode == 0) {
+          if (s->SortMode == 3) {
             s->SortAscending = !s->SortAscending;
-            s->SortMode = 3; // Title
           } else {
             s->SortMode = 3; // Title
             s->SortAscending = true;
@@ -2409,15 +2424,23 @@ static void Browser_Draw(Component *base) {
     DrawRectangleLinesEx(tableHeaderRect, 1.0f, ColorDark1);
 
     // Column Dividers
+    DrawLine(listX + S(46), listYOffset, listX + S(46), listYOffset + headerH, ColorDark1); // NO. | TITLE
     DrawLine(listX + listW - S(110), listYOffset, listX + listW - S(110), listYOffset + headerH, ColorDark1);
     DrawLine(listX + listW - S(55), listYOffset, listX + listW - S(55), listYOffset + headerH, ColorDark1);
 
-    // Column 1: NO. / TITLE
-    char titleHeaderLabel[32] = "NO. / TITLE";
-    if (s->SortMode == 3 || s->SortMode == 0) {
-      snprintf(titleHeaderLabel, sizeof(titleHeaderLabel), "NO. / TITLE %s", s->SortAscending ? "\uf0d8" : "\uf0d7");
+    // Column 1: NO.
+    char noHeaderLabel[32] = "NO.";
+    if (s->SortMode == 0) {
+      snprintf(noHeaderLabel, sizeof(noHeaderLabel), "NO.%s", s->SortAscending ? "\uf0d8" : "\uf0d7");
     }
-    UIDrawText(titleHeaderLabel, faceXS, listX + S(6), listYOffset + S(5), S(10), (s->SortMode == 3 || s->SortMode == 0) ? ColorWhite : ColorShadow);
+    UIDrawText(noHeaderLabel, faceXS, listX + S(6), listYOffset + S(5), S(10), (s->SortMode == 0) ? ColorWhite : ColorShadow);
+
+    // Column 2: TITLE
+    char titleHeaderLabel[32] = "TITLE";
+    if (s->SortMode == 3) {
+      snprintf(titleHeaderLabel, sizeof(titleHeaderLabel), "TITLE %s", s->SortAscending ? "\uf0d8" : "\uf0d7");
+    }
+    UIDrawText(titleHeaderLabel, faceXS, listX + S(52), listYOffset + S(5), S(10), (s->SortMode == 3) ? ColorWhite : ColorShadow);
 
     // Column 2: BPM (Reference Image 2: BPM ▲ / ▼)
     char bpmHeaderLabel[32] = "BPM";
