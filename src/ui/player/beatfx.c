@@ -27,14 +27,14 @@ static int BeatFX_Update(Component *base) {
     
     // Calculate FX Label and Select hit box
     float fxSelectY = y + S(4) + S(13); // Label + Spacing
-    Rectangle fxSelectRect = { x + S(4), fxSelectY, w - S(8), S(18) };
+    Rectangle fxSelectRect = { x + S(4), fxSelectY, w - S(8), S(26) };
     bool fxHovered = CheckCollisionPointRec(mouse, fxSelectRect);
 
     // Calculate CH SELECT hit box (following Draw logic)
-    float cy = fxSelectY + S(22); // FXSelect + Spacing
+    float cy = fxSelectY + S(30); // FXSelect(26) + Spacing(4)
     cy += S(10); // Spacing after "CH SELECT" label
     
-    Rectangle chRect = { x + S(4), cy, w - S(8), S(14) };
+    Rectangle chRect = { x + S(4), cy, w - S(8), S(20) };
     bool chHovered = CheckCollisionPointRec(mouse, chRect);
     
     // Sync UI State with Engine State (if engine exists)
@@ -227,12 +227,12 @@ static void BeatFX_Draw(Component *base) {
 
     // 1. FX Name Select
     const char* fxName = AllFXNames[b->State->SelectedFX % ALL_FX_COUNT];
-    DrawRectangle(x + S(4), cy, w - S(8), S(18), ColorBlack);
-    DrawRectangleLines(x + S(4), cy, w - S(8), S(18), ColorDark1);
-    DrawCentredText(fxName, faceLg, x + S(4), w - S(8), cy + S(3), S(12), ColorWhite);
-    DrawTriangle((Vector2){x + w - S(14), cy + S(7)}, (Vector2){x + w - S(8), cy + S(7)}, (Vector2){x + w - S(11), cy + S(12)}, ColorWhite);
+    DrawRectangle(x + S(4), cy, w - S(8), S(26), ColorBlack);
+    DrawRectangleLines(x + S(4), cy, w - S(8), S(26), ColorDark1);
+    DrawCentredText(fxName, faceLg, x + S(4), w - S(8), cy + S(7), S(12), ColorWhite);
+    DrawTriangle((Vector2){x + w - S(14), cy + S(11)}, (Vector2){x + w - S(8), cy + S(11)}, (Vector2){x + w - S(11), cy + S(17)}, ColorWhite);
     
-    cy += S(22);
+    cy += S(30); // FX button(26) + gap(4)
 
     // 2. CH SELECT
     DrawCentredText("CH SELECT", faceXXS, x, w, cy, S(7), ColorShadow);
@@ -242,12 +242,12 @@ static void BeatFX_Draw(Component *base) {
     if (b->State->SelectedChannel == 1) chName = "DECK 1";
     if (b->State->SelectedChannel == 2) chName = "DECK 2";
     
-    DrawRectangle(x + S(4), cy, w - S(8), S(14), ColorDark3);
-    DrawRectangleLines(x + S(4), cy, w - S(8), S(14), ColorDark1);
-    DrawCentredText(chName, faceSm, x + S(4), w - S(8), cy + S(2), S(9), ColorWhite);
-    DrawTriangle((Vector2){x + w - S(12), cy + S(5)}, (Vector2){x + w - S(6), cy + S(5)}, (Vector2){x + w - S(9), cy + S(10)}, ColorWhite);
+    DrawRectangle(x + S(4), cy, w - S(8), S(20), ColorDark3);
+    DrawRectangleLines(x + S(4), cy, w - S(8), S(20), ColorDark1);
+    DrawCentredText(chName, faceSm, x + S(4), w - S(8), cy + S(5.5f), S(9), ColorWhite);
+    DrawTriangle((Vector2){x + w - S(12), cy + S(8)}, (Vector2){x + w - S(6), cy + S(8)}, (Vector2){x + w - S(9), cy + S(14)}, ColorWhite);
     
-    cy += S(20);
+    cy += S(26); // CH button(20) + gap(6)
 
 
     // 3. Black parameter container
