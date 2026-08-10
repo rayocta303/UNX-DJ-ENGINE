@@ -22,8 +22,34 @@ static int Settings_Update(Component *base) {
   Vector2 mouse = UIGetMousePosition();
 
   // If a sub-window or modal popup is open, disable background item clicking
-  if (r->State->IsDropdownOpen || r->State->IsEditMappingOpen || r->State->IsMappingListOpen) {
+  if (r->State->IsDropdownOpen || r->State->IsEditMappingOpen || r->State->IsMappingListOpen || r->State->IsSystemInfoOpen) {
       canClick = false;
+  }
+
+  if (r->State->IsSystemInfoOpen) {
+      if (UI_IsReleased()) {
+          Vector2 mouse = UIGetMousePosition();
+          float winW = GetScreenWidth();
+          float winH = GetScreenHeight() - DECK_STR_H;
+          float modalW = S(360.0f);
+          float modalH = S(220.0f);
+          float modalX = (winW - modalW) / 2.0f;
+          float modalY = (winH - modalH) / 2.0f;
+          
+          Rectangle closeBtn = { modalX + modalW - S(32.0f), modalY + S(3.0f), S(28.0f), S(24.0f) };
+          Rectangle okBtn = { modalX + (modalW - S(100.0f)) / 2.0f, modalY + modalH - S(34.0f), S(100.0f), S(26.0f) };
+          
+          if (CheckCollisionPointRec(mouse, closeBtn) || CheckCollisionPointRec(mouse, okBtn) || !CheckCollisionPointRec(mouse, (Rectangle){ modalX, modalY, modalW, modalH })) {
+              r->State->IsSystemInfoOpen = false;
+              UI_ConsumeTouch();
+              return 1;
+          }
+      }
+      if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_ENTER)) {
+          r->State->IsSystemInfoOpen = false;
+          return 1;
+      }
+      return 1;
   }
 
   // Handle dropdown intercept
@@ -838,88 +864,7 @@ static void Settings_Draw(Component *base) {
     }
   }
 
-  float systemCardH = (r->State->SelectedTab == SETTING_CAT_SYSTEM) ? S(112.0f) : 0.0f;
-
-  if (r->State->SelectedTab == SETTING_CAT_SYSTEM) {
-      // Draw System Usage & Resource Dashboard Card
-      Rectangle cardRect = { S(10), listY + S(4), SCREEN_WIDTH - S(20), S(104) };
-      DrawRectangleRounded(cardRect, 0.08f, 4, ColorDark1);
-      DrawRectangleRoundedLines(cardRect, 0.08f, 4, 1.0f, ColorShadow);
-      
-      // Header
-      DrawRectangle(cardRect.x, cardRect.y, cardRect.width, S(22), ColorDark2);
-      UIDrawText("\uf085", faceIconSm, cardRect.x + S(10), cardRect.y + S(5), S(12), ColorOrange);
-      UIDrawText("SYSTEM RESOURCE USAGE & SPECIFICATIONS", faceSm, cardRect.x + S(28), cardRect.y + S(5), S(11), ColorOrange);
-      DrawLine(cardRect.x, cardRect.y + S(22), cardRect.x + cardRect.width, cardRect.y + S(22), ColorOrange);
-
-      // 1. CPU Load
-      float cpuUsage = r->State->CPUUsage;
-      if (cpuUsage < 0.0f) cpuUsage = 0.0f;
-      if (cpuUsage > 1.0f) cpuUsage = 1.0f;
-      
-      float row1Y = cardRect.y + S(28);
-      UIDrawText("CPU Load:", faceSm, cardRect.x + S(12), row1Y, S(10), ColorWhite);
-      
-      float cpuBarX = cardRect.x + S(75);
-      float cpuBarW = S(140);
-      float cpuBarH = S(10);
-      DrawRectangleRounded((Rectangle){ cpuBarX, row1Y + S(1), cpuBarW, cpuBarH }, 0.3f, 4, ColorDark2);
-      DrawRectangleRoundedLines((Rectangle){ cpuBarX, row1Y + S(1), cpuBarW, cpuBarH }, 0.3f, 4, 1.0f, ColorShadow);
-      
-      float cpuFill = (cpuBarW - S(2.0f)) * cpuUsage;
-      if (cpuFill > S(1.0f)) {
-          Color cpuCol = (cpuUsage > 0.85f) ? ColorRed : ((cpuUsage > 0.60f) ? ColorOrange : ColorDGreen);
-          DrawRectangleRounded((Rectangle){ cpuBarX + S(1.0f), row1Y + S(2), cpuFill, cpuBarH - S(2.0f) }, 0.3f, 4, cpuCol);
-      }
-      char cpuBuf[32];
-      snprintf(cpuBuf, sizeof(cpuBuf), "%d%%", (int)(cpuUsage * 100.0f));
-      UIDrawText(cpuBuf, faceSm, cpuBarX + cpuBarW + S(8), row1Y, S(10), ColorOrange);
-
-      // 2. RAM Memory
-      float ramUsed = r->State->RAMUsageMB;
-      float ramTotal = r->State->RAMTotalMB > 0 ? r->State->RAMTotalMB : 1024.0f;
-      float ramFree = (r->State->RAMFreeMB > 0) ? r->State->RAMFreeMB : (ramTotal - ramUsed);
-      if (ramFree < 0) ramFree = 0;
-      float ramRatio = ramUsed / ramTotal;
-      if (ramRatio > 1.0f) ramRatio = 1.0f;
-
-      float row2Y = cardRect.y + S(46);
-      UIDrawText("RAM Usage:", faceSm, cardRect.x + S(12), row2Y, S(10), ColorWhite);
-      
-      float ramBarX = cardRect.x + S(75);
-      float ramBarW = S(140);
-      float ramBarH = S(10);
-      DrawRectangleRounded((Rectangle){ ramBarX, row2Y + S(1), ramBarW, ramBarH }, 0.3f, 4, ColorDark2);
-      DrawRectangleRoundedLines((Rectangle){ ramBarX, row2Y + S(1), ramBarW, ramBarH }, 0.3f, 4, 1.0f, ColorShadow);
-      
-      float ramFill = (ramBarW - S(2.0f)) * ramRatio;
-      if (ramFill > S(1.0f)) {
-          Color ramCol = (ramRatio > 0.85f) ? ColorRed : ColorOrange;
-          DrawRectangleRounded((Rectangle){ ramBarX + S(1.0f), row2Y + S(2), ramFill, ramBarH - S(2.0f) }, 0.3f, 4, ramCol);
-      }
-
-      char ramText[128];
-      snprintf(ramText, sizeof(ramText), "Used: %d MB  |  Free: %d MB  |  Total: %d MB", (int)ramUsed, (int)ramFree, (int)ramTotal);
-      UIDrawText(ramText, faceXS, ramBarX + ramBarW + S(8), row2Y + S(1), S(9.5f), ColorWhite);
-
-      // 3. Audio & Engine Metrics
-      float row3Y = cardRect.y + S(64);
-      char audioText[128];
-      snprintf(audioText, sizeof(audioText), "Audio Engine: %d Hz  |  Buffer: %d frames (%.1f ms latency)",
-               r->State->AudioSampleRate > 0 ? r->State->AudioSampleRate : 44100,
-               r->State->AudioBufferSize > 0 ? r->State->AudioBufferSize : 512,
-               r->State->AudioLatencyMs);
-      UIDrawText("\uf028", faceIconSm, cardRect.x + S(12), row3Y, S(10), ColorBlue);
-      UIDrawText(audioText, faceSm, cardRect.x + S(28), row3Y, S(10), ColorWhite);
-
-      // 4. Platform Specifications
-      float row4Y = cardRect.y + S(82);
-      char specText[128];
-      snprintf(specText, sizeof(specText), "OS Platform: %s  |  App Engine: UNX DJ Engine (v1.0)",
-               r->State->OSPlatformStr[0] != '\0' ? r->State->OSPlatformStr : "Embedded Linux");
-      UIDrawText("\uf108", faceIconSm, cardRect.x + S(12), row4Y, S(10), ColorDGreen);
-      UIDrawText(specText, faceSm, cardRect.x + S(28), row4Y, S(10), ColorGray);
-  }
+  float systemCardH = 0.0f;
 
   float effectiveListY = listY + systemCardH;
   int visibleRows = (int)((divY - effectiveListY) / rowH);
@@ -1369,6 +1314,121 @@ static void Settings_Draw(Component *base) {
       DrawRectangleRounded(btn4, 0.2f, 4, ColorDGreen);
       DrawCentredText("SAVE & CLOSE", faceXS, btn4.x, btn4.width, btn4.y + S(7), S(9.5f), ColorWhite);
   }
+
+  // Render System Info Modal Popup
+  if (r->State->IsSystemInfoOpen) {
+      float winW = SCREEN_WIDTH;
+      float viewH = SCREEN_HEIGHT - DECK_STR_H;
+      
+      DrawRectangle(0, 0, (int)SCREEN_WIDTH, (int)SCREEN_HEIGHT, (Color){ 0, 0, 0, 180 });
+      
+      float modalW = S(360.0f);
+      float modalH = S(235.0f);
+      float modalX = (winW - modalW) / 2.0f;
+      float modalY = (viewH - modalH) / 2.0f;
+      
+      Rectangle modalRect = { modalX, modalY, modalW, modalH };
+      DrawRectangleRounded(modalRect, 0.06f, 4, ColorDark1);
+      DrawRectangleRoundedLines(modalRect, 0.06f, 4, 1.5f, ColorOrange);
+      
+      // Header
+      DrawRectangle(modalX, modalY, modalW, S(30.0f), ColorDark2);
+      UIDrawText("\uf085", faceIconSm, modalX + S(12.0f), modalY + S(8.0f), S(14), ColorOrange);
+      UIDrawText("SYSTEM USAGE & SPECIFICATIONS", faceSm, modalX + S(34.0f), modalY + S(8.0f), S(11), ColorOrange);
+      DrawLine(modalX, modalY + S(30.0f), modalX + modalW, modalY + S(30.0f), ColorOrange);
+      
+      // Close Button 'X'
+      Rectangle closeBtn = { modalX + modalW - S(32.0f), modalY + S(3.0f), S(28.0f), S(24.0f) };
+      UIDrawText("\uf00d", faceIconSm, closeBtn.x + S(8.0f), closeBtn.y + S(5.0f), S(14), ColorGray);
+      
+      // 1. CPU Load
+      float cpuUsage = r->State->CPUUsage;
+      if (cpuUsage < 0.0f) cpuUsage = 0.0f;
+      if (cpuUsage > 1.0f) cpuUsage = 1.0f;
+      
+      float row1Y = modalY + S(36.0f);
+      UIDrawText("CPU Load:", faceSm, modalX + S(16.0f), row1Y, S(11), ColorWhite);
+      
+      float cpuBarX = modalX + S(98.0f);
+      float cpuBarW = S(175.0f);
+      float cpuBarH = S(11.0f);
+      DrawRectangleRounded((Rectangle){ cpuBarX, row1Y + S(1.0f), cpuBarW, cpuBarH }, 0.3f, 4, ColorDark2);
+      DrawRectangleRoundedLines((Rectangle){ cpuBarX, row1Y + S(1.0f), cpuBarW, cpuBarH }, 0.3f, 4, 1.0f, ColorShadow);
+      
+      float cpuFill = (cpuBarW - S(2.0f)) * cpuUsage;
+      if (cpuFill > S(1.0f)) {
+          Color cpuCol = (cpuUsage > 0.85f) ? ColorRed : ((cpuUsage > 0.60f) ? ColorOrange : ColorDGreen);
+          DrawRectangleRounded((Rectangle){ cpuBarX + S(1.0f), row1Y + S(2.0f), cpuFill, cpuBarH - S(2.0f) }, 0.3f, 4, cpuCol);
+      }
+      char cpuBuf[32];
+      snprintf(cpuBuf, sizeof(cpuBuf), "%d%%", (int)(cpuUsage * 100.0f));
+      UIDrawText(cpuBuf, faceSm, cpuBarX + cpuBarW + S(8.0f), row1Y, S(11), ColorOrange);
+
+      // 2. RAM Memory (Global System RAM)
+      float ramUsed = r->State->RAMUsageMB;
+      float ramTotal = r->State->RAMTotalMB > 0 ? r->State->RAMTotalMB : 1024.0f;
+      float ramFree = (r->State->RAMFreeMB > 0) ? r->State->RAMFreeMB : (ramTotal - ramUsed);
+      if (ramFree < 0) ramFree = 0;
+      float ramRatio = ramUsed / ramTotal;
+      if (ramRatio > 1.0f) ramRatio = 1.0f;
+
+      float row2Y = modalY + S(56.0f);
+      UIDrawText("RAM (Global):", faceSm, modalX + S(16.0f), row2Y, S(11), ColorWhite);
+      
+      float ramBarX = modalX + S(98.0f);
+      float ramBarW = S(175.0f);
+      float ramBarH = S(11.0f);
+      DrawRectangleRounded((Rectangle){ ramBarX, row2Y + S(1.0f), ramBarW, ramBarH }, 0.3f, 4, ColorDark2);
+      DrawRectangleRoundedLines((Rectangle){ ramBarX, row2Y + S(1.0f), ramBarW, ramBarH }, 0.3f, 4, 1.0f, ColorShadow);
+      
+      float ramFill = (ramBarW - S(2.0f)) * ramRatio;
+      if (ramFill > S(1.0f)) {
+          Color ramCol = (ramRatio > 0.85f) ? ColorRed : ColorOrange;
+          DrawRectangleRounded((Rectangle){ ramBarX + S(1.0f), row2Y + S(2.0f), ramFill, ramBarH - S(2.0f) }, 0.3f, 4, ramCol);
+      }
+      char ramPct[32];
+      snprintf(ramPct, sizeof(ramPct), "%d%%", (int)(ramRatio * 100.0f));
+      UIDrawText(ramPct, faceSm, ramBarX + ramBarW + S(8.0f), row2Y, S(11), ColorOrange);
+
+      char ramText[128];
+      snprintf(ramText, sizeof(ramText), "Used: %d MB   Free: %d MB   Total: %d MB", (int)ramUsed, (int)ramFree, (int)ramTotal);
+      UIDrawText(ramText, faceXS, modalX + S(16.0f), row2Y + S(16.0f), S(9.5f), ColorGray);
+
+      // 3. RAM (App Only)
+      float row3Y = modalY + S(90.0f);
+      char appRamText[64];
+      snprintf(appRamText, sizeof(appRamText), "App Memory Usage: %d MB (Process)", (int)r->State->RAMAppMB);
+      UIDrawText("\uf538", faceIconSm, modalX + S(16.0f), row3Y, S(11), ColorOrange);
+      UIDrawText(appRamText, faceSm, modalX + S(34.0f), row3Y, S(10.5f), ColorWhite);
+
+      // 4. Audio Engine Metrics
+      float row4Y = modalY + S(112.0f);
+      char audioText[128];
+      snprintf(audioText, sizeof(audioText), "Audio Engine: %d Hz  |  Buffer: %d frames (%.1f ms)",
+               r->State->AudioSampleRate > 0 ? r->State->AudioSampleRate : 44100,
+               r->State->AudioBufferSize > 0 ? r->State->AudioBufferSize : 512,
+               r->State->AudioLatencyMs);
+      UIDrawText("\uf028", faceIconSm, modalX + S(16.0f), row4Y, S(11), ColorBlue);
+      UIDrawText(audioText, faceSm, modalX + S(34.0f), row4Y, S(10.5f), ColorWhite);
+
+      // 5. Platform Specifications
+      float row5Y = modalY + S(134.0f);
+      char specText[128];
+      snprintf(specText, sizeof(specText), "OS Platform: %s",
+               r->State->OSPlatformStr[0] != '\0' ? r->State->OSPlatformStr : "Embedded Linux");
+      UIDrawText("\uf108", faceIconSm, modalX + S(16.0f), row5Y, S(11), ColorDGreen);
+      UIDrawText(specText, faceSm, modalX + S(34.0f), row5Y, S(10.5f), ColorWhite);
+
+      float row6Y = modalY + S(156.0f);
+      UIDrawText("\uf121", faceIconSm, modalX + S(16.0f), row6Y, S(11), ColorOrange);
+      UIDrawText("App Engine: UNX DJ Engine (v1.0 Pro)", faceSm, modalX + S(34.0f), row6Y, S(10.5f), ColorGray);
+
+      // OK / Close Button
+      Rectangle okBtn = { modalX + (modalW - S(100.0f)) / 2.0f, modalY + modalH - S(34.0f), S(100.0f), S(26.0f) };
+      DrawRectangleRounded(okBtn, 0.2f, 4, ColorDark2);
+      DrawRectangleRoundedLines(okBtn, 0.2f, 4, 1.0f, ColorOrange);
+      DrawCentredText("CLOSE", faceSm, okBtn.x, okBtn.width, okBtn.y + S(5.0f), S(11), ColorWhite);
+  }
 }
 
 void SettingsRenderer_Init(SettingsRenderer *r, SettingsState *state) {
@@ -1382,6 +1442,7 @@ void SettingsRenderer_Init(SettingsRenderer *r, SettingsState *state) {
   r->State->MappingListCursorPos = 0;
   r->State->IsSliderPopupOpen = false;
   r->State->SliderPopupItemIdx = -1;
+  r->State->IsSystemInfoOpen = false;
   r->State->LastKnobTapTime = 0.0;
   r->State->LastKnobTapItemIdx = -1;
   r->State->LastKnobTapPos = (Vector2){ 0, 0 };

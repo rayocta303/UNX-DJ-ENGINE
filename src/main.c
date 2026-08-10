@@ -461,7 +461,9 @@ void OnSettingsValueChanged(void *ctx, int idx) {
 void OnSettingsAction(void *ctx, int idx) {
   App *a = (App *)ctx;
   SettingItem *item = &a->settingsState.Items[idx];
-  if (strcmp(item->Label, "LOAD DEFAULT JOG SETTINGS") == 0) {
+  if (strcmp(item->Label, "SYSTEM INFO & RESOURCES") == 0) {
+    a->settingsState.IsSystemInfoOpen = true;
+  } else if (strcmp(item->Label, "LOAD DEFAULT JOG SETTINGS") == 0) {
     JogConfig_InitDefaults(&g_JogConfig);
     JogConfig_Save(&g_JogConfig, "jog_config.json");
     UpdateJogSettingsUI(a);
@@ -1330,23 +1332,27 @@ void App_Init(App *a) {
   a->settingsState.Items[17].Current = a->activeAudioConfig.CrossfaderCurve;
   a->settingsState.Items[17].Category = SETTING_CAT_AUDIO;
 
-  strcpy(a->settingsState.Items[18].Label, "ABOUT");
+  strcpy(a->settingsState.Items[18].Label, "SYSTEM INFO & RESOURCES");
   a->settingsState.Items[18].Type = SETTING_TYPE_ACTION;
   a->settingsState.Items[18].Category = SETTING_CAT_SYSTEM;
 
-  strcpy(a->settingsState.Items[19].Label, "CREDITS");
+  strcpy(a->settingsState.Items[19].Label, "ABOUT");
   a->settingsState.Items[19].Type = SETTING_TYPE_ACTION;
   a->settingsState.Items[19].Category = SETTING_CAT_SYSTEM;
 
-  strcpy(a->settingsState.Items[20].Label, "RESTART APP");
+  strcpy(a->settingsState.Items[20].Label, "CREDITS");
   a->settingsState.Items[20].Type = SETTING_TYPE_ACTION;
   a->settingsState.Items[20].Category = SETTING_CAT_SYSTEM;
 
-  strcpy(a->settingsState.Items[21].Label, "OS POWER");
+  strcpy(a->settingsState.Items[21].Label, "RESTART APP");
   a->settingsState.Items[21].Type = SETTING_TYPE_ACTION;
   a->settingsState.Items[21].Category = SETTING_CAT_SYSTEM;
 
-  int sysCount = 22;
+  strcpy(a->settingsState.Items[22].Label, "OS POWER");
+  a->settingsState.Items[22].Type = SETTING_TYPE_ACTION;
+  a->settingsState.Items[22].Category = SETTING_CAT_SYSTEM;
+
+  int sysCount = 23;
 #if !defined(PLATFORM_DRM)
   strcpy(a->settingsState.Items[sysCount].Label, "EXIT APPLICATION");
   a->settingsState.Items[sysCount].Type = SETTING_TYPE_ACTION;
@@ -3613,6 +3619,7 @@ void UpdateDrawFrame(App *app) {
 
       app->settingsState.CPUUsage = stats.cpuUsage;
       app->settingsState.RAMUsageMB = stats.ramUsageMB;
+      app->settingsState.RAMAppMB = stats.ramAppMB;
       app->settingsState.RAMTotalMB = stats.ramTotalMB;
       app->settingsState.RAMFreeMB = stats.ramFreeMB;
 

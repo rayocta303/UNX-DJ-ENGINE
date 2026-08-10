@@ -81,7 +81,7 @@ SystemStats GetSystemStats() {
     // RAM Usage
     PROCESS_MEMORY_COUNTERS pmc;
     if (GetProcessMemoryInfo(self, &pmc, sizeof(pmc))) {
-        stats.ramUsageMB = (float)pmc.WorkingSetSize / (1024.0f * 1024.0f);
+        stats.ramAppMB = (float)pmc.WorkingSetSize / (1024.0f * 1024.0f);
     }
     
     MEMORYSTATUSEX memInfo;
@@ -89,6 +89,7 @@ SystemStats GetSystemStats() {
     if (GlobalMemoryStatusEx(&memInfo)) {
         stats.ramTotalMB = (float)memInfo.ullTotalPhys / (1024.0f * 1024.0f);
         stats.ramFreeMB = (float)memInfo.ullAvailPhys / (1024.0f * 1024.0f);
+        stats.ramUsageMB = stats.ramTotalMB - stats.ramFreeMB; // Global System RAM Used
     }
     
     // Battery Info
@@ -119,19 +120,19 @@ SystemStats GetSystemStats() {
     
     stats.ramTotalMB = (float)(memInfo.totalram * memInfo.mem_unit) / (1024.0f * 1024.0f);
     stats.ramFreeMB = (float)(memInfo.freeram * memInfo.mem_unit) / (1024.0f * 1024.0f);
-    
-    // Very simplified Linux CPU usage (reading /proc/stat would be better but complex for a quick fix)
+    stats.ramUsageMB = stats.ramTotalMB - stats.ramFreeMB; // Global System RAM Used
+
     FILE* file = fopen("/proc/loadavg", "r");
     if (file) {
         float load;
         if (fscanf(file, "%f", &load) > 0) {
-            stats.cpuUsage = load / 4.0f; // Assume 4 cores for normalized display
+            stats.cpuUsage = load / 4.0f; // Assume 4 cores
             if (stats.cpuUsage > 1.0f) stats.cpuUsage = 1.0f;
         }
         fclose(file);
     }
-    
-    // RAM usage (self)
+
+    // App Process RAM Usage
     file = fopen("/proc/self/status", "r");
     if (file) {
         char line[128];
@@ -139,7 +140,7 @@ SystemStats GetSystemStats() {
             if (strncmp(line, "VmRSS:", 6) == 0) {
                 int rss;
                 sscanf(line + 6, "%d", &rss);
-                stats.ramUsageMB = (float)rss / 1024.0f;
+                stats.ramAppMB = (float)rss / 1024.0f;
                 break;
             }
         }

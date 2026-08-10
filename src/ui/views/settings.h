@@ -78,9 +78,12 @@ typedef struct {
   int MidiBrowseDelta;
   bool MidiRequestEnter;
 
+  bool IsSystemInfoOpen;
+
   // Live System Metrics & Specifications
   float CPUUsage;
   float RAMUsageMB;
+  float RAMAppMB;
   float RAMTotalMB;
   float RAMFreeMB;
   int AudioSampleRate;

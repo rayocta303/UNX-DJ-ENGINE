@@ -5,7 +5,8 @@
 
 typedef struct {
     float cpuUsage; // 0.0 to 1.0
-    float ramUsageMB;
+    float ramUsageMB; // Global System RAM
+    float ramAppMB;   // App Process RAM
     float ramTotalMB;
     float ramFreeMB;
     float batteryLevel; // 0.0 to 1.0, -1.0 if no battery
