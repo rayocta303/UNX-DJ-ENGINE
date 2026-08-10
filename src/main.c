@@ -3611,6 +3611,30 @@ void UpdateDrawFrame(App *app) {
       app->topbar.RAMUsage = stats.ramUsageMB;
       app->topbar.BatteryLevel = stats.batteryLevel;
       app->topbar.IsCharging = stats.isCharging;
+
+      app->settingsState.CPUUsage = stats.cpuUsage;
+      app->settingsState.RAMUsageMB = stats.ramUsageMB;
+      app->settingsState.RAMTotalMB = stats.ramTotalMB;
+      app->settingsState.RAMFreeMB = stats.ramFreeMB;
+
+      int actSR = 0, actBuf = 0;
+      AudioBackend_GetActiveInfo(NULL, &actSR, &actBuf, NULL);
+      app->settingsState.AudioSampleRate = actSR;
+      app->settingsState.AudioBufferSize = actBuf;
+      app->settingsState.AudioLatencyMs = (actSR > 0 && actBuf > 0) ? ((float)actBuf / (float)actSR) * 1000.0f : 0.0f;
+
+#if defined(__linux__)
+      snprintf(app->settingsState.OSPlatformStr, sizeof(app->settingsState.OSPlatformStr), "Linux / Armbian Kernel");
+#elif defined(_WIN32)
+      snprintf(app->settingsState.OSPlatformStr, sizeof(app->settingsState.OSPlatformStr), "Windows x64");
+#elif defined(__ANDROID__)
+      snprintf(app->settingsState.OSPlatformStr, sizeof(app->settingsState.OSPlatformStr), "Android OS");
+#elif defined(PLATFORM_IOS)
+      snprintf(app->settingsState.OSPlatformStr, sizeof(app->settingsState.OSPlatformStr), "iOS / iPadOS");
+#else
+      snprintf(app->settingsState.OSPlatformStr, sizeof(app->settingsState.OSPlatformStr), "Embedded OS");
+#endif
+
       statsTimer = 0;
 
       // Periodically monitor USB storage device & MIDI Controller connections

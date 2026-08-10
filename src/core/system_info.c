@@ -88,6 +88,7 @@ SystemStats GetSystemStats() {
     memInfo.dwLength = sizeof(MEMORYSTATUSEX);
     if (GlobalMemoryStatusEx(&memInfo)) {
         stats.ramTotalMB = (float)memInfo.ullTotalPhys / (1024.0f * 1024.0f);
+        stats.ramFreeMB = (float)memInfo.ullAvailPhys / (1024.0f * 1024.0f);
     }
     
     // Battery Info
@@ -117,6 +118,7 @@ SystemStats GetSystemStats() {
     sysinfo(&memInfo);
     
     stats.ramTotalMB = (float)(memInfo.totalram * memInfo.mem_unit) / (1024.0f * 1024.0f);
+    stats.ramFreeMB = (float)(memInfo.freeram * memInfo.mem_unit) / (1024.0f * 1024.0f);
     
     // Very simplified Linux CPU usage (reading /proc/stat would be better but complex for a quick fix)
     FILE* file = fopen("/proc/loadavg", "r");

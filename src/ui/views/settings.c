@@ -355,7 +355,9 @@ static int Settings_Update(Component *base) {
   float rowH = (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) ? S(38.0f) : S(32.0f);
   float bottomH = S(46.0f);
   float listY = TOP_BAR_H + tabH;
-  int visibleRows = (int)((viewH - listY - bottomH) / rowH);
+  float systemCardH = (r->State->SelectedTab == SETTING_CAT_SYSTEM) ? S(112.0f) : 0.0f;
+  float effectiveListY = listY + systemCardH;
+  int visibleRows = (int)((viewH - effectiveListY - bottomH) / rowH);
   if (visibleRows <= 0) visibleRows = 1;
 
   // Handle 3-Tier MIDI Rotary Encoder Navigation for Settings
@@ -521,8 +523,8 @@ static int Settings_Update(Component *base) {
 
   // Calculate hovered item row
   int hoveredItemIdx = -1;
-  if (mousePos.y >= listY && mousePos.y < (viewH - bottomH)) {
-      int rowIdx = (int)((mousePos.y - listY) / rowH);
+  if (mousePos.y >= effectiveListY && mousePos.y < (viewH - bottomH)) {
+      int rowIdx = (int)((mousePos.y - effectiveListY) / rowH);
       if (rowIdx >= 0 && rowIdx < visibleRows) {
           int idx_f = r->State->Scroll + rowIdx;
           if (idx_f < filteredCount) {
@@ -597,8 +599,8 @@ static int Settings_Update(Component *base) {
           break;
 
         int idx = filteredIndices[idx_f];
-        float ry = listY - pixelOffset + (i * rowH);
-        if (ry < listY - S(5.0f) || ry > (divY - S(5.0f))) continue;
+        float ry = effectiveListY - pixelOffset + (i * rowH);
+        if (ry < effectiveListY - S(5.0f) || ry > (divY - S(5.0f))) continue;
         Rectangle rowRect = {0, ry, SCREEN_WIDTH, rowH};
 
         if (UICheckClick(rowRect)) {
@@ -836,14 +838,98 @@ static void Settings_Draw(Component *base) {
     }
   }
 
-  int visibleRows = (int)((divY - listY) / rowH);
+  float systemCardH = (r->State->SelectedTab == SETTING_CAT_SYSTEM) ? S(112.0f) : 0.0f;
+
+  if (r->State->SelectedTab == SETTING_CAT_SYSTEM) {
+      // Draw System Usage & Resource Dashboard Card
+      Rectangle cardRect = { S(10), listY + S(4), SCREEN_WIDTH - S(20), S(104) };
+      DrawRectangleRounded(cardRect, 0.08f, 4, ColorDark1);
+      DrawRectangleRoundedLines(cardRect, 0.08f, 4, 1.0f, ColorShadow);
+      
+      // Header
+      DrawRectangle(cardRect.x, cardRect.y, cardRect.width, S(22), ColorDark2);
+      UIDrawText("\uf085", faceIconSm, cardRect.x + S(10), cardRect.y + S(5), S(12), ColorOrange);
+      UIDrawText("SYSTEM RESOURCE USAGE & SPECIFICATIONS", faceSm, cardRect.x + S(28), cardRect.y + S(5), S(11), ColorOrange);
+      DrawLine(cardRect.x, cardRect.y + S(22), cardRect.x + cardRect.width, cardRect.y + S(22), ColorOrange);
+
+      // 1. CPU Load
+      float cpuUsage = r->State->CPUUsage;
+      if (cpuUsage < 0.0f) cpuUsage = 0.0f;
+      if (cpuUsage > 1.0f) cpuUsage = 1.0f;
+      
+      float row1Y = cardRect.y + S(28);
+      UIDrawText("CPU Load:", faceSm, cardRect.x + S(12), row1Y, S(10), ColorWhite);
+      
+      float cpuBarX = cardRect.x + S(75);
+      float cpuBarW = S(140);
+      float cpuBarH = S(10);
+      DrawRectangleRounded((Rectangle){ cpuBarX, row1Y + S(1), cpuBarW, cpuBarH }, 0.3f, 4, ColorDark2);
+      DrawRectangleRoundedLines((Rectangle){ cpuBarX, row1Y + S(1), cpuBarW, cpuBarH }, 0.3f, 4, 1.0f, ColorShadow);
+      
+      float cpuFill = (cpuBarW - S(2.0f)) * cpuUsage;
+      if (cpuFill > S(1.0f)) {
+          Color cpuCol = (cpuUsage > 0.85f) ? ColorRed : ((cpuUsage > 0.60f) ? ColorOrange : ColorDGreen);
+          DrawRectangleRounded((Rectangle){ cpuBarX + S(1.0f), row1Y + S(2), cpuFill, cpuBarH - S(2.0f) }, 0.3f, 4, cpuCol);
+      }
+      char cpuBuf[32];
+      snprintf(cpuBuf, sizeof(cpuBuf), "%d%%", (int)(cpuUsage * 100.0f));
+      UIDrawText(cpuBuf, faceSm, cpuBarX + cpuBarW + S(8), row1Y, S(10), ColorOrange);
+
+      // 2. RAM Memory
+      float ramUsed = r->State->RAMUsageMB;
+      float ramTotal = r->State->RAMTotalMB > 0 ? r->State->RAMTotalMB : 1024.0f;
+      float ramFree = (r->State->RAMFreeMB > 0) ? r->State->RAMFreeMB : (ramTotal - ramUsed);
+      if (ramFree < 0) ramFree = 0;
+      float ramRatio = ramUsed / ramTotal;
+      if (ramRatio > 1.0f) ramRatio = 1.0f;
+
+      float row2Y = cardRect.y + S(46);
+      UIDrawText("RAM Usage:", faceSm, cardRect.x + S(12), row2Y, S(10), ColorWhite);
+      
+      float ramBarX = cardRect.x + S(75);
+      float ramBarW = S(140);
+      float ramBarH = S(10);
+      DrawRectangleRounded((Rectangle){ ramBarX, row2Y + S(1), ramBarW, ramBarH }, 0.3f, 4, ColorDark2);
+      DrawRectangleRoundedLines((Rectangle){ ramBarX, row2Y + S(1), ramBarW, ramBarH }, 0.3f, 4, 1.0f, ColorShadow);
+      
+      float ramFill = (ramBarW - S(2.0f)) * ramRatio;
+      if (ramFill > S(1.0f)) {
+          Color ramCol = (ramRatio > 0.85f) ? ColorRed : ColorOrange;
+          DrawRectangleRounded((Rectangle){ ramBarX + S(1.0f), row2Y + S(2), ramFill, ramBarH - S(2.0f) }, 0.3f, 4, ramCol);
+      }
+
+      char ramText[128];
+      snprintf(ramText, sizeof(ramText), "Used: %d MB  |  Free: %d MB  |  Total: %d MB", (int)ramUsed, (int)ramFree, (int)ramTotal);
+      UIDrawText(ramText, faceXS, ramBarX + ramBarW + S(8), row2Y + S(1), S(9.5f), ColorWhite);
+
+      // 3. Audio & Engine Metrics
+      float row3Y = cardRect.y + S(64);
+      char audioText[128];
+      snprintf(audioText, sizeof(audioText), "Audio Engine: %d Hz  |  Buffer: %d frames (%.1f ms latency)",
+               r->State->AudioSampleRate > 0 ? r->State->AudioSampleRate : 44100,
+               r->State->AudioBufferSize > 0 ? r->State->AudioBufferSize : 512,
+               r->State->AudioLatencyMs);
+      UIDrawText("\uf028", faceIconSm, cardRect.x + S(12), row3Y, S(10), ColorBlue);
+      UIDrawText(audioText, faceSm, cardRect.x + S(28), row3Y, S(10), ColorWhite);
+
+      // 4. Platform Specifications
+      float row4Y = cardRect.y + S(82);
+      char specText[128];
+      snprintf(specText, sizeof(specText), "OS Platform: %s  |  App Engine: UNX DJ Engine (v1.0)",
+               r->State->OSPlatformStr[0] != '\0' ? r->State->OSPlatformStr : "Embedded Linux");
+      UIDrawText("\uf108", faceIconSm, cardRect.x + S(12), row4Y, S(10), ColorDGreen);
+      UIDrawText(specText, faceSm, cardRect.x + S(28), row4Y, S(10), ColorGray);
+  }
+
+  float effectiveListY = listY + systemCardH;
+  int visibleRows = (int)((divY - effectiveListY) / rowH);
 
   // Layout params
   float labelX = S(20);
   float valueWidth = S(180);
   float valueX = SCREEN_WIDTH - valueWidth - S(20);
 
-  BeginScissorMode(0, (int)listY, (int)SCREEN_WIDTH, (int)(divY - listY));
+  BeginScissorMode(0, (int)effectiveListY, (int)SCREEN_WIDTH, (int)(divY - effectiveListY));
 
   float pixelOffset = fmodf(r->State->VisualScroll, rowH);
 
@@ -854,7 +940,7 @@ static void Settings_Draw(Component *base) {
 
     int idx = filteredIndices[idx_f];
     SettingItem *item = &r->State->Items[idx];
-    float ry = listY - pixelOffset + (i * rowH);
+    float ry = effectiveListY - pixelOffset + (i * rowH);
 
     bool selected = (r->State->FocusLevel >= 1 && i == r->State->CursorPos);
     bool isEditingThis = (r->State->FocusLevel == 2 && selected);

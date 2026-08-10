@@ -77,6 +77,16 @@ typedef struct {
   int FocusLevel; // 0 = Category/Tab selection, 1 = Sub-menu/List item selection, 2 = Active Value Editing
   int MidiBrowseDelta;
   bool MidiRequestEnter;
+
+  // Live System Metrics & Specifications
+  float CPUUsage;
+  float RAMUsageMB;
+  float RAMTotalMB;
+  float RAMFreeMB;
+  int AudioSampleRate;
+  int AudioBufferSize;
+  float AudioLatencyMs;
+  char OSPlatformStr[64];
 } SettingsState;
 
 typedef struct SettingsRenderer SettingsRenderer;
