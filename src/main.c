@@ -147,6 +147,9 @@ typedef struct {
   char midiPresetPaths[32][256];
   int midiPresetCount;
   char activeControllerPath[256];
+
+  int midiSettingsStartIdx;
+  int jogSettingsStartIdx;
 } App;
 
 void PopulateMidiSettings(App *a);
@@ -500,7 +503,7 @@ void UpdateJogSettingsUI(App *a) {
 }
 
 void PopulateJogSettings(App *a) {
-  int writeIdx = a->settingsState.ItemsCount;
+  int writeIdx = (a->jogSettingsStartIdx > 0) ? a->jogSettingsStartIdx : 24;
 
   // 1. Default RPM
   strcpy(a->settingsState.Items[writeIdx].Label, "DEFAULT RPM");
@@ -655,8 +658,7 @@ void PopulateJogSettings(App *a) {
 }
 
 void PopulateMidiSettings(App *a) {
-  int startIdx = a->settingsState.ItemsCount;
-  if (startIdx < 22) startIdx = 22;
+  int startIdx = (a->midiSettingsStartIdx > 0) ? a->midiSettingsStartIdx : 22;
 
   // --- CONNECTED DEVICE SELECTION ITEM ---
   char devNames[16][64];
@@ -699,9 +701,6 @@ void PopulateMidiSettings(App *a) {
       a->settingsState.Items[startIdx + 1].Current = i;
     }
   }
-
-  a->settingsState.ItemsCount = startIdx + 2;
-  PopulateJogSettings(a);
 }
 
 static void App_DeactivateAllViews(App *a) {
@@ -1354,7 +1353,12 @@ void App_Init(App *a) {
   a->settingsState.Items[sysCount].Category = SETTING_CAT_SYSTEM;
   sysCount++;
 #endif
-  a->settingsState.ItemsCount = sysCount;
+
+  a->midiSettingsStartIdx = sysCount;
+  PopulateMidiSettings(a);
+
+  a->jogSettingsStartIdx = a->midiSettingsStartIdx + 2;
+  PopulateJogSettings(a);
 
   // Set Load Lock current opt
   a->settingsState.Items[1].Current = a->deckA.Waveform.LoadLock ? 1 : 0;
@@ -1391,9 +1395,6 @@ void App_Init(App *a) {
   a->settings.OnValueChanged = OnSettingsValueChanged;
   a->settings.callbackCtx = a;
 
-  // Settings_Load (at line 360) already populated this.
-  // We only set hardcoded defaults if you want a fallback before loading.
-
   AboutRenderer_Init(&a->about, &a->aboutState);
   CreditsRenderer_Init(&a->credits, &a->creditsState);
   a->mixerState.FXState = &a->fxState;
@@ -1413,8 +1414,6 @@ void App_Init(App *a) {
   SplashRenderer_Init(&a->splash, &a->splashCounter);
   a->keyMap = GetDefaultMapping();
   memset(&a->midiCtx, 0, sizeof(MidiContext));
-
-  PopulateMidiSettings(a);
 }
 
 #if defined(PLATFORM_DRM) || (defined(__linux__) && !defined(__ANDROID__))
