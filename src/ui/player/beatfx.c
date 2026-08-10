@@ -227,12 +227,12 @@ static void BeatFX_Draw(Component *base) {
 
     // 1. FX Name Select
     const char* fxName = AllFXNames[b->State->SelectedFX % ALL_FX_COUNT];
-    DrawRectangle(x + S(4), cy, w - S(8), S(26), ColorBlack);
-    DrawRectangleLines(x + S(4), cy, w - S(8), S(26), ColorDark1);
-    DrawCentredText(fxName, faceLg, x + S(4), w - S(8), cy + S(7), S(12), ColorWhite);
-    DrawTriangle((Vector2){x + w - S(14), cy + S(11)}, (Vector2){x + w - S(8), cy + S(11)}, (Vector2){x + w - S(11), cy + S(17)}, ColorWhite);
+    DrawRectangle(x + S(4), cy, w - S(8), S(34), ColorBlack);
+    DrawRectangleLinesEx((Rectangle){x + S(4), cy, w - S(8), S(34)}, 1.0f, ColorWhite);
+    DrawCentredText(fxName, faceLg, x + S(4), w - S(8), cy + S(11), S(12), ColorWhite);
+    DrawTriangle((Vector2){x + w - S(14), cy + S(15)}, (Vector2){x + w - S(8), cy + S(15)}, (Vector2){x + w - S(11), cy + S(21)}, ColorWhite);
     
-    cy += S(30); // FX button(26) + gap(4)
+    cy += S(38); // FX button(34) + gap(4)
 
     // 2. CH SELECT
     DrawCentredText("CH SELECT", faceXXS, x, w, cy, S(7), ColorShadow);
@@ -242,12 +242,12 @@ static void BeatFX_Draw(Component *base) {
     if (b->State->SelectedChannel == 1) chName = "DECK 1";
     if (b->State->SelectedChannel == 2) chName = "DECK 2";
     
-    DrawRectangle(x + S(4), cy, w - S(8), S(20), ColorDark3);
-    DrawRectangleLines(x + S(4), cy, w - S(8), S(20), ColorDark1);
-    DrawCentredText(chName, faceSm, x + S(4), w - S(8), cy + S(5.5f), S(9), ColorWhite);
-    DrawTriangle((Vector2){x + w - S(12), cy + S(8)}, (Vector2){x + w - S(6), cy + S(8)}, (Vector2){x + w - S(9), cy + S(14)}, ColorWhite);
+    DrawRectangle(x + S(4), cy, w - S(8), S(26), ColorDark3);
+    DrawRectangleLines(x + S(4), cy, w - S(8), S(26), ColorDark1);
+    DrawCentredText(chName, faceSm, x + S(4), w - S(8), cy + S(8.5f), S(9), ColorWhite);
+    DrawTriangle((Vector2){x + w - S(12), cy + S(11)}, (Vector2){x + w - S(6), cy + S(11)}, (Vector2){x + w - S(9), cy + S(17)}, ColorWhite);
     
-    cy += S(26); // CH button(20) + gap(6)
+    cy += S(32); // CH button(26) + gap(6)
 
 
     // 3. Black parameter container
@@ -343,7 +343,7 @@ static void BeatFX_Draw(Component *base) {
     cy += rowH + S(12);
 
     // 3.5 FX ON / OFF Toggle
-    float btnH = S(16);
+    float btnH = S(22);
     float btnW = w - S(8); 
     
     b->FXButton = (Rectangle){ x + S(4), cy, btnW, btnH };
@@ -351,10 +351,10 @@ static void BeatFX_Draw(Component *base) {
     bool isFxBlinking = (fmod(GetTime(), 0.5) < 0.25);
     Color btnColor = b->State->IsFXOn ? (isFxBlinking ? (Color){0, 140, 255, 255} : (Color){0, 40, 110, 255}) : ColorDark2;
     DrawRectangleRec(b->FXButton, btnColor);
-    DrawRectangleLinesEx(b->FXButton, 1, b->State->IsFXOn ? ColorWhite : ColorShadow);
+    DrawRectangleLinesEx(b->FXButton, 1.0f, ColorWhite);
     
     const char* fxBtnText = b->State->IsFXOn ? "BEAT FX ON" : "BEAT FX OFF";
-    DrawCentredText(fxBtnText, faceXXS, b->FXButton.x, b->FXButton.width, b->FXButton.y + S(4.5f), S(7), ColorWhite);
+    DrawCentredText(fxBtnText, faceSm, b->FXButton.x, b->FXButton.width, b->FXButton.y + S(6.5f), S(9), ColorWhite);
     
     cy += btnH + S(12);
 
