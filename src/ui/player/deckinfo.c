@@ -311,7 +311,7 @@ static void DeckInfo_Draw(Component *base) {
 
     DrawRectangleRec(syRect, syncActive ? Fade(syncColor, 0.3f) : ColorDark1);
     DrawRectangleLinesEx(syRect, S(1), syncActive ? syncColor : ColorShadow);
-    const char *syncLbl = (d->State->SyncMode == 2) ? "BEAT SYNC" : ((d->State->SyncMode == 1) ? "BPM SYNC" : "SYNC");
+    const char *syncLbl = (d->State->SyncMode == 2) ? "BEAT" : ((d->State->SyncMode == 1) ? "BPM" : "SYNC");
     Vector2 syncSz = MeasureTextEx(faceSm, syncLbl, S(9), 1);
     UIDrawText(syncLbl, faceSm, syRect.x + (utilW - syncSz.x)/2.0f, syRect.y + (utilH - S(9))/2.0f, S(9), syncActive ? ColorWhite : ColorShadow);
 
