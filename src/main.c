@@ -29,7 +29,7 @@
 #include "ui/views/splash.h"
 #include "ui/views/topbar.h"
 #include "core/logic/quantize.h"
-#include "library/hotcue_db.h"
+#include "library/unx_database.h"
 #include "version.h"
 #include <math.h>
 #include <stdio.h>
@@ -847,7 +847,7 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
         }
         UNX_LOG_INFO("[HOT CUE] Deleted Hot Cue %c (ID %d) on Deck %d", 'A' + padIdx, padIdx + 1, deckIdx + 1);
         const char *storagePath = a->browserState.SelectedStorage ? a->browserState.SelectedStorage->Path : NULL;
-        HotCueDB_SaveTrack(storagePath, ds->LoadedTrack->FilePath, ds->TrackTitle, ds->ArtistName, ds->LoadedTrack->HotCues, ds->LoadedTrack->HotCuesCount);
+        UNXDatabase_SaveTrack(storagePath, ds->LoadedTrack->FilePath, ds->TrackTitle, ds->ArtistName, ds->LoadedTrack->HotCues, ds->LoadedTrack->HotCuesCount);
       }
     } else {
       if (foundIdx >= 0) {
@@ -914,7 +914,7 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
           UNX_LOG_INFO("[HOT CUE] Created Hot Cue %c (ID %d) at %u ms on Deck %d", 'A' + padIdx, padIdx + 1, currentMs, deckIdx + 1);
 
           const char *storagePath = a->browserState.SelectedStorage ? a->browserState.SelectedStorage->Path : NULL;
-          HotCueDB_SaveTrack(storagePath, ds->LoadedTrack->FilePath, ds->TrackTitle, ds->ArtistName, ds->LoadedTrack->HotCues, ds->LoadedTrack->HotCuesCount);
+          UNXDatabase_SaveTrack(storagePath, ds->LoadedTrack->FilePath, ds->TrackTitle, ds->ArtistName, ds->LoadedTrack->HotCues, ds->LoadedTrack->HotCuesCount);
         }
       }
     }

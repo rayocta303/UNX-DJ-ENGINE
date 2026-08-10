@@ -34,7 +34,7 @@ CXXFLAGS += -Wall -Wextra -Isrc -Isrc/core -Isrc/engine -Ilib -Ilib/soundtouch -
 
 # Source files
 SRC_C = src/main.c \
-        src/library/hotcue_db.c \
+        src/library/unx_database.c \
         src/ui/components/theme.c \
         src/ui/components/fonts.c \
         src/ui/components/helpers.c \

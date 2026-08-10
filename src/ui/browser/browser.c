@@ -8,7 +8,7 @@
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
 #include "ui/player/player_state.h"
-#include "library/hotcue_db.h"
+#include "library/unx_database.h"
 #include "core/system_info.h"
 #include <math.h>
 #include <stdio.h>
@@ -1828,7 +1828,7 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
         HotCue dbCues[8];
         int dbCount = 0;
         const char *storagePath = s->SelectedStorage ? s->SelectedStorage->Path : NULL;
-        if (HotCueDB_GetTrack(storagePath, newTrack->FilePath, newTrack->Title, newTrack->Artist, dbCues, &dbCount)) {
+        if (UNXDatabase_GetTrack(storagePath, newTrack->FilePath, newTrack->Title, newTrack->Artist, dbCues, &dbCount)) {
           newTrack->HotCuesCount = dbCount;
           memset(newTrack->HotCues, 0, sizeof(newTrack->HotCues));
           if (dbCount > 0) memcpy(newTrack->HotCues, dbCues, sizeof(HotCue) * dbCount);
@@ -1875,6 +1875,8 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
           DeckAudio_SetPlaying(&s->AudioPlugin->Decks[loadToDeck], true);
           targetDeck->IsPlaying = true;
         }
+
+        UNXDatabase_LogHistory(storagePath, targetDeck);
       }
     }
   } else { // Serato
@@ -1954,7 +1956,7 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
           HotCue dbCues[8];
           int dbCount = 0;
           const char *storagePath = s->SelectedStorage ? s->SelectedStorage->Path : NULL;
-          if (HotCueDB_GetTrack(storagePath, newTrack->FilePath, newTrack->Title, newTrack->Artist, dbCues, &dbCount)) {
+          if (UNXDatabase_GetTrack(storagePath, newTrack->FilePath, newTrack->Title, newTrack->Artist, dbCues, &dbCount)) {
             newTrack->HotCuesCount = dbCount;
             memset(newTrack->HotCues, 0, sizeof(newTrack->HotCues));
             if (dbCount > 0) memcpy(newTrack->HotCues, dbCues, sizeof(HotCue) * dbCount);
@@ -1993,6 +1995,8 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
             DeckAudio_SetPlaying(&s->AudioPlugin->Decks[loadToDeck], true);
             targetDeck->IsPlaying = true;
           }
+
+          UNXDatabase_LogHistory(storagePath, targetDeck);
         }
       }
     }
