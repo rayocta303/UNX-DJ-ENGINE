@@ -26,13 +26,9 @@ float UI_OffsetY = 0.0f;
 bool UI_BoldEnabled = true;
 
 void UI_UpdateScale(void) {
-    // Calculate aspect-ratio aware scales
-    float scaleX = (float)GetScreenWidth() / REF_WIDTH;
-    float scaleY = (float)GetScreenHeight() / REF_HEIGHT;
-    
-    // Primary scaling anchor is the smaller dimension to maintain consistent layout 
-    // and prevent horizontal overlap on narrow screens (e.g. 800x480).
-    UI_CurrScale = (scaleX < scaleY) ? scaleX : scaleY;
+    // Primary scaling anchor is height to maintain consistent vertical layout density.
+    // Horizontal layout becomes responsive (waveforms stretch/contract).
+    UI_CurrScale = (float)GetScreenHeight() / REF_HEIGHT;
     
     // In responsive mode, we occupy the full window native area.
     UI_OffsetX = 0;

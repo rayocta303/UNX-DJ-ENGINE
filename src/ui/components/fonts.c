@@ -13,12 +13,7 @@ static Font iconSolid;
 static Font iconRegular;
 static Font iconBrand;
 
-static void ApplyFontFiltering(Font *font) {
-    if (font->texture.id > 0) {
-        GenTextureMipmaps(&font->texture);
-        SetTextureFilter(font->texture, TEXTURE_FILTER_TRILINEAR);
-    }
-}
+
 
 // We define a helper that loads font with full Unicode support if needed.
 // For now, we allow raylib to fallback to default loading or we load specific
@@ -136,13 +131,7 @@ void UIFonts_Init(void) {
     printf("[FONT] Failed to load brand icon font from memory\n");
   }
 
-  // Apply high-quality filtering for sharp rendering on downscaled/low-res displays
-  ApplyFontFiltering(&defaultFace);
-  if (boldFace.texture.id != defaultFace.texture.id) ApplyFontFiltering(&boldFace);
-  if (timeFace.texture.id != defaultFace.texture.id) ApplyFontFiltering(&timeFace);
-  ApplyFontFiltering(&iconSolid);
-  ApplyFontFiltering(&iconRegular);
-  ApplyFontFiltering(&iconBrand);
+
 
   UNX_LOG_INFO("[FONTS] UIFonts_Init completed.");
 }
