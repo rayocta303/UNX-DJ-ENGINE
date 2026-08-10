@@ -22,7 +22,8 @@ static int Settings_Update(Component *base) {
 
   // If a sub-window or modal popup is open, disable background item clicking
   if (r->State->IsDropdownOpen || r->State->IsEditMappingOpen ||
-      r->State->IsMappingListOpen || r->State->IsSystemInfoOpen) {
+      r->State->IsMappingListOpen || r->State->IsSystemInfoOpen ||
+      r->State->IsSliderModalOpen || r->State->IsConfirmPopupOpen) {
     canClick = false;
   }
 
@@ -53,6 +54,126 @@ static int Settings_Update(Component *base) {
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) ||
         IsKeyPressed(KEY_ENTER)) {
       r->State->IsSystemInfoOpen = false;
+      return 1;
+    }
+    return 1;
+  }
+
+  // --- CONFIRMATION POPUP HANDLER ---
+  if (r->State->IsConfirmPopupOpen) {
+    if (UI_IsReleased()) {
+      Vector2 mouse = UIGetMousePosition();
+      float winW = GetScreenWidth();
+      float winH = GetScreenHeight() - DECK_STR_H;
+      float modalW = S(320.0f);
+      float modalH = S(160.0f);
+      float modalX = (winW - modalW) / 2.0f;
+      float modalY = (winH - modalH) / 2.0f;
+
+      Rectangle cancelBtn = {modalX + S(20), modalY + modalH - S(44), S(130), S(32)};
+      Rectangle okBtn = {modalX + modalW - S(150), modalY + modalH - S(44), S(130), S(32)};
+
+      if (CheckCollisionPointRec(mouse, cancelBtn)) {
+        r->State->IsConfirmPopupOpen = false;
+        UI_ConsumeTouch();
+        return 1;
+      }
+      if (CheckCollisionPointRec(mouse, okBtn)) {
+        if (r->OnAction) {
+           r->OnAction(r->callbackCtx, r->State->ConfirmActionIdx);
+        }
+        r->State->IsConfirmPopupOpen = false;
+        UI_ConsumeTouch();
+        return 1;
+      }
+      if (!CheckCollisionPointRec(mouse, (Rectangle){modalX, modalY, modalW, modalH})) {
+        r->State->IsConfirmPopupOpen = false;
+        UI_ConsumeTouch();
+        return 1;
+      }
+    }
+    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
+      r->State->IsConfirmPopupOpen = false;
+      return 1;
+    }
+    if (IsKeyPressed(KEY_ENTER)) {
+      if (r->OnAction) {
+         r->OnAction(r->callbackCtx, r->State->ConfirmActionIdx);
+      }
+      r->State->IsConfirmPopupOpen = false;
+      return 1;
+    }
+    return 1;
+  }
+
+  // --- SLIDER MODAL HANDLER ---
+  if (r->State->IsSliderModalOpen) {
+    SettingItem *item = &r->State->Items[r->State->SliderItemIdx];
+    float winW = GetScreenWidth();
+    float winH = GetScreenHeight() - DECK_STR_H;
+    float modalW = S(400.0f);
+    float modalH = S(160.0f);
+    float modalX = (winW - modalW) / 2.0f;
+    float modalY = (winH - modalH) / 2.0f;
+
+    // Handle encoder / keyboard
+    float step = (item->Step > 0) ? item->Step : (item->Max - item->Min) / 40.0f;
+    if (r->State->MidiBrowseDelta != 0) {
+      item->Value += r->State->MidiBrowseDelta * step;
+      if (item->Value < item->Min) item->Value = item->Min;
+      if (item->Value > item->Max) item->Value = item->Max;
+      r->State->MidiBrowseDelta = 0;
+      if (r->OnApply) r->OnApply(r->callbackCtx);
+    }
+    if (IsKeyPressed(KEY_LEFT)) {
+      item->Value -= step;
+      if (item->Value < item->Min) item->Value = item->Min;
+      if (r->OnApply) r->OnApply(r->callbackCtx);
+    }
+    if (IsKeyPressed(KEY_RIGHT)) {
+      item->Value += step;
+      if (item->Value > item->Max) item->Value = item->Max;
+      if (r->OnApply) r->OnApply(r->callbackCtx);
+    }
+
+    if (UI_IsReleased()) {
+      Vector2 mouse = UIGetMousePosition();
+      Rectangle closeBtn = {modalX + modalW - S(32), modalY + S(3), S(28), S(24)};
+      Rectangle okBtn = {modalX + (modalW - S(120))/2.0f, modalY + modalH - S(44), S(120), S(32)};
+      
+      // Allow touching slider track
+      Rectangle sliderRect = {modalX + S(30), modalY + S(70), modalW - S(60), S(30)};
+      bool inSlider = CheckCollisionPointRec(mouse, sliderRect);
+      
+      if (CheckCollisionPointRec(mouse, closeBtn) || CheckCollisionPointRec(mouse, okBtn)) {
+        r->State->IsSliderModalOpen = false;
+        UI_ConsumeTouch();
+        return 1;
+      }
+      if (!inSlider && !CheckCollisionPointRec(mouse, (Rectangle){modalX, modalY, modalW, modalH})) {
+        r->State->IsSliderModalOpen = false;
+        UI_ConsumeTouch();
+        return 1;
+      }
+    }
+    
+    // Touch drag on slider
+    if (UI_IsDown()) {
+       Vector2 mouse = UIGetMousePosition();
+       Rectangle sliderRect = {modalX + S(30), modalY + S(60), modalW - S(60), S(50)}; // wider touch area
+       if (CheckCollisionPointRec(mouse, sliderRect)) {
+          float relX = mouse.x - sliderRect.x;
+          float pct = relX / sliderRect.width;
+          if (pct < 0) pct = 0;
+          if (pct > 1) pct = 1;
+          item->Value = item->Min + pct * (item->Max - item->Min);
+          if (r->OnApply) r->OnApply(r->callbackCtx);
+       }
+    }
+
+    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_ENTER) || r->State->MidiRequestEnter) {
+      r->State->IsSliderModalOpen = false;
+      r->State->MidiRequestEnter = false;
       return 1;
     }
     return 1;
@@ -503,7 +624,11 @@ static int Settings_Update(Component *base) {
           r->State->DropdownScroll = 0;
           r->State->FocusLevel = 2;
         } else if (item->Type == SETTING_TYPE_KNOB) {
-          r->State->FocusLevel = 2;
+          // Double click to open slider modal
+          if (now - g_lastSettingsClickTime < 0.35) {
+            r->State->IsSliderModalOpen = true;
+            r->State->SliderItemIdx = idx;
+          }
         } else if (item->Type == SETTING_TYPE_ACTION) {
           if (item->Category == SETTING_CAT_CONTROLLERS &&
               strcmp(item->Label, "CONNECTED DEVICE") != 0 &&
@@ -517,8 +642,14 @@ static int Settings_Update(Component *base) {
               r->State->EditMappingItemIdx = idx;
             }
           } else {
-            if (r->OnAction)
-              r->OnAction(r->callbackCtx, idx);
+            // Confirm popup for jogwheel reset
+            if (strcmp(item->Label, "LOAD DEFAULT JOGWHEEL SETTINGS") == 0) {
+                r->State->IsConfirmPopupOpen = true;
+                r->State->ConfirmActionIdx = idx;
+                strncpy(r->State->ConfirmMessage, "Are you sure you want to load default jogwheel settings?", 127);
+            } else {
+                if (r->OnAction) r->OnAction(r->callbackCtx, idx);
+            }
           }
         }
       }
@@ -722,8 +853,19 @@ static int Settings_Update(Component *base) {
             }
             return 1;
           } else if (clickedItem->Type == SETTING_TYPE_ACTION) {
-            if (r->OnAction)
-              r->OnAction(r->callbackCtx, idx);
+            if (strcmp(clickedItem->Label, "LOAD DEFAULT JOGWHEEL SETTINGS") == 0) {
+                r->State->IsConfirmPopupOpen = true;
+                r->State->ConfirmActionIdx = idx;
+                strncpy(r->State->ConfirmMessage, "Are you sure you want to load default jogwheel settings?", 127);
+            } else {
+                if (r->OnAction) r->OnAction(r->callbackCtx, idx);
+            }
+          } else if (clickedItem->Type == SETTING_TYPE_KNOB) {
+            // Double click to open slider modal
+            if (now - g_lastSettingsClickTime < 0.35) {
+                r->State->IsSliderModalOpen = true;
+                r->State->SliderItemIdx = idx;
+            }
           } else if (clickedItem->Type == SETTING_TYPE_LIST) {
             r->State->IsDropdownOpen = true;
             r->State->DropdownItemIdx = idx;
@@ -844,6 +986,12 @@ static int Settings_Update(Component *base) {
         if (r->OnApply)
           r->OnApply(r->callbackCtx);
       }
+      
+      if (IsKeyPressed(KEY_ENTER)) {
+        r->State->IsSliderModalOpen = true;
+        r->State->SliderItemIdx = idx;
+        return 0; // Prevent fall-through
+      }
     } else if (item->Type == SETTING_TYPE_ACTION) {
       if (IsKeyPressed(KEY_ENTER)) {
         if (item->Category == SETTING_CAT_CONTROLLERS &&
@@ -855,8 +1003,13 @@ static int Settings_Update(Component *base) {
           r->State->MappingListScroll = 0;
           r->State->MappingListCursorPos = 0;
         } else {
-          if (r->OnAction)
-            r->OnAction(r->callbackCtx, idx);
+          if (strcmp(item->Label, "LOAD DEFAULT JOGWHEEL SETTINGS") == 0) {
+              r->State->IsConfirmPopupOpen = true;
+              r->State->ConfirmActionIdx = idx;
+              strncpy(r->State->ConfirmMessage, "Are you sure you want to load default jogwheel settings?", 127);
+          } else {
+              if (r->OnAction) r->OnAction(r->callbackCtx, idx);
+          }
         }
         return 0; // Prevent fall-through to global Enter/Apply handler
       }
@@ -1710,6 +1863,102 @@ static void Settings_Draw(Component *base) {
     DrawCentredText("CLOSE", faceSm, okBtn.x, okBtn.width, okBtn.y + S(8.0f),
                     S(11), ColorWhite);
   }
+
+  // Render Slider Modal Popup
+  if (r->State->IsSliderModalOpen) {
+    SettingItem *item = &r->State->Items[r->State->SliderItemIdx];
+    float winW = SCREEN_WIDTH;
+    float viewH = SCREEN_HEIGHT - DECK_STR_H;
+    DrawRectangle(0, 0, winW, viewH, (Color){0, 0, 0, 180});
+
+    float modalW = S(400.0f);
+    float modalH = S(160.0f);
+    float modalX = (winW - modalW) / 2.0f;
+    float modalY = (viewH - modalH) / 2.0f;
+
+    Rectangle modalRect = {modalX, modalY, modalW, modalH};
+    DrawRectangleRec(modalRect, ColorDark1);
+    DrawRectangleLinesEx(modalRect, 2.0f, ColorOrange);
+
+    // Header
+    DrawRectangle(modalX, modalY, modalW, S(30.0f), ColorDark2);
+    DrawCentredText(item->Label, faceMd, modalX, modalW, modalY + S(8.0f), S(12), ColorOrange);
+
+    // Slider UI
+    float sliderW = modalW - S(60);
+    float sliderX = modalX + S(30);
+    float sliderY = modalY + S(75);
+    
+    // Draw track
+    DrawRectangle(sliderX, sliderY, sliderW, S(12), ColorDark3);
+    DrawRectangleLines(sliderX, sliderY, sliderW, S(12), ColorShadow);
+
+    // Draw value fill
+    float pct = (item->Value - item->Min) / (item->Max - item->Min);
+    if (pct < 0) pct = 0; if (pct > 1) pct = 1;
+    float fillW = pct * sliderW;
+    DrawRectangle(sliderX, sliderY, fillW, S(12), ColorOrange);
+
+    // Draw handle
+    float hX = sliderX + fillW - S(6);
+    DrawRectangle(hX, sliderY - S(8), S(12), S(28), ColorWhite);
+
+    // Draw value text
+    char valBuf[64];
+    if (item->Step < 0.01f || fabsf(item->Value) < 0.1f) sprintf(valBuf, "%.3f", item->Value);
+    else if (fabsf(item->Value * 4.0f - roundf(item->Value * 4.0f)) < 0.01f || item->Step < 0.1f) sprintf(valBuf, "%.2f", item->Value);
+    else sprintf(valBuf, "%.1f", item->Value);
+    
+    if (item->Unit[0] != '\0') {
+      char fBuf[128];
+      sprintf(fBuf, "%s %s", valBuf, item->Unit);
+      DrawCentredText(fBuf, faceSm, modalX, modalW, modalY + S(45), S(12), ColorWhite);
+    } else {
+      DrawCentredText(valBuf, faceSm, modalX, modalW, modalY + S(45), S(12), ColorWhite);
+    }
+
+    // OK Button
+    Rectangle okBtn = {modalX + (modalW - S(120))/2.0f, modalY + modalH - S(44), S(120), S(32)};
+    DrawRectangleRec(okBtn, ColorDark2);
+    DrawRectangleLinesEx(okBtn, 1.5f, ColorOrange);
+    DrawCentredText("APPLY", faceSm, okBtn.x, okBtn.width, okBtn.y + S(10), S(11), ColorWhite);
+  }
+
+  // Render Confirmation Popup
+  if (r->State->IsConfirmPopupOpen) {
+    float winW = SCREEN_WIDTH;
+    float viewH = SCREEN_HEIGHT - DECK_STR_H;
+    DrawRectangle(0, 0, winW, viewH, (Color){0, 0, 0, 180});
+
+    float modalW = S(320.0f);
+    float modalH = S(160.0f);
+    float modalX = (winW - modalW) / 2.0f;
+    float modalY = (viewH - modalH) / 2.0f;
+
+    Rectangle modalRect = {modalX, modalY, modalW, modalH};
+    DrawRectangleRec(modalRect, ColorDark1);
+    DrawRectangleLinesEx(modalRect, 2.0f, ColorRed);
+
+    // Header
+    DrawRectangle(modalX, modalY, modalW, S(30.0f), (Color){100, 20, 20, 255});
+    DrawCentredText("CONFIRMATION", faceMd, modalX, modalW, modalY + S(8.0f), S(12), ColorWhite);
+
+    // Message
+    // Split message into two lines if needed
+    DrawCentredText("Are you sure you want to load", faceSm, modalX, modalW, modalY + S(55), S(10), ColorWhite);
+    DrawCentredText("default jogwheel settings?", faceSm, modalX, modalW, modalY + S(75), S(10), ColorWhite);
+
+    // Cancel / OK Buttons
+    Rectangle cancelBtn = {modalX + S(20), modalY + modalH - S(44), S(130), S(32)};
+    DrawRectangleRec(cancelBtn, ColorDark2);
+    DrawRectangleLinesEx(cancelBtn, 1.5f, ColorShadow);
+    DrawCentredText("CANCEL", faceSm, cancelBtn.x, cancelBtn.width, cancelBtn.y + S(10), S(11), ColorWhite);
+
+    Rectangle okBtn = {modalX + modalW - S(150), modalY + modalH - S(44), S(130), S(32)};
+    DrawRectangleRec(okBtn, ColorDark2);
+    DrawRectangleLinesEx(okBtn, 1.5f, ColorRed);
+    DrawCentredText("OK", faceSm, okBtn.x, okBtn.width, okBtn.y + S(10), S(11), ColorRed);
+  }
 }
 
 void SettingsRenderer_Init(SettingsRenderer *r, SettingsState *state) {
@@ -1721,12 +1970,9 @@ void SettingsRenderer_Init(SettingsRenderer *r, SettingsState *state) {
   r->State->IsMappingListOpen = false;
   r->State->MappingListScroll = 0;
   r->State->MappingListCursorPos = 0;
-  r->State->IsSliderPopupOpen = false;
-  r->State->SliderPopupItemIdx = -1;
+  r->State->IsConfirmPopupOpen = false;
+  r->State->IsSliderModalOpen = false;
   r->State->IsSystemInfoOpen = false;
-  r->State->LastKnobTapTime = 0.0;
-  r->State->LastKnobTapItemIdx = -1;
-  r->State->LastKnobTapPos = (Vector2){0, 0};
   r->OnClose = NULL;
   r->OnApply = NULL;
   r->callbackCtx = NULL;

@@ -79,6 +79,14 @@ typedef struct {
   bool MidiRequestEnter;
 
   bool IsSystemInfoOpen;
+  
+  // Modals for interaction safety
+  bool IsSliderModalOpen;
+  int SliderItemIdx;
+
+  bool IsConfirmPopupOpen;
+  int ConfirmActionIdx;
+  char ConfirmMessage[128];
 
   // Live System Metrics & Specifications
   float CPUUsage;
