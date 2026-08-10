@@ -39,6 +39,8 @@ static void LinuxMIDI_AutoConnectPorts(char *outDetectedName) {
   snd_seq_client_info_alloca(&cinfo);
   snd_seq_port_info_alloca(&pinfo);
 
+  printf("[MIDI] Scanning ALSA ports... in_port=%d out_port=%d\n", in_port, out_port);
+
   snd_seq_client_info_set_client(cinfo, -1);
   while (snd_seq_query_next_client(seq, cinfo) >= 0) {
     int client = snd_seq_client_info_get_client(cinfo);
@@ -49,37 +51,50 @@ static void LinuxMIDI_AutoConnectPorts(char *outDetectedName) {
     if (!cName || strstr(cName, "Midi Through"))
       continue;
 
+    printf("[MIDI] Found ALSA client [%d] '%s'\n", client, cName);
+
     snd_seq_port_info_set_client(pinfo, client);
     snd_seq_port_info_set_port(pinfo, -1);
     while (snd_seq_query_next_port(seq, pinfo) >= 0) {
       int port = snd_seq_port_info_get_port(pinfo);
       unsigned int caps = snd_seq_port_info_get_capability(pinfo);
+      printf("[MIDI]   Port [%d:%d] caps=0x%02x\n", client, port, caps);
 
-      if ((caps & SND_SEQ_PORT_CAP_READ) ||
-          (caps & SND_SEQ_PORT_CAP_SUBS_READ)) {
+      // Connect FROM controller -> our in_port (receive MIDI input from controller)
+      if ((caps & SND_SEQ_PORT_CAP_READ) || (caps & SND_SEQ_PORT_CAP_SUBS_READ)) {
         if (in_port >= 0) {
+          // Check not already connected
           int err1 = snd_seq_connect_from(seq, in_port, client, port);
-          printf("[MIDI] ALSA connect_from (in_port %d <- client %d:%d): %d "
-                 "(%s)\n",
-                 in_port, client, port, err1, cName);
-          if (outDetectedName && outDetectedName[0] == '\0') {
-            strncpy(outDetectedName, cName, 127);
+          if (err1 < 0 && err1 != -EEXIST)
+            printf("[MIDI] connect_from [%d:%d] -> in_port %d FAIL: %s\n", client, port, in_port, snd_strerror(err1));
+          else {
+            printf("[MIDI] connect_from [%d:%d] '%s' -> in_port %d OK\n", client, port, cName, in_port);
+            if (outDetectedName && outDetectedName[0] == '\0')
+              strncpy(outDetectedName, cName, 127);
           }
         }
       }
-      if ((caps & SND_SEQ_PORT_CAP_WRITE) ||
-          (caps & SND_SEQ_PORT_CAP_SUBS_WRITE)) {
+
+      // Connect our out_port -> controller (send MIDI output / LED commands to controller)
+      if ((caps & SND_SEQ_PORT_CAP_WRITE) || (caps & SND_SEQ_PORT_CAP_SUBS_WRITE)) {
         if (out_port >= 0) {
           int err2 = snd_seq_connect_to(seq, out_port, client, port);
-          printf(
-              "[MIDI] ALSA connect_to (out_port %d -> client %d:%d): %d (%s)\n",
-              out_port, client, port, err2, cName);
-          dest_client = client;
-          dest_port = port;
+          if (err2 < 0 && err2 != -EEXIST)
+            printf("[MIDI] connect_to out_port %d -> [%d:%d] FAIL: %s\n", out_port, client, port, snd_strerror(err2));
+          else {
+            printf("[MIDI] connect_to out_port %d -> [%d:%d] '%s' OK\n", out_port, client, port, cName);
+            dest_client = client;
+            dest_port = port;
+          }
         }
       }
     }
   }
+
+  if (dest_client == -1)
+    printf("[MIDI] WARNING: No writable MIDI output target found! LED/feedback will not work.\n");
+  else
+    printf("[MIDI] Output wired: out_port %d -> dest [%d:%d]\n", out_port, dest_client, dest_port);
 #else
   (void)outDetectedName;
 #endif
@@ -105,6 +120,25 @@ static bool lastMsgSet = false;
 void MIDI_SendSysEx(const uint8_t *data, uint32_t length) {
 #if defined(_WIN32)
   WinMIDI_SendSysEx(data, length);
+#elif defined(__linux__) && !defined(__ANDROID__)
+#ifdef HAS_ALSA
+  if (!seq_handle || out_port < 0 || !data || length == 0) return;
+  if (!midi_coder) {
+    if (snd_midi_event_new(1024, &midi_coder) < 0) return;
+  }
+  snd_seq_event_t ev;
+  snd_seq_ev_clear(&ev);
+  snd_midi_event_init(midi_coder);
+  long encoded = snd_midi_event_encode(midi_coder, data, (long)length, &ev);
+  if (encoded > 0) {
+    snd_seq_ev_set_source(&ev, out_port);
+    snd_seq_ev_set_subs(&ev);
+    snd_seq_ev_set_direct(&ev);
+    int err = snd_seq_event_output((snd_seq_t *)seq_handle, &ev);
+    snd_seq_drain_output((snd_seq_t *)seq_handle);
+    printf("[MIDI] SysEx sent (%u bytes): err=%d\n", length, err);
+  }
+#endif
 #else
   (void)data; (void)length;
 #endif
@@ -115,25 +149,41 @@ void MIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
   WinMIDI_SendShortMsg(status, data1, data2);
 #elif defined(__linux__) && !defined(__ANDROID__)
 #ifdef HAS_ALSA
-  if (!seq_handle)
+  if (!seq_handle || out_port < 0)
     return;
+  if (!midi_coder) {
+    if (snd_midi_event_new(256, &midi_coder) < 0) return;
+  }
+  uint8_t buf[3] = { status, data1, data2 };
   snd_seq_event_t ev;
   snd_seq_ev_clear(&ev);
-  snd_seq_ev_set_source(&ev, out_port);
-  snd_seq_ev_set_subs(&ev);
-  snd_seq_ev_set_direct(&ev);
-  uint8_t type = status & 0xF0;
-  if (type == 0xB0) {
-    snd_seq_ev_set_controller(&ev, status & 0x0F, data1, data2);
-  } else if (type == 0x90) {
-    snd_seq_ev_set_noteon(&ev, status & 0x0F, data1, data2);
-  } else if (type == 0x80) {
-    snd_seq_ev_set_noteoff(&ev, status & 0x0F, data1, data2);
+  snd_midi_event_init(midi_coder);
+  long encoded = snd_midi_event_encode(midi_coder, buf, 3, &ev);
+  if (encoded == 3) {
+    snd_seq_ev_set_source(&ev, out_port);
+    snd_seq_ev_set_subs(&ev);
+    snd_seq_ev_set_direct(&ev);
+    snd_seq_event_output((snd_seq_t *)seq_handle, &ev);
+    snd_seq_drain_output((snd_seq_t *)seq_handle);
   } else {
-    snd_seq_ev_set_controller(&ev, status & 0x0F, data1, data2);
+    // Fallback direct event construction
+    snd_seq_ev_clear(&ev);
+    snd_seq_ev_set_source(&ev, out_port);
+    snd_seq_ev_set_subs(&ev);
+    snd_seq_ev_set_direct(&ev);
+    uint8_t type = status & 0xF0;
+    if (type == 0xB0) {
+      snd_seq_ev_set_controller(&ev, status & 0x0F, data1, data2);
+    } else if (type == 0x90) {
+      snd_seq_ev_set_noteon(&ev, status & 0x0F, data1, data2);
+    } else if (type == 0x80) {
+      snd_seq_ev_set_noteoff(&ev, status & 0x0F, data1, data2);
+    } else {
+      snd_seq_ev_set_controller(&ev, status & 0x0F, data1, data2);
+    }
+    snd_seq_event_output((snd_seq_t *)seq_handle, &ev);
+    snd_seq_drain_output((snd_seq_t *)seq_handle);
   }
-  snd_seq_event_output((snd_seq_t *)seq_handle, &ev);
-  snd_seq_drain_output((snd_seq_t *)seq_handle);
 #endif
 #else
   (void)status; (void)data1; (void)data2;
@@ -316,6 +366,14 @@ bool MIDI_Init(MidiContext *ctx) {
   MIDI_SendShortMsg(0x91, 0x7F, 0x7F);
   MIDI_SendShortMsg(0x93, 0x7F, 0x7F);
   MIDI_SendShortMsg(0x94, 0x7F, 0x7F);
+
+  // Pioneer DDJ Status Query & Unlock SysEx
+  static const uint8_t sysexInit1[] = {0xF0, 0x00, 0x20, 0x7F, 0x03, 0x01, 0xF7};
+  static const uint8_t sysexInit2[] = {0xF0, 0x00, 0x40, 0x05, 0x00, 0x00, 0x04, 0x05, 0x00, 0x50, 0x02, 0xF7};
+  static const uint8_t sysexInit3[] = {0xF0, 0x00, 0x20, 0x2B, 0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0xF7};
+  MIDI_SendSysEx(sysexInit1, sizeof(sysexInit1));
+  MIDI_SendSysEx(sysexInit2, sizeof(sysexInit2));
+  MIDI_SendSysEx(sysexInit3, sizeof(sysexInit3));
 
   char toastMsg[160];
   snprintf(toastMsg, sizeof(toastMsg), "MIDI CONNECTED: %s", deviceName);
