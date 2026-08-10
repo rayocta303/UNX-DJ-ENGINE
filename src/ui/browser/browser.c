@@ -2493,8 +2493,8 @@ static void Browser_Draw(Component *base) {
     const char *artist = "";
     const char *bpmText = "124.0";
     const char *keyStr = "12A";
+    const char *filePath = "";
     bool isPlaying = false;
-    (void)isPlaying;
 
     switch (s->BrowseLevel) {
     case 0:
@@ -2507,6 +2507,7 @@ static void Browser_Draw(Component *base) {
           sprintf(bpmBuf, "%.1f", t->BPM);
           bpmText = bpmBuf;
           keyStr = t->Key;
+          filePath = t->FilePath;
         }
       } else {
         if (idx < s->ActiveTrackCount && s->SeratoTrackPointers[idx]) {
@@ -2517,6 +2518,7 @@ static void Browser_Draw(Component *base) {
           sprintf(bpmBuf, "%.1f", t->BPM);
           bpmText = bpmBuf;
           keyStr = t->Key;
+          filePath = t->FilePath;
         }
       }
       break;
@@ -2549,6 +2551,11 @@ static void Browser_Draw(Component *base) {
     if (title[0] == '\0')
       continue;
 
+    if (filePath[0] != '\0') {
+      if (s->DeckA && s->DeckA->LoadedTrack && strcmp(s->DeckA->LoadedTrack->FilePath, filePath) == 0) isPlaying = true;
+      if (s->DeckB && s->DeckB->LoadedTrack && strcmp(s->DeckB->LoadedTrack->FilePath, filePath) == 0) isPlaying = true;
+    }
+
     float ry = listYOffset - pixelOffset + i * rowH;
     bool isCursor = (idx == s->CursorPos + s->ScrollOffset);
 
@@ -2557,17 +2564,22 @@ static void Browser_Draw(Component *base) {
       if (s->BrowseLevel > 0 && !s->IsTagList) {
         DrawSelectionTriangle(listX + S(2), ry + (rowH / 2.0f), ColorWhite);
       }
+    } else if (isPlaying) {
+      DrawRectangle(listX, ry + 1, listW, rowH - 2, (Color){ 255, 121, 0, 45 });
     } else if (i % 2 != 0) {
       DrawRectangle(listX, ry + 1, listW, rowH - 2, ColorDark2);
     }
+
+    Color textCol = isCursor ? ColorWhite : (isPlaying ? ColorOrange : ColorShadow);
+    Color titleCol = isCursor ? ColorWhite : (isPlaying ? ColorOrange : ColorWhite);
 
     // Render Track/Playlist Index Number (1., 2., 3...)
     if (s->BrowseLevel == 0 || s->BrowseLevel == 1) {
       char numBuf[16];
       sprintf(numBuf, "%d.", idx + 1);
-      UIDrawText(numBuf, faceXS, listX + S(4), ry + S(9), S(10), isCursor ? ColorWhite : ColorShadow);
+      UIDrawText(numBuf, faceXS, listX + S(4), ry + S(9), S(10), textCol);
       if (s->BrowseLevel == 0) {
-        UIDrawText("\uf001", faceIcon, listX + S(32), ry + S(9), S(9), isCursor ? ColorWhite : ColorShadow);
+        UIDrawText(isPlaying ? "\uf04b" : "\uf001", faceIcon, listX + S(32), ry + S(9), S(9), textCol);
       }
     }
 
@@ -2593,20 +2605,19 @@ static void Browser_Draw(Component *base) {
 
     float maxTitleW = listW - (textX - listX) - S(115);
     Rectangle titleRect = { textX, textY, maxTitleW, rowH };
-    UIDrawScrollingText(title, faceSm, titleRect, S(13), ColorWhite, isCursor ? s->MarqueeScrollX : 0.0f);
+    UIDrawScrollingText(title, faceSm, titleRect, S(13), titleCol, isCursor ? s->MarqueeScrollX : 0.0f);
 
     // BUG FIX: UIDrawScrollingText terminates ScissorMode internally when active.
     // We must restore the main list's ScissorMode so subsequent items and text don't bleed over the table header!
     BeginScissorMode((int)listX, (int)listYOffset, (int)listW + S(10), (int)listAreaH);
 
     if (artist[0] != '\0' && s->BrowseLevel == 0 && !s->InfoEnabled) {
-      UIDrawText(artist, faceXS, textX, ry + S(15), S(10),
-                 isCursor ? ColorWhite : ColorShadow);
+      UIDrawText(artist, faceXS, textX, ry + S(15), S(10), textCol);
     }
 
     // BPM & Key Badge (Reference Image 1 & 2 - NO LOAD BUTTON)
     if (s->BrowseLevel == 0 && !s->InfoEnabled) {
-      DrawCentredText(bpmText, faceXS, listX + listW - S(110), S(55), ry + S(9), S(11), isCursor ? ColorWhite : ColorShadow);
+      DrawCentredText(bpmText, faceXS, listX + listW - S(110), S(55), ry + S(9), S(11), textCol);
 
       // Key Badge with Camelot Wheel Traffic Light Harmonic Matching
       Rectangle keyBadgeRect = { listX + listW - S(52), ry + S(4), S(48), rowH - S(8) };
