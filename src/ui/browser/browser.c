@@ -1630,377 +1630,10 @@ static int Browser_Update(Component *base) {
   }
 
   if (s->BrowseLevel == 0 && loadToDeck != -1) {
-    // LOAD TRACK
-    struct DeckState *targetDeck = loadToDeck == 0 ? s->DeckA : s->DeckB;
-    if (targetDeck) targetDeck->IsLoading = true;
-    if (targetDeck && targetDeck->Waveform.LoadLock && targetDeck->IsPlaying) {
-      UNX_LOG_WARN("[BROWSER] LOAD LOCKED: Deck %c is playing",
-                   loadToDeck == 0 ? 'A' : 'B');
-      return 0; // Prevent load
-    }
-
-    // NAV-02 FIX: calculate fresh target track index at point of loading
     int idx = s->ScrollOffset + s->CursorPos;
-    if (s->DatabaseType == 0) { // Rekordbox
-      if (idx < s->ActiveTrackCount && s->TrackPointers[idx]) {
-        RBTrack *t = s->TrackPointers[idx];
-        UNX_LOG_INFO("[BROWSER] Loading RB track: %s to Deck %c", t->Title,
-                     loadToDeck == 0 ? 'A' : 'B');
-
-        if (MemoryGuard_GetLevel() == MEM_MODE_CRITICAL) {
-            UNX_LOG_ERR("[BROWSER] LOAD BLOCKED: Memory is critical.");
-            s->ShowLoadPopup = false;
-            return 0;
-        }
-
-        if (s->SelectedStorage) {
-          RB_LoadTrackData(&t->Analysis, t->AnalyzePath, t->Title, t->ID, s->SelectedStorage->Path);
-
-          char trackFullPath[1024] = {0};
-          const char *relPath = t->FilePath;
-          if (relPath[0] == '/' || relPath[0] == '\\')
-            relPath++;
-          snprintf(trackFullPath, sizeof(trackFullPath), "%s/%s",
-                   s->SelectedStorage->Path, relPath);
-
-          if (s->AudioPlugin) {
-            DeckAudio_LoadTrackAsync(&s->AudioPlugin->Decks[loadToDeck], trackFullPath);
-          }
-
-          // NAV-05 FIX: targetDeck is already declared above, do not shadow
-          if (targetDeck) {
-            strncpy(targetDeck->TrackTitle, t->Title, 127);
-            targetDeck->TrackTitle[127] = '\0';
-            strncpy(targetDeck->ArtistName, t->Artist, 127);
-            targetDeck->ArtistName[127] = '\0';
-            strncpy(targetDeck->AlbumName, t->Album, 127);
-            targetDeck->AlbumName[127] = '\0';
-            strncpy(targetDeck->GenreName, t->Genre, 63);
-            targetDeck->GenreName[63] = '\0';
-            strncpy(targetDeck->TrackKey, t->Key, 15);
-            targetDeck->TrackKey[15] = '\0';
-            strncpy(targetDeck->LabelName, t->Label, 127);
-            targetDeck->LabelName[127] = '\0';
-            strncpy(targetDeck->Comment, t->Comment, 255);
-            targetDeck->Comment[255] = '\0';
-            targetDeck->Rating = t->Rating;
-            targetDeck->Year = t->Year;
-            targetDeck->TrackNumber = t->TrackNumber;
-            
-            // NAV-06 FIX: assign OriginalBPM and CurrentBPM cleanly without redundant override
-            float validBpm = (t->BPM > 0) ? t->BPM : 120.0f;
-            targetDeck->OriginalBPM = validBpm;
-            targetDeck->CurrentBPM = validBpm;
-
-            if (s->SelectedStorage) {
-              strncpy(targetDeck->SourceName, s->SelectedStorage->Name, 31);
-            }
-
-            // Artwork
-            if (t->ArtworkPath[0] != '\0') {
-              const char *artRel = t->ArtworkPath;
-              while (artRel[0] == '/' || artRel[0] == '\\')
-                artRel++;
-              
-              const char *sep = "";
-              size_t pLen = strlen(s->SelectedStorage->Path);
-              if (pLen > 0 && s->SelectedStorage->Path[pLen-1] != '/' && s->SelectedStorage->Path[pLen-1] != '\\') {
-                  sep = "/";
-              }
-              
-              snprintf(targetDeck->ArtworkPath, sizeof(targetDeck->ArtworkPath),
-                       "%s%s%s", s->SelectedStorage->Path, sep, artRel);
-            } else
-              targetDeck->ArtworkPath[0] = '\0';
-
-            // Allocate and setup TrackState
-            TrackState *newTrack = (TrackState *)malloc(sizeof(TrackState));
-            if (!newTrack) {
-                UNX_LOG_ERR("[BROWSER] OOM: Failed to allocate TrackState");
-                s->ShowLoadPopup = false;
-                return 0;
-            }
-            
-            memset(newTrack, 0, sizeof(TrackState));
-              
-              if (s->SelectedStorage) {
-                snprintf(newTrack->AnalyzePath, sizeof(newTrack->AnalyzePath), "%s/%s", s->SelectedStorage->Path, t->AnalyzePath);
-              }
-
-              newTrack->Analysis.StaticWaveformLen = t->Analysis.StaticWaveformLen;
-              newTrack->Analysis.StaticWaveformType = t->Analysis.StaticWaveformType;
-              memcpy(newTrack->Analysis.StaticWaveform, t->Analysis.StaticWaveform,
-                     t->Analysis.StaticWaveformLen > 8192 ? 8192 : t->Analysis.StaticWaveformLen);
-              
-              // DEEP COPY: Isolate dynamic waveform memory per deck
-              newTrack->Analysis.DynamicWaveformLen = t->Analysis.DynamicWaveformLen;
-              if (newTrack->Analysis.DynamicWaveformLen > 0 && t->Analysis.DynamicWaveform != NULL) {
-                  newTrack->Analysis.DynamicWaveform = (unsigned char*)malloc(newTrack->Analysis.DynamicWaveformLen);
-                  if (newTrack->Analysis.DynamicWaveform) {
-                      memcpy(newTrack->Analysis.DynamicWaveform, t->Analysis.DynamicWaveform, newTrack->Analysis.DynamicWaveformLen);
-                      newTrack->Analysis.WaveformType = t->Analysis.WaveformType;
-                  }
-              }
-
-              // Deep copy BeatGrid
-              newTrack->Analysis.BeatGridCount = t->Analysis.BeatGridCount;
-              if (newTrack->Analysis.BeatGridCount > 0 && t->Analysis.BeatGrid != NULL) {
-                  newTrack->Analysis.BeatGrid = (RBBeat*)malloc(sizeof(RBBeat) * newTrack->Analysis.BeatGridCount);
-                  if (newTrack->Analysis.BeatGrid) {
-                      memcpy(newTrack->Analysis.BeatGrid, t->Analysis.BeatGrid, sizeof(RBBeat) * newTrack->Analysis.BeatGridCount);
-                  }
-              }
-
-              // Deep copy Phrases
-              newTrack->Analysis.PhraseCount = t->Analysis.PhraseCount;
-              if (newTrack->Analysis.PhraseCount > 0 && t->Analysis.Phrases != NULL) {
-                  newTrack->Analysis.Phrases = (RBPhrase*)malloc(sizeof(RBPhrase) * newTrack->Analysis.PhraseCount);
-                  if (newTrack->Analysis.Phrases) {
-                      memcpy(newTrack->Analysis.Phrases, t->Analysis.Phrases, sizeof(RBPhrase) * newTrack->Analysis.PhraseCount);
-                  }
-              }
-
-              // Deep copy Cues
-              newTrack->Analysis.CueCount = t->Analysis.CueCount;
-              if (newTrack->Analysis.CueCount > 0 && t->Analysis.Cues != NULL) {
-                  newTrack->Analysis.Cues = (RBCue*)malloc(sizeof(RBCue) * newTrack->Analysis.CueCount);
-                  if (newTrack->Analysis.Cues) {
-                      memcpy(newTrack->Analysis.Cues, t->Analysis.Cues, sizeof(RBCue) * newTrack->Analysis.CueCount);
-                  }
-              }
-
-              for (uint32_t i = 0; i < t->Analysis.CueCount && i < 32; i++) {
-                if (t->Analysis.Cues[i].ID >= 1 && t->Analysis.Cues[i].ID <= 8) {
-                  newTrack->HotCues[newTrack->HotCuesCount].ID = t->Analysis.Cues[i].ID;
-                  newTrack->HotCues[newTrack->HotCuesCount].Start =
-                      t->Analysis.Cues[i].Time;
-                  memcpy(newTrack->HotCues[newTrack->HotCuesCount].Color,
-                         t->Analysis.Cues[i].Color, 3);
-                  newTrack->HotCuesCount++;
-                } else if (t->Analysis.Cues[i].ID == 0) {
-                  newTrack->Cues[newTrack->CuesCount].Start = t->Analysis.Cues[i].Time;
-                  memcpy(newTrack->Cues[newTrack->CuesCount].Color,
-                         t->Analysis.Cues[i].Color, 3);
-                  newTrack->CuesCount++;
-                }
-              }
-
-              strncpy(newTrack->FilePath, trackFullPath, sizeof(newTrack->FilePath) - 1);
-              strncpy(newTrack->Title, t->Title, sizeof(newTrack->Title) - 1);
-              strncpy(newTrack->Artist, t->Artist, sizeof(newTrack->Artist) - 1);
-
-              // Check persistent HotCue database for overrides (Rekordbox)
-              HotCue dbCues[8];
-              int dbCount = 0;
-              const char *storagePath = s->SelectedStorage ? s->SelectedStorage->Path : NULL;
-              if (HotCueDB_GetTrack(storagePath, newTrack->FilePath, newTrack->Title, newTrack->Artist, dbCues, &dbCount)) {
-                  newTrack->HotCuesCount = dbCount;
-                  memset(newTrack->HotCues, 0, sizeof(newTrack->HotCues));
-                  if (dbCount > 0) {
-                      memcpy(newTrack->HotCues, dbCues, sizeof(HotCue) * dbCount);
-                  }
-                  
-                  // Re-build Analysis.Cues to match persisted HotCues
-                  if (newTrack->Analysis.Cues) free(newTrack->Analysis.Cues);
-                  newTrack->Analysis.CueCount = dbCount;
-                  if (dbCount > 0) {
-                      newTrack->Analysis.Cues = (RBCue*)malloc(sizeof(RBCue) * dbCount);
-                      if (newTrack->Analysis.Cues) {
-                          for (int h = 0; h < dbCount; h++) {
-                              memset(&newTrack->Analysis.Cues[h], 0, sizeof(RBCue));
-                              newTrack->Analysis.Cues[h].Time = dbCues[h].Start;
-                              newTrack->Analysis.Cues[h].ID = dbCues[h].ID;
-                              newTrack->Analysis.Cues[h].Type = 1;
-                              newTrack->Analysis.Cues[h].Status = 1;
-                              memcpy(newTrack->Analysis.Cues[h].Color, dbCues[h].Color, 3);
-                          }
-                      }
-                  } else {
-                      newTrack->Analysis.Cues = NULL;
-                  }
-              }
-
-              // Also copy Phrases to legacy array if needed for UI
-              newTrack->PhraseCount = t->Analysis.PhraseCount > 64 ? 64 : t->Analysis.PhraseCount;
-              for (int i = 0; i < newTrack->PhraseCount; i++) {
-                  newTrack->Phrases[i].Index = t->Analysis.Phrases[i].Index;
-                  newTrack->Phrases[i].Beat = t->Analysis.Phrases[i].Beat;
-                  newTrack->Phrases[i].KindID = t->Analysis.Phrases[i].KindID;
-                  strncpy(newTrack->Phrases[i].Kind, t->Analysis.Phrases[i].Kind, 31);
-              }
-
-              TrackState *oldTrack = targetDeck->LoadedTrack;
-              targetDeck->LoadedTrack = newTrack; // Atomic pointer swap on UI thread
-
-              // Cleanup old track memory (including buffers)
-              if (oldTrack){
-                if (oldTrack->Analysis.BeatGrid != NULL) free(oldTrack->Analysis.BeatGrid);
-                if (oldTrack->Analysis.Cues != NULL) free(oldTrack->Analysis.Cues);
-                if (oldTrack->Analysis.Phrases != NULL) free(oldTrack->Analysis.Phrases);
-                if (oldTrack->Analysis.DynamicWaveform != NULL) free(oldTrack->Analysis.DynamicWaveform);
-                free(oldTrack);
-              }
-                
-              targetDeck->PositionMs = (newTrack->CuesCount > 0)
-                                           ? newTrack->Cues[0].Start
-                                           : (newTrack->Analysis.BeatGridCount > 0
-                                                  ? newTrack->Analysis.BeatGrid[0].Time
-                                                  : 0);
-              targetDeck->LoadAnimTimer = 0.5f;
-              DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck],
-                                 (uint32_t)targetDeck->PositionMs);
-          }
-        }
-      }
-    } else { // Serato
-      if (idx < s->ActiveTrackCount && s->SeratoTrackPointers[idx]) {
-        SeratoTrack *t = s->SeratoTrackPointers[idx];
-        UNX_LOG_INFO("[BROWSER] Loading Serato track: %s to Deck %c", t->Title,
-                     loadToDeck == 0 ? 'A' : 'B');
-
-        if (s->SelectedStorage) {
-          Serato_LoadTrackData(t, s->SelectedStorage->Path);
-
-          char trackFullPath[1024] = {0};
-          const char *relPath = t->FilePath;
-          if (relPath[0] == '/' || relPath[0] == '\\')
-            relPath++;
-          snprintf(trackFullPath, sizeof(trackFullPath), "%s/%s",
-                   s->SelectedStorage->Path, relPath);
-
-          if (s->AudioPlugin) {
-            DeckAudio_LoadTrackAsync(&s->AudioPlugin->Decks[loadToDeck], trackFullPath);
-          }
-
-          // NAV-05 FIX: targetDeck is already declared above
-          if (targetDeck) {
-            strncpy(targetDeck->TrackTitle, t->Title, 127);
-            targetDeck->TrackTitle[127] = '\0';
-            strncpy(targetDeck->ArtistName, t->Artist, 127);
-            targetDeck->ArtistName[127] = '\0';
-            strncpy(targetDeck->AlbumName, t->Album, 127);
-            targetDeck->AlbumName[127] = '\0';
-            strncpy(targetDeck->GenreName, t->Genre, 63);
-            targetDeck->GenreName[63] = '\0';
-            strncpy(targetDeck->TrackKey, t->Key, 15);
-            targetDeck->TrackKey[15] = '\0';
-            strncpy(targetDeck->LabelName, t->Label, 127);
-            targetDeck->LabelName[127] = '\0';
-            strncpy(targetDeck->Comment, t->Comment, 255);
-            targetDeck->Comment[255] = '\0';
-            targetDeck->Rating = 0; // Serato rating not in DB v2
-            targetDeck->Year = t->Year;
-            targetDeck->TrackNumber = 0; // Not available in Serato DB v2
-            targetDeck->OriginalBPM = t->BPM;
-            targetDeck->CurrentBPM = t->BPM;
-            targetDeck->OriginalBPM = (t->BPM > 0) ? t->BPM : 120.0f;
-
-            if (s->SelectedStorage) {
-              strncpy(targetDeck->SourceName, s->SelectedStorage->Name, 31);
-            }
-            targetDeck->ArtworkPath[0] =
-                '\0'; // Serato artwork not implemented yet
-
-            TrackState *newTrack = (TrackState *)malloc(sizeof(TrackState));
-            if (newTrack) {
-              memset(newTrack, 0, sizeof(TrackState));
-
-              // Copy cues to Analysis.Cues for waveform and dynamic editing sync
-              newTrack->Analysis.CueCount = t->CueCount;
-              if (newTrack->Analysis.CueCount > 0 && t->Cues != NULL) {
-                newTrack->Analysis.Cues = (RBCue*)malloc(sizeof(RBCue) * newTrack->Analysis.CueCount);
-                if (newTrack->Analysis.Cues) {
-                  memcpy(newTrack->Analysis.Cues, t->Cues, sizeof(RBCue) * newTrack->Analysis.CueCount);
-                }
-              }
-
-              // Synthesize BeatGrid from BPM if not present so Quantize Snap works on Serato tracks
-              if (newTrack->Analysis.BeatGridCount == 0 && targetDeck->OriginalBPM > 30.0f) {
-                double beatMs = 60000.0 / (double)targetDeck->OriginalBPM;
-                uint32_t totalBeats = (uint32_t)(3600000.0 / beatMs); // 1 hour of beats
-                newTrack->Analysis.BeatGrid = (RBBeat*)malloc(sizeof(RBBeat) * totalBeats);
-                if (newTrack->Analysis.BeatGrid) {
-                  newTrack->Analysis.BeatGridCount = totalBeats;
-                  for (uint32_t b = 0; b < totalBeats; b++) {
-                    newTrack->Analysis.BeatGrid[b].Time = (uint32_t)(b * beatMs);
-                    newTrack->Analysis.BeatGrid[b].BPM = (uint16_t)(targetDeck->OriginalBPM * 100.0f);
-                    newTrack->Analysis.BeatGrid[b].BeatNumber = (b % 4) + 1;
-                  }
-                }
-              }
-
-              // Copy cues from Serato metadata to HotCues array
-              for (uint32_t i = 0; i < t->CueCount && i < 32; i++) {
-                if (t->Cues[i].ID >= 1 && t->Cues[i].ID <= 8) {
-                  newTrack->HotCues[newTrack->HotCuesCount].ID = t->Cues[i].ID;
-                  newTrack->HotCues[newTrack->HotCuesCount].Start =
-                      t->Cues[i].Time;
-                  memcpy(newTrack->HotCues[newTrack->HotCuesCount].Color,
-                         t->Cues[i].Color, 3);
-                  newTrack->HotCuesCount++;
-                } else if (t->Cues[i].ID == 0) {
-                  newTrack->Cues[newTrack->CuesCount].Start = t->Cues[i].Time;
-                  memcpy(newTrack->Cues[newTrack->CuesCount].Color,
-                         t->Cues[i].Color, 3);
-                  newTrack->CuesCount++;
-                }
-              }
-
-              strncpy(newTrack->FilePath, trackFullPath, sizeof(newTrack->FilePath) - 1);
-              strncpy(newTrack->Title, t->Title, sizeof(newTrack->Title) - 1);
-              strncpy(newTrack->Artist, t->Artist, sizeof(newTrack->Artist) - 1);
-
-              // Check persistent HotCue database for overrides (Serato)
-              HotCue dbCues[8];
-              int dbCount = 0;
-              const char *storagePath = s->SelectedStorage ? s->SelectedStorage->Path : NULL;
-              if (HotCueDB_GetTrack(storagePath, newTrack->FilePath, newTrack->Title, newTrack->Artist, dbCues, &dbCount)) {
-                  newTrack->HotCuesCount = dbCount;
-                  memset(newTrack->HotCues, 0, sizeof(newTrack->HotCues));
-                  if (dbCount > 0) {
-                      memcpy(newTrack->HotCues, dbCues, sizeof(HotCue) * dbCount);
-                  }
-                  
-                  // Re-build Analysis.Cues to match persisted HotCues
-                  if (newTrack->Analysis.Cues) free(newTrack->Analysis.Cues);
-                  newTrack->Analysis.CueCount = dbCount;
-                  if (dbCount > 0) {
-                      newTrack->Analysis.Cues = (RBCue*)malloc(sizeof(RBCue) * dbCount);
-                      if (newTrack->Analysis.Cues) {
-                          for (int h = 0; h < dbCount; h++) {
-                              memset(&newTrack->Analysis.Cues[h], 0, sizeof(RBCue));
-                              newTrack->Analysis.Cues[h].Time = dbCues[h].Start;
-                              newTrack->Analysis.Cues[h].ID = dbCues[h].ID;
-                              newTrack->Analysis.Cues[h].Type = 1;
-                              newTrack->Analysis.Cues[h].Status = 1;
-                              memcpy(newTrack->Analysis.Cues[h].Color, dbCues[h].Color, 3);
-                          }
-                      }
-                  } else {
-                      newTrack->Analysis.Cues = NULL;
-                  }
-              }
-
-              TrackState *oldTrack = targetDeck->LoadedTrack;
-              targetDeck->LoadedTrack = newTrack;
-              if (oldTrack) {
-                if (oldTrack->Analysis.BeatGrid != NULL) free(oldTrack->Analysis.BeatGrid);
-                if (oldTrack->Analysis.Phrases != NULL) free(oldTrack->Analysis.Phrases);
-                if (oldTrack->Analysis.Cues != NULL) free(oldTrack->Analysis.Cues);
-                if (oldTrack->Analysis.DynamicWaveform != NULL) free(oldTrack->Analysis.DynamicWaveform);
-                free(oldTrack);
-              }
-              targetDeck->PositionMs =
-                  (newTrack->CuesCount > 0) ? newTrack->Cues[0].Start : 0;
-              targetDeck->LoadAnimTimer = 0.5f;
-              DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck],
-                                 (uint32_t)targetDeck->PositionMs);
-            }
-          }
-        }
-      }
-    }
+    return Browser_LoadTrackAtIndex(s, idx, loadToDeck, false);
   }
+
 
   if ((IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_ESCAPE))) {
     Browser_Back(s);
@@ -2008,6 +1641,331 @@ static int Browser_Update(Component *base) {
 
   s->MidiRequestBack = false;
   return 0;
+}
+
+int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool autoPlay) {
+  if (!s || loadToDeck < 0 || loadToDeck > 1) return 0;
+  if (idx < 0 || idx >= s->ActiveTrackCount) return 0;
+
+  struct DeckState *targetDeck = (loadToDeck == 0) ? s->DeckA : s->DeckB;
+  if (!targetDeck) return 0;
+
+  targetDeck->IsLoading = true;
+  if (!autoPlay && targetDeck->Waveform.LoadLock && targetDeck->IsPlaying) {
+    UNX_LOG_WARN("[BROWSER] LOAD LOCKED: Deck %c is playing", loadToDeck == 0 ? 'A' : 'B');
+    return 0;
+  }
+
+  targetDeck->LoadedTrackIndex = idx;
+
+  if (s->DatabaseType == 0) { // Rekordbox
+    if (s->TrackPointers[idx]) {
+      RBTrack *t = s->TrackPointers[idx];
+      UNX_LOG_INFO("[BROWSER] Loading RB track: %s to Deck %c (Index %d)", t->Title, loadToDeck == 0 ? 'A' : 'B', idx);
+
+      if (MemoryGuard_GetLevel() == MEM_MODE_CRITICAL) {
+        UNX_LOG_ERR("[BROWSER] LOAD BLOCKED: Memory is critical.");
+        s->ShowLoadPopup = false;
+        return 0;
+      }
+
+      if (s->SelectedStorage) {
+        RB_LoadTrackData(&t->Analysis, t->AnalyzePath, t->Title, t->ID, s->SelectedStorage->Path);
+
+        char trackFullPath[1024] = {0};
+        const char *relPath = t->FilePath;
+        if (relPath[0] == '/' || relPath[0] == '\\') relPath++;
+        snprintf(trackFullPath, sizeof(trackFullPath), "%s/%s", s->SelectedStorage->Path, relPath);
+
+        if (s->AudioPlugin) {
+          DeckAudio_LoadTrackAsync(&s->AudioPlugin->Decks[loadToDeck], trackFullPath);
+        }
+
+        strncpy(targetDeck->TrackTitle, t->Title, 127); targetDeck->TrackTitle[127] = '\0';
+        strncpy(targetDeck->ArtistName, t->Artist, 127); targetDeck->ArtistName[127] = '\0';
+        strncpy(targetDeck->AlbumName, t->Album, 127); targetDeck->AlbumName[127] = '\0';
+        strncpy(targetDeck->GenreName, t->Genre, 63); targetDeck->GenreName[63] = '\0';
+        strncpy(targetDeck->TrackKey, t->Key, 15); targetDeck->TrackKey[15] = '\0';
+        strncpy(targetDeck->LabelName, t->Label, 127); targetDeck->LabelName[127] = '\0';
+        strncpy(targetDeck->Comment, t->Comment, 255); targetDeck->Comment[255] = '\0';
+        targetDeck->Rating = t->Rating;
+        targetDeck->Year = t->Year;
+        targetDeck->TrackNumber = (t->TrackNumber > 0) ? t->TrackNumber : (idx + 1);
+
+        float validBpm = (t->BPM > 0) ? t->BPM : 120.0f;
+        targetDeck->OriginalBPM = validBpm;
+        targetDeck->CurrentBPM = validBpm;
+
+        if (s->SelectedStorage) {
+          strncpy(targetDeck->SourceName, s->SelectedStorage->Name, 31);
+        }
+
+        if (t->ArtworkPath[0] != '\0') {
+          const char *artRel = t->ArtworkPath;
+          while (artRel[0] == '/' || artRel[0] == '\\') artRel++;
+          const char *sep = "";
+          size_t pLen = strlen(s->SelectedStorage->Path);
+          if (pLen > 0 && s->SelectedStorage->Path[pLen-1] != '/' && s->SelectedStorage->Path[pLen-1] != '\\') sep = "/";
+          snprintf(targetDeck->ArtworkPath, sizeof(targetDeck->ArtworkPath), "%s%s%s", s->SelectedStorage->Path, sep, artRel);
+        } else targetDeck->ArtworkPath[0] = '\0';
+
+        TrackState *newTrack = (TrackState *)malloc(sizeof(TrackState));
+        if (!newTrack) {
+          UNX_LOG_ERR("[BROWSER] OOM: Failed to allocate TrackState");
+          s->ShowLoadPopup = false;
+          return 0;
+        }
+        memset(newTrack, 0, sizeof(TrackState));
+
+        if (s->SelectedStorage) {
+          snprintf(newTrack->AnalyzePath, sizeof(newTrack->AnalyzePath), "%s/%s", s->SelectedStorage->Path, t->AnalyzePath);
+        }
+
+        newTrack->Analysis.StaticWaveformLen = t->Analysis.StaticWaveformLen;
+        newTrack->Analysis.StaticWaveformType = t->Analysis.StaticWaveformType;
+        memcpy(newTrack->Analysis.StaticWaveform, t->Analysis.StaticWaveform,
+               t->Analysis.StaticWaveformLen > 8192 ? 8192 : t->Analysis.StaticWaveformLen);
+        
+        newTrack->Analysis.DynamicWaveformLen = t->Analysis.DynamicWaveformLen;
+        if (newTrack->Analysis.DynamicWaveformLen > 0 && t->Analysis.DynamicWaveform != NULL) {
+          newTrack->Analysis.DynamicWaveform = (unsigned char*)malloc(newTrack->Analysis.DynamicWaveformLen);
+          if (newTrack->Analysis.DynamicWaveform) {
+            memcpy(newTrack->Analysis.DynamicWaveform, t->Analysis.DynamicWaveform, newTrack->Analysis.DynamicWaveformLen);
+            newTrack->Analysis.WaveformType = t->Analysis.WaveformType;
+          }
+        }
+
+        newTrack->Analysis.BeatGridCount = t->Analysis.BeatGridCount;
+        if (newTrack->Analysis.BeatGridCount > 0 && t->Analysis.BeatGrid != NULL) {
+          newTrack->Analysis.BeatGrid = (RBBeat*)malloc(sizeof(RBBeat) * newTrack->Analysis.BeatGridCount);
+          if (newTrack->Analysis.BeatGrid) {
+            memcpy(newTrack->Analysis.BeatGrid, t->Analysis.BeatGrid, sizeof(RBBeat) * newTrack->Analysis.BeatGridCount);
+          }
+        }
+
+        newTrack->Analysis.PhraseCount = t->Analysis.PhraseCount;
+        if (newTrack->Analysis.PhraseCount > 0 && t->Analysis.Phrases != NULL) {
+          newTrack->Analysis.Phrases = (RBPhrase*)malloc(sizeof(RBPhrase) * newTrack->Analysis.PhraseCount);
+          if (newTrack->Analysis.Phrases) {
+            memcpy(newTrack->Analysis.Phrases, t->Analysis.Phrases, sizeof(RBPhrase) * newTrack->Analysis.PhraseCount);
+          }
+        }
+
+        newTrack->Analysis.CueCount = t->Analysis.CueCount;
+        if (newTrack->Analysis.CueCount > 0 && t->Analysis.Cues != NULL) {
+          newTrack->Analysis.Cues = (RBCue*)malloc(sizeof(RBCue) * newTrack->Analysis.CueCount);
+          if (newTrack->Analysis.Cues) {
+            memcpy(newTrack->Analysis.Cues, t->Analysis.Cues, sizeof(RBCue) * newTrack->Analysis.CueCount);
+          }
+        }
+
+        for (uint32_t c = 0; c < t->Analysis.CueCount && c < 32; c++) {
+          if (t->Analysis.Cues[c].ID >= 1 && t->Analysis.Cues[c].ID <= 8) {
+            newTrack->HotCues[newTrack->HotCuesCount].ID = t->Analysis.Cues[c].ID;
+            newTrack->HotCues[newTrack->HotCuesCount].Start = t->Analysis.Cues[c].Time;
+            memcpy(newTrack->HotCues[newTrack->HotCuesCount].Color, t->Analysis.Cues[c].Color, 3);
+            newTrack->HotCuesCount++;
+          } else if (t->Analysis.Cues[c].ID == 0) {
+            newTrack->Cues[newTrack->CuesCount].Start = t->Analysis.Cues[c].Time;
+            memcpy(newTrack->Cues[newTrack->CuesCount].Color, t->Analysis.Cues[c].Color, 3);
+            newTrack->CuesCount++;
+          }
+        }
+
+        strncpy(newTrack->FilePath, trackFullPath, sizeof(newTrack->FilePath) - 1);
+        strncpy(newTrack->Title, t->Title, sizeof(newTrack->Title) - 1);
+        strncpy(newTrack->Artist, t->Artist, sizeof(newTrack->Artist) - 1);
+
+        HotCue dbCues[8];
+        int dbCount = 0;
+        const char *storagePath = s->SelectedStorage ? s->SelectedStorage->Path : NULL;
+        if (HotCueDB_GetTrack(storagePath, newTrack->FilePath, newTrack->Title, newTrack->Artist, dbCues, &dbCount)) {
+          newTrack->HotCuesCount = dbCount;
+          memset(newTrack->HotCues, 0, sizeof(newTrack->HotCues));
+          if (dbCount > 0) memcpy(newTrack->HotCues, dbCues, sizeof(HotCue) * dbCount);
+          if (newTrack->Analysis.Cues) free(newTrack->Analysis.Cues);
+          newTrack->Analysis.CueCount = dbCount;
+          if (dbCount > 0) {
+            newTrack->Analysis.Cues = (RBCue*)malloc(sizeof(RBCue) * dbCount);
+            if (newTrack->Analysis.Cues) {
+              for (int h = 0; h < dbCount; h++) {
+                memset(&newTrack->Analysis.Cues[h], 0, sizeof(RBCue));
+                newTrack->Analysis.Cues[h].Time = dbCues[h].Start;
+                newTrack->Analysis.Cues[h].ID = dbCues[h].ID;
+                newTrack->Analysis.Cues[h].Type = 1;
+                newTrack->Analysis.Cues[h].Status = 1;
+                memcpy(newTrack->Analysis.Cues[h].Color, dbCues[h].Color, 3);
+              }
+            }
+          } else newTrack->Analysis.Cues = NULL;
+        }
+
+        newTrack->PhraseCount = t->Analysis.PhraseCount > 64 ? 64 : t->Analysis.PhraseCount;
+        for (int p = 0; p < newTrack->PhraseCount; p++) {
+          newTrack->Phrases[p].Index = t->Analysis.Phrases[p].Index;
+          newTrack->Phrases[p].Beat = t->Analysis.Phrases[p].Beat;
+          newTrack->Phrases[p].KindID = t->Analysis.Phrases[p].KindID;
+          strncpy(newTrack->Phrases[p].Kind, t->Analysis.Phrases[p].Kind, 31);
+        }
+
+        TrackState *oldTrack = targetDeck->LoadedTrack;
+        targetDeck->LoadedTrack = newTrack;
+        if (oldTrack) {
+          if (oldTrack->Analysis.BeatGrid != NULL) free(oldTrack->Analysis.BeatGrid);
+          if (oldTrack->Analysis.Cues != NULL) free(oldTrack->Analysis.Cues);
+          if (oldTrack->Analysis.Phrases != NULL) free(oldTrack->Analysis.Phrases);
+          if (oldTrack->Analysis.DynamicWaveform != NULL) free(oldTrack->Analysis.DynamicWaveform);
+          free(oldTrack);
+        }
+
+        targetDeck->PositionMs = (newTrack->CuesCount > 0) ? newTrack->Cues[0].Start : (newTrack->Analysis.BeatGridCount > 0 ? newTrack->Analysis.BeatGrid[0].Time : 0);
+        targetDeck->LoadAnimTimer = 0.5f;
+        DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck], (uint32_t)targetDeck->PositionMs);
+
+        if (autoPlay) {
+          DeckAudio_SetPlaying(&s->AudioPlugin->Decks[loadToDeck], true);
+          targetDeck->IsPlaying = true;
+        }
+      }
+    }
+  } else { // Serato
+    if (s->SeratoTrackPointers[idx]) {
+      SeratoTrack *t = s->SeratoTrackPointers[idx];
+      UNX_LOG_INFO("[BROWSER] Loading Serato track: %s to Deck %c (Index %d)", t->Title, loadToDeck == 0 ? 'A' : 'B', idx);
+
+      if (s->SelectedStorage) {
+        Serato_LoadTrackData(t, s->SelectedStorage->Path);
+
+        char trackFullPath[1024] = {0};
+        const char *relPath = t->FilePath;
+        if (relPath[0] == '/' || relPath[0] == '\\') relPath++;
+        snprintf(trackFullPath, sizeof(trackFullPath), "%s/%s", s->SelectedStorage->Path, relPath);
+
+        if (s->AudioPlugin) {
+          DeckAudio_LoadTrackAsync(&s->AudioPlugin->Decks[loadToDeck], trackFullPath);
+        }
+
+        strncpy(targetDeck->TrackTitle, t->Title, 127); targetDeck->TrackTitle[127] = '\0';
+        strncpy(targetDeck->ArtistName, t->Artist, 127); targetDeck->ArtistName[127] = '\0';
+        strncpy(targetDeck->AlbumName, t->Album, 127); targetDeck->AlbumName[127] = '\0';
+        strncpy(targetDeck->GenreName, t->Genre, 63); targetDeck->GenreName[63] = '\0';
+        strncpy(targetDeck->TrackKey, t->Key, 15); targetDeck->TrackKey[15] = '\0';
+        strncpy(targetDeck->LabelName, t->Label, 127); targetDeck->LabelName[127] = '\0';
+        strncpy(targetDeck->Comment, t->Comment, 255); targetDeck->Comment[255] = '\0';
+        targetDeck->Rating = 0;
+        targetDeck->Year = t->Year;
+        targetDeck->TrackNumber = (idx + 1);
+        targetDeck->OriginalBPM = (t->BPM > 0) ? t->BPM : 120.0f;
+        targetDeck->CurrentBPM = targetDeck->OriginalBPM;
+
+        if (s->SelectedStorage) strncpy(targetDeck->SourceName, s->SelectedStorage->Name, 31);
+        targetDeck->ArtworkPath[0] = '\0';
+
+        TrackState *newTrack = (TrackState *)malloc(sizeof(TrackState));
+        if (newTrack) {
+          memset(newTrack, 0, sizeof(TrackState));
+          newTrack->Analysis.CueCount = t->CueCount;
+          if (newTrack->Analysis.CueCount > 0 && t->Cues != NULL) {
+            newTrack->Analysis.Cues = (RBCue*)malloc(sizeof(RBCue) * newTrack->Analysis.CueCount);
+            if (newTrack->Analysis.Cues) {
+              memcpy(newTrack->Analysis.Cues, t->Cues, sizeof(RBCue) * newTrack->Analysis.CueCount);
+            }
+          }
+
+          if (newTrack->Analysis.BeatGridCount == 0 && targetDeck->OriginalBPM > 30.0f) {
+            double beatMs = 60000.0 / (double)targetDeck->OriginalBPM;
+            uint32_t totalBeats = (uint32_t)(3600000.0 / beatMs);
+            newTrack->Analysis.BeatGrid = (RBBeat*)malloc(sizeof(RBBeat) * totalBeats);
+            if (newTrack->Analysis.BeatGrid) {
+              newTrack->Analysis.BeatGridCount = totalBeats;
+              for (uint32_t b = 0; b < totalBeats; b++) {
+                newTrack->Analysis.BeatGrid[b].Time = (uint32_t)(b * beatMs);
+                newTrack->Analysis.BeatGrid[b].BeatNumber = (uint16_t)((b % 4) + 1);
+              }
+            }
+          }
+
+          for (uint32_t c = 0; c < t->CueCount && c < 32; c++) {
+            if (t->Cues[c].ID >= 1 && t->Cues[c].ID <= 8) {
+              newTrack->HotCues[newTrack->HotCuesCount].ID = t->Cues[c].ID;
+              newTrack->HotCues[newTrack->HotCuesCount].Start = (uint32_t)t->Cues[c].Time;
+              memcpy(newTrack->HotCues[newTrack->HotCuesCount].Color, t->Cues[c].Color, 3);
+              newTrack->HotCuesCount++;
+            } else if (t->Cues[c].ID == 0) {
+              newTrack->Cues[newTrack->CuesCount].Start = (uint32_t)t->Cues[c].Time;
+              memcpy(newTrack->Cues[newTrack->CuesCount].Color, t->Cues[c].Color, 3);
+              newTrack->CuesCount++;
+            }
+          }
+
+          strncpy(newTrack->FilePath, trackFullPath, sizeof(newTrack->FilePath) - 1);
+          strncpy(newTrack->Title, t->Title, sizeof(newTrack->Title) - 1);
+          strncpy(newTrack->Artist, t->Artist, sizeof(newTrack->Artist) - 1);
+
+          HotCue dbCues[8];
+          int dbCount = 0;
+          const char *storagePath = s->SelectedStorage ? s->SelectedStorage->Path : NULL;
+          if (HotCueDB_GetTrack(storagePath, newTrack->FilePath, newTrack->Title, newTrack->Artist, dbCues, &dbCount)) {
+            newTrack->HotCuesCount = dbCount;
+            memset(newTrack->HotCues, 0, sizeof(newTrack->HotCues));
+            if (dbCount > 0) memcpy(newTrack->HotCues, dbCues, sizeof(HotCue) * dbCount);
+            if (newTrack->Analysis.Cues) free(newTrack->Analysis.Cues);
+            newTrack->Analysis.CueCount = dbCount;
+            if (dbCount > 0) {
+              newTrack->Analysis.Cues = (RBCue*)malloc(sizeof(RBCue) * dbCount);
+              if (newTrack->Analysis.Cues) {
+                for (int h = 0; h < dbCount; h++) {
+                  memset(&newTrack->Analysis.Cues[h], 0, sizeof(RBCue));
+                  newTrack->Analysis.Cues[h].Time = dbCues[h].Start;
+                  newTrack->Analysis.Cues[h].ID = dbCues[h].ID;
+                  newTrack->Analysis.Cues[h].Type = 1;
+                  newTrack->Analysis.Cues[h].Status = 1;
+                  memcpy(newTrack->Analysis.Cues[h].Color, dbCues[h].Color, 3);
+                }
+              }
+            } else newTrack->Analysis.Cues = NULL;
+          }
+
+          TrackState *oldTrack = targetDeck->LoadedTrack;
+          targetDeck->LoadedTrack = newTrack;
+          if (oldTrack) {
+            if (oldTrack->Analysis.BeatGrid != NULL) free(oldTrack->Analysis.BeatGrid);
+            if (oldTrack->Analysis.Cues != NULL) free(oldTrack->Analysis.Cues);
+            if (oldTrack->Analysis.Phrases != NULL) free(oldTrack->Analysis.Phrases);
+            if (oldTrack->Analysis.DynamicWaveform != NULL) free(oldTrack->Analysis.DynamicWaveform);
+            free(oldTrack);
+          }
+
+          targetDeck->PositionMs = (newTrack->CuesCount > 0) ? newTrack->Cues[0].Start : 0;
+          targetDeck->LoadAnimTimer = 0.5f;
+          DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck], (uint32_t)targetDeck->PositionMs);
+
+          if (autoPlay) {
+            DeckAudio_SetPlaying(&s->AudioPlugin->Decks[loadToDeck], true);
+            targetDeck->IsPlaying = true;
+          }
+        }
+      }
+    }
+  }
+
+  s->ShowLoadPopup = false;
+  return 1;
+}
+
+int Browser_LoadNextTrack(BrowserState *s, int deckIdx) {
+  if (!s || deckIdx < 0 || deckIdx > 1) return 0;
+  struct DeckState *ds = (deckIdx == 0) ? s->DeckA : s->DeckB;
+  if (!ds) return 0;
+  
+  if (s->ActiveTrackCount <= 0) return 0;
+  
+  int nextIdx = ds->LoadedTrackIndex + 1;
+  if (nextIdx >= s->ActiveTrackCount) {
+    nextIdx = 0; // Wrap around to first track
+  }
+
+  return Browser_LoadTrackAtIndex(s, nextIdx, deckIdx, true);
 }
 
 // On-Screen Keyboard (OSK) Touch Rendering & Interaction

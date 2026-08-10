@@ -102,6 +102,8 @@ typedef struct {
 void Browser_RefreshStorages(BrowserState *s);
 void Browser_CheckStorageConnection(BrowserState *s);
 void Browser_Back(BrowserState *s);
+int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool autoPlay);
+int Browser_LoadNextTrack(BrowserState *s, int deckIdx);
 
 typedef struct {
     Component base;

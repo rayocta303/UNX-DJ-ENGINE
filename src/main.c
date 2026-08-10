@@ -237,6 +237,10 @@ void OnSettingsApply(void *ctx) {
   App *a = (App *)ctx;
 
   // Sync UI items back to deck states
+  int playMode = a->settingsState.Items[0].Current;
+  a->deckA.PlayMode = playMode;
+  a->deckB.PlayMode = playMode;
+
   int styleIdx = a->settingsState.Items[2].Current;
   a->deckA.Waveform.Style = (WaveformStyle)styleIdx;
   a->deckB.Waveform.Style = (WaveformStyle)styleIdx;
@@ -2601,13 +2605,18 @@ void UpdateDrawFrame(App *app) {
                     .Time;
       }
 
-      // Stop if we passed the end marker
+      // Stop or Continue if we passed the end marker
       if (ds->PositionMs >= endMs) {
-        DeckAudio_Stop(&audioEngine->Decks[i]);
-        // Also ensure position doesn't drift too far past
-        DeckAudio_JumpToMs(&audioEngine->Decks[i], endMs);
-        ds->IsPlaying = false;
-        ds->PositionMs = endMs;
+        if (ds->PlayMode == 1) { // 1 = CONTINUE
+          UNX_LOG_INFO("[MAIN] Track end reached on Deck %c in CONTINUE mode -> Loading next track...", i == 0 ? 'A' : 'B');
+          Browser_LoadNextTrack(&app->browserState, i);
+        } else {
+          DeckAudio_Stop(&audioEngine->Decks[i]);
+          // Also ensure position doesn't drift too far past
+          DeckAudio_JumpToMs(&audioEngine->Decks[i], endMs);
+          ds->IsPlaying = false;
+          ds->PositionMs = endMs;
+        }
       }
     }
   }
