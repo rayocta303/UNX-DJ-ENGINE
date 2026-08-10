@@ -2551,9 +2551,14 @@ static void Browser_Draw(Component *base) {
     if (title[0] == '\0')
       continue;
 
-    if (filePath[0] != '\0') {
-      if (s->DeckA && s->DeckA->LoadedTrack && strcmp(s->DeckA->LoadedTrack->FilePath, filePath) == 0) isPlaying = true;
-      if (s->DeckB && s->DeckB->LoadedTrack && strcmp(s->DeckB->LoadedTrack->FilePath, filePath) == 0) isPlaying = true;
+    if (filePath[0] != '\0' && s->SelectedStorage) {
+      char trackFullPath[1024] = {0};
+      const char *relPath = filePath;
+      if (relPath[0] == '/' || relPath[0] == '\\') relPath++;
+      snprintf(trackFullPath, sizeof(trackFullPath), "%s/%s", s->SelectedStorage->Path, relPath);
+
+      if (s->DeckA && s->DeckA->LoadedTrack && strcmp(s->DeckA->LoadedTrack->FilePath, trackFullPath) == 0) isPlaying = true;
+      if (s->DeckB && s->DeckB->LoadedTrack && strcmp(s->DeckB->LoadedTrack->FilePath, trackFullPath) == 0) isPlaying = true;
     }
 
     float ry = listYOffset - pixelOffset + i * rowH;
