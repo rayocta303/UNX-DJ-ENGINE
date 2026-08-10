@@ -1304,13 +1304,9 @@ static void Settings_Draw(Component *base) {
     Rectangle cardRect = {(SCREEN_WIDTH - cardW) / 2.0f, (viewH - cardH) / 2.0f,
                           cardW, cardH};
 
-    // Neon orange border glow
-    DrawRectangleRounded((Rectangle){cardRect.x - S(2), cardRect.y - S(2),
-                                     cardRect.width + S(4),
-                                     cardRect.height + S(4)},
-                         0.1f, 4, (Color){255, 121, 0, 80});
-    DrawRectangleRounded(cardRect, 0.1f, 4, ColorBGUtil);
-    DrawRectangleRoundedLines(cardRect, 0.1f, 4, 1.5f, ColorOrange);
+    // Sharp non-rounded modal window frame
+    DrawRectangleRec(cardRect, ColorBGUtil);
+    DrawRectangleLinesEx(cardRect, 2.0f, ColorOrange);
 
     // Bouncing MIDI connection icon
     float bounce = sinf(GetTime() * 8.0f) * S(4.0f);
@@ -1507,18 +1503,14 @@ static void Settings_Draw(Component *base) {
     DrawRectangle(0, 0, SCREEN_WIDTH, viewH, (Color){10, 10, 15, 230});
 
     // Dialog Card layout
-    float cardW = S(320.0f);
-    float cardH = S(185.0f);
+    float cardW = S(340.0f);
+    float cardH = S(195.0f);
     Rectangle cardRect = {(SCREEN_WIDTH - cardW) / 2.0f, (viewH - cardH) / 2.0f,
                           cardW, cardH};
 
-    // Neon orange border glow
-    DrawRectangleRounded((Rectangle){cardRect.x - S(2), cardRect.y - S(2),
-                                     cardRect.width + S(4),
-                                     cardRect.height + S(4)},
-                         0.08f, 4, (Color){255, 121, 0, 80});
-    DrawRectangleRounded(cardRect, 0.08f, 4, ColorBGUtil);
-    DrawRectangleRoundedLines(cardRect, 0.08f, 4, 1.5f, ColorOrange);
+    // Sharp non-rounded modal window frame
+    DrawRectangleRec(cardRect, ColorBGUtil);
+    DrawRectangleLinesEx(cardRect, 2.0f, ColorOrange);
 
     // Header Title
     DrawCentredText("EDIT MIDI MAPPING", faceMd, cardRect.x, cardRect.width,
@@ -1540,27 +1532,30 @@ static void Settings_Draw(Component *base) {
     UIDrawText(typeBuf, faceSm, cardRect.x + S(20), cardRect.y + S(72),
                S(10.5f), ColorWhite);
 
-    // 2x2 Buttons Grid
-    Rectangle btn1 = {cardRect.x + S(15), cardRect.y + S(105), S(135), S(24)};
-    DrawRectangleRounded(btn1, 0.2f, 4, ColorBlue);
+    // 2x2 Larger Sharp Buttons Grid
+    float btnW = S(150.0f), btnH = S(28.0f);
+    Rectangle btn1 = {cardRect.x + S(15), cardRect.y + S(110), btnW, btnH};
+    DrawRectangleRec(btn1, ColorBlue);
+    DrawRectangleLinesEx(btn1, 1.0f, ColorWhite);
     DrawCentredText("START MIDI LEARN", faceXS, btn1.x, btn1.width,
-                    btn1.y + S(7), S(9.5f), ColorWhite);
+                    btn1.y + S(9), S(9.5f), ColorWhite);
 
-    Rectangle btn2 = {cardRect.x + S(170), cardRect.y + S(105), S(135), S(24)};
-    DrawRectangleRounded(btn2, 0.2f, 4, ColorDark2);
-    DrawRectangleRoundedLines(btn2, 0.2f, 4, 1.0f, ColorGray);
-    DrawCentredText("CYCLE TYPE", faceXS, btn2.x, btn2.width, btn2.y + S(7),
+    Rectangle btn2 = {cardRect.x + S(175), cardRect.y + S(110), btnW, btnH};
+    DrawRectangleRec(btn2, ColorDark2);
+    DrawRectangleLinesEx(btn2, 1.0f, ColorOrange);
+    DrawCentredText("CYCLE TYPE", faceXS, btn2.x, btn2.width, btn2.y + S(9),
                     S(9.5f), ColorOrange);
 
-    Rectangle btn3 = {cardRect.x + S(15), cardRect.y + S(140), S(135), S(24)};
-    DrawRectangleRounded(btn3, 0.2f, 4, (Color){100, 30, 30, 255});
-    DrawRectangleRoundedLines(btn3, 0.2f, 4, 1.0f, ColorRed);
-    DrawCentredText("CLEAR / RESET", faceXS, btn3.x, btn3.width, btn3.y + S(7),
+    Rectangle btn3 = {cardRect.x + S(15), cardRect.y + S(150), btnW, btnH};
+    DrawRectangleRec(btn3, (Color){100, 30, 30, 255});
+    DrawRectangleLinesEx(btn3, 1.0f, ColorRed);
+    DrawCentredText("CLEAR / RESET", faceXS, btn3.x, btn3.width, btn3.y + S(9),
                     S(9.5f), ColorWhite);
 
-    Rectangle btn4 = {cardRect.x + S(170), cardRect.y + S(140), S(135), S(24)};
-    DrawRectangleRounded(btn4, 0.2f, 4, ColorDGreen);
-    DrawCentredText("SAVE & CLOSE", faceXS, btn4.x, btn4.width, btn4.y + S(7),
+    Rectangle btn4 = {cardRect.x + S(175), cardRect.y + S(150), btnW, btnH};
+    DrawRectangleRec(btn4, ColorDGreen);
+    DrawRectangleLinesEx(btn4, 1.0f, ColorWhite);
+    DrawCentredText("SAVE & CLOSE", faceXS, btn4.x, btn4.width, btn4.y + S(9),
                     S(9.5f), ColorWhite);
   }
 
@@ -1572,14 +1567,15 @@ static void Settings_Draw(Component *base) {
     DrawRectangle(0, 0, (int)SCREEN_WIDTH, (int)SCREEN_HEIGHT,
                   (Color){0, 0, 0, 180});
 
-    float modalW = S(360.0f);
-    float modalH = S(265.0f);
+    float modalW = S(380.0f);
+    float modalH = S(240.0f);
     float modalX = (winW - modalW) / 2.0f;
     float modalY = (viewH - modalH) / 2.0f;
 
     Rectangle modalRect = {modalX, modalY, modalW, modalH};
-    DrawRectangleRounded(modalRect, 0.06f, 4, ColorDark1);
-    DrawRectangleRoundedLines(modalRect, 0.06f, 4, 1.5f, ColorOrange);
+    // Sharp non-rounded modal window frame
+    DrawRectangleRec(modalRect, ColorDark1);
+    DrawRectangleLinesEx(modalRect, 2.0f, ColorOrange);
 
     // Header
     DrawRectangle(modalX, modalY, modalW, S(30.0f), ColorDark2);
@@ -1608,31 +1604,25 @@ static void Settings_Draw(Component *base) {
                ColorWhite);
 
     float cpuBarX = modalX + S(98.0f);
-    float cpuBarW = S(175.0f);
+    float cpuBarW = S(190.0f);
     float cpuBarH = S(11.0f);
-    DrawRectangleRounded(
-        (Rectangle){cpuBarX, row1Y + S(1.0f), cpuBarW, cpuBarH}, 0.3f, 4,
-        ColorDark2);
-    DrawRectangleRoundedLines(
-        (Rectangle){cpuBarX, row1Y + S(1.0f), cpuBarW, cpuBarH}, 0.3f, 4, 1.0f,
-        ColorShadow);
+    DrawRectangle(cpuBarX, row1Y + S(1.0f), cpuBarW, cpuBarH, ColorDark2);
+    DrawRectangleLinesEx((Rectangle){cpuBarX, row1Y + S(1.0f), cpuBarW, cpuBarH}, 1.0f, ColorShadow);
 
     float cpuFill = (cpuBarW - S(2.0f)) * cpuUsage;
     if (cpuFill > S(1.0f)) {
       Color cpuCol = (cpuUsage > 0.85f)
                          ? ColorRed
                          : ((cpuUsage > 0.60f) ? ColorOrange : ColorDGreen);
-      DrawRectangleRounded((Rectangle){cpuBarX + S(1.0f), row1Y + S(2.0f),
-                                       cpuFill, cpuBarH - S(2.0f)},
-                           0.3f, 4, cpuCol);
+      DrawRectangle(cpuBarX + S(1.0f), row1Y + S(2.0f), cpuFill, cpuBarH - S(2.0f), cpuCol);
     }
     char cpuBuf[32];
     snprintf(cpuBuf, sizeof(cpuBuf), "%d%%", (int)(cpuUsage * 100.0f));
-    UIDrawText(cpuBuf, faceSm, cpuBarX + cpuBarW + S(8.0f), row1Y, S(11),
+    UIDrawText(cpuBuf, faceSm, cpuBarX + cpuBarW + S(6.0f), row1Y, S(11),
                ColorOrange);
 
-    // 2. CPU Specs (Dapur Pacu: Cores & Frequency)
-    float row2Y = modalY + S(56.0f);
+    // 2. CPU Specs
+    float row2Y = modalY + S(54.0f);
     char cpuSpecText[96];
     int cores = r->State->CPUCores > 0 ? r->State->CPUCores : 4;
     float ghz = r->State->CPUMhz > 0 ? (r->State->CPUMhz > 10.0f ? r->State->CPUMhz / 1000.0f : r->State->CPUMhz) : 2.0f;
@@ -1651,40 +1641,34 @@ static void Settings_Draw(Component *base) {
     if (ramRatio > 1.0f)
       ramRatio = 1.0f;
 
-    float row3Y = modalY + S(78.0f);
+    float row3Y = modalY + S(72.0f);
     UIDrawText("RAM (Global):", faceSm, modalX + S(16.0f), row3Y, S(11), ColorWhite);
 
     float ramBarX = modalX + S(98.0f);
-    float ramBarW = S(175.0f);
+    float ramBarW = S(190.0f);
     float ramBarH = S(11.0f);
-    DrawRectangleRounded(
-        (Rectangle){ramBarX, row3Y + S(1.0f), ramBarW, ramBarH}, 0.3f, 4,
-        ColorDark2);
-    DrawRectangleRoundedLines(
-        (Rectangle){ramBarX, row3Y + S(1.0f), ramBarW, ramBarH}, 0.3f, 4, 1.0f,
-        ColorShadow);
+    DrawRectangle(ramBarX, row3Y + S(1.0f), ramBarW, ramBarH, ColorDark2);
+    DrawRectangleLinesEx((Rectangle){ramBarX, row3Y + S(1.0f), ramBarW, ramBarH}, 1.0f, ColorShadow);
 
     float ramFill = (ramBarW - S(2.0f)) * ramRatio;
     if (ramFill > S(1.0f)) {
       Color ramCol = (ramRatio > 0.85f) ? ColorRed : ColorOrange;
-      DrawRectangleRounded((Rectangle){ramBarX + S(1.0f), row3Y + S(2.0f),
-                                       ramFill, ramBarH - S(2.0f)},
-                           0.3f, 4, ramCol);
+      DrawRectangle(ramBarX + S(1.0f), row3Y + S(2.0f), ramFill, ramBarH - S(2.0f), ramCol);
     }
     char ramPct[32];
     snprintf(ramPct, sizeof(ramPct), "%d%%", (int)(ramRatio * 100.0f));
-    UIDrawText(ramPct, faceSm, ramBarX + ramBarW + S(8.0f), row3Y, S(11),
+    UIDrawText(ramPct, faceSm, ramBarX + ramBarW + S(6.0f), row3Y, S(11),
                ColorOrange);
 
     char ramText[128];
     snprintf(ramText, sizeof(ramText),
              "Used: %d MB   Free: %d MB   Total: %d MB", (int)ramUsed,
              (int)ramFree, (int)ramTotal);
-    UIDrawText(ramText, faceXS, modalX + S(16.0f), row3Y + S(16.0f), S(9.5f),
+    UIDrawText(ramText, faceXS, modalX + S(16.0f), row3Y + S(15.0f), S(9.5f),
                ColorGray);
 
     // 4. RAM (App Only)
-    float row4Y = modalY + S(116.0f);
+    float row4Y = modalY + S(106.0f);
     char appRamText[64];
     snprintf(appRamText, sizeof(appRamText),
              "App Memory Usage: %d MB (Process)", (int)r->State->RAMAppMB);
@@ -1694,7 +1678,7 @@ static void Settings_Draw(Component *base) {
                ColorWhite);
 
     // 5. Audio Engine Metrics
-    float row5Y = modalY + S(138.0f);
+    float row5Y = modalY + S(126.0f);
     char audioText[128];
     int sr = r->State->AudioSampleRate > 0 ? r->State->AudioSampleRate : 44100;
     int buf = r->State->AudioBufferSize > 0 ? r->State->AudioBufferSize : 512;
@@ -1708,7 +1692,7 @@ static void Settings_Draw(Component *base) {
                ColorWhite);
 
     // 6. Platform Specifications
-    float row6Y = modalY + S(160.0f);
+    float row6Y = modalY + S(146.0f);
     char specText[128];
     snprintf(specText, sizeof(specText), "OS Platform: %s",
              r->State->OSPlatformStr[0] != '\0' ? r->State->OSPlatformStr
@@ -1718,17 +1702,12 @@ static void Settings_Draw(Component *base) {
     UIDrawText(specText, faceSm, modalX + S(34.0f), row6Y, S(10.5f),
                ColorWhite);
 
-    // 7. App Engine Specification
-    float row7Y = modalY + S(182.0f);
-    UIDrawText("\uf121", faceIconSm, modalX + S(16.0f), row7Y, S(11), ColorOrange);
-    UIDrawText("App Engine: UNX DJ Engine (v1.0 Pro)", faceSm, modalX + S(34.0f), row7Y, S(10.5f), ColorGray);
-
-    // OK / Close Button
-    Rectangle okBtn = {modalX + (modalW - S(100.0f)) / 2.0f,
-                       modalY + modalH - S(34.0f), S(100.0f), S(26.0f)};
-    DrawRectangleRounded(okBtn, 0.2f, 4, ColorDark2);
-    DrawRectangleRoundedLines(okBtn, 0.2f, 4, 1.0f, ColorOrange);
-    DrawCentredText("CLOSE", faceSm, okBtn.x, okBtn.width, okBtn.y + S(5.0f),
+    // Larger Sharp OK / Close Button
+    Rectangle okBtn = {modalX + (modalW - S(120.0f)) / 2.0f,
+                       modalY + modalH - S(36.0f), S(120.0f), S(28.0f)};
+    DrawRectangleRec(okBtn, ColorDark2);
+    DrawRectangleLinesEx(okBtn, 1.5f, ColorOrange);
+    DrawCentredText("CLOSE", faceSm, okBtn.x, okBtn.width, okBtn.y + S(8.0f),
                     S(11), ColorWhite);
   }
 }

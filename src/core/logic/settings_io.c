@@ -1,4 +1,5 @@
 #include "settings_io.h"
+#include "jog_config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,7 +32,7 @@ static void EnsureControllersExist(const char* baseDir) {
     }
 }
 
-static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB, bool *quantizeA, bool *quantizeB, float *masterVolume) {
+static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB, bool *quantizeA, bool *quantizeB, float *masterVolume, JogConfig *jog) {
     if (!json) return;
     
     const char* p = json;
@@ -126,9 +127,22 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
             *masterVolume = val;
         }
     }
+
+    // Jogwheel Config
+    if (jog && (p = strstr(json, "\"jog\""))) {
+        if ((sub = strstr(p, "\"rpm\"")) && sscanf(sub, "\"rpm\": %f", &val) == 1) jog->DefaultRPM = val;
+        if ((sub = strstr(p, "\"tpr\"")) && sscanf(sub, "\"tpr\": %f", &val) == 1) jog->TicksPerRev = val;
+        if ((sub = strstr(p, "\"eraw\"")) && sscanf(sub, "\"eraw\": %f", &val) == 1) jog->EmaRawWeight = val;
+        if ((sub = strstr(p, "\"eprev\"")) && sscanf(sub, "\"eprev\": %f", &val) == 1) jog->EmaPrevWeight = val;
+        if ((sub = strstr(p, "\"vfric\"")) && sscanf(sub, "\"vfric\": %f", &val) == 1) jog->VinylReleaseFriction = val;
+        if ((sub = strstr(p, "\"vcutoff\"")) && sscanf(sub, "\"vcutoff\": %f", &val) == 1) jog->VinylReleaseCutoff = val;
+        if ((sub = strstr(p, "\"pbfric\"")) && sscanf(sub, "\"pbfric\": %f", &val) == 1) jog->PitchBendFriction = val;
+        if ((sub = strstr(p, "\"pbscale\"")) && sscanf(sub, "\"pbscale\": %f", &val) == 1) jog->PitchBendScale = val;
+        if ((sub = strstr(p, "\"nudge\"")) && sscanf(sub, "\"nudge\": %f", &val) == 1) jog->WaveformNudgeScale = val;
+    }
 }
 
-void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB, char *controllerPath, bool *quantizeA, bool *quantizeB, float *masterVolume) {
+void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB, char *controllerPath, bool *quantizeA, bool *quantizeB, float *masterVolume, JogConfig *jog) {
     // Defaults
     controllerPath[0] = '\0';
     wfmA->Style = WAVEFORM_STYLE_RGB;
@@ -196,7 +210,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
 
     if (!f) {
         EnsureControllersExist("."); // Fallback to current dir if nothing else
-        Settings_Save(*wfmA, *wfmB, *audio, *fx, *cfxA, *cfxB, controllerPath, quantizeA ? *quantizeA : true, quantizeB ? *quantizeB : true, masterVolume ? *masterVolume : 1.0f);
+        Settings_Save(*wfmA, *wfmB, *audio, *fx, *cfxA, *cfxB, controllerPath, quantizeA ? *quantizeA : true, quantizeB ? *quantizeB : true, masterVolume ? *masterVolume : 1.0f, jog);
         return;
     }
 
@@ -208,7 +222,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     if (buf) {
         fread(buf, 1, size, f);
         buf[size] = '\0';
-        LoadFromJSON(buf, wfmA, wfmB, audio, fx, cfxA, cfxB, quantizeA, quantizeB, masterVolume);
+        LoadFromJSON(buf, wfmA, wfmB, audio, fx, cfxA, cfxB, quantizeA, quantizeB, masterVolume, jog);
         
         // Extract controller path manually to avoid changing too many signatures
         const char *p;
@@ -230,7 +244,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     fclose(f);
 }
 
-void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendConfig audio, BeatFXState fx, ColorFXManager cfxA, ColorFXManager cfxB, const char *controllerPath, bool quantizeA, bool quantizeB, float masterVolume) {
+void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendConfig audio, BeatFXState fx, ColorFXManager cfxA, ColorFXManager cfxB, const char *controllerPath, bool quantizeA, bool quantizeB, float masterVolume, const JogConfig *jog) {
     char path[512];
 
 #if defined(__ANDROID__)
@@ -273,6 +287,12 @@ void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendCon
             (int)cfxA.activeFX, cfxA.parameter, cfxA.colorValue, cfxB.colorValue);
     fprintf(f, "  \"quantize\": { \"qA\": %d, \"qB\": %d },\n", quantizeA ? 1 : 0, quantizeB ? 1 : 0);
     fprintf(f, "  \"master\": { \"vol\": %.3f },\n", masterVolume);
+    if (jog) {
+        fprintf(f, "  \"jog\": { \"rpm\": %.6f, \"tpr\": %.2f, \"eraw\": %.4f, \"eprev\": %.4f, \"vfric\": %.4f, \"vcutoff\": %.6f, \"pbfric\": %.4f, \"pbscale\": %.4f, \"nudge\": %.4f },\n",
+                jog->DefaultRPM, jog->TicksPerRev, jog->EmaRawWeight, jog->EmaPrevWeight,
+                jog->VinylReleaseFriction, jog->VinylReleaseCutoff,
+                jog->PitchBendFriction, jog->PitchBendScale, jog->WaveformNudgeScale);
+    }
     fprintf(f, "  \"controllers\": { \"path\": \"%s\" }\n", controllerPath ? controllerPath : "");
     fprintf(f, "}\n");
 

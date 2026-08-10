@@ -227,7 +227,7 @@ void App_SaveSettings(App *a) {
   Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig,
                 a->fxState, a->colorFxDeckA, a->colorFxDeckB,
                 a->activeControllerPath, a->deckA.QuantizeEnabled,
-                a->deckB.QuantizeEnabled, a->masterVolume);
+                a->deckB.QuantizeEnabled, a->masterVolume, &g_JogConfig);
 }
 
 void OnSettingsClose(void *ctx) {
@@ -1183,7 +1183,7 @@ void App_Init(App *a) {
   Settings_Load(&a->deckA.Waveform, &a->deckB.Waveform, &a->activeAudioConfig,
                 &a->fxState, &a->colorFxDeckA, &a->colorFxDeckB,
                 a->activeControllerPath, &a->deckA.QuantizeEnabled,
-                &a->deckB.QuantizeEnabled, &a->masterVolume);
+                &a->deckB.QuantizeEnabled, &a->masterVolume, &g_JogConfig);
   if (a->activeControllerPath[0] != '\0') {
     MIDI_RefreshMapping(a->activeControllerPath);
   }
