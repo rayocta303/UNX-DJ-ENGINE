@@ -639,6 +639,10 @@ static int Settings_Update(Component *base) {
     } else {
       r->State->VisualScroll -= wheel * rowH * 3.0f;
       r->State->ScrollVelocity = 0;
+      if (r->State->VisualScroll < 0.0f)
+        r->State->VisualScroll = 0.0f;
+      if (r->State->VisualScroll > maxScroll)
+        r->State->VisualScroll = maxScroll;
     }
   }
 
