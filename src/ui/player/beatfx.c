@@ -169,12 +169,11 @@ static int BeatFX_Update(Component *base) {
         }
     }
 
-    // --- ZOOM BUTTONS (COMMENTED OUT) ---
-    /*
-    float plusMinusY = b->FXButton.y + b->FXButton.height + S(12) + S(18);
+    // --- ZOOM BUTTONS (RESTORED) ---
+    float plusMinusY = b->FXButton.y + b->FXButton.height + S(12);
     float halfB = (w - S(12)) / 2;
-    Rectangle minusRect = { x + S(4), plusMinusY, halfB, S(14) };
-    Rectangle plusRect = { x + S(8) + halfB, plusMinusY, halfB, S(14) };
+    Rectangle minusRect = { x + S(4), plusMinusY, halfB, S(20) };
+    Rectangle plusRect = { x + S(8) + halfB, plusMinusY, halfB, S(20) };
 
     if (UI_IsReleased()) {
         int zoomDelta = 0;
@@ -201,7 +200,6 @@ static int BeatFX_Update(Component *base) {
             }
         }
     }
-    */
 
     return 0;
 }
@@ -360,26 +358,15 @@ static void BeatFX_Draw(Component *base) {
     
     cy += btnH + S(12);
 
-    // --- ZOOM / GRID BUTTONS (COMMENTED OUT) ---
-    /*
+    // 4b. +/- BUTTONS (Restored without ZOOM/GRID label)
     float halfB = (w - S(12)) / 2;
-    DrawRectangle(x + S(4), cy, halfB, S(14), ColorBlue);
-    DrawCentredText("ZOOM", faceXXS, x + S(4), halfB, cy + S(3.5f), S(7), ColorWhite);
+    DrawRectangle(x + S(4), cy, halfB, S(20), ColorDark2);
+    DrawRectangleLines(x + S(4), cy, halfB, S(20), ColorShadow);
+    DrawCentredText("-", faceSm, x + S(4), halfB, cy + S(5.5f), S(9), ColorWhite);
 
-    DrawRectangle(x + S(8) + halfB, cy, halfB, S(14), ColorDark1);
-    DrawRectangleLines(x + S(8) + halfB, cy, halfB, S(14), ColorShadow);
-    DrawCentredText("GRID", faceXXS, x + S(8) + halfB, halfB, cy + S(3.5f), S(7), ColorShadow);
-
-    // 4b. +/- BUTTONS (Below Zoom/Grid)
-    cy += S(18); // Row height + spacing
-    DrawRectangle(x + S(4), cy, halfB, S(14), ColorDark2);
-    DrawRectangleLines(x + S(4), cy, halfB, S(14), ColorShadow);
-    DrawCentredText("-", faceSm, x + S(4), halfB, cy + S(2.5f), S(9), ColorWhite);
-
-    DrawRectangle(x + S(8) + halfB, cy, halfB, S(14), ColorDark2);
-    DrawRectangleLines(x + S(8) + halfB, cy, halfB, S(14), ColorShadow);
-    DrawCentredText("+", faceSm, x + S(8) + halfB, halfB, cy + S(2.5f), S(9), ColorWhite);
-    */
+    DrawRectangle(x + S(8) + halfB, cy, halfB, S(20), ColorDark2);
+    DrawRectangleLines(x + S(8) + halfB, cy, halfB, S(20), ColorShadow);
+    DrawCentredText("+", faceSm, x + S(8) + halfB, halfB, cy + S(5.5f), S(9), ColorWhite);
 
     cy = y + h - S(18); // Bottom alignment
 
