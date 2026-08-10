@@ -35,3 +35,10 @@ zig-out/
 # OS files
 Thumbs.db
 .DS_Store
+
+# Local Deployment & Private Scripts
+deploy_*.bat
+deploy_*.sh
+scratch/
+*.secret
+

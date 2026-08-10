@@ -10,11 +10,13 @@
 
 #if defined(__linux__) && !defined(__ANDROID__)
 #include <alsa/asoundlib.h>
+#include <errno.h>
 #ifndef HAS_ALSA
 #define HAS_ALSA 1
 #endif
 
 typedef struct _snd_midi_event snd_midi_event_t;
+const char *snd_strerror(int errnum);
 int snd_midi_event_new(size_t bufsize, snd_midi_event_t **rdev);
 void snd_midi_event_free(snd_midi_event_t *dev);
 void snd_midi_event_init(snd_midi_event_t *dev);
