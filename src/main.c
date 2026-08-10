@@ -258,6 +258,7 @@ void OnSettingsApply(void *ctx) {
   a->deckA.Waveform.VinylStartMs = a->settingsState.Items[6].Value;
   a->deckA.Waveform.VinylStopMs = a->settingsState.Items[7].Value;
   a->deckA.Waveform.JogCalibRPM = (a->settingsState.Items[8].Current == 1) ? 45.0f : 33.3f;
+  a->deckA.Waveform.WaveformTouchEnabled = (a->settingsState.Items[9].Current == 1);
   a->deckB.Waveform = a->deckA.Waveform;
 
   // Save/Sync JogConfig from JOG tab items
@@ -294,18 +295,18 @@ void OnSettingsApply(void *ctx) {
   // Apply Audio backend settings
   AudioBackendConfig aconf = {
       .DeviceIndex =
-          a->settingsState.Items[9].Current - 1, // 0 is System Default
-      .MasterOutL = a->settingsState.Items[10].Current,
-      .MasterOutR = a->settingsState.Items[11].Current,
+          a->settingsState.Items[10].Current - 1, // 0 is System Default
+      .MasterOutL = a->settingsState.Items[11].Current,
+      .MasterOutR = a->settingsState.Items[12].Current,
       // Cue items have "Blank" at index 0, so subtract 1 for physical channel
-      .CueOutL = a->settingsState.Items[12].Current - 1,
-      .CueOutR = a->settingsState.Items[13].Current - 1,
-      .SampleRate = (a->settingsState.Items[15].Current == 0) ? 44100 : 48000,
-      .PCMBitDepth = (a->settingsState.Items[16].Current == 0) ? 16 : 24,
-      .CrossfaderCurve = a->settingsState.Items[17].Current,
+      .CueOutL = a->settingsState.Items[13].Current - 1,
+      .CueOutR = a->settingsState.Items[14].Current - 1,
+      .SampleRate = (a->settingsState.Items[16].Current == 0) ? 44100 : 48000,
+      .PCMBitDepth = (a->settingsState.Items[17].Current == 0) ? 16 : 24,
+      .CrossfaderCurve = a->settingsState.Items[18].Current,
   };
   int bufMap[] = {128, 256, 512, 1024};
-  aconf.BufferSizeFrames = bufMap[a->settingsState.Items[14].Current];
+  aconf.BufferSizeFrames = bufMap[a->settingsState.Items[15].Current];
 
   if (globalAudioEngine) {
     globalAudioEngine->CrossfaderCurve = aconf.CrossfaderCurve;
@@ -1255,104 +1256,112 @@ void App_Init(App *a) {
   a->settingsState.Items[8].Current = (a->deckA.Waveform.JogCalibRPM > 40.0f) ? 1 : 0;
   a->settingsState.Items[8].Category = SETTING_CAT_DECK;
 
+  // New DECK item: Waveform Touch
+  strcpy(a->settingsState.Items[9].Label, "WAVEFORM TOUCH");
+  a->settingsState.Items[9].Type = SETTING_TYPE_LIST;
+  strcpy(a->settingsState.Items[9].Options[0], "DISABLE");
+  strcpy(a->settingsState.Items[9].Options[1], "ENABLE");
+  a->settingsState.Items[9].OptionsCount = 2;
+  a->settingsState.Items[9].Current = a->deckA.Waveform.WaveformTouchEnabled ? 1 : 0;
+  a->settingsState.Items[9].Category = SETTING_CAT_DECK;
+
   // --- Audio Configurations ---
   AudioDeviceInfo devs[MAX_AUDIO_DEVICES];
   int devCount = AudioBackend_GetDevices(devs, MAX_AUDIO_DEVICES);
 
-  strcpy(a->settingsState.Items[9].Label, "AUDIO DEVICE");
-  a->settingsState.Items[9].Type = SETTING_TYPE_LIST;
-  a->settingsState.Items[9].OptionsCount = devCount + 1;
-  strcpy(a->settingsState.Items[9].Options[0], "System Default");
+  strcpy(a->settingsState.Items[10].Label, "AUDIO DEVICE");
+  a->settingsState.Items[10].Type = SETTING_TYPE_LIST;
+  a->settingsState.Items[10].OptionsCount = devCount + 1;
+  strcpy(a->settingsState.Items[10].Options[0], "System Default");
   for (int i = 0; i < devCount && i < 31; i++) {
-    // 31 characters limit for options. Format: "2CH Output Name"
-    snprintf(a->settingsState.Items[9].Options[i + 1], 32, "%dCH %s",
+    snprintf(a->settingsState.Items[10].Options[i + 1], 32, "%dCH %s",
              devs[i].NativeChannels, devs[i].Name);
   }
-  a->settingsState.Items[9].Category = SETTING_CAT_AUDIO;
+  a->settingsState.Items[10].Category = SETTING_CAT_AUDIO;
 
   // Initial population based on loaded config
   UpdateChannelOptions(a, a->activeAudioConfig.DeviceIndex);
 
   // Back-sync from loaded config to UI selection items
-  a->settingsState.Items[9].Current = a->activeAudioConfig.DeviceIndex + 1;
-  a->settingsState.Items[10].Current = a->activeAudioConfig.MasterOutL;
-  a->settingsState.Items[11].Current = a->activeAudioConfig.MasterOutR;
-  a->settingsState.Items[12].Current = a->activeAudioConfig.CueOutL + 1;
-  a->settingsState.Items[13].Current = a->activeAudioConfig.CueOutR + 1;
+  a->settingsState.Items[10].Current = a->activeAudioConfig.DeviceIndex + 1;
+  a->settingsState.Items[11].Current = a->activeAudioConfig.MasterOutL;
+  a->settingsState.Items[12].Current = a->activeAudioConfig.MasterOutR;
+  a->settingsState.Items[13].Current = a->activeAudioConfig.CueOutL + 1;
+  a->settingsState.Items[14].Current = a->activeAudioConfig.CueOutR + 1;
 
   int bufMap[] = {128, 256, 512, 1024};
-  a->settingsState.Items[14].Current = 1; // Default 256
+  a->settingsState.Items[15].Current = 1; // Default 256
   for (int i = 0; i < 4; i++) {
     if (a->activeAudioConfig.BufferSizeFrames == bufMap[i])
-      a->settingsState.Items[14].Current = i;
+      a->settingsState.Items[15].Current = i;
   }
-  a->settingsState.Items[15].Current =
+  a->settingsState.Items[16].Current =
       (a->activeAudioConfig.SampleRate == 44100) ? 0 : 1;
 
-  strcpy(a->settingsState.Items[14].Label, "BUFFER SIZE");
-  a->settingsState.Items[14].Type = SETTING_TYPE_LIST;
-  a->settingsState.Items[14].OptionsCount = 4;
-  strcpy(a->settingsState.Items[14].Options[0], "128");
-  strcpy(a->settingsState.Items[14].Options[1], "256");
-  strcpy(a->settingsState.Items[14].Options[2], "512");
-  strcpy(a->settingsState.Items[14].Options[3], "1024");
-  a->settingsState.Items[14].Category = SETTING_CAT_AUDIO;
-
-  strcpy(a->settingsState.Items[15].Label, "SAMPLE RATE");
+  strcpy(a->settingsState.Items[15].Label, "BUFFER SIZE");
   a->settingsState.Items[15].Type = SETTING_TYPE_LIST;
-  a->settingsState.Items[15].OptionsCount = 2;
-  strcpy(a->settingsState.Items[15].Options[0], "44100 Hz");
-  strcpy(a->settingsState.Items[15].Options[1], "48000 Hz");
+  a->settingsState.Items[15].OptionsCount = 4;
+  strcpy(a->settingsState.Items[15].Options[0], "128");
+  strcpy(a->settingsState.Items[15].Options[1], "256");
+  strcpy(a->settingsState.Items[15].Options[2], "512");
+  strcpy(a->settingsState.Items[15].Options[3], "1024");
   a->settingsState.Items[15].Category = SETTING_CAT_AUDIO;
 
-  // Sync again to make sure labels/options are set before setting Current
-  a->settingsState.Items[14].Current = 1; // Default 256
-  for (int i = 0; i < 4; i++) {
-    if (a->activeAudioConfig.BufferSizeFrames == bufMap[i])
-      a->settingsState.Items[14].Current = i;
-  }
-  a->settingsState.Items[15].Current =
-      (a->activeAudioConfig.SampleRate == 44100) ? 0 : 1;
-
-  strcpy(a->settingsState.Items[16].Label, "PCM BIT DEPTH");
+  strcpy(a->settingsState.Items[16].Label, "SAMPLE RATE");
   a->settingsState.Items[16].Type = SETTING_TYPE_LIST;
   a->settingsState.Items[16].OptionsCount = 2;
-  strcpy(a->settingsState.Items[16].Options[0], "16-bit (RAM Save)");
-  strcpy(a->settingsState.Items[16].Options[1], "24-bit (Quality)");
-  a->settingsState.Items[16].Current =
-      (a->activeAudioConfig.PCMBitDepth == 24) ? 1 : 0;
+  strcpy(a->settingsState.Items[16].Options[0], "44100 Hz");
+  strcpy(a->settingsState.Items[16].Options[1], "48000 Hz");
   a->settingsState.Items[16].Category = SETTING_CAT_AUDIO;
 
-  strcpy(a->settingsState.Items[17].Label, "CROSSFADER CURVE");
+  // Sync again to make sure labels/options are set before setting Current
+  a->settingsState.Items[15].Current = 1; // Default 256
+  for (int i = 0; i < 4; i++) {
+    if (a->activeAudioConfig.BufferSizeFrames == bufMap[i])
+      a->settingsState.Items[15].Current = i;
+  }
+  a->settingsState.Items[16].Current =
+      (a->activeAudioConfig.SampleRate == 44100) ? 0 : 1;
+
+  strcpy(a->settingsState.Items[17].Label, "PCM BIT DEPTH");
   a->settingsState.Items[17].Type = SETTING_TYPE_LIST;
-  a->settingsState.Items[17].OptionsCount = 3;
-  strcpy(a->settingsState.Items[17].Options[0], "SMOOTH (POWER)");
-  strcpy(a->settingsState.Items[17].Options[1], "LINEAR");
-  strcpy(a->settingsState.Items[17].Options[2], "CUTTING (SCRATCH)");
-  a->settingsState.Items[17].Current = a->activeAudioConfig.CrossfaderCurve;
+  a->settingsState.Items[17].OptionsCount = 2;
+  strcpy(a->settingsState.Items[17].Options[0], "16-bit (RAM Save)");
+  strcpy(a->settingsState.Items[17].Options[1], "24-bit (Quality)");
+  a->settingsState.Items[17].Current =
+      (a->activeAudioConfig.PCMBitDepth == 24) ? 1 : 0;
   a->settingsState.Items[17].Category = SETTING_CAT_AUDIO;
 
-  strcpy(a->settingsState.Items[18].Label, "SYSTEM INFO & RESOURCES");
-  a->settingsState.Items[18].Type = SETTING_TYPE_ACTION;
-  a->settingsState.Items[18].Category = SETTING_CAT_SYSTEM;
+  strcpy(a->settingsState.Items[18].Label, "CROSSFADER CURVE");
+  a->settingsState.Items[18].Type = SETTING_TYPE_LIST;
+  a->settingsState.Items[18].OptionsCount = 3;
+  strcpy(a->settingsState.Items[18].Options[0], "SMOOTH (POWER)");
+  strcpy(a->settingsState.Items[18].Options[1], "LINEAR");
+  strcpy(a->settingsState.Items[18].Options[2], "CUTTING (SCRATCH)");
+  a->settingsState.Items[18].Current = a->activeAudioConfig.CrossfaderCurve;
+  a->settingsState.Items[18].Category = SETTING_CAT_AUDIO;
 
-  strcpy(a->settingsState.Items[19].Label, "ABOUT");
+  strcpy(a->settingsState.Items[19].Label, "SYSTEM INFO & RESOURCES");
   a->settingsState.Items[19].Type = SETTING_TYPE_ACTION;
   a->settingsState.Items[19].Category = SETTING_CAT_SYSTEM;
 
-  strcpy(a->settingsState.Items[20].Label, "CREDITS");
+  strcpy(a->settingsState.Items[20].Label, "ABOUT");
   a->settingsState.Items[20].Type = SETTING_TYPE_ACTION;
   a->settingsState.Items[20].Category = SETTING_CAT_SYSTEM;
 
-  strcpy(a->settingsState.Items[21].Label, "RESTART APP");
+  strcpy(a->settingsState.Items[21].Label, "CREDITS");
   a->settingsState.Items[21].Type = SETTING_TYPE_ACTION;
   a->settingsState.Items[21].Category = SETTING_CAT_SYSTEM;
 
-  strcpy(a->settingsState.Items[22].Label, "OS POWER");
+  strcpy(a->settingsState.Items[22].Label, "RESTART APP");
   a->settingsState.Items[22].Type = SETTING_TYPE_ACTION;
   a->settingsState.Items[22].Category = SETTING_CAT_SYSTEM;
 
-  int sysCount = 23;
+  strcpy(a->settingsState.Items[23].Label, "OS POWER");
+  a->settingsState.Items[23].Type = SETTING_TYPE_ACTION;
+  a->settingsState.Items[23].Category = SETTING_CAT_SYSTEM;
+
+  int sysCount = 24;
 #if !defined(PLATFORM_DRM)
   strcpy(a->settingsState.Items[sysCount].Label, "EXIT APPLICATION");
   a->settingsState.Items[sysCount].Type = SETTING_TYPE_ACTION;

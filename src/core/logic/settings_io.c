@@ -56,6 +56,9 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         }
         if ((sub = strstr(p, "\"lock\"")) && sscanf(sub, "\"lock\": %d", &ival) == 1) wfmA->LoadLock = (bool)ival;
         if ((sub = strstr(p, "\"rpm\"")) && sscanf(sub, "\"rpm\": %f", &val) == 1) wfmA->JogCalibRPM = val;
+        // WaveformTouch: default enabled (1) if field absent (backwards compat)
+        wfmA->WaveformTouchEnabled = true;
+        if ((sub = strstr(p, "\"touch\"")) && sscanf(sub, "\"touch\": %d", &ival) == 1) wfmA->WaveformTouchEnabled = (bool)ival;
     }
 
     // Deck B
@@ -74,6 +77,8 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         }
         if ((sub = strstr(p, "\"lock\"")) && sscanf(sub, "\"lock\": %d", &ival) == 1) wfmB->LoadLock = (bool)ival;
         if ((sub = strstr(p, "\"rpm\"")) && sscanf(sub, "\"rpm\": %f", &val) == 1) wfmB->JogCalibRPM = val;
+        wfmB->WaveformTouchEnabled = true;
+        if ((sub = strstr(p, "\"touch\"")) && sscanf(sub, "\"touch\": %d", &ival) == 1) wfmB->WaveformTouchEnabled = (bool)ival;
     }
 
     // Audio
@@ -275,10 +280,10 @@ void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendCon
     if (!f) return;
 
     fprintf(f, "{\n");
-    fprintf(f, "  \"wfmA\": { \"style\": %d, \"low\": %.2f, \"mid\": %.2f, \"high\": %.2f, \"start\": %.1f, \"stop\": %.1f, \"lock\": %d, \"rpm\": %.1f },\n", 
-            wfmA.Style, wfmA.GainLow, wfmA.GainMid, wfmA.GainHigh, wfmA.VinylStartMs, wfmA.VinylStopMs, wfmA.LoadLock ? 1 : 0, wfmA.JogCalibRPM);
-    fprintf(f, "  \"wfmB\": { \"style\": %d, \"low\": %.2f, \"mid\": %.2f, \"high\": %.2f, \"start\": %.1f, \"stop\": %.1f, \"lock\": %d, \"rpm\": %.1f },\n", 
-            wfmB.Style, wfmB.GainLow, wfmB.GainMid, wfmB.GainHigh, wfmB.VinylStartMs, wfmB.VinylStopMs, wfmB.LoadLock ? 1 : 0, wfmB.JogCalibRPM);
+    fprintf(f, "  \"wfmA\": { \"style\": %d, \"low\": %.2f, \"mid\": %.2f, \"high\": %.2f, \"start\": %.1f, \"stop\": %.1f, \"lock\": %d, \"rpm\": %.1f, \"touch\": %d },\n", 
+            wfmA.Style, wfmA.GainLow, wfmA.GainMid, wfmA.GainHigh, wfmA.VinylStartMs, wfmA.VinylStopMs, wfmA.LoadLock ? 1 : 0, wfmA.JogCalibRPM, wfmA.WaveformTouchEnabled ? 1 : 0);
+    fprintf(f, "  \"wfmB\": { \"style\": %d, \"low\": %.2f, \"mid\": %.2f, \"high\": %.2f, \"start\": %.1f, \"stop\": %.1f, \"lock\": %d, \"rpm\": %.1f, \"touch\": %d },\n", 
+            wfmB.Style, wfmB.GainLow, wfmB.GainMid, wfmB.GainHigh, wfmB.VinylStartMs, wfmB.VinylStopMs, wfmB.LoadLock ? 1 : 0, wfmB.JogCalibRPM, wfmB.WaveformTouchEnabled ? 1 : 0);
     fprintf(f, "  \"audio\": { \"devIdx\": %d, \"mastL\": %d, \"mastR\": %d, \"cueL\": %d, \"cueR\": %d, \"sr\": %d, \"buf\": %d, \"bitdepth\": %d, \"xfader\": %d },\n",
             audio.DeviceIndex, audio.MasterOutL, audio.MasterOutR, audio.CueOutL, audio.CueOutR, audio.SampleRate, audio.BufferSizeFrames, audio.PCMBitDepth, audio.CrossfaderCurve);
     fprintf(f, "  \"beatfx\": { \"fx\": %d, \"pad\": %d, \"ch\": %d, \"depth\": %.2f, \"q\": %d, \"tab\": %d, \"on\": %d },\n",

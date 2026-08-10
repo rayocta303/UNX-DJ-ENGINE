@@ -32,6 +32,7 @@ typedef struct {
   float VinylStopMs;
   bool LoadLock;
   float JogCalibRPM;
+  bool WaveformTouchEnabled; // Enable/disable touch & drag interaction on waveform
 } WaveformSettings;
 
 typedef struct TrackState {

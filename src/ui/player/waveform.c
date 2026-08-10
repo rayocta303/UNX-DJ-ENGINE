@@ -147,16 +147,17 @@ static int Waveform_Update(Component *base) {
   static bool isMouseTouchingWaveform[2] = {false, false};
   int dId = (r->State->ID >= 0 && r->State->ID < 2) ? r->State->ID : 0;
   bool midiConnected = MIDI_IsControllerConnected();
+  bool touchAllowed = r->State->Waveform.WaveformTouchEnabled && !midiConnected;
 
-  // If a physical DJ controller is connected, disable UI waveform touch/scratch interaction
-  if (!midiConnected && inWaveform && UI_IsPressed()) {
+  // Waveform touch: disabled if WaveformTouchEnabled=false OR MIDI controller is connected
+  if (touchAllowed && inWaveform && UI_IsPressed()) {
     r->State->IsTouching = true;
     isMouseTouchingWaveform[dId] = true;
     r->lastMouseX = mouse.x;
   }
 
   if (isMouseTouchingWaveform[dId]) {
-    if (!midiConnected && UI_IsDown()) {
+    if (touchAllowed && UI_IsDown()) {
       float dx = mouse.x - r->lastMouseX;
       r->lastMouseX = mouse.x;
 
