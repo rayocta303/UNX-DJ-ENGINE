@@ -86,31 +86,79 @@ static void TopBar_Draw(Component *base) {
   t->btnFullW = 0;
   float textStartX = t->MarginX + S(4);
 #endif
-  // 2. CPU Progress Bar & RAM Usage
-  float barW = S(38.0f);
-  float barH = S(8.0f);
-  float barY = (TOP_BAR_H - barH) / 2.0f;
+  // 2. CPU & RAM Telemetry Progress Bars (Stacked 2-row layout)
+  float row1Y = S(3.5f);
+  float row2Y = S(16.0f);
+  float barH = S(6.5f);
+  float barW = S(34.0f);
 
+  float lblX = textStartX;
+  float barX = lblX + S(20.0f);
+  float valX = barX + barW + S(4.0f);
+
+  Font faceMicro = UIFonts_GetFace(S(8.0f));
+
+  // --- Row 1: CPU ---
   float cpuUsage = t->CPUUsage;
   if (cpuUsage < 0.0f) cpuUsage = 0.0f;
   if (cpuUsage > 1.0f) cpuUsage = 1.0f;
 
-  // Draw CPU Progressbar
-  DrawRectangleRounded((Rectangle){ textStartX, barY, barW, barH }, 0.3f, 4, ColorDark1);
-  DrawRectangleRoundedLines((Rectangle){ textStartX, barY, barW, barH }, 0.3f, 4, 1.0f, ColorShadow);
+  UIDrawText("CPU", faceMicro, lblX, row1Y, S(8.0f), ColorGray);
 
-  float fillW = (barW - S(2.0f)) * cpuUsage;
-  if (fillW > S(1.0f)) {
+  DrawRectangleRounded((Rectangle){ barX, row1Y + S(1.0f), barW, barH }, 0.3f, 4, ColorDark1);
+  DrawRectangleRoundedLines((Rectangle){ barX, row1Y + S(1.0f), barW, barH }, 0.3f, 4, 1.0f, ColorShadow);
+
+  float cpuFillW = (barW - S(2.0f)) * cpuUsage;
+  if (cpuFillW > S(1.0f)) {
     Color cpuCol = (cpuUsage > 0.85f) ? ColorRed : ((cpuUsage > 0.60f) ? ColorOrange : ColorDGreen);
-    DrawRectangleRounded((Rectangle){ textStartX + S(1.0f), barY + S(1.0f), fillW, barH - S(2.0f) }, 0.3f, 4, cpuCol);
+    DrawRectangleRounded((Rectangle){ barX + S(1.0f), row1Y + S(2.0f), cpuFillW, barH - S(2.0f) }, 0.3f, 4, cpuCol);
   }
 
-  // Draw RAM Usage (Direct value only)
+  char cpuStr[16];
+  snprintf(cpuStr, sizeof(cpuStr), "%d%%", (int)(cpuUsage * 100.0f));
+  UIDrawText(cpuStr, faceMicro, valX, row1Y, S(8.0f), ColorWhite);
+
+  // --- Row 2: RAM (2-Segment Progress Bar: App Usage + System Usage) ---
+  float ramTotalMB = (t->RAMTotal > 0.0f) ? t->RAMTotal : 4096.0f;
+  float ramAppMB = (t->RAMApp >= 0.0f) ? t->RAMApp : 0.0f;
+  if (ramAppMB > t->RAMUsage) ramAppMB = t->RAMUsage;
+
+  float ramSysMB = t->RAMUsage - ramAppMB;
+  if (ramSysMB < 0.0f) ramSysMB = 0.0f;
+
+  float appRatio = ramAppMB / ramTotalMB;
+  float sysRatio = ramSysMB / ramTotalMB;
+  float totalRatio = (ramAppMB + ramSysMB) / ramTotalMB;
+
+  if (appRatio < 0.0f) appRatio = 0.0f;
+  if (sysRatio < 0.0f) sysRatio = 0.0f;
+  if (totalRatio > 1.0f) totalRatio = 1.0f;
+
+  UIDrawText("RAM", faceMicro, lblX, row2Y, S(8.0f), ColorGray);
+
+  // Outer container
+  DrawRectangleRounded((Rectangle){ barX, row2Y + S(1.0f), barW, barH }, 0.3f, 4, ColorDark1);
+  DrawRectangleRoundedLines((Rectangle){ barX, row2Y + S(1.0f), barW, barH }, 0.3f, 4, 1.0f, ColorShadow);
+
+  float maxInnerW = barW - S(2.0f);
+  float appFillW = maxInnerW * appRatio;
+  float sysFillW = maxInnerW * sysRatio;
+
+  // Segment 1: App Usage (Cyan / Blue)
+  if (appFillW > S(0.5f)) {
+    Color appCol = (Color){0, 185, 240, 255}; // Bright Cyan
+    DrawRectangle((int)(barX + S(1.0f)), (int)(row2Y + S(2.0f)), (int)appFillW, (int)(barH - S(2.0f)), appCol);
+  }
+
+  // Segment 2: Other System Usage (Orange / Amber / Red)
+  if (sysFillW > S(0.5f)) {
+    Color sysCol = (totalRatio > 0.85f) ? ColorRed : ((totalRatio > 0.70f) ? ColorOrange : (Color){240, 150, 40, 255});
+    DrawRectangle((int)(barX + S(1.0f) + appFillW), (int)(row2Y + S(2.0f)), (int)sysFillW, (int)(barH - S(2.0f)), sysCol);
+  }
+
   char ramStr[32];
   snprintf(ramStr, sizeof(ramStr), "%dMB", (int)t->RAMUsage);
-  float ramX = textStartX + barW + S(8.0f);
-  float sysTextY = (TOP_BAR_H - S(9.5f)) / 2.0f;
-  UIDrawText(ramStr, faceSm, ramX, sysTextY, S(9.5f), ColorWhite);
+  UIDrawText(ramStr, faceMicro, valX, row2Y, S(8.0f), ColorWhite);
 
   // 3. Center Group
   float btnSpacing = S(6);
@@ -213,6 +261,8 @@ void TopBar_Init(TopBar *t) {
   t->BatteryLevel = 0.85f;
   t->CPUUsage = 0;
   t->RAMUsage = 0;
+  t->RAMTotal = 0;
+  t->RAMApp = 0;
   t->OnBrowse = NULL;
   t->OnMixer = NULL;
   t->OnInfo = NULL;

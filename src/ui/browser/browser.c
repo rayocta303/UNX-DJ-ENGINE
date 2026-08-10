@@ -572,15 +572,27 @@ static bool IsValidStorageDir(const char *fullPath) {
     }
 
     FILE *f = fopen("/proc/mounts", "r");
+    bool isMounted = false;
     if (f) {
         char line[512];
         while (fgets(line, sizeof(line), f)) {
             if (strstr(line, fullPath)) {
-                fclose(f);
-                return true;
+                isMounted = true;
+                break;
             }
         }
         fclose(f);
+    }
+
+    if (isMounted) return true;
+
+    // Under /media, /mnt, or /run/media: if NOT in /proc/mounts, it is disconnected!
+    if (strncmp(fullPath, "/media", 6) == 0 ||
+        strncmp(fullPath, "/mnt", 4) == 0 ||
+        strncmp(fullPath, "/run/media", 10) == 0) {
+        // Clean up empty orphaned mount directory
+        rmdir(fullPath);
+        return false;
     }
 
     DIR *d = opendir(fullPath);
@@ -664,24 +676,28 @@ void Browser_RefreshStorages(BrowserState *s) {
 #ifdef _WIN32
   // 2. Scan drive letters D..Z
   for (char drive = 'D'; drive <= 'Z'; drive++) {
-    char path[32];
-    sprintf(path, "%c:/PIONEER/rekordbox/export.pdb", drive);
-    if (stat(path, &st) == 0) {
-      sprintf(s->AvailableStorages[s->StorageCount].Name, "USB (%c:) RB",
-              drive);
-      sprintf(s->AvailableStorages[s->StorageCount].Path, "%c:/", drive);
-      strcpy(s->AvailableStorages[s->StorageCount].Type, "Rekordbox");
-      s->StorageCount++;
-      if (s->StorageCount >= 16)
-        break;
-    }
-    sprintf(path, "%c:/_Serato_/database V2", drive);
-    if (stat(path, &st) == 0) {
-      sprintf(s->AvailableStorages[s->StorageCount].Name, "USB (%c:) Serato",
-              drive);
-      sprintf(s->AvailableStorages[s->StorageCount].Path, "%c:/", drive);
-      strcpy(s->AvailableStorages[s->StorageCount].Type, "Serato");
-      s->StorageCount++;
+    char rootPath[8];
+    sprintf(rootPath, "%c:\\", drive);
+    UINT driveType = GetDriveTypeA(rootPath);
+    if (driveType == DRIVE_REMOVABLE || driveType == DRIVE_FIXED) {
+      char path[64];
+      sprintf(path, "%c:/PIONEER/rekordbox/export.pdb", drive);
+      if (stat(path, &st) == 0) {
+        sprintf(s->AvailableStorages[s->StorageCount].Name, "USB (%c:) RB",
+                drive);
+        sprintf(s->AvailableStorages[s->StorageCount].Path, "%c:/", drive);
+        strcpy(s->AvailableStorages[s->StorageCount].Type, "Rekordbox");
+        s->StorageCount++;
+      } else {
+        sprintf(path, "%c:/_Serato_/database V2", drive);
+        if (stat(path, &st) == 0) {
+          sprintf(s->AvailableStorages[s->StorageCount].Name, "USB (%c:) Serato",
+                  drive);
+          sprintf(s->AvailableStorages[s->StorageCount].Path, "%c:/", drive);
+          strcpy(s->AvailableStorages[s->StorageCount].Type, "Serato");
+          s->StorageCount++;
+        }
+      }
       if (s->StorageCount >= 16)
         break;
     }
@@ -868,6 +884,17 @@ void Browser_RefreshStorages(BrowserState *s) {
       strncpy(s_knownNames[i], s->AvailableStorages[i].Name, 127);
     }
   }
+
+  // Clamp cursor bounds when in Source selection mode (BrowseLevel == 3)
+  if (s->BrowseLevel == 3) {
+    if (s->StorageCount > 0) {
+      if (s->CursorPos >= s->StorageCount) s->CursorPos = s->StorageCount - 1;
+      if (s->ScrollOffset > s->CursorPos) s->ScrollOffset = s->CursorPos;
+    } else {
+      s->CursorPos = 0;
+      s->ScrollOffset = 0;
+    }
+  }
 }
 
 static int Browser_Update(Component *base) {
@@ -877,8 +904,16 @@ static int Browser_Update(Component *base) {
   if (!s->IsActive)
     return 0;
 
-  // Check storage connection and auto-reset state if disconnected
-  Browser_CheckStorageConnection(s);
+  // Auto-refresh storage devices every 0.5s when browser view is open
+  static double lastAutoStorageRefresh = 0.0;
+  double nowStorageTime = GetTime();
+  if (nowStorageTime - lastAutoStorageRefresh >= 0.5) {
+    lastAutoStorageRefresh = nowStorageTime;
+    Browser_CheckStorageConnection(s);
+    if (s->BrowseLevel == 3) {
+      Browser_RefreshStorages(s);
+    }
+  }
 
   int loadToDeck = -1;
   int targetIdx = s->ScrollOffset + s->CursorPos;

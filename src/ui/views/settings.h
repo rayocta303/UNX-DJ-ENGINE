@@ -82,6 +82,8 @@ typedef struct {
 
   // Live System Metrics & Specifications
   float CPUUsage;
+  int CPUCores;
+  float CPUMhz;
   float RAMUsageMB;
   float RAMAppMB;
   float RAMTotalMB;

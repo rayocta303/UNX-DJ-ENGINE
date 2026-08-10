@@ -39,10 +39,14 @@ static AudioBackendConfig g_currentConfig;
 static ma_device_info g_deviceInfos[MAX_AUDIO_DEVICES];
 static int g_deviceCount = 0;
 
-void AudioBackend_GetActiveInfo(int* outChannels, int* outSampleRate, char* outBackendName, char* outDeviceName) {
+void AudioBackend_GetActiveInfo(int* outChannels, int* outSampleRate, int* outBufferSize, char* outBackendName, char* outDeviceName) {
     if (g_isDeviceInitialized) {
         if (outChannels) *outChannels = g_maDevice.playback.channels;
         if (outSampleRate) *outSampleRate = g_maDevice.sampleRate;
+        if (outBufferSize) {
+            int bs = (g_maDevice.playback.internalPeriodSizeInFrames > 0) ? (int)g_maDevice.playback.internalPeriodSizeInFrames : g_currentConfig.BufferSizeFrames;
+            *outBufferSize = (bs > 0) ? bs : 512;
+        }
         if (outBackendName) {
             strcpy(outBackendName, ma_backend_to_string(g_maContext.backend));
         }
@@ -62,6 +66,7 @@ void AudioBackend_GetActiveInfo(int* outChannels, int* outSampleRate, char* outB
     } else {
         if (outChannels) *outChannels = 0;
         if (outSampleRate) *outSampleRate = 0;
+        if (outBufferSize) *outBufferSize = 0;
         if (outBackendName) strcpy(outBackendName, "None");
         if (outDeviceName) strcpy(outDeviceName, "Not connected");
     }

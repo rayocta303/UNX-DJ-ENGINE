@@ -329,7 +329,7 @@ void OnSettingsApply(void *ctx) {
 
       // Sync actual hardware sample rate back to engine
       int actualSR = 0;
-      AudioBackend_GetActiveInfo(NULL, &actualSR, NULL, NULL);
+      AudioBackend_GetActiveInfo(NULL, &actualSR, NULL, NULL, NULL);
       if (globalAudioEngine)
         AudioEngine_SetOutputSampleRate(globalAudioEngine, actualSR);
 
@@ -338,7 +338,7 @@ void OnSettingsApply(void *ctx) {
         AudioEngine_SetPCMBitDepth(globalAudioEngine, aconf.PCMBitDepth);
 
       // Update active driver info in About screen
-      AudioBackend_GetActiveInfo(NULL, NULL, a->aboutState.AudioDriver,
+      AudioBackend_GetActiveInfo(NULL, NULL, NULL, a->aboutState.AudioDriver,
                                  a->aboutState.AudioDevice);
     }
   } else {
@@ -1859,7 +1859,7 @@ Log_LogDeviceInfo(gpuModel);
                initialAudioCfg.SampleRate, initialAudioCfg.BufferSizeFrames);
   UNX_LOG_INFO("[MAIN] Retrieving active audio info...");
   // Set initial Audio Driver name for the UI
-  AudioBackend_GetActiveInfo(NULL, NULL, app->aboutState.AudioDriver,
+  AudioBackend_GetActiveInfo(NULL, NULL, NULL, app->aboutState.AudioDriver,
                              app->aboutState.AudioDevice);
 
   UNX_LOG_INFO("[MAIN] Initializing Audio Engine (Heap)...");
@@ -2284,7 +2284,7 @@ Log_LogDeviceInfo(gpuModel);
 
   // Final sync of actual hardware sample rate
   int actualSR = 0;
-  AudioBackend_GetActiveInfo(NULL, &actualSR, NULL, NULL);
+  AudioBackend_GetActiveInfo(NULL, &actualSR, NULL, NULL, NULL);
   AudioEngine_SetOutputSampleRate(audioEngine, actualSR);
 #endif
 
@@ -3614,17 +3614,21 @@ void UpdateDrawFrame(App *app) {
       SystemStats stats = GetSystemStats();
       app->topbar.CPUUsage = stats.cpuUsage;
       app->topbar.RAMUsage = stats.ramUsageMB;
+      app->topbar.RAMTotal = stats.ramTotalMB;
+      app->topbar.RAMApp = stats.ramAppMB;
       app->topbar.BatteryLevel = stats.batteryLevel;
       app->topbar.IsCharging = stats.isCharging;
 
       app->settingsState.CPUUsage = stats.cpuUsage;
+      app->settingsState.CPUCores = stats.cpuCores;
+      app->settingsState.CPUMhz = stats.cpuMhz;
       app->settingsState.RAMUsageMB = stats.ramUsageMB;
       app->settingsState.RAMAppMB = stats.ramAppMB;
       app->settingsState.RAMTotalMB = stats.ramTotalMB;
       app->settingsState.RAMFreeMB = stats.ramFreeMB;
 
-      int actSR = 0, actBuf = 0;
-      AudioBackend_GetActiveInfo(NULL, &actSR, &actBuf, NULL);
+      int actCh = 0, actSR = 0, actBuf = 0;
+      AudioBackend_GetActiveInfo(&actCh, &actSR, &actBuf, NULL, NULL);
       app->settingsState.AudioSampleRate = actSR;
       app->settingsState.AudioBufferSize = actBuf;
       app->settingsState.AudioLatencyMs = (actSR > 0 && actBuf > 0) ? ((float)actBuf / (float)actSR) * 1000.0f : 0.0f;

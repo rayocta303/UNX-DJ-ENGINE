@@ -78,6 +78,17 @@ SystemStats GetSystemStats() {
         stats.cpuUsage = 0.0f;
     }
 
+    // CPU Cores & Frequency (Windows)
+    stats.cpuCores = numProcessors;
+    DWORD mhz = 0;
+    DWORD size = sizeof(mhz);
+    HKEY hKey;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        RegQueryValueExA(hKey, "~MHz", NULL, NULL, (LPBYTE)&mhz, &size);
+        RegCloseKey(hKey);
+    }
+    stats.cpuMhz = (float)mhz;
+
     // RAM Usage
     PROCESS_MEMORY_COUNTERS pmc;
     if (GetProcessMemoryInfo(self, &pmc, sizeof(pmc))) {
@@ -111,6 +122,7 @@ void System_ShowKeyboard(bool show) {
 }
 #elif defined(__linux__)
 #include <sys/sysinfo.h>
+#include <unistd.h>
 #include <stdio.h>
 
 SystemStats GetSystemStats() {
@@ -122,15 +134,45 @@ SystemStats GetSystemStats() {
     stats.ramFreeMB = (float)(memInfo.freeram * memInfo.mem_unit) / (1024.0f * 1024.0f);
     stats.ramUsageMB = stats.ramTotalMB - stats.ramFreeMB; // Global System RAM Used
 
+    int cores = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    if (cores <= 0) cores = 4;
+    stats.cpuCores = cores;
+
     FILE* file = fopen("/proc/loadavg", "r");
     if (file) {
         float load;
         if (fscanf(file, "%f", &load) > 0) {
-            stats.cpuUsage = load / 4.0f; // Assume 4 cores
+            stats.cpuUsage = load / (float)cores;
             if (stats.cpuUsage > 1.0f) stats.cpuUsage = 1.0f;
         }
         fclose(file);
     }
+
+    // CPU Frequency
+    float mhz = 0.0f;
+    FILE* ffreq = fopen("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq", "r");
+    if (!ffreq) ffreq = fopen("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq", "r");
+    if (ffreq) {
+        int khz = 0;
+        if (fscanf(ffreq, "%d", &khz) > 0) {
+            mhz = (float)khz / 1000.0f;
+        }
+        fclose(ffreq);
+    }
+    if (mhz <= 0.0f) {
+        FILE* fcpu = fopen("/proc/cpuinfo", "r");
+        if (fcpu) {
+            char line[128];
+            while (fgets(line, 128, fcpu)) {
+                if (strncmp(line, "cpu MHz", 7) == 0) {
+                    sscanf(line + 7, " : %f", &mhz);
+                    break;
+                }
+            }
+            fclose(fcpu);
+        }
+    }
+    stats.cpuMhz = mhz;
 
     // App Process RAM Usage
     file = fopen("/proc/self/status", "r");
