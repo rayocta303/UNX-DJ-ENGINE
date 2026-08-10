@@ -143,7 +143,7 @@ typedef struct DeckState {
   bool MidiRequestPlay;
   bool MidiRequestCue;
   int DeckLayer;
-  int PlayMode; // 0=SINGLE, 1=CONTINUE
+  int PlayMode; // 0=CONTINUE, 1=SINGLE
   int LoadedTrackIndex; // Index of loaded track in active track list
 } DeckState;
 

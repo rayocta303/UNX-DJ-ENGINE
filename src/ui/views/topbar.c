@@ -86,10 +86,31 @@ static void TopBar_Draw(Component *base) {
   t->btnFullW = 0;
   float textStartX = t->MarginX + S(4);
 #endif
-  char cpuRamStr[64];
-  snprintf(cpuRamStr, sizeof(cpuRamStr), "CPU: %d%%  |  RAM: %dMB", (int)(t->CPUUsage * 100), (int)t->RAMUsage);
+  // 2. CPU Progress Bar & RAM Usage
+  float barW = S(38.0f);
+  float barH = S(8.0f);
+  float barY = (TOP_BAR_H - barH) / 2.0f;
+
+  float cpuUsage = t->CPUUsage;
+  if (cpuUsage < 0.0f) cpuUsage = 0.0f;
+  if (cpuUsage > 1.0f) cpuUsage = 1.0f;
+
+  // Draw CPU Progressbar
+  DrawRectangleRounded((Rectangle){ textStartX, barY, barW, barH }, 0.3f, 4, ColorDark1);
+  DrawRectangleRoundedLines((Rectangle){ textStartX, barY, barW, barH }, 0.3f, 4, 1.0f, ColorShadow);
+
+  float fillW = (barW - S(2.0f)) * cpuUsage;
+  if (fillW > S(1.0f)) {
+    Color cpuCol = (cpuUsage > 0.85f) ? ColorRed : ((cpuUsage > 0.60f) ? ColorOrange : ColorDGreen);
+    DrawRectangleRounded((Rectangle){ textStartX + S(1.0f), barY + S(1.0f), fillW, barH - S(2.0f) }, 0.3f, 4, cpuCol);
+  }
+
+  // Draw RAM Usage (Direct value only)
+  char ramStr[32];
+  snprintf(ramStr, sizeof(ramStr), "%dMB", (int)t->RAMUsage);
+  float ramX = textStartX + barW + S(8.0f);
   float sysTextY = (TOP_BAR_H - S(9.5f)) / 2.0f;
-  UIDrawText(cpuRamStr, faceSm, textStartX, sysTextY, S(9.5f), ColorWhite);
+  UIDrawText(ramStr, faceSm, ramX, sysTextY, S(9.5f), ColorWhite);
 
   // 3. Center Group
   float btnSpacing = S(6);

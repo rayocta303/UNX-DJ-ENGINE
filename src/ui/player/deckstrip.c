@@ -53,8 +53,8 @@ static void drawLeftBadgeColumn(DeckStrip *d, float x, float y, float h) {
 
   // 3. PLAY MODE (SINGLE / CONTINUE)
   float singleY = 52;
-  const char *playModeStr = (d->State->PlayMode == 1) ? "CONTINUE" : "SINGLE";
-  Color playModeColor = (d->State->PlayMode == 1) ? ColorOrange : ColorShadow;
+  const char *playModeStr = (d->State->PlayMode == 0) ? "CONTINUE" : "SINGLE";
+  Color playModeColor = (d->State->PlayMode == 0) ? ColorOrange : ColorShadow;
   DrawCentredText(playModeStr, faceXXS, lColX, lColW, y + S(singleY), S(7),
                   playModeColor);
 
@@ -106,7 +106,7 @@ static int DeckStrip_Update(Component *base) {
   float tx = mtX + mtW + S(6);
 
   if (UICheckClick((Rectangle){ x, y + S(50), lColW, S(16) })) {
-    d->State->PlayMode = (d->State->PlayMode == 1) ? 0 : 1;
+    d->State->PlayMode = (d->State->PlayMode == 0) ? 1 : 0;
   }
   if (UICheckClick((Rectangle){ x, y + S(68), lColW, S(20) })) {
     d->State->QuantizeEnabled = !d->State->QuantizeEnabled;

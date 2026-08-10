@@ -2590,6 +2590,10 @@ void UpdateDrawFrame(App *app) {
     app->deckB.TrackLengthMs = (long long)(lenSec * 1000.0);
   }
 
+  if (!app->settingsState.IsActive) {
+    app->settingsState.Items[0].Current = app->deckA.PlayMode;
+  }
+
   // --- Auto Stop at End of Track / Beatgrid & Empty Deck Guard ---
   for (int i = 0; i < 2; i++) {
     DeckState *ds = (i == 0) ? &app->deckA : &app->deckB;
@@ -2607,7 +2611,7 @@ void UpdateDrawFrame(App *app) {
 
       // Stop or Continue if we passed the end marker
       if (ds->PositionMs >= endMs) {
-        if (ds->PlayMode == 1) { // 1 = CONTINUE
+        if (ds->PlayMode == 0) { // 0 = CONTINUE
           UNX_LOG_INFO("[MAIN] Track end reached on Deck %c in CONTINUE mode -> Loading next track...", i == 0 ? 'A' : 'B');
           Browser_LoadNextTrack(&app->browserState, i);
         } else {
