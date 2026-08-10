@@ -143,8 +143,16 @@ static void BottomStrip_Draw(Component *base) {
                             hasCue = true;
                             cueColor = GetCueColor(hc, hcPalette[i % 8]);
                             
-                            // Active Loop blinking
-                            if (hc.Status == 4 && (int)(GetTime() * 4) % 2 == 0) {
+                            bool isApproaching = false;
+                            if (ds->CurrentBPM > 0) {
+                                double distanceMs = (double)hc.Start - (double)ds->PositionMs;
+                                if (distanceMs > 0 && distanceMs <= (60000.0 / ds->CurrentBPM) * 16.0) {
+                                    isApproaching = true;
+                                }
+                            }
+                            
+                            // Active Loop or Approaching blinking
+                            if ((hc.Status == 4 || isApproaching) && (int)(GetTime() * 4) % 2 == 0) {
                                 cueColor = ColorWhite;
                             }
                             break;

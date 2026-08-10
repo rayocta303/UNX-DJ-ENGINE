@@ -1150,6 +1150,8 @@ void App_Init(App *a) {
   memset(&a->browserState, 0, sizeof(BrowserState));
   a->browserState.IsActive = false;
   a->browserState.BrowseLevel = 3; // Source level
+  a->browserState.SortMode = 0; // Default: Number
+  a->browserState.SortAscending = true; // Ascending (smallest first)
   for (int i = 0; i < 3; i++)
     a->browserState.PlaylistBank[i].PlaylistIdx = -1;
 
@@ -3580,6 +3582,39 @@ void UpdateDrawFrame(App *app) {
     }
   }
 
+  // Global Track Unload for failed decoding (Execute immediately, regardless of active screen)
+  for (int i = 0; i < 2; i++) {
+    if (audioEngine->Decks[i].LoadFailed) {
+      DeckState *target = (i == 0) ? &app->deckA : &app->deckB;
+      if (target->LoadedTrack) {
+        if (target->LoadedTrack->Analysis.BeatGrid != NULL) free(target->LoadedTrack->Analysis.BeatGrid);
+        if (target->LoadedTrack->Analysis.Cues != NULL) free(target->LoadedTrack->Analysis.Cues);
+        if (target->LoadedTrack->Analysis.Phrases != NULL) free(target->LoadedTrack->Analysis.Phrases);
+        if (target->LoadedTrack->Analysis.DynamicWaveform != NULL) free(target->LoadedTrack->Analysis.DynamicWaveform);
+        free(target->LoadedTrack);
+        target->LoadedTrack = NULL;
+      }
+      target->TrackTitle[0] = '\0';
+      target->ArtistName[0] = '\0';
+      target->AlbumName[0] = '\0';
+      target->GenreName[0] = '\0';
+      target->LabelName[0] = '\0';
+      target->TrackKey[0] = '\0';
+      target->ArtworkPath[0] = '\0';
+      target->Comment[0] = '\0';
+      target->MixName[0] = '\0';
+      target->Remixer[0] = '\0';
+      target->TrackNumber = 0;
+      target->OriginalBPM = 0;
+      target->CurrentBPM = 0;
+      target->Rating = 0;
+      target->Year = 0;
+      target->PositionMs = 0;
+      target->Position = 0;
+      audioEngine->Decks[i].LoadFailed = false; // Reset
+    }
+  }
+
   // Update active components
   if (app->screen == ScreenSplash)
     app->splash.base.Update((Component *)&app->splash);
@@ -3595,16 +3630,26 @@ void UpdateDrawFrame(App *app) {
     app->info.base.Update((Component *)&app->info);
   if (app->screen == ScreenSettings)
     app->settings.base.Update((Component *)&app->settings);
-  if (app->screen == ScreenAbout)
+  if (app->screen == ScreenAbout) {
     app->about.base.Update((Component *)&app->about);
+    if (!app->aboutState.IsActive) {
+      app->screen = ScreenSettings; // Return to Settings on close
+      app->settingsState.IsActive = true;
+    }
+  }
   if (app->screen == ScreenMixer)
     app->mixer.base.Update((Component *)&app->mixer);
   if (app->screen == ScreenPad)
     app->pad.base.Update((Component *)&app->pad);
   if (app->screen == ScreenDebug)
     app->debugView.base.Update((Component *)&app->debugView);
-  if (app->screen == ScreenCredits)
+  if (app->screen == ScreenCredits) {
     app->credits.base.Update((Component *)&app->credits);
+    if (!app->creditsState.IsActive) {
+      app->screen = ScreenSettings; // Return to Settings on close
+      app->settingsState.IsActive = true;
+    }
+  }
   if (app->screen == ScreenSplash) {
     app->splash.base.Update((Component *)&app->splash);
     if (app->splashCounter > 0)

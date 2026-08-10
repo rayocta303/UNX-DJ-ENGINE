@@ -79,6 +79,7 @@ typedef struct {
     int ColorID;
     int TrackNumber;
     int DiscNumber;
+    int BrowserDisplayNumber; // Used for UI sorting and display
     
     RBAnalysis Analysis;
 } RBTrack;

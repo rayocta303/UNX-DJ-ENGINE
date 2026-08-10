@@ -104,6 +104,7 @@ typedef struct DeckAudioState {
   double LoopEndPos;
 
   bool IsLoading;        // Track is currently being decoded in background
+  bool LoadFailed;       // Track decoding failed (Unsupported format, corrupted, etc)
   float LoadingProgress; // 0.0 to 1.0 (if supported by decoder)
 
   // VU Meter (Real-time tracking of DSP output peak for UI)

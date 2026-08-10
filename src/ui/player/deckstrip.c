@@ -611,13 +611,18 @@ static void DeckStrip_Draw(Component *base) {
           
           Color hcClr = GetCueColor(d->State->LoadedTrack->HotCues[h], hcPalette[idx]);
           
+          // Thick line for pointer
+          DrawLineEx((Vector2){rx, wy}, (Vector2){rx, wy + wh}, 2.0f, hcClr);
+
           // Downward triangle at top
-          DrawTriangle((Vector2){rx - S(3), wy}, (Vector2){rx + S(3), wy},
-                       (Vector2){rx, wy + S(5)}, hcClr);
+          DrawTriangle((Vector2){rx - S(4), wy}, (Vector2){rx + S(4), wy},
+                       (Vector2){rx, wy + S(6)}, hcClr);
           
-          // Letter label
+          // Letter label with background
           char hcChar[2] = { (char)('A' + idx), 0 };
-          UIDrawText(hcChar, faceXXS, rx + S(2), wy + S(1), S(7), hcClr);
+          float txtW = MeasureTextEx(faceXXS, hcChar, S(7), 1).x;
+          DrawRectangleRec((Rectangle){rx + S(2), wy, txtW + S(4), S(9)}, (Color){0, 0, 0, 200});
+          UIDrawText(hcChar, faceXXS, rx + S(4), wy + S(1), S(7), hcClr);
         }
       }
       

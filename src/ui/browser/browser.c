@@ -52,8 +52,30 @@ static const char* stristr_local(const char* haystack, const char* needle) {
 
 #endif
 
-static const char *categories[] = {"FILENAME", "FOLDER", "PLAYLIST", "TRACK",
-                                   "SEARCH"};
+static const char *categories[] = {"COLLECTION", "PLAYLIST", "TRACK"};
+
+static uint32_t GetMaxTrackCapacity_RB(RBDatabase *db) {
+    if (!db) return 0;
+    uint32_t max = db->TrackCount;
+    for (uint32_t i = 0; i < db->PlaylistCount; i++) {
+        if (db->Playlists[i].TrackCount > max) max = db->Playlists[i].TrackCount;
+    }
+    for (uint32_t i = 0; i < db->HistoryCount; i++) {
+        if (db->History[i].TrackCount > max) max = db->History[i].TrackCount;
+    }
+    if (100 > max) max = 100; // TagList max capacity
+    return max;
+}
+
+static uint32_t GetMaxTrackCapacity_Serato(SeratoDatabase *db) {
+    if (!db) return 0;
+    uint32_t max = db->TrackCount;
+    for (uint32_t i = 0; i < db->PlaylistCount; i++) {
+        if (db->Playlists[i].TrackCount > max) max = db->Playlists[i].TrackCount;
+    }
+    if (100 > max) max = 100;
+    return max;
+}
 
 static void Browser_SwitchStorageByPath(BrowserState *s, const char *path) {
   // Find storage in AvailableStorages
@@ -67,6 +89,8 @@ static void Browser_SwitchStorageByPath(BrowserState *s, const char *path) {
 
   if (foundIdx != -1) {
     s->SelectedStorage = &s->AvailableStorages[foundIdx];
+    s->ActiveTrackCount = 0;
+    s->CurrentPlaylistIdx = -1;
     if (s->DB)
       RB_FreeDatabase(s->DB);
     if (s->SeratoDB)
@@ -82,12 +106,12 @@ static void Browser_SwitchStorageByPath(BrowserState *s, const char *path) {
       s->DatabaseType = 0;
       if (s->TrackPointers)
         free(s->TrackPointers);
-      s->TrackPointers = (RBTrack **)malloc(s->DB->TrackCount * sizeof(RBTrack *));
+      s->TrackPointers = (RBTrack **)malloc(GetMaxTrackCapacity_RB(s->DB) * sizeof(RBTrack *));
     }
     if (s->SeratoDB) {
       if (s->SeratoTrackPointers)
         free(s->SeratoTrackPointers);
-      s->SeratoTrackPointers = (SeratoTrack **)malloc(s->SeratoDB->TrackCount * sizeof(SeratoTrack *));
+      s->SeratoTrackPointers = (SeratoTrack **)malloc(GetMaxTrackCapacity_Serato(s->SeratoDB) * sizeof(SeratoTrack *));
       if (!s->DB)
         s->DatabaseType = 1;
     }
@@ -195,6 +219,28 @@ static int GetCamelotHarmonicMatchLevel(const char *keyTrackStr, const char *key
 }
 
 // Sorter Helpers
+static int CompareTracks_No_RB(const void *a, const void *b) {
+    RBTrack *ta = *(RBTrack **)a;
+    RBTrack *tb = *(RBTrack **)b;
+    if (!ta && !tb) return 0;
+    if (!ta) return 1;
+    if (!tb) return -1;
+    if (ta->BrowserDisplayNumber < tb->BrowserDisplayNumber) return -1;
+    if (ta->BrowserDisplayNumber > tb->BrowserDisplayNumber) return 1;
+    return 0;
+}
+
+static int CompareTracks_No_Serato(const void *a, const void *b) {
+    SeratoTrack *ta = *(SeratoTrack **)a;
+    SeratoTrack *tb = *(SeratoTrack **)b;
+    if (!ta && !tb) return 0;
+    if (!ta) return 1;
+    if (!tb) return -1;
+    if (ta->BrowserDisplayNumber < tb->BrowserDisplayNumber) return -1;
+    if (ta->BrowserDisplayNumber > tb->BrowserDisplayNumber) return 1;
+    return 0;
+}
+
 static int CompareTracks_BPM_RB(const void *a, const void *b) {
     RBTrack *ta = *(RBTrack **)a;
     RBTrack *tb = *(RBTrack **)b;
@@ -286,6 +332,7 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
             }
           }
         }
+        if (s->TrackPointers[i]) s->TrackPointers[i]->BrowserDisplayNumber = i + 1;
       }
     } else if (s->CurrentPlaylistIdx >= 0 &&
                s->CurrentPlaylistIdx < (int)s->DB->PlaylistCount) {
@@ -304,11 +351,13 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
             }
           }
         }
+        if (s->TrackPointers[i]) s->TrackPointers[i]->BrowserDisplayNumber = i + 1;
       }
     } else {
       s->ActiveTrackCount = s->DB->TrackCount;
       for (uint32_t i = 0; i < s->DB->TrackCount; i++) {
         s->TrackPointers[i] = &s->DB->Tracks[i];
+        s->TrackPointers[i]->BrowserDisplayNumber = (s->TrackPointers[i]->TrackNumber > 0) ? s->TrackPointers[i]->TrackNumber : (i + 1);
       }
     }
   } else { // Serato
@@ -337,11 +386,15 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
             }
           }
         }
+        if (s->SeratoTrackPointers[i]) {
+            s->SeratoTrackPointers[i]->BrowserDisplayNumber = i + 1;
+        }
       }
     } else {
       s->ActiveTrackCount = s->SeratoDB->TrackCount;
       for (uint32_t i = 0; i < s->SeratoDB->TrackCount; i++) {
         s->SeratoTrackPointers[i] = &s->SeratoDB->Tracks[i];
+        s->SeratoTrackPointers[i]->BrowserDisplayNumber = i + 1; // Serato has no TrackNumber in V2 DB
       }
     }
   }
@@ -371,14 +424,16 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
     s->ActiveTrackCount = filteredCount;
   }
   // Apply Sort
-  if (s->SortMode > 0 && s->ActiveTrackCount > 0) {
+  if (s->SortMode >= 0 && s->ActiveTrackCount > 0) {
       if (s->DatabaseType == 0 && s->TrackPointers) { // Rekordbox
-          if (s->SortMode == 1) qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *), CompareTracks_BPM_RB);
+          if (s->SortMode == 0) qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *), CompareTracks_No_RB);
+          else if (s->SortMode == 1) qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *), CompareTracks_BPM_RB);
           else if (s->SortMode == 2) qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *), CompareTracks_Key_RB);
           else if (s->SortMode == 3) qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *), CompareTracks_Title_RB);
           else if (s->SortMode == 4) qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *), CompareTracks_Rating_RB);
       } else if (s->DatabaseType == 1 && s->SeratoTrackPointers) { // Serato
-          if (s->SortMode == 1) qsort(s->SeratoTrackPointers, s->ActiveTrackCount, sizeof(SeratoTrack *), CompareTracks_BPM_Serato);
+          if (s->SortMode == 0) qsort(s->SeratoTrackPointers, s->ActiveTrackCount, sizeof(SeratoTrack *), CompareTracks_No_Serato);
+          else if (s->SortMode == 1) qsort(s->SeratoTrackPointers, s->ActiveTrackCount, sizeof(SeratoTrack *), CompareTracks_BPM_Serato);
           else if (s->SortMode == 2) qsort(s->SeratoTrackPointers, s->ActiveTrackCount, sizeof(SeratoTrack *), CompareTracks_Key_Serato);
           else if (s->SortMode == 3) qsort(s->SeratoTrackPointers, s->ActiveTrackCount, sizeof(SeratoTrack *), CompareTracks_Title_Serato);
           else if (s->SortMode == 4) qsort(s->SeratoTrackPointers, s->ActiveTrackCount, sizeof(SeratoTrack *), CompareTracks_Rating_Serato);
@@ -1134,14 +1189,17 @@ static int Browser_Update(Component *base) {
         loadToDeck = 0;
         targetIdx = s->PopupTrackIdx;
         s->ShowLoadPopup = false;
+        UI_ConsumeTouch(); // Prevent bleed-through to list items below
       } else if (CheckCollisionPointRec(mousePos, deckBRect)) {
         loadToDeck = 1;
         targetIdx = s->PopupTrackIdx;
         s->ShowLoadPopup = false;
+        UI_ConsumeTouch(); // Prevent bleed-through to list items below
       } else if (!CheckCollisionPointRec(mousePos,
                                          (Rectangle){px, py, pw, ph})) {
         // Backdrop click
         s->ShowLoadPopup = false;
+        UI_ConsumeTouch();
       }
     }
     if (!s->IsSearching && (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) || s->MidiRequestBack)) {
@@ -1431,7 +1489,7 @@ static int Browser_Update(Component *base) {
   }
 
   // 3. List Item Interaction (Tap & Load trigger)
-  if (!s->ShowLoadPopup && !s->IsScrollbarDragging) {
+  if (!s->ShowLoadPopup && !s->IsScrollbarDragging && loadToDeck == -1) {
     float pixelOffset = fmodf(s->VisualScroll, rowH);
     for (int i = 0; i < totalVisible + 1; i++) {
       int idx = s->ScrollOffset + i;
@@ -1547,6 +1605,8 @@ static int Browser_Update(Component *base) {
           s->CurrentPlaylistIdx = -1;
           s->CameFromBank = false;
           s->CursorPos = 0;
+          s->SortMode = 0;
+          s->SortAscending = true;
           Browser_UpdateActiveTracks(s);
         }
       } else {
@@ -1558,6 +1618,8 @@ static int Browser_Update(Component *base) {
           s->CurrentPlaylistIdx = s->PlaylistBank[bankIdx].PlaylistIdx;
           s->CameFromBank = true;
           s->BrowseLevel = 0;
+          s->SortMode = 0;
+          s->SortAscending = true;
           Browser_UpdateActiveTracks(s);
           s->CursorPos = s->ScrollOffset = 0;
           s->VisualScroll = 0;
@@ -1568,6 +1630,8 @@ static int Browser_Update(Component *base) {
       int idx = s->ScrollOffset + s->CursorPos;
       if (idx < s->StorageCount) {
         s->SelectedStorage = &s->AvailableStorages[idx];
+        s->ActiveTrackCount = 0;
+        s->CurrentPlaylistIdx = -1;
         if (s->DB)
           RB_FreeDatabase(s->DB);
         if (s->SeratoDB)
@@ -1585,7 +1649,7 @@ static int Browser_Update(Component *base) {
           if (s->TrackPointers)
             free(s->TrackPointers);
           s->TrackPointers =
-              (RBTrack **)malloc(s->DB->TrackCount * sizeof(RBTrack *));
+              (RBTrack **)malloc(GetMaxTrackCapacity_RB(s->DB) * sizeof(RBTrack *));
         } else if (s->SeratoDB) {
           s->DatabaseType = 1; // Fallback to Serato
         } else {
@@ -1596,7 +1660,7 @@ static int Browser_Update(Component *base) {
           if (s->SeratoTrackPointers)
             free(s->SeratoTrackPointers);
           s->SeratoTrackPointers = (SeratoTrack **)malloc(
-              s->SeratoDB->TrackCount * sizeof(SeratoTrack *));
+              GetMaxTrackCapacity_Serato(s->SeratoDB) * sizeof(SeratoTrack *));
         }
 
         s->BrowseLevel = 2; // Categories level
@@ -1609,7 +1673,7 @@ static int Browser_Update(Component *base) {
       }
     } else if (s->BrowseLevel == 2) {
       int catIdx = s->ScrollOffset + s->CursorPos;
-      if (catIdx == 5 && s->HasBothDatabases) {
+      if (catIdx == 3 && s->HasBothDatabases) {
         // TOGGLE DATABASE
         s->DatabaseType = (s->DatabaseType == 0) ? 1 : 0;
         UNX_LOG_INFO("[BROWSER] Switched database to %s",
@@ -1619,14 +1683,8 @@ static int Browser_Update(Component *base) {
         s->VisualScroll = 0.0f;
         s->ScrollVelocity = 0.0f;
         Browser_UpdateActiveTracks(s);
-      } else if (catIdx == 2) {
+      } else if (catIdx == 1) {
         s->BrowseLevel = 1; // Categories to Playlists
-        s->CursorPos = s->ScrollOffset = 0;
-        s->VisualScroll = 0.0f;
-        s->ScrollVelocity = 0.0f;
-      } else if (catIdx == 4) {
-        s->IsSearching = true; // Categories to Search/OSK
-        s->ShowOSK = true;
         s->CursorPos = s->ScrollOffset = 0;
         s->VisualScroll = 0.0f;
         s->ScrollVelocity = 0.0f;
@@ -1648,6 +1706,8 @@ static int Browser_Update(Component *base) {
         if (s->DB && idx < (int)s->DB->PlaylistCount) {
           s->CurrentPlaylistIdx = idx;
           s->BrowseLevel = 0;
+          s->SortMode = 0;
+          s->SortAscending = true;
           Browser_UpdateActiveTracks(s);
           s->CursorPos = s->ScrollOffset = 0;
         s->VisualScroll = 0;
@@ -1657,6 +1717,8 @@ static int Browser_Update(Component *base) {
         if (s->SeratoDB && idx < (int)s->SeratoDB->PlaylistCount) {
           s->CurrentPlaylistIdx = idx;
           s->BrowseLevel = 0;
+          s->SortMode = 0;
+          s->SortAscending = true;
           Browser_UpdateActiveTracks(s);
           s->CursorPos = s->ScrollOffset = 0;
         s->VisualScroll = 0;
@@ -1692,6 +1754,29 @@ static int Browser_Update(Component *base) {
   return 0;
 }
 
+static bool IsFormatSupported(const char *filepath) {
+    if (!filepath) return false;
+    const char *ext = strrchr(filepath, '.');
+    if (!ext) return false;
+    
+    char lowerExt[16] = {0};
+    for (int i = 0; i < 15 && ext[i] != '\0'; i++) {
+        lowerExt[i] = (ext[i] >= 'A' && ext[i] <= 'Z') ? (ext[i] + 32) : ext[i];
+    }
+    
+    if (strcmp(lowerExt, ".mp3") == 0 ||
+        strcmp(lowerExt, ".wav") == 0 ||
+        strcmp(lowerExt, ".flac") == 0 ||
+        strcmp(lowerExt, ".aiff") == 0 ||
+        strcmp(lowerExt, ".aif") == 0 ||
+        strcmp(lowerExt, ".m4a") == 0 ||
+        strcmp(lowerExt, ".aac") == 0 ||
+        strcmp(lowerExt, ".ogg") == 0) {
+        return true;
+    }
+    return false;
+}
+
 int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool autoPlay) {
   if (!s || loadToDeck < 0 || loadToDeck > 1) return 0;
   if (idx < 0 || idx >= s->ActiveTrackCount) return 0;
@@ -1715,6 +1800,14 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
       if (MemoryGuard_GetLevel() == MEM_MODE_CRITICAL) {
         UNX_LOG_ERR("[BROWSER] LOAD BLOCKED: Memory is critical.");
         s->ShowLoadPopup = false;
+        return 0;
+      }
+
+      if (!IsFormatSupported(t->FilePath)) {
+        UNX_LOG_WARN("[BROWSER] LOAD BLOCKED: Unsupported format %s", t->FilePath);
+        Toast_Show("UNSUPPORTED TRACK FORMAT", 3.0f, (Color){240, 50, 50, 255});
+        s->ShowLoadPopup = false;
+        targetDeck->IsLoading = false;
         return 0;
       }
 
@@ -1883,6 +1976,13 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
     if (s->SeratoTrackPointers[idx]) {
       SeratoTrack *t = s->SeratoTrackPointers[idx];
       UNX_LOG_INFO("[BROWSER] Loading Serato track: %s to Deck %c (Index %d)", t->Title, loadToDeck == 0 ? 'A' : 'B', idx);
+      if (!IsFormatSupported(t->FilePath)) {
+        UNX_LOG_WARN("[BROWSER] LOAD BLOCKED: Unsupported format %s", t->FilePath);
+        Toast_Show("UNSUPPORTED TRACK FORMAT", 3.0f, (Color){240, 50, 50, 255});
+        s->ShowLoadPopup = false;
+        targetDeck->IsLoading = false;
+        return 0;
+      }
 
       if (s->SelectedStorage) {
         Serato_LoadTrackData(t, s->SelectedStorage->Path);
@@ -2433,32 +2533,40 @@ static void Browser_Draw(Component *base) {
     DrawLine(listX + listW - S(55), listYOffset, listX + listW - S(55), listYOffset + headerH, ColorDark1);
 
     // Column 1: NO.
-    char noHeaderLabel[32] = "NO.";
+    UIDrawText("NO.", faceXS, listX + S(6), listYOffset + S(5), S(10), (s->SortMode == 0) ? ColorWhite : ColorShadow);
     if (s->SortMode == 0) {
-      snprintf(noHeaderLabel, sizeof(noHeaderLabel), "NO.%s", s->SortAscending ? "\uf0d8" : "\uf0d7");
+      float cx = listX + S(28);
+      float cy = listYOffset + S(8);
+      if (s->SortAscending) DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)}, (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
+      else DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy}, (Vector2){cx, cy}, ColorWhite);
     }
-    UIDrawText(noHeaderLabel, faceXS, listX + S(6), listYOffset + S(5), S(10), (s->SortMode == 0) ? ColorWhite : ColorShadow);
 
     // Column 2: TITLE
-    char titleHeaderLabel[32] = "TITLE";
+    UIDrawText("TITLE", faceXS, listX + S(52), listYOffset + S(5), S(10), (s->SortMode == 3) ? ColorWhite : ColorShadow);
     if (s->SortMode == 3) {
-      snprintf(titleHeaderLabel, sizeof(titleHeaderLabel), "TITLE %s", s->SortAscending ? "\uf0d8" : "\uf0d7");
+      float cx = listX + S(82);
+      float cy = listYOffset + S(8);
+      if (s->SortAscending) DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)}, (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
+      else DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy}, (Vector2){cx, cy}, ColorWhite);
     }
-    UIDrawText(titleHeaderLabel, faceXS, listX + S(52), listYOffset + S(5), S(10), (s->SortMode == 3) ? ColorWhite : ColorShadow);
 
-    // Column 2: BPM (Reference Image 2: BPM ▲ / ▼)
-    char bpmHeaderLabel[32] = "BPM";
+    // Column 3: BPM
+    DrawCentredText("BPM", faceXS, listX + listW - S(110), S(55), listYOffset + S(5), S(10), (s->SortMode == 1) ? ColorWhite : ColorShadow);
     if (s->SortMode == 1) {
-      snprintf(bpmHeaderLabel, sizeof(bpmHeaderLabel), "BPM %s", s->SortAscending ? "\uf0d8" : "\uf0d7");
+      float cx = listX + listW - S(110) + S(42);
+      float cy = listYOffset + S(8);
+      if (s->SortAscending) DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)}, (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
+      else DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy}, (Vector2){cx, cy}, ColorWhite);
     }
-    DrawCentredText(bpmHeaderLabel, faceXS, listX + listW - S(110), S(55), listYOffset + S(5), S(10), (s->SortMode == 1) ? ColorWhite : ColorShadow);
 
-    // Column 3: KEY (Reference Image 2: Key ▲ / ▼)
-    char keyHeaderLabel[32] = "KEY";
+    // Column 4: KEY
+    DrawCentredText("KEY", faceXS, listX + listW - S(55), S(55), listYOffset + S(5), S(10), (s->SortMode == 2) ? ColorWhite : ColorShadow);
     if (s->SortMode == 2) {
-      snprintf(keyHeaderLabel, sizeof(keyHeaderLabel), "KEY %s", s->SortAscending ? "\uf0d8" : "\uf0d7");
+      float cx = listX + listW - S(55) + S(42);
+      float cy = listYOffset + S(8);
+      if (s->SortAscending) DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)}, (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
+      else DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy}, (Vector2){cx, cy}, ColorWhite);
     }
-    DrawCentredText(keyHeaderLabel, faceXS, listX + listW - S(55), S(55), listYOffset + S(5), S(10), (s->SortMode == 2) ? ColorWhite : ColorShadow);
 
     listYOffset += headerH;
     totalVisible = (int)floorf((viewH - listYOffset) / rowH);
@@ -2474,7 +2582,7 @@ static void Browser_Draw(Component *base) {
     else
       totalItems = s->SeratoDB ? (int)s->SeratoDB->PlaylistCount : 0;
   } else if (s->BrowseLevel == 2)
-    totalItems = 5 + (s->HasBothDatabases ? 1 : 0);
+    totalItems = 3 + (s->HasBothDatabases ? 1 : 0);
   else if (s->BrowseLevel == 3)
     totalItems = s->StorageCount;
 
@@ -2537,9 +2645,9 @@ static void Browser_Draw(Component *base) {
       }
       break;
     case 2:
-      if (idx < 5)
+      if (idx < 3)
         title = categories[idx];
-      else if (idx == 5 && s->HasBothDatabases) {
+      else if (idx == 3 && s->HasBothDatabases) {
         static char switchBuf[32];
         sprintf(switchBuf, "SWITCH TO %s",
                 s->DatabaseType == 0 ? "SERATO" : "REKORDBOX");
@@ -2582,14 +2690,18 @@ static void Browser_Draw(Component *base) {
     Color textCol = isCursor ? ColorWhite : (isPlaying ? ColorOrange : ColorShadow);
     Color titleCol = isCursor ? ColorWhite : (isPlaying ? ColorOrange : ColorWhite);
 
-    // Render Track/Playlist Index Number (1., 2., 3...)
-    if (s->BrowseLevel == 0 || s->BrowseLevel == 1) {
+    // Render Track Index Number - only for Track List (BrowseLevel 0)
+    if (s->BrowseLevel == 0) {
       char numBuf[16];
-      sprintf(numBuf, "%d.", idx + 1);
-      UIDrawText(numBuf, faceXS, listX + S(4), ry + S(9), S(10), textCol);
-      if (s->BrowseLevel == 0) {
-        UIDrawText(isPlaying ? "\uf04b" : "\uf001", faceIcon, listX + S(32), ry + S(9), S(9), textCol);
+      int displayNum = idx + 1;
+      if (s->DatabaseType == 0 && idx < s->ActiveTrackCount && s->TrackPointers[idx]) {
+          displayNum = s->TrackPointers[idx]->BrowserDisplayNumber;
+      } else if (s->DatabaseType == 1 && idx < s->ActiveTrackCount && s->SeratoTrackPointers[idx]) {
+          displayNum = s->SeratoTrackPointers[idx]->BrowserDisplayNumber;
       }
+      sprintf(numBuf, "%d.", displayNum);
+      UIDrawText(numBuf, faceXS, listX + S(4), ry + S(9), S(10), textCol);
+      UIDrawText(isPlaying ? "\uf04b" : "\uf001", faceIcon, listX + S(32), ry + S(9), S(9), textCol);
     }
 
     float textX = listX + S(36);

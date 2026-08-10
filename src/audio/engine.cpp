@@ -37,11 +37,12 @@ void DeckAudio_LoadTrackAsync(DeckAudioState *deck, const char *filePath) {
 
   std::string path = filePath;
   std::thread([deck, path, myID]() {
-    DeckAudio_LoadTrack(deck, path.c_str());
+    bool success = DeckAudio_LoadTrack(deck, path.c_str());
     
     // Only clear IsLoading if this was the latest request
     if (deck->LastLoadID == myID) {
       deck->IsLoading = false;
+      deck->LoadFailed = !success;
       deck->LoadingProgress = 1.0f;
     } else {
       // Stale request, but DeckAudio_LoadTrack already modified the deck.

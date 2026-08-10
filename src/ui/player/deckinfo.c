@@ -36,7 +36,9 @@ static int DeckInfo_Update(Component *base) {
     float ejectY = y + (headerH - ejectH) / 2.0f;
     Rectangle ejectRect = { ejectX, ejectY, ejectW, ejectH };
     
-    if (d->State->LoadedTrack != NULL && Touch_CheckClick(ejectRect, S(5.0f))) {
+    bool isEjectLocked = d->State->Waveform.LoadLock && d->State->IsPlaying;
+
+    if (!isEjectLocked && d->State->LoadedTrack != NULL && Touch_CheckClick(ejectRect, S(5.0f))) {
         DeckAudio_Unload(&d->Engine->Decks[d->ID]);
         d->State->IsPlaying = false;
         d->State->IsCueActive = false;
@@ -241,7 +243,9 @@ static void DeckInfo_Draw(Component *base) {
     Color ptrColor = d->State->IsTouching ? ColorRed : (d->State->LoadAnimTimer > 0.0f ? ColorWhite : (d->State->IsPlaying ? ColorGreen : ColorWhite));
     DrawLineEx(pStart, pEnd, S(1.2f), ptrColor);
 
-    if (d->State->LoadedTrack != NULL) {
+    bool isEjectLocked = d->State->Waveform.LoadLock && d->State->IsPlaying;
+
+    if (!isEjectLocked && d->State->LoadedTrack != NULL) {
         bool hoverEject = CheckCollisionPointRec(UIGetMousePosition(), ejectRect);
         
         // Button Background

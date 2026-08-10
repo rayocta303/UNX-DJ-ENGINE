@@ -66,6 +66,7 @@ static int Credits_Update(Component *base) {
   bool closeClicked = false;
   if (Touch_CheckClick((Rectangle){0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}, 0) && !CheckCollisionPointRec(mouse, cardRect)) {
       closeClicked = true;
+      UI_ConsumeTouch();
   }
   
   float btnW = S(120);
@@ -74,6 +75,7 @@ static int Credits_Update(Component *base) {
   float btnY = cardY + cardH - btnH - S(10);
   if (Touch_CheckClick((Rectangle){btnX, btnY, btnW, btnH}, S(5))) {
       closeClicked = true;
+      UI_ConsumeTouch();
   }
 
   if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) || closeClicked) {

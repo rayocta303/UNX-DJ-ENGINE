@@ -727,15 +727,18 @@ static void Waveform_Draw(Component *base) {
         if (idx < 0) idx = 0; if (idx > 7) idx = 7;
         Color hcClr = GetCueColor(hc, hcPalette[idx]);
         // Triangle pointing down at top
-        DrawTriangle((Vector2){bx - S(5), wfY}, (Vector2){bx + S(5), wfY},
-                     (Vector2){bx, wfY + S(8)}, hcClr);
+        DrawTriangle((Vector2){bx - S(6), wfY}, (Vector2){bx + S(6), wfY},
+                     (Vector2){bx, wfY + S(10)}, hcClr);
         
-        // Letter indicator
+        // Letter indicator with background
         char hcLabel[2] = {(char)('A' + hc.ID - 1), 0};
-        UIDrawText(hcLabel, faceXS, bx + S(6), wfY + S(1), S(8), hcClr);
+        Font hcFont = UIFonts_GetBoldFace(S(12));
+        float txtW = MeasureTextEx(hcFont, hcLabel, S(12), 1).x;
+        DrawRectangleRec((Rectangle){bx + S(6), wfY, txtW + S(4), S(14)}, (Color){0, 0, 0, 220});
+        UIDrawText(hcLabel, hcFont, bx + S(8), wfY + S(1), S(12), hcClr);
         
-        // Subtle vertical line through waveform
-        DrawRectangleV((Vector2){bx, wfY + S(8)}, (Vector2){1.0f, waveH - S(8)}, Fade(hcClr, 0.3f));
+        // Bold vertical line through waveform
+        DrawRectangleV((Vector2){bx - 1.0f, wfY + S(10)}, (Vector2){3.0f, waveH - S(10)}, Fade(hcClr, 0.85f));
       }
     }
   }

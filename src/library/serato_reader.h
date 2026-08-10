@@ -38,6 +38,7 @@ typedef struct {
     int SampleRate;
     uint32_t FileTime;
     uint32_t DateAdded;
+    int BrowserDisplayNumber; // Used for UI sorting and display
     
     // Analysis data
     RBCue* Cues;
