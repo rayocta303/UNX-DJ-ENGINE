@@ -2412,10 +2412,10 @@ static void Browser_Draw(Component *base) {
     DrawLine(listX + listW - S(110), listYOffset, listX + listW - S(110), listYOffset + headerH, ColorDark1);
     DrawLine(listX + listW - S(55), listYOffset, listX + listW - S(55), listYOffset + headerH, ColorDark1);
 
-    // Column 1: # / TITLE
-    char titleHeaderLabel[32] = "# / TITLE";
+    // Column 1: NO. / TITLE
+    char titleHeaderLabel[32] = "NO. / TITLE";
     if (s->SortMode == 3 || s->SortMode == 0) {
-      snprintf(titleHeaderLabel, sizeof(titleHeaderLabel), "# / TITLE %s", s->SortAscending ? "\uf0d8" : "\uf0d7");
+      snprintf(titleHeaderLabel, sizeof(titleHeaderLabel), "NO. / TITLE %s", s->SortAscending ? "\uf0d8" : "\uf0d7");
     }
     UIDrawText(titleHeaderLabel, faceXS, listX + S(6), listYOffset + S(5), S(10), (s->SortMode == 3 || s->SortMode == 0) ? ColorWhite : ColorShadow);
 
@@ -2538,17 +2538,21 @@ static void Browser_Draw(Component *base) {
       DrawRectangle(listX, ry + 1, listW, rowH - 2, ColorDark2);
     }
 
-    // Render Track Index Number (019, 020, 021...) & Musical Note Icon (Reference Image 1)
-    if (s->BrowseLevel == 0) {
+    // Render Track/Playlist Index Number (1., 2., 3...)
+    if (s->BrowseLevel == 0 || s->BrowseLevel == 1) {
       char numBuf[16];
-      sprintf(numBuf, "%03d", idx + 1);
+      sprintf(numBuf, "%d.", idx + 1);
       UIDrawText(numBuf, faceXS, listX + S(4), ry + S(9), S(10), isCursor ? ColorWhite : ColorShadow);
-      UIDrawText("\uf001", faceIcon, listX + S(32), ry + S(9), S(9), isCursor ? ColorWhite : ColorShadow);
+      if (s->BrowseLevel == 0) {
+        UIDrawText("\uf001", faceIcon, listX + S(32), ry + S(9), S(9), isCursor ? ColorWhite : ColorShadow);
+      }
     }
 
     float textX = listX + S(36);
     if (s->BrowseLevel == 0)
       textX = listX + S(46);
+    else if (s->BrowseLevel == 1)
+      textX = listX + S(30);
     else if (s->BrowseLevel == 3)
       textX = listX + S(38);
     else if (s->BrowseLevel > 0)
