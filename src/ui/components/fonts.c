@@ -8,6 +8,7 @@
 
 static Font defaultFace;
 static Font boldFace;
+static Font timeFace;
 static Font iconSolid;
 static Font iconRegular;
 static Font iconBrand;
@@ -22,56 +23,64 @@ void UIFonts_Init(void) {
   isInitialized = true;
   UNX_LOG_INFO("[FONTS] UIFonts_Init starting...");
 
-  // Attempt to load standard font. Use Arial on Windows as requested.
-  // TODO: Embed a primary UI font to avoid OS dependencies.
-  // Attempt to load standard font from assets first, then fallback.
-#if defined(PLATFORM_IOS)
-  const char *ios_get_bundle_path(const char *filename);
-  const char *fontPathBundled =
-      ios_get_bundle_path("assets/fonts/Inter-Regular.ttf");
-  const char *boldPathBundled =
-      ios_get_bundle_path("assets/fonts/Inter-Bold.ttf");
-#else
-  const char *fontPathBundled = "assets/fonts/Inter-Regular.ttf";
-  const char *boldPathBundled = FileExists("assets/fonts/Inter-Bold.ttf") ? "assets/fonts/Inter-Bold.ttf" : fontPathBundled;
-#endif
-
 #if defined(PLATFORM_IOS)
   int fontSize = 40;
 #else
   int fontSize = 64;
 #endif
 
-  UNX_LOG_INFO("[FONTS] Loading default from: %s", fontPathBundled);
-  defaultFace = LoadFontEx(fontPathBundled, fontSize, 0, 0);
-  UNX_LOG_INFO("[FONTS] Loading bold from: %s", boldPathBundled);
-  if (strcmp(boldPathBundled, fontPathBundled) == 0) {
-    boldFace = defaultFace;
-  } else {
-    boldFace = LoadFontEx(boldPathBundled, fontSize, 0, 0);
+  // 1. Default UI Face (Nexa Heavy)
+  const char *pathDefault = NULL;
+  if (FileExists("assets/fonts/nexa/Nexa-Heavy.ttf")) pathDefault = "assets/fonts/nexa/Nexa-Heavy.ttf";
+  else if (FileExists("../assets/fonts/nexa/Nexa-Heavy.ttf")) pathDefault = "../assets/fonts/nexa/Nexa-Heavy.ttf";
+
+  if (pathDefault) {
+    UNX_LOG_INFO("[FONTS] Loading default (Nexa Heavy) from file: %s", pathDefault);
+    defaultFace = LoadFontEx(pathDefault, fontSize, 0, 0);
   }
-  
-  UNX_LOG_INFO("[FONTS] Result: Default ID=%u, Bold ID=%u", defaultFace.texture.id, boldFace.texture.id);
+  if (defaultFace.texture.id == 0) {
+    UNX_LOG_INFO("[FONTS] Loading default (Nexa Heavy) from memory bundle...");
+    defaultFace = LoadFontFromMemory(".ttf", font_nexa_heavy, font_nexa_heavy_size, fontSize, 0, 0);
+  }
+
+  // 2. Bold UI Face (Nexa Heavy)
+  const char *pathBold = NULL;
+  if (FileExists("assets/fonts/nexa/Nexa-Heavy.ttf")) pathBold = "assets/fonts/nexa/Nexa-Heavy.ttf";
+  else if (FileExists("../assets/fonts/nexa/Nexa-Heavy.ttf")) pathBold = "../assets/fonts/nexa/Nexa-Heavy.ttf";
+
+  if (pathBold) {
+    UNX_LOG_INFO("[FONTS] Loading bold from file: %s", pathBold);
+    boldFace = LoadFontEx(pathBold, fontSize, 0, 0);
+  }
+  if (boldFace.texture.id == 0) {
+    UNX_LOG_INFO("[FONTS] Loading bold (Nexa Heavy) from memory bundle...");
+    boldFace = LoadFontFromMemory(".ttf", font_nexa_heavy, font_nexa_heavy_size, fontSize, 0, 0);
+  }
+
+  // 3. Time Counter Face (Inter Regular)
+  const char *pathTime = NULL;
+  if (FileExists("assets/fonts/Inter-Regular.ttf")) pathTime = "assets/fonts/Inter-Regular.ttf";
+  else if (FileExists("../assets/fonts/Inter-Regular.ttf")) pathTime = "../assets/fonts/Inter-Regular.ttf";
+
+  if (pathTime) {
+    UNX_LOG_INFO("[FONTS] Loading time counter font from file: %s", pathTime);
+    timeFace = LoadFontEx(pathTime, fontSize, 0, 0);
+  }
+  if (timeFace.texture.id == 0) {
+    UNX_LOG_INFO("[FONTS] Loading time counter font (Inter Regular) from memory bundle...");
+    timeFace = LoadFontFromMemory(".ttf", font_inter_regular, font_inter_regular_size, fontSize, 0, 0);
+  }
+
+  UNX_LOG_INFO("[FONTS] Result: Default ID=%u, Bold ID=%u, Time ID=%u", defaultFace.texture.id, boldFace.texture.id, timeFace.texture.id);
 
   if (defaultFace.texture.id == 0) {
-#ifdef _WIN32
-    const char *winFont = "C:/Windows/Fonts/arial.ttf";
-    defaultFace = LoadFontEx(winFont, 64, 0, 0);
-#endif
-    if (defaultFace.texture.id == 0) {
-      printf("[FONT] Failed to load fonts, using default raylib font\n");
-      defaultFace = GetFontDefault();
-    }
+    defaultFace = GetFontDefault();
   }
-
   if (boldFace.texture.id == 0) {
-#ifdef _WIN32
-    const char *winBold = "C:/Windows/Fonts/arialbd.ttf";
-    boldFace = LoadFontEx(winBold, 64, 0, 0);
-#endif
-    if (boldFace.texture.id == 0) {
-      boldFace = defaultFace; // Fallback to regular if bold fails
-    }
+    boldFace = defaultFace;
+  }
+  if (timeFace.texture.id == 0) {
+    timeFace = defaultFace;
   }
 
   // Common Unicode ranges for Font Awesome 5/6 (PUA range)
@@ -127,6 +136,9 @@ void UIFonts_Unload(void) {
   if (boldFace.texture.id != 0 && boldFace.texture.id != defaultFace.texture.id) {
     UnloadFont(boldFace);
   }
+  if (timeFace.texture.id != 0 && timeFace.texture.id != defaultFace.texture.id && timeFace.texture.id != boldFace.texture.id) {
+    UnloadFont(timeFace);
+  }
   if (iconSolid.texture.id != 0) UnloadFont(iconSolid);
   if (iconRegular.texture.id != 0) UnloadFont(iconRegular);
   if (iconBrand.texture.id != 0) UnloadFont(iconBrand);
@@ -140,6 +152,11 @@ Font UIFonts_GetFace(float size) {
 Font UIFonts_GetBoldFace(float size) {
   (void)size;
   return boldFace;
+}
+
+Font UIFonts_GetTimeFace(float size) {
+  (void)size;
+  return timeFace;
 }
 
 Font UIFonts_GetIcon(float size) {

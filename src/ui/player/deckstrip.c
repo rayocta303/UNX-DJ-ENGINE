@@ -197,8 +197,6 @@ static void DeckStrip_Draw(Component *base) {
 
   Font faceXXS = UIFonts_GetFace(S(7));
   Font faceMd = UIFonts_GetFace(S(11));
-  Font faceLg = UIFonts_GetFace(S(18));
-  Font faceSub = UIFonts_GetFace(S(13));
   Font faceBPM = UIFonts_GetFace(S(20));
 
   float lColW = S(40);
@@ -282,13 +280,16 @@ static void DeckStrip_Draw(Component *base) {
     sprintf(timeStr, "%02d:%02d", minutes, seconds);
   }
 
-  float timeValY = midY + S(9);
-  UIDrawText(timeStr, faceLg, timeX, timeValY, S(18), ColorWhite);
+  Font faceTime = UIFonts_GetTimeFace(S(18));
+  Font faceTimeSub = UIFonts_GetTimeFace(S(13));
 
-  float wM = MeasureTextEx(faceLg, timeStr, S(18), 1).x;
+  float timeValY = midY + S(9);
+  UIDrawText(timeStr, faceTime, timeX, timeValY, S(18), ColorWhite);
+
+  float wM = MeasureTextEx(faceTime, timeStr, S(18), 1).x;
   char subStr[8];
   sprintf(subStr, ".%03d", subSec);
-  UIDrawText(subStr, faceSub, timeX + wM + S(2), timeValY + S(4), S(13),
+  UIDrawText(subStr, faceTimeSub, timeX + wM + S(2), timeValY + S(4), S(13),
              ColorPaper);
 
   float bpmBoxW = S(56);

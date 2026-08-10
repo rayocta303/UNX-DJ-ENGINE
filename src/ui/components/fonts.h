@@ -17,6 +17,8 @@ void UIFonts_Unload(void);
 Font UIFonts_GetFace(float size);
 // Returns bold version of the UI face
 Font UIFonts_GetBoldFace(float size);
+// Returns font configured for time counter
+Font UIFonts_GetTimeFace(float size);
 // Returns standard raylib font configured for solid icon face
 Font UIFonts_GetIcon(float size);
 // Returns standard raylib font configured for regular icon face

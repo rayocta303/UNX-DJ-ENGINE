@@ -20,6 +20,9 @@ EOF
 ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Free-Solid-900.otf" src/ui/components/assets_bundle.h font_awesome_solid append
 ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Free-Regular-400.otf" src/ui/components/assets_bundle.h font_awesome_regular append
 ./tools/bin2c "assets/fonts/otfs/Font Awesome 5 Brands-Regular-400.otf" src/ui/components/assets_bundle.h font_awesome_brand append
+./tools/bin2c "assets/fonts/nexa/Nexa-ExtraLight.ttf" src/ui/components/assets_bundle.h font_nexa_extralight append
+./tools/bin2c "assets/fonts/nexa/Nexa-Heavy.ttf" src/ui/components/assets_bundle.h font_nexa_heavy append
+./tools/bin2c "assets/fonts/Inter-Regular.ttf" src/ui/components/assets_bundle.h font_inter_regular append
 ./tools/bin2c "assets/splash.png" src/ui/components/assets_bundle.h unx_logo append
 ./tools/bin2c "assets/icons/crown.png" src/ui/components/assets_bundle.h icon_crown append
 ./tools/bin2c "assets/icons/star.png" src/ui/components/assets_bundle.h icon_star append
