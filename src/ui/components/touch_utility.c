@@ -41,16 +41,13 @@ void TouchScroll_Update(TouchScroll *ts, float maxScroll, float dt) {
             ts->Velocity = 0.0f;
         }
 
-        // Overscroll Rubber-banding / Elastic Springback
+        // Strict Boundary Clamping (No overscroll bounce / sembul / pantul)
         if (ts->Scroll < 0.0f) {
-            ts->Scroll = ts->Scroll * (1.0f - 12.0f * dt);
-            ts->Velocity *= 0.5f;
-            if (fabsf(ts->Scroll) < 0.5f) ts->Scroll = 0.0f;
+            ts->Scroll = 0.0f;
+            ts->Velocity = 0.0f;
         } else if (ts->Scroll > maxScroll) {
-            float diff = ts->Scroll - maxScroll;
-            ts->Scroll = maxScroll + diff * (1.0f - 12.0f * dt);
-            ts->Velocity *= 0.5f;
-            if (fabsf(ts->Scroll - maxScroll) < 0.5f) ts->Scroll = maxScroll;
+            ts->Scroll = maxScroll;
+            ts->Velocity = 0.0f;
         }
     }
 

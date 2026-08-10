@@ -1359,13 +1359,17 @@ static int Browser_Update(Component *base) {
         }
 
         if (s->IsDragging || s->TouchDragAccumulator > S(2.0f)) {
-          float resistance = 1.0f;
-          if (s->VisualScroll < 0 && dy > 0) resistance = 0.3f;
-          if (s->VisualScroll > maxScroll && dy < 0) resistance = 0.3f;
-
-          s->VisualScroll -= dy * resistance;
-          float instantVel = (-dy * resistance) / frameTime;
-          s->TouchVelocityY = s->TouchVelocityY * 0.3f + instantVel * 0.7f;
+          s->VisualScroll -= dy;
+          if (s->VisualScroll < 0.0f) {
+            s->VisualScroll = 0.0f;
+            s->TouchVelocityY = 0.0f;
+          } else if (s->VisualScroll > maxScroll) {
+            s->VisualScroll = maxScroll;
+            s->TouchVelocityY = 0.0f;
+          } else {
+            float instantVel = -dy / frameTime;
+            s->TouchVelocityY = s->TouchVelocityY * 0.3f + instantVel * 0.7f;
+          }
         }
       }
     } else {
@@ -1374,18 +1378,13 @@ static int Browser_Update(Component *base) {
       s->ScrollVelocity *= 0.95f; // Friction
       if (fabsf(s->ScrollVelocity) < 5.0f) s->ScrollVelocity = 0.0f;
 
-      // Elastic Bungee Return (Spring-back) - NAV-08 FIX: reset velocity when spring activates
-      float springK = 14.0f; 
-      if (s->VisualScroll < 0) {
+      // Strict Boundary Clamping (No overscroll bounce / sembul / pantul)
+      if (s->VisualScroll < 0.0f) {
+        s->VisualScroll = 0.0f;
         s->ScrollVelocity = 0.0f;
-        s->VisualScroll -= s->VisualScroll * springK * GetFrameTime();
-        if (fabsf(s->VisualScroll) < 0.5f) s->VisualScroll = 0.0f;
-      }
-      if (s->VisualScroll > maxScroll) {
+      } else if (s->VisualScroll > maxScroll) {
+        s->VisualScroll = maxScroll;
         s->ScrollVelocity = 0.0f;
-        float diff = s->VisualScroll - maxScroll;
-        s->VisualScroll -= diff * springK * GetFrameTime();
-        if (fabsf(s->VisualScroll - maxScroll) < 0.5f) s->VisualScroll = maxScroll;
       }
     }
 
@@ -1404,9 +1403,9 @@ static int Browser_Update(Component *base) {
       s->ScrollVelocity = 0.0f; 
     }
 
-    // Constraints for interaction safety
-    if (s->VisualScroll < -S(120)) s->VisualScroll = -S(120);
-    if (s->VisualScroll > maxScroll + S(120)) s->VisualScroll = maxScroll + S(120);
+    // Constraints for interaction safety (Strict boundary clamping - No overscroll bounce)
+    if (s->VisualScroll < 0.0f) s->VisualScroll = 0.0f;
+    if (s->VisualScroll > maxScroll) s->VisualScroll = maxScroll;
 
     // Sync back to discrete offsets for logic compatibility
     s->ScrollOffset = (int)(s->VisualScroll / rowH);

@@ -560,16 +560,18 @@ static int Settings_Update(Component *base) {
     }
 
     if (r->State->IsDragging || r->State->TouchDragAccumulator > S(2.0f)) {
-      float resistance = 1.0f;
-      if (r->State->VisualScroll < 0 && dy > 0)
-        resistance = 0.3f;
-      if (r->State->VisualScroll > maxScroll && dy < 0)
-        resistance = 0.3f;
-
-      r->State->VisualScroll -= dy * resistance;
-      float instantVel = (-dy * resistance) / frameTime;
-      r->State->TouchVelocityY =
-          r->State->TouchVelocityY * 0.3f + instantVel * 0.7f;
+      r->State->VisualScroll -= dy;
+      if (r->State->VisualScroll < 0.0f) {
+        r->State->VisualScroll = 0.0f;
+        r->State->TouchVelocityY = 0.0f;
+      } else if (r->State->VisualScroll > maxScroll) {
+        r->State->VisualScroll = maxScroll;
+        r->State->TouchVelocityY = 0.0f;
+      } else {
+        float instantVel = -dy / frameTime;
+        r->State->TouchVelocityY =
+            r->State->TouchVelocityY * 0.3f + instantVel * 0.7f;
+      }
     }
   } else {
     // Kinetic Inertia Decay (Smooth Flick)
@@ -578,19 +580,13 @@ static int Settings_Update(Component *base) {
     if (fabsf(r->State->ScrollVelocity) < 5.0f)
       r->State->ScrollVelocity = 0.0f;
 
-    // Elastic Bungee Return
-    float springK = 14.0f;
-    if (r->State->VisualScroll < 0) {
-      r->State->VisualScroll -=
-          r->State->VisualScroll * springK * GetFrameTime();
-      if (fabsf(r->State->VisualScroll) < 0.5f)
-        r->State->VisualScroll = 0.0f;
-    }
-    if (r->State->VisualScroll > maxScroll) {
-      float diff = r->State->VisualScroll - maxScroll;
-      r->State->VisualScroll -= diff * springK * GetFrameTime();
-      if (fabsf(r->State->VisualScroll - maxScroll) < 0.5f)
-        r->State->VisualScroll = maxScroll;
+    // Strict Boundary Clamping (No overscroll bounce / sembul / pantul)
+    if (r->State->VisualScroll < 0.0f) {
+      r->State->VisualScroll = 0.0f;
+      r->State->ScrollVelocity = 0.0f;
+    } else if (r->State->VisualScroll > maxScroll) {
+      r->State->VisualScroll = maxScroll;
+      r->State->ScrollVelocity = 0.0f;
     }
   }
 
