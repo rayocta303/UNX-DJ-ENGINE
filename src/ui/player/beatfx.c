@@ -169,7 +169,8 @@ static int BeatFX_Update(Component *base) {
         }
     }
 
-    // Zoom buttons interaction
+    // --- ZOOM BUTTONS (COMMENTED OUT) ---
+    /*
     float plusMinusY = b->FXButton.y + b->FXButton.height + S(12) + S(18);
     float halfB = (w - S(12)) / 2;
     Rectangle minusRect = { x + S(4), plusMinusY, halfB, S(14) };
@@ -200,6 +201,7 @@ static int BeatFX_Update(Component *base) {
             }
         }
     }
+    */
 
     return 0;
 }
@@ -227,12 +229,12 @@ static void BeatFX_Draw(Component *base) {
 
     // 1. FX Name Select
     const char* fxName = AllFXNames[b->State->SelectedFX % ALL_FX_COUNT];
-    DrawRectangle(x + S(4), cy, w - S(8), S(34), ColorBlack);
-    DrawRectangleLinesEx((Rectangle){x + S(4), cy, w - S(8), S(34)}, 1.0f, ColorWhite);
-    DrawCentredText(fxName, faceLg, x + S(4), w - S(8), cy + S(11), S(12), ColorWhite);
-    DrawTriangle((Vector2){x + w - S(14), cy + S(15)}, (Vector2){x + w - S(8), cy + S(15)}, (Vector2){x + w - S(11), cy + S(21)}, ColorWhite);
+    DrawRectangle(x + S(4), cy, w - S(8), S(28), ColorBlack);
+    DrawRectangleLinesEx((Rectangle){x + S(4), cy, w - S(8), S(28)}, 1.0f, ColorWhite);
+    DrawCentredText(fxName, faceLg, x + S(4), w - S(8), cy + S(8), S(12), ColorWhite);
+    DrawTriangle((Vector2){x + w - S(14), cy + S(12)}, (Vector2){x + w - S(8), cy + S(12)}, (Vector2){x + w - S(11), cy + S(18)}, ColorWhite);
     
-    cy += S(38); // FX button(34) + gap(4)
+    cy += S(32); // FX button(28) + gap(4)
 
     // 2. CH SELECT
     DrawCentredText("CH SELECT", faceXXS, x, w, cy, S(7), ColorShadow);
@@ -242,12 +244,12 @@ static void BeatFX_Draw(Component *base) {
     if (b->State->SelectedChannel == 1) chName = "DECK 1";
     if (b->State->SelectedChannel == 2) chName = "DECK 2";
     
-    DrawRectangle(x + S(4), cy, w - S(8), S(26), ColorDark3);
-    DrawRectangleLines(x + S(4), cy, w - S(8), S(26), ColorDark1);
-    DrawCentredText(chName, faceSm, x + S(4), w - S(8), cy + S(8.5f), S(9), ColorWhite);
-    DrawTriangle((Vector2){x + w - S(12), cy + S(11)}, (Vector2){x + w - S(6), cy + S(11)}, (Vector2){x + w - S(9), cy + S(17)}, ColorWhite);
+    DrawRectangle(x + S(4), cy, w - S(8), S(22), ColorDark3);
+    DrawRectangleLines(x + S(4), cy, w - S(8), S(22), ColorDark1);
+    DrawCentredText(chName, faceSm, x + S(4), w - S(8), cy + S(6.5f), S(9), ColorWhite);
+    DrawTriangle((Vector2){x + w - S(12), cy + S(9)}, (Vector2){x + w - S(6), cy + S(9)}, (Vector2){x + w - S(9), cy + S(15)}, ColorWhite);
     
-    cy += S(32); // CH button(26) + gap(6)
+    cy += S(28); // CH button(22) + gap(6)
 
 
     // 3. Black parameter container
@@ -343,7 +345,7 @@ static void BeatFX_Draw(Component *base) {
     cy += rowH + S(12);
 
     // 3.5 FX ON / OFF Toggle
-    float btnH = S(22);
+    float btnH = S(18);
     float btnW = w - S(8); 
     
     b->FXButton = (Rectangle){ x + S(4), cy, btnW, btnH };
@@ -354,11 +356,12 @@ static void BeatFX_Draw(Component *base) {
     DrawRectangleLinesEx(b->FXButton, 1.0f, ColorWhite);
     
     const char* fxBtnText = b->State->IsFXOn ? "BEAT FX ON" : "BEAT FX OFF";
-    DrawCentredText(fxBtnText, faceSm, b->FXButton.x, b->FXButton.width, b->FXButton.y + S(6.5f), S(9), ColorWhite);
+    DrawCentredText(fxBtnText, faceSm, b->FXButton.x, b->FXButton.width, b->FXButton.y + S(5.0f), S(9), ColorWhite);
     
     cy += btnH + S(12);
 
-    // 4. ZOOM / GRID
+    // --- ZOOM / GRID BUTTONS (COMMENTED OUT) ---
+    /*
     float halfB = (w - S(12)) / 2;
     DrawRectangle(x + S(4), cy, halfB, S(14), ColorBlue);
     DrawCentredText("ZOOM", faceXXS, x + S(4), halfB, cy + S(3.5f), S(7), ColorWhite);
@@ -376,6 +379,7 @@ static void BeatFX_Draw(Component *base) {
     DrawRectangle(x + S(8) + halfB, cy, halfB, S(14), ColorDark2);
     DrawRectangleLines(x + S(8) + halfB, cy, halfB, S(14), ColorShadow);
     DrawCentredText("+", faceSm, x + S(8) + halfB, halfB, cy + S(2.5f), S(9), ColorWhite);
+    */
 
     cy = y + h - S(18); // Bottom alignment
 

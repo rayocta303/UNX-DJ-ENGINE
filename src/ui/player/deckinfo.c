@@ -71,12 +71,12 @@ static int DeckInfo_Update(Component *base) {
         strcpy(d->State->TrackKey, "");
     }
 
-    // 2. Utility Buttons (2 Rows x 2 Columns Grid)
+    // 2. Utility Buttons (2 Rows x 2 Columns Grid) - ENLARGED
     float utilY = contentY + statusH + S(5);
     float utilGap = S(4.0f);
     float utilW = (deckInfoW - margin * 2 - utilGap) / 2.0f;
-    float utilH = S(14);
-    float utilY2 = utilY + utilH + S(3.0f);
+    float utilH = S(24); // Enlarged from S(14) to S(24)
+    float utilY2 = utilY + utilH + S(6.0f); // Increased gap to match
 
     // Row 1: Master (Top-Left), Sync (Top-Right)
     Rectangle msRect = { margin, utilY, utilW, utilH };
@@ -100,7 +100,8 @@ static int DeckInfo_Update(Component *base) {
         d->State->VinylModeEnabled = !d->State->VinylModeEnabled;
     }
 
-    // 3. Main Controls
+    // --- 3. Main Controls (CUE / PLAY) COMMENTED OUT ---
+    /*
     Rectangle cueRect = { margin, btnY, btnW, btnH };
     
     if (CheckCollisionPointRec(UIGetMousePosition(), cueRect)) {
@@ -160,6 +161,7 @@ static int DeckInfo_Update(Component *base) {
             d->State->IsPlaying = targetPlaying;
         }
     }
+    */
 
     return 0;
 }
@@ -283,20 +285,20 @@ static void DeckInfo_Draw(Component *base) {
     }
     UIDrawText(barsVal, faceSm, col2X + S(2), contentY + S(11), S(10), d->ID == 0 ? ColorOrange : ColorWhite);
 
-    // --- Row 2: Utility Buttons (2 Rows x 2 Columns Grid) ---
+    // --- Row 2: Utility Buttons (2 Rows x 2 Columns Grid) - ENLARGED ---
     float utilY = contentY + statusH + S(5);
     float utilGap = S(4.0f);
     float utilW = (deckInfoW - margin * 2 - utilGap) / 2.0f;
-    float utilH = S(14);
-    float utilY2 = utilY + utilH + S(3.0f);
+    float utilH = S(24); // Enlarged from S(14)
+    float utilY2 = utilY + utilH + S(6.0f); // Increased gap
 
     // 1. Master (Top-Left)
     Rectangle msRect = { margin, utilY, utilW, utilH };
     DrawRectangleRec(msRect, d->State->IsMaster ? Fade(ColorOrange, 0.3f) : ColorDark1);
     DrawRectangleLinesEx(msRect, S(1), d->State->IsMaster ? ColorOrange : ColorShadow);
     const char *msLbl = "MASTER";
-    Vector2 msSz = MeasureTextEx(faceXXS, msLbl, S(7), 1);
-    UIDrawText(msLbl, faceXXS, msRect.x + (utilW - msSz.x)/2.0f, msRect.y + S(3.5f), S(7), d->State->IsMaster ? ColorOrange : ColorShadow);
+    Vector2 msSz = MeasureTextEx(faceSm, msLbl, S(9), 1);
+    UIDrawText(msLbl, faceSm, msRect.x + (utilW - msSz.x)/2.0f, msRect.y + (utilH - S(9))/2.0f, S(9), d->State->IsMaster ? ColorOrange : ColorShadow);
 
     // 2. Sync (Top-Right)
     Rectangle syRect = { margin + utilW + utilGap, utilY, utilW, utilH };
@@ -310,16 +312,16 @@ static void DeckInfo_Draw(Component *base) {
     DrawRectangleRec(syRect, syncActive ? Fade(syncColor, 0.3f) : ColorDark1);
     DrawRectangleLinesEx(syRect, S(1), syncActive ? syncColor : ColorShadow);
     const char *syncLbl = (d->State->SyncMode == 2) ? "BEAT SYNC" : ((d->State->SyncMode == 1) ? "BPM SYNC" : "SYNC");
-    Vector2 syncSz = MeasureTextEx(faceXXS, syncLbl, S(7), 1);
-    UIDrawText(syncLbl, faceXXS, syRect.x + (utilW - syncSz.x)/2.0f, syRect.y + S(3.5f), S(7), syncActive ? ColorWhite : ColorShadow);
+    Vector2 syncSz = MeasureTextEx(faceSm, syncLbl, S(9), 1);
+    UIDrawText(syncLbl, faceSm, syRect.x + (utilW - syncSz.x)/2.0f, syRect.y + (utilH - S(9))/2.0f, S(9), syncActive ? ColorWhite : ColorShadow);
 
     // 3. MT (Bottom-Left)
     Rectangle mtRect = { margin, utilY2, utilW, utilH };
     DrawRectangleRec(mtRect, d->State->MasterTempo ? Fade(ColorRed, 0.3f) : ColorDark1);
     DrawRectangleLinesEx(mtRect, S(1), d->State->MasterTempo ? ColorRed : ColorShadow);
     const char *mtLbl = d->State->MasterTempo ? "MT (ON)" : "MT (OFF)";
-    Vector2 mtSz = MeasureTextEx(faceXXS, mtLbl, S(7), 1);
-    UIDrawText(mtLbl, faceXXS, mtRect.x + (utilW - mtSz.x)/2.0f, mtRect.y + S(3.5f), S(7), d->State->MasterTempo ? ColorWhite : ColorShadow);
+    Vector2 mtSz = MeasureTextEx(faceSm, mtLbl, S(9), 1);
+    UIDrawText(mtLbl, faceSm, mtRect.x + (utilW - mtSz.x)/2.0f, mtRect.y + (utilH - S(9))/2.0f, S(9), d->State->MasterTempo ? ColorWhite : ColorShadow);
 
     // 4. Vinyl / CDJ Mode (Bottom-Right)
     Rectangle viRect = { margin + utilW + utilGap, utilY2, utilW, utilH };
@@ -328,10 +330,11 @@ static void DeckInfo_Draw(Component *base) {
     DrawRectangleRec(viRect, Fade(viColor, 0.3f));
     DrawRectangleLinesEx(viRect, S(1), viColor);
     const char *viLbl = vinylOn ? "VINYL" : "CDJ";
-    Vector2 viSz = MeasureTextEx(faceXXS, viLbl, S(7), 1);
-    UIDrawText(viLbl, faceXXS, viRect.x + (utilW - viSz.x)/2.0f, viRect.y + S(3.5f), S(7), ColorWhite);
+    Vector2 viSz = MeasureTextEx(faceSm, viLbl, S(9), 1);
+    UIDrawText(viLbl, faceSm, viRect.x + (utilW - viSz.x)/2.0f, viRect.y + (utilH - S(9))/2.0f, S(9), ColorWhite);
 
-    // --- Row 3: Main Controls (Cue, Play) ---
+    // --- Row 3: Main Controls (Cue, Play) COMMENTED OUT ---
+    /*
     float btnH = S(26);
     float btnY = y + deckInfoH - btnH - S(6);
     float btnW = (deckInfoW - margin * 2 - S(6)) / 2.0f;
@@ -353,6 +356,7 @@ static void DeckInfo_Draw(Component *base) {
     DrawRectangleLinesEx(playRect, S(1), isPlaying ? ColorGreen : ColorShadow);
     if (hoverPlay) DrawRectangleLinesEx(playRect, S(1.5f), ColorWhite);
     UIDrawText(isPlaying ? "\uf04c" : "\uf04b", faceIcon, playRect.x + (btnW - S(10))/2.0f, playRect.y + S(8), S(11), isPlaying ? ColorWhite : ColorShadow);
+    */
 }
 
 void DeckInfoPanel_Init(DeckInfoPanel *p, int id, DeckState *state, AudioEngine *engine) {
