@@ -224,7 +224,7 @@ static void Mixer_Draw(Component *base) {
   DrawRectangle(leftX, panelY, colFXW, panelH, (Color){20, 20, 20, 255});
   DrawRectangleLinesEx((Rectangle){leftX, panelY, colFXW, panelH}, 1.0f, ColorDark1);
   float fxY = panelY + S(12);
-  DrawCentredText("SOUND COLOR FX", fTiny, leftX, colFXW, fxY, S(7), ColorShadow);
+  DrawCentredText("SOUND COLOR FX", fSub, leftX, colFXW, fxY, S(9), ColorShadow);
   
   float cfy = fxY + S(14);
   char *cfxNames[] = {"SPACE", "DUB ECHO", "SWEEP", "NOISE", "FILTER", "JET"};
@@ -371,20 +371,26 @@ static void Mixer_Draw(Component *base) {
   HandleKnob(r->State, &eng->MasterVolume, rightX + colRightW / 2.0f, masterKnobY, S(15), 0.0f, 2.0f, true, mousePos, mDown);
 
   float bfxY = masterKnobY + S(40);
-  DrawCentredText("BEAT FX", fTiny, rightX, colRightW, bfxY, S(7), ColorShadow);
+  DrawCentredText("BEAT FX", fSub, rightX, colRightW, bfxY, S(9), ColorShadow);
   
   const char *bfxNames[] = {"DELAY", "ECHO", "P-PONG", "SPIRAL", "REVERB", "TRANS", "FILTER", "FLANGER", "PHASER", "PITCH", "SLIPROLL", "ROLL", "BRAKE", "HELIX"};
-  float bSelectorY = bfxY + S(12);
-  DrawRectangle(rightX + S(10), bSelectorY, colRightW - S(20), S(18), ColorBlack);
-  DrawCentredText(bfxNames[fxs->SelectedFX % 14], fSub, rightX, colRightW, bSelectorY + S(4), S(9), ColorWhite);
-  if (UICheckClick((Rectangle){rightX + S(10), bSelectorY, colRightW - S(20), S(18)})) {
+  float bSelectorY = bfxY + S(15);
+  Rectangle fxSelRect = {rightX + S(10), bSelectorY, colRightW - S(20), S(26)};
+  DrawRectangleRec(fxSelRect, ColorBlack);
+  DrawRectangleLinesEx(fxSelRect, 1.0f, ColorWhite);
+  DrawCentredText(bfxNames[fxs->SelectedFX % 14], fSub, rightX, colRightW, bSelectorY + S(8), S(9), ColorWhite);
+  if (UICheckClick(fxSelRect)) {
       fxs->SelectedFX = (fxs->SelectedFX + 1) % 14;
       BeatFXManager_SetFX(&eng->BeatFX, fxs->SelectedFX);
   }
 
-  float targetY = bSelectorY + S(24);
+  float targetY = bSelectorY + S(32);
   const char *targetNames[] = {"MASTER", "CH 1", "CH 2"};
-  if (DrawFXButton(targetNames[fxs->SelectedChannel % 3], rightX + S(10), targetY, colRightW - S(20), S(18), false)) {
+  Rectangle chSelRect = {rightX + S(10), targetY, colRightW - S(20), S(26)};
+  DrawRectangleRec(chSelRect, ColorBlack);
+  DrawRectangleLinesEx(chSelRect, 1.0f, ColorWhite);
+  DrawCentredText(targetNames[fxs->SelectedChannel % 3], fSub, rightX, colRightW, targetY + S(8), S(9), ColorOrange);
+  if (UICheckClick(chSelRect)) {
       fxs->SelectedChannel = (fxs->SelectedChannel + 1) % 3;
   }
 
