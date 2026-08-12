@@ -65,7 +65,6 @@ bool Touch_CheckPress(Rectangle rect, float padding);
 
 // Reset global touch debounce timer
 void Touch_ResetGlobalDebounce(void);
-void Touch_ConsumeInput(void);
 float Touch_GetDragDistance(void);
 Vector2 Touch_GetStartPos(void);
 

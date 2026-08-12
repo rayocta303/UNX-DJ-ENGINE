@@ -63,11 +63,6 @@ TouchState TouchInput_GetState(void) {
     return g_touchState;
 }
 
-void Touch_ConsumeInput(void) {
-    g_touchState = TOUCH_STATE_IDLE;
-    Touch_ResetGlobalDebounce();
-}
-
 float Touch_GetDragDistance(void) {
     return g_dragDist;
 }
