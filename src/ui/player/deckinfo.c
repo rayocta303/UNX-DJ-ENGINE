@@ -121,7 +121,7 @@ static int DeckInfo_Update(Component *base) {
             } else {
                 // While paused: Set new cue point (quantized if enabled)
                 if (d->State->QuantizeEnabled && d->State->LoadedTrack) {
-                    d->State->MainCueMs = Quantize_GetNearestBeatMs(d->State->LoadedTrack, d->State->PositionMs);
+                    d->State->MainCueMs = Quantize_GetNearestBeatMs(d->State->LoadedTrack, d->State->PositionMs, Quantize_GetDivisor(d->State->Waveform.QuantizeResolution));
                 } else {
                     d->State->MainCueMs = d->State->PositionMs;
                 }

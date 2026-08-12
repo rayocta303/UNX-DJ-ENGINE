@@ -58,23 +58,26 @@ void Sync_Update(DeckState *deckA, DeckState *deckB, AudioEngine *audioEngine) {
     double multiplier = Sync_DetermineBpmMultiplier(follower->OriginalBPM, master->CurrentBPM);
     float targetTempoPercent = ((master->CurrentBPM * multiplier / follower->OriginalBPM) - 1.0f) * 100.0f;
     
-    // Check if jogwheel manipulation or touch is active on follower or master
+    // Check if jogwheel manipulation or touch is active on follower
     int followerIdx = (follower->ID == 0) ? 0 : 1;
-    bool isJogActive = (follower->IsTouching || master->IsTouching || follower->JogDelta != 0);
+    bool isJogActive = (follower->IsTouching || follower->JogDelta != 0);
     if (audioEngine) {
         if (fabs(audioEngine->Decks[followerIdx].JogRate) > 0.005f) {
             isJogActive = true;
         }
     }
 
-    // When nudge / jog touch is triggered, release Beat Sync and downgrade to BPM Sync
+    // When nudge / jog touch is triggered on follower, release Beat Sync and downgrade to BPM Sync
     if (follower->SyncMode == 2 && isJogActive) {
         follower->SyncMode = 1;
         follower->LastPhaseAdjustment = 0.0f;
     }
 
     // 2. Phase Sync (Beat Snap) - Only active in BEAT SYNC mode (SyncMode == 2)
-    if (follower->SyncMode == 2 && follower->IsPlaying && follower->LoadedTrack && master->LoadedTrack) {
+    // Temporarily bypass phase tracking if either deck is being scrubbed/previewed to prevent erratic snapping
+    bool isPreviewing = (follower->IsPreviewing || master->IsPreviewing || master->IsTouching);
+    
+    if (follower->SyncMode == 2 && follower->IsPlaying && !isPreviewing && follower->LoadedTrack && master->LoadedTrack) {
         double masterDist = Quantize_GetBeatDistance(master->LoadedTrack, master->PositionMs);
         double followerDist = Quantize_GetBeatDistance(follower->LoadedTrack, follower->PositionMs);
         

@@ -2,30 +2,55 @@
 #include <stdlib.h>
 #include <math.h>
 
-int64_t Quantize_GetNearestBeatMs(TrackState *track, int64_t currentMs) {
+int Quantize_GetDivisor(int resolution) {
+    if (resolution == 0) return 8;
+    if (resolution == 1) return 4;
+    if (resolution == 2) return 2;
+    return 1;
+}
+
+int64_t Quantize_GetNearestBeatMs(TrackState *track, int64_t currentMs, int divisor) {
     if (!track || track->Analysis.BeatGridCount == 0 || !track->Analysis.BeatGrid) return currentMs;
+    if (divisor < 1) divisor = 1;
     
-    // Find closest beat in BeatGrid array
-    int64_t closestBeatMs = (int64_t)track->Analysis.BeatGrid[0].Time;
-    int64_t minDiff = llabs(currentMs - closestBeatMs);
+    int64_t closestMs = (int64_t)track->Analysis.BeatGrid[0].Time;
+    int64_t minDiff = llabs(currentMs - closestMs);
     
-    for (int i = 1; i < track->Analysis.BeatGridCount; i++) {
-        int64_t diff = llabs(currentMs - (int64_t)track->Analysis.BeatGrid[i].Time);
-        if (diff < minDiff) {
-            minDiff = diff;
-            closestBeatMs = (int64_t)track->Analysis.BeatGrid[i].Time;
-        } else if (diff > minDiff) {
-            // Since BeatGrid is sorted, distance starts increasing after we pass the minimum
-            break; 
+    for (int i = 0; i < track->Analysis.BeatGridCount; i++) {
+        int64_t beatStart = (int64_t)track->Analysis.BeatGrid[i].Time;
+        int64_t beatEnd = beatStart;
+        if (i < track->Analysis.BeatGridCount - 1) {
+            beatEnd = (int64_t)track->Analysis.BeatGrid[i+1].Time;
+        } else if (i > 0) {
+            beatEnd = beatStart + (beatStart - (int64_t)track->Analysis.BeatGrid[i-1].Time);
+        } else {
+            beatEnd = beatStart + 500;
+        }
+        
+        int64_t beatLen = beatEnd - beatStart;
+        if (beatLen <= 0) continue;
+        
+        double segmentLen = (double)beatLen / (double)divisor;
+        
+        for (int j = 0; j < divisor; j++) {
+            int64_t subBeatTime = beatStart + (int64_t)(j * segmentLen);
+            int64_t diff = llabs(currentMs - subBeatTime);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestMs = subBeatTime;
+            }
+        }
+        if (beatStart > currentMs + beatLen) {
+             break;
         }
     }
     
-    return closestBeatMs;
+    return closestMs;
 }
 
 int32_t Quantize_GetPhaseErrorMs(TrackState *track, int64_t currentMs) {
     if (!track || track->Analysis.BeatGridCount == 0 || !track->Analysis.BeatGrid) return 0;
-    int64_t nearest = Quantize_GetNearestBeatMs(track, currentMs);
+    int64_t nearest = Quantize_GetNearestBeatMs(track, currentMs, 1);
     return (int32_t)(currentMs - nearest);
 }
 

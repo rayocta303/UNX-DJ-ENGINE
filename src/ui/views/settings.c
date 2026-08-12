@@ -28,69 +28,67 @@ static int Settings_Update(Component *base) {
   }
 
   if (r->State->IsSystemInfoOpen) {
-    if (Input_IsReleased() && Input_GetDragDistance() < S(10.0f)) {
-      Vector2 mouse = Input_GetPointerPos();
-      float winW = GetScreenWidth();
-      float winH = GetScreenHeight() - DECK_STR_H;
-      float modalW = S(360.0f);
-      float modalH = S(265.0f);
-      float modalX = (winW - modalW) / 2.0f;
-      float modalY = (winH - modalH) / 2.0f;
+    float winW = GetScreenWidth();
+    float winH = GetScreenHeight() - DECK_STR_H;
+    float modalW = S(360.0f);
+    float modalH = S(265.0f);
+    float modalX = (winW - modalW) / 2.0f;
+    float modalY = (winH - modalH) / 2.0f;
+    Rectangle modalRect = {modalX, modalY, modalW, modalH};
 
-      Rectangle closeBtn = {modalX + modalW - S(32.0f), modalY + S(3.0f),
-                            S(28.0f), S(24.0f)};
-      Rectangle okBtn = {modalX + (modalW - S(100.0f)) / 2.0f,
-                         modalY + modalH - S(34.0f), S(100.0f), S(26.0f)};
+    Rectangle closeBtn = {modalX + modalW - S(32.0f), modalY + S(3.0f), S(28.0f), S(24.0f)};
+    Rectangle okBtn = {modalX + (modalW - S(100.0f)) / 2.0f, modalY + modalH - S(34.0f), S(100.0f), S(26.0f)};
 
-      if (CheckCollisionPointRec(mouse, closeBtn) ||
-          CheckCollisionPointRec(mouse, okBtn) ||
-          !CheckCollisionPointRec(
-              mouse, (Rectangle){modalX, modalY, modalW, modalH})) {
-        r->State->IsSystemInfoOpen = false;
-        Input_Consume();
-        return 1;
-      }
+    if (Input_CheckClick(closeBtn) || Input_CheckClick(okBtn)) {
+      r->State->IsSystemInfoOpen = false;
+      Input_Consume();
+      return 1;
+    }
+    
+    if (Input_CheckClick((Rectangle){0, 0, 9999, 9999}) && !CheckCollisionPointRec(Input_GetPointerPos(), modalRect)) {
+      r->State->IsSystemInfoOpen = false;
+      Input_Consume();
+      return 1;
     }
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) ||
         IsKeyPressed(KEY_ENTER)) {
       r->State->IsSystemInfoOpen = false;
       return 1;
     }
+    if (Input_IsReleased() || Input_IsDown() || Input_IsPressed()) Input_Consume();
     return 1;
   }
 
   // --- CONFIRMATION POPUP HANDLER ---
   if (r->State->IsConfirmPopupOpen) {
-    if (Input_IsReleased() && Input_GetDragDistance() < S(10.0f)) {
-      Vector2 mouse = Input_GetPointerPos();
-      float winW = GetScreenWidth();
-      float winH = GetScreenHeight() - DECK_STR_H;
-      float modalW = S(320.0f);
-      float modalH = S(160.0f);
-      float modalX = (winW - modalW) / 2.0f;
-      float modalY = (winH - modalH) / 2.0f;
+    float winW = GetScreenWidth();
+    float winH = GetScreenHeight() - DECK_STR_H;
+    float modalW = S(320.0f);
+    float modalH = S(160.0f);
+    float modalX = (winW - modalW) / 2.0f;
+    float modalY = (winH - modalH) / 2.0f;
+    Rectangle modalRect = {modalX, modalY, modalW, modalH};
 
-      Rectangle cancelBtn = {modalX + S(20), modalY + modalH - S(44), S(130), S(32)};
-      Rectangle okBtn = {modalX + modalW - S(150), modalY + modalH - S(44), S(130), S(32)};
+    Rectangle cancelBtn = {modalX + S(20), modalY + modalH - S(44), S(130), S(32)};
+    Rectangle okBtn = {modalX + modalW - S(150), modalY + modalH - S(44), S(130), S(32)};
 
-      if (CheckCollisionPointRec(mouse, cancelBtn)) {
-        r->State->IsConfirmPopupOpen = false;
-        Input_Consume();
-        return 1;
+    if (Input_CheckClick(cancelBtn)) {
+      r->State->IsConfirmPopupOpen = false;
+      Input_Consume();
+      return 1;
+    }
+    if (Input_CheckClick(okBtn)) {
+      if (r->OnAction) {
+         r->OnAction(r->callbackCtx, r->State->ConfirmActionIdx);
       }
-      if (CheckCollisionPointRec(mouse, okBtn)) {
-        if (r->OnAction) {
-           r->OnAction(r->callbackCtx, r->State->ConfirmActionIdx);
-        }
-        r->State->IsConfirmPopupOpen = false;
-        Input_Consume();
-        return 1;
-      }
-      if (!CheckCollisionPointRec(mouse, (Rectangle){modalX, modalY, modalW, modalH})) {
-        r->State->IsConfirmPopupOpen = false;
-        Input_Consume();
-        return 1;
-      }
+      r->State->IsConfirmPopupOpen = false;
+      Input_Consume();
+      return 1;
+    }
+    if (Input_CheckClick((Rectangle){0, 0, 9999, 9999}) && !CheckCollisionPointRec(Input_GetPointerPos(), modalRect)) {
+      r->State->IsConfirmPopupOpen = false;
+      Input_Consume();
+      return 1;
     }
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
       r->State->IsConfirmPopupOpen = false;
@@ -103,6 +101,7 @@ static int Settings_Update(Component *base) {
       r->State->IsConfirmPopupOpen = false;
       return 1;
     }
+    if (Input_IsReleased() || Input_IsDown() || Input_IsPressed()) Input_Consume();
     return 1;
   }
 
@@ -136,21 +135,21 @@ static int Settings_Update(Component *base) {
       if (r->OnApply) r->OnApply(r->callbackCtx);
     }
 
-    if (Input_IsReleased()) {
+    Rectangle closeBtn = {modalX + modalW - S(32), modalY + S(3), S(28), S(24)};
+    Rectangle okBtn = {modalX + (modalW - S(120))/2.0f, modalY + modalH - S(44), S(120), S(32)};
+    Rectangle modalRect = {modalX, modalY, modalW, modalH};
+    Rectangle sliderRect = {modalX + S(30), modalY + S(70), modalW - S(60), S(30)};
+    
+    if (Input_CheckClick(closeBtn) || Input_CheckClick(okBtn)) {
+      r->State->IsSliderModalOpen = false;
+      Input_Consume();
+      return 1;
+    }
+    
+    if (Input_CheckClick((Rectangle){0, 0, 9999, 9999})) {
       Vector2 mouse = Input_GetPointerPos();
-      Rectangle closeBtn = {modalX + modalW - S(32), modalY + S(3), S(28), S(24)};
-      Rectangle okBtn = {modalX + (modalW - S(120))/2.0f, modalY + modalH - S(44), S(120), S(32)};
-      
-      // Allow touching slider track
-      Rectangle sliderRect = {modalX + S(30), modalY + S(70), modalW - S(60), S(30)};
       bool inSlider = CheckCollisionPointRec(mouse, sliderRect);
-      
-      if (CheckCollisionPointRec(mouse, closeBtn) || CheckCollisionPointRec(mouse, okBtn)) {
-        r->State->IsSliderModalOpen = false;
-        Input_Consume();
-        return 1;
-      }
-      if (!inSlider && !CheckCollisionPointRec(mouse, (Rectangle){modalX, modalY, modalW, modalH})) {
+      if (!inSlider && !CheckCollisionPointRec(mouse, modalRect)) {
         r->State->IsSliderModalOpen = false;
         Input_Consume();
         return 1;
@@ -176,6 +175,7 @@ static int Settings_Update(Component *base) {
       r->State->MidiRequestEnter = false;
       return 1;
     }
+    if (Input_IsReleased() || Input_IsDown() || Input_IsPressed()) Input_Consume();
     return 1;
   }
 
@@ -545,8 +545,7 @@ static int Settings_Update(Component *base) {
       (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) ? S(38.0f) : S(32.0f);
   float bottomH = S(46.0f);
   float listY = TOP_BAR_H + tabH;
-  float systemCardH =
-      (r->State->SelectedTab == SETTING_CAT_SYSTEM) ? S(112.0f) : 0.0f;
+  float systemCardH = 0.0f;
   float effectiveListY = listY + systemCardH;
   int visibleRows = (int)((viewH - effectiveListY - bottomH) / rowH);
   if (visibleRows <= 0)

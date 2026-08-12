@@ -1018,8 +1018,16 @@ static void Waveform_Draw(Component *base) {
     float pmY = wfY + S(4);
 
     // Get current beat (1-4) and map it to a 0-3 index for the blocks
-    int myBeat =
-        Quantize_GetCurrentBeat(r->State->LoadedTrack, r->State->PositionMs);
+    uint32_t myPosMs = r->State->PositionMs;
+    extern AudioEngine *globalAudioEngine;
+    if (r->State->IsPreviewing && globalAudioEngine && r->ID >= 0 && r->ID < 2) {
+        DeckAudioState *audio = &globalAudioEngine->Decks[r->ID];
+        if (audio->SampleRate > 0) {
+            myPosMs = (uint32_t)((audio->Position / (double)audio->SampleRate) * 1000.0);
+        }
+    }
+    
+    int myBeat = Quantize_GetCurrentBeat(r->State->LoadedTrack, myPosMs);
     int myDisplayBeat = ((myBeat - 1) % 4);
 
     float blockSpacing = S(4);
@@ -1041,8 +1049,15 @@ static void Waveform_Draw(Component *base) {
 
     // Draw Other Deck - Small blocks underneath (for visual beat matching)
     if (r->OtherDeck && r->OtherDeck->LoadedTrack) {
-      int otherBeat = Quantize_GetCurrentBeat(r->OtherDeck->LoadedTrack,
-                                              r->OtherDeck->PositionMs);
+      uint32_t otherPosMs = r->OtherDeck->PositionMs;
+      if (r->OtherDeck->IsPreviewing && globalAudioEngine && r->OtherDeck->ID >= 0 && r->OtherDeck->ID < 2) {
+          DeckAudioState *otherAudio = &globalAudioEngine->Decks[r->OtherDeck->ID];
+          if (otherAudio->SampleRate > 0) {
+              otherPosMs = (uint32_t)((otherAudio->Position / (double)otherAudio->SampleRate) * 1000.0);
+          }
+      }
+
+      int otherBeat = Quantize_GetCurrentBeat(r->OtherDeck->LoadedTrack, otherPosMs);
       int otherDisplayBeat = ((otherBeat - 1) % 4);
 
       float otherY = pmY + pmH + S(2);

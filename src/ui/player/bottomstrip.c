@@ -145,7 +145,16 @@ static void BottomStrip_Draw(Component *base) {
                             
                             bool isApproaching = false;
                             if (ds->CurrentBPM > 0) {
-                                double distanceMs = (double)hc.Start - (double)ds->PositionMs;
+                                uint32_t currentPosMs = ds->PositionMs;
+                                extern AudioEngine *globalAudioEngine;
+                                if (ds->IsPreviewing && globalAudioEngine && ds->ID >= 0 && ds->ID < 2) {
+                                    DeckAudioState *audio = &globalAudioEngine->Decks[ds->ID];
+                                    if (audio->SampleRate > 0) {
+                                        currentPosMs = (uint32_t)((audio->Position / (double)audio->SampleRate) * 1000.0);
+                                    }
+                                }
+
+                                double distanceMs = (double)hc.Start - (double)currentPosMs;
                                 if (distanceMs > 0 && distanceMs <= (60000.0 / ds->CurrentBPM) * 16.0) {
                                     isApproaching = true;
                                 }

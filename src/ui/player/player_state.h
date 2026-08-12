@@ -33,6 +33,7 @@ typedef struct {
   bool LoadLock;
   float JogCalibRPM;
   bool WaveformTouchEnabled; // Enable/disable touch & drag interaction on waveform
+  int QuantizeResolution; // 0=1/8 Beat, 1=1/4 Beat, 2=1/2 Beat, 3=1 Beat
 } WaveformSettings;
 
 typedef struct TrackState {

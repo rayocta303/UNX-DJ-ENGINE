@@ -169,7 +169,7 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2,
       if (d1->PositionMs != d1->MainCueMs) {
         if (d1->QuantizeEnabled && d1->LoadedTrack) {
           d1->MainCueMs =
-              Quantize_GetNearestBeatMs(d1->LoadedTrack, d1->PositionMs);
+              Quantize_GetNearestBeatMs(d1->LoadedTrack, d1->PositionMs, Quantize_GetDivisor(d1->Waveform.QuantizeResolution));
         } else {
           d1->MainCueMs = d1->PositionMs;
         }
@@ -201,7 +201,7 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2,
       if (d2->PositionMs != d2->MainCueMs) {
         if (d2->QuantizeEnabled && d2->LoadedTrack) {
           d2->MainCueMs =
-              Quantize_GetNearestBeatMs(d2->LoadedTrack, d2->PositionMs);
+              Quantize_GetNearestBeatMs(d2->LoadedTrack, d2->PositionMs, Quantize_GetDivisor(d2->Waveform.QuantizeResolution));
         } else {
           d2->MainCueMs = d2->PositionMs;
         }

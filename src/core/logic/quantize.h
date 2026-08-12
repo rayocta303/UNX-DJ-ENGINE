@@ -10,7 +10,8 @@ extern "C" {
 
 // Returns the timestamp (in ms) of the closest beat to the provided currentMs.
 // Assumes track->BeatGrid is sorted ascending.
-int64_t Quantize_GetNearestBeatMs(TrackState *track, int64_t currentMs);
+int Quantize_GetDivisor(int resolution);
+int64_t Quantize_GetNearestBeatMs(TrackState *track, int64_t currentMs, int divisor);
 
 // Returns (currentMs - NearestBeatMs).
 // A negative value means the user hit the button early (before the beat).

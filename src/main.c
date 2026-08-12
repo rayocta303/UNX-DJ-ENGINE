@@ -260,6 +260,14 @@ void OnSettingsApply(void *ctx) {
   a->deckA.Waveform.VinylStopMs = a->settingsState.Items[7].Value;
   a->deckA.Waveform.JogCalibRPM = (a->settingsState.Items[8].Current == 1) ? 45.0f : 33.3f;
   a->deckA.Waveform.WaveformTouchEnabled = (a->settingsState.Items[9].Current == 1);
+  
+  for (int i = 0; i < a->settingsState.ItemsCount; i++) {
+    if (strcmp(a->settingsState.Items[i].Label, "QUANTIZE VALUE") == 0) {
+      a->deckA.Waveform.QuantizeResolution = a->settingsState.Items[i].Current;
+      break;
+    }
+  }
+
   a->deckB.Waveform = a->deckA.Waveform;
 
   // Save/Sync JogConfig from JOG tab items
@@ -868,16 +876,7 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
 
         // Quantize Snap: If Quantize is Enabled, snap marker to nearest beatgrid point
         if (ds->QuantizeEnabled && ds->LoadedTrack && ds->LoadedTrack->Analysis.BeatGridCount > 0) {
-          int nearestIdx = 0;
-          double minDist = 100000.0;
-          for (int i = 0; i < ds->LoadedTrack->Analysis.BeatGridCount; i++) {
-            double diff = fabs((double)ds->LoadedTrack->Analysis.BeatGrid[i].Time - (double)currentMs);
-            if (diff < minDist) {
-              minDist = diff;
-              nearestIdx = i;
-            }
-          }
-          currentMs = ds->LoadedTrack->Analysis.BeatGrid[nearestIdx].Time;
+          currentMs = Quantize_GetNearestBeatMs(ds->LoadedTrack, currentMs, Quantize_GetDivisor(ds->Waveform.QuantizeResolution));
         }
 
         if (ds->LoadedTrack->HotCuesCount < 8) {
@@ -1372,6 +1371,17 @@ void App_Init(App *a) {
   a->settingsState.Items[sysCount].Category = SETTING_CAT_SYSTEM;
   sysCount++;
 #endif
+
+  int qIdx = sysCount++;
+  strcpy(a->settingsState.Items[qIdx].Label, "QUANTIZE VALUE");
+  a->settingsState.Items[qIdx].Type = SETTING_TYPE_LIST;
+  strcpy(a->settingsState.Items[qIdx].Options[0], "1/8 BEAT");
+  strcpy(a->settingsState.Items[qIdx].Options[1], "1/4 BEAT");
+  strcpy(a->settingsState.Items[qIdx].Options[2], "1/2 BEAT");
+  strcpy(a->settingsState.Items[qIdx].Options[3], "1 BEAT");
+  a->settingsState.Items[qIdx].OptionsCount = 4;
+  a->settingsState.Items[qIdx].Current = a->deckA.Waveform.QuantizeResolution;
+  a->settingsState.Items[qIdx].Category = SETTING_CAT_DECK;
 
   a->midiSettingsStartIdx = sysCount;
   PopulateMidiSettings(a);
@@ -2972,7 +2982,7 @@ void UpdateDrawFrame(App *app) {
         if (ds->PositionMs != ds->MainCueMs) {
           if (ds->QuantizeEnabled && ds->LoadedTrack) {
             ds->MainCueMs =
-                Quantize_GetNearestBeatMs(ds->LoadedTrack, ds->PositionMs);
+                Quantize_GetNearestBeatMs(ds->LoadedTrack, ds->PositionMs, Quantize_GetDivisor(ds->Waveform.QuantizeResolution));
           } else {
             ds->MainCueMs = ds->PositionMs;
           }
@@ -3015,17 +3025,8 @@ void UpdateDrawFrame(App *app) {
       double pos = audio->Position;
 
       if (ds->QuantizeEnabled && ds->LoadedTrack && ds->LoadedTrack->Analysis.BeatGridCount > 0) {
-        double currentMs = (pos / trackSR) * 1000.0;
-        int nearestIdx = 0;
-        double minDist = 100000.0;
-        for (int b = 0; b < ds->LoadedTrack->Analysis.BeatGridCount; b++) {
-          double dist = fabs((double)ds->LoadedTrack->Analysis.BeatGrid[b].Time - currentMs);
-          if (dist < minDist) {
-            minDist = dist;
-            nearestIdx = b;
-          }
-        }
-        pos = (ds->LoadedTrack->Analysis.BeatGrid[nearestIdx].Time / 1000.0) * trackSR;
+        int64_t currentMs = (int64_t)((pos / trackSR) * 1000.0);
+        pos = (Quantize_GetNearestBeatMs(ds->LoadedTrack, currentMs, Quantize_GetDivisor(ds->Waveform.QuantizeResolution)) / 1000.0) * trackSR;
       }
 
       if (audio->IsLooping) {
@@ -3058,17 +3059,8 @@ void UpdateDrawFrame(App *app) {
         }
       } else {
         if (ds->QuantizeEnabled && ds->LoadedTrack && ds->LoadedTrack->Analysis.BeatGridCount > 0) {
-          double currentMs = (pos / trackSR) * 1000.0;
-          int nearestIdx = 0;
-          double minDist = 100000.0;
-          for (int b = 0; b < ds->LoadedTrack->Analysis.BeatGridCount; b++) {
-            double dist = fabs((double)ds->LoadedTrack->Analysis.BeatGrid[b].Time - currentMs);
-            if (dist < minDist) {
-              minDist = dist;
-              nearestIdx = b;
-            }
-          }
-          pos = (ds->LoadedTrack->Analysis.BeatGrid[nearestIdx].Time / 1000.0) * trackSR;
+          int64_t currentMs = (int64_t)((pos / trackSR) * 1000.0);
+          pos = (Quantize_GetNearestBeatMs(ds->LoadedTrack, currentMs, Quantize_GetDivisor(ds->Waveform.QuantizeResolution)) / 1000.0) * trackSR;
         }
 
         if (pos <= audio->LoopStartPos) {
@@ -3166,7 +3158,7 @@ void UpdateDrawFrame(App *app) {
         if (ds->LoadedTrack) {
           uint32_t currentMs = (uint32_t)ds->PositionMs;
           if (ds->QuantizeEnabled && ds->LoadedTrack->Analysis.BeatGridCount > 0) {
-            currentMs = Quantize_GetNearestBeatMs(ds->LoadedTrack, currentMs);
+            currentMs = Quantize_GetNearestBeatMs(ds->LoadedTrack, currentMs, Quantize_GetDivisor(ds->Waveform.QuantizeResolution));
           }
 
           int existingIdx = -1;
