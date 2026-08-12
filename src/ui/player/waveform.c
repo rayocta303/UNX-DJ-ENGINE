@@ -1,22 +1,25 @@
 #include "ui/player/waveform.h"
-#include "core/memory_guard.h"
-#include "core/logger.h"
 #include "audio/engine.h"
-#include "core/logic/quantize.h"
+#include "core/logger.h"
 #include "core/logic/jog_config.h"
+#include "core/logic/quantize.h"
+#include "core/memory_guard.h"
+#include "core/midi/midi_handler.h"
+#include "input/input.h"
 #include "rlgl.h"
 #include "ui/components/assets_bundle.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
-#include "input/input.h"
-#include "core/midi/midi_handler.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-// (Local GetCurrentBeat removed, now using Quantize_GetCurrentBeat from quantize.h)
+
+// (Local GetCurrentBeat removed, now using Quantize_GetCurrentBeat from
+// quantize.h)
 void Waveform_AdjustZoom(DeckState *ds, int direction) {
-  if (!ds) return;
+  if (!ds)
+    return;
   int currentIndex = 0;
   float minDiff = 99999.0f;
   for (int i = 0; i < NUM_ZOOM_LEVELS; i++) {
@@ -27,9 +30,11 @@ void Waveform_AdjustZoom(DeckState *ds, int direction) {
     }
   }
   currentIndex += direction;
-  if (currentIndex < 0) currentIndex = 0;
+  if (currentIndex < 0)
+    currentIndex = 0;
   int maxZoomIndex = NUM_ZOOM_LEVELS - 1;
-  if (currentIndex > maxZoomIndex) currentIndex = maxZoomIndex;
+  if (currentIndex > maxZoomIndex)
+    currentIndex = maxZoomIndex;
   ds->ZoomScale = ZOOM_LEVELS[currentIndex];
 }
 
@@ -38,14 +43,16 @@ static int Waveform_Update(Component *base) {
 
   // Refresh dynamic frame count when track changes
   // Recalculate data density if track length or waveform data changes
-  if (r->State->LoadedTrack != r->cachedTrack || r->dataDensity <= 0.001f || (r->State->TrackLengthMs > 0 && r->State->TrackLengthMs != r->cachedTrackLength)) {
+  if (r->State->LoadedTrack != r->cachedTrack || r->dataDensity <= 0.001f ||
+      (r->State->TrackLengthMs > 0 &&
+       r->State->TrackLengthMs != r->cachedTrackLength)) {
     r->cachedTrack = r->State->LoadedTrack;
     r->cachedTrackLength = r->State->TrackLengthMs;
 
     if (r->cachedTrack != NULL) {
       int bpf = (r->cachedTrack->Analysis.WaveformType == 3)   ? 3
                 : (r->cachedTrack->Analysis.WaveformType == 2) ? 2
-                                                      : 1;
+                                                               : 1;
       r->dynWfmFrames = r->cachedTrack->Analysis.DynamicWaveformLen / bpf;
 
       if (r->State->TrackLengthMs > 0 && r->dynWfmFrames > 0) {
@@ -71,39 +78,46 @@ static int Waveform_Update(Component *base) {
                      mouse.y >= wfY && mouse.y <= wfY + waveH);
 
   // AUTO RELOAD: If focused and buffer was evicted, reload it
-  bool isInteracting = (inWaveform || r->State->IsPlaying || r->State->IsTouching);
-  if (isInteracting) r->lastInteractionTime = GetTime();
+  bool isInteracting =
+      (inWaveform || r->State->IsPlaying || r->State->IsTouching);
+  if (isInteracting)
+    r->lastInteractionTime = GetTime();
 
-  if (r->cachedTrack && r->cachedTrack->Analysis.DynamicWaveform == NULL && r->cachedTrack->Analysis.DynamicWaveformLen > 0) {
-      // Reload if we are interacting OR we are master
-      if (isInteracting || r->State->IsMaster) {
-          UNX_LOG_INFO("[WAVE] Reloading evicted buffer for Deck %c", r->ID == 0 ? 'A' : 'B');
-          RB_ReloadWaveform(r->cachedTrack->AnalyzePath, 
-                          &r->cachedTrack->Analysis.DynamicWaveform,
-                          &r->cachedTrack->Analysis.DynamicWaveformLen,
-                          &r->cachedTrack->Analysis.WaveformType);
-      }
+  if (r->cachedTrack && r->cachedTrack->Analysis.DynamicWaveform == NULL &&
+      r->cachedTrack->Analysis.DynamicWaveformLen > 0) {
+    // Reload if we are interacting OR we are master
+    if (isInteracting || r->State->IsMaster) {
+      UNX_LOG_INFO("[WAVE] Reloading evicted buffer for Deck %c",
+                   r->ID == 0 ? 'A' : 'B');
+      RB_ReloadWaveform(r->cachedTrack->AnalyzePath,
+                        &r->cachedTrack->Analysis.DynamicWaveform,
+                        &r->cachedTrack->Analysis.DynamicWaveformLen,
+                        &r->cachedTrack->Analysis.WaveformType);
+    }
   }
 
   // AUTO EVICT: If idle and memory is low, clear buffer
   if (r->cachedTrack && r->cachedTrack->Analysis.DynamicWaveform != NULL) {
-      if (!isInteracting && !r->State->IsPlaying && !r->State->IsMaster) {
-          if (MemoryGuard_GetLevel() >= MEM_MODE_LITE && (GetTime() - r->lastInteractionTime > 5.0)) {
-              UNX_LOG_INFO("[WAVE] Evicting idle buffer for Deck %c to save RAM", r->ID == 0 ? 'A' : 'B');
-              free(r->cachedTrack->Analysis.DynamicWaveform);
-              r->cachedTrack->Analysis.DynamicWaveform = NULL;
-          }
+    if (!isInteracting && !r->State->IsPlaying && !r->State->IsMaster) {
+      if (MemoryGuard_GetLevel() >= MEM_MODE_LITE &&
+          (GetTime() - r->lastInteractionTime > 5.0)) {
+        UNX_LOG_INFO("[WAVE] Evicting idle buffer for Deck %c to save RAM",
+                     r->ID == 0 ? 'A' : 'B');
+        free(r->cachedTrack->Analysis.DynamicWaveform);
+        r->cachedTrack->Analysis.DynamicWaveform = NULL;
       }
+    }
   }
 
   // Zoom & Jog Interaction Logic
   int gesture = GetGestureDetected();
   if (inWaveform) {
     float wheel = Mouse_GetWheel();
-    
+
     // Support for Pinch Gesture (Touch)
-    bool isPinch = (gesture == GESTURE_PINCH_IN || gesture == GESTURE_PINCH_OUT);
-    
+    bool isPinch =
+        (gesture == GESTURE_PINCH_IN || gesture == GESTURE_PINCH_OUT);
+
     if (wheel != 0.0f || isPinch) {
       int currentIndex = 0;
       float minDiff = 99999.0f;
@@ -116,41 +130,46 @@ static int Waveform_Update(Component *base) {
       }
 
       if (isPinch) {
-          static float pinchTimer = 0;
-          pinchTimer += GetFrameTime();
-          if (pinchTimer > 0.1f) { // Rate limit pinch zoom
-              if (gesture == GESTURE_PINCH_OUT) currentIndex++;
-              else currentIndex--;
-              pinchTimer = 0;
-          }
+        static float pinchTimer = 0;
+        pinchTimer += GetFrameTime();
+        if (pinchTimer > 0.1f) { // Rate limit pinch zoom
+          if (gesture == GESTURE_PINCH_OUT)
+            currentIndex++;
+          else
+            currentIndex--;
+          pinchTimer = 0;
+        }
       } else {
-          float deadZone = 0.05f;
-          if (wheel > deadZone) {
-            currentIndex--; // Positive wheel decreases zoom (Zoom Out)
-          } else if (wheel < -deadZone) {
-            currentIndex++; // Negative wheel increases zoom (Zoom In)
-          }
+        float deadZone = 0.05f;
+        if (wheel > deadZone) {
+          currentIndex--; // Positive wheel decreases zoom (Zoom Out)
+        } else if (wheel < -deadZone) {
+          currentIndex++; // Negative wheel increases zoom (Zoom In)
+        }
       }
 
       // Clamp the index
-      if (currentIndex < 0) currentIndex = 0;
-      
+      if (currentIndex < 0)
+        currentIndex = 0;
+
       int maxZoomIndex = NUM_ZOOM_LEVELS - 1;
-      if (currentIndex > maxZoomIndex) currentIndex = maxZoomIndex;
+      if (currentIndex > maxZoomIndex)
+        currentIndex = maxZoomIndex;
 
       r->State->ZoomScale = ZOOM_LEVELS[currentIndex];
-      
-      if (isPinch) r->State->IsTouching = false; // Avoid scratching while pinching
+
+      if (isPinch)
+        r->State->IsTouching = false; // Avoid scratching while pinching
     }
   }
-
 
   static bool isMouseTouchingWaveform[2] = {false, false};
   int dId = (r->State->ID >= 0 && r->State->ID < 2) ? r->State->ID : 0;
   bool midiConnected = MIDI_IsControllerConnected();
   bool touchAllowed = r->State->Waveform.WaveformTouchEnabled && !midiConnected;
 
-  // Waveform touch: disabled if WaveformTouchEnabled=false OR MIDI controller is connected
+  // Waveform touch: disabled if WaveformTouchEnabled=false OR MIDI controller
+  // is connected
   if (touchAllowed && inWaveform && Input_IsPressed()) {
     r->State->IsTouching = true;
     isMouseTouchingWaveform[dId] = true;
@@ -230,7 +249,8 @@ int PWV2_Decode(unsigned char v, Color *outColor) {
 //   Red    = (v >> 13) & 0x07  → bits 15-13
 //   Color intensities are scaled: component = (intensity / 7.0) * 255
 // ─────────────────────────────────────────────────────────────────────────────
-int PWV4_Decode(unsigned char *data, int64_t frame, int64_t maxFrames, Color *outColor) {
+int PWV4_Decode(unsigned char *data, int64_t frame, int64_t maxFrames,
+                Color *outColor) {
   if (frame < 0 || frame >= maxFrames) {
     *outColor = (Color){0, 0, 0, 0};
     return 0;
@@ -246,8 +266,6 @@ int PWV4_Decode(unsigned char *data, int64_t frame, int64_t maxFrames, Color *ou
   outColor->a = 255;
   return height;
 }
-
-
 
 // PWV7 (3-Band Scrolling Waveform) byte layout per Pioneer reverse engineering
 // (dysentery):
@@ -361,7 +379,7 @@ static void Waveform_Draw(Component *base) {
   Font faceXS = UIFonts_GetFace(S(8));
 
   float pitchRatio = 1.0f + (r->State->TempoPercent / 100.0f);
-  
+
   // Apply the pitch ratio to the zoom scale.
   // Faster BPM (ratio > 1.0) increases effective zoom -> squishes waveform
   // Slower BPM (ratio < 1.0) decreases effective zoom -> stretches waveform
@@ -373,7 +391,8 @@ static void Waveform_Draw(Component *base) {
   extern AudioEngine *globalAudioEngine;
   if (globalAudioEngine != NULL && r->ID >= 0 && r->ID < 2) {
     DeckAudioState *audio = &globalAudioEngine->Decks[r->ID];
-    double ratioHF = (audio->SampleRate > 0) ? ((double)audio->SampleRate / 150.0) : 294.0;
+    double ratioHF =
+        (audio->SampleRate > 0) ? ((double)audio->SampleRate / 150.0) : 294.0;
     if (r->State->LoopAdjustIn && audio->LoopStartPos > 0) {
       elapsedHalfFrames = audio->LoopStartPos / ratioHF;
     } else if (r->State->LoopAdjustOut && audio->LoopEndPos > 0) {
@@ -384,7 +403,8 @@ static void Waveform_Draw(Component *base) {
   float centerX = wfLeft + (wfW / 2.0f);
   float playheadX = centerX;
 
-  // Position is updated in real-time by main.c (including during Loop In/Out jog edit)
+  // Position is updated in real-time by main.c (including during Loop In/Out
+  // jog edit)
 
   float zoomDelta = effectiveZoom * r->dataDensity;
 
@@ -395,25 +415,29 @@ static void Waveform_Draw(Component *base) {
   extern AudioEngine *globalAudioEngine;
   float eqLowMult = 1.0f, eqMidMult = 1.0f, eqHighMult = 1.0f;
   if (globalAudioEngine != NULL && r->ID >= 0 && r->ID < 2) {
-      eqLowMult = globalAudioEngine->Decks[r->ID].EqLow * 2.0f;
-      eqMidMult = globalAudioEngine->Decks[r->ID].EqMid * 2.0f;
-      eqHighMult = globalAudioEngine->Decks[r->ID].EqHigh * 2.0f;
+    eqLowMult = globalAudioEngine->Decks[r->ID].EqLow * 2.0f;
+    eqMidMult = globalAudioEngine->Decks[r->ID].EqMid * 2.0f;
+    eqHighMult = globalAudioEngine->Decks[r->ID].EqHigh * 2.0f;
   }
 
   float gLow =
-      ((r->State->Waveform.GainLow > 0) ? r->State->Waveform.GainLow : 1.0f) * eqLowMult;
+      ((r->State->Waveform.GainLow > 0) ? r->State->Waveform.GainLow : 1.0f) *
+      eqLowMult;
   float gMid =
-      ((r->State->Waveform.GainMid > 0) ? r->State->Waveform.GainMid : 1.0f) * eqMidMult;
+      ((r->State->Waveform.GainMid > 0) ? r->State->Waveform.GainMid : 1.0f) *
+      eqMidMult;
   float gHigh =
-      ((r->State->Waveform.GainHigh > 0) ? r->State->Waveform.GainHigh : 1.0f) * eqHighMult;
+      ((r->State->Waveform.GainHigh > 0) ? r->State->Waveform.GainHigh : 1.0f) *
+      eqHighMult;
 
   // Scaling constants for 3-Band (Matched to Teensy/CDJ-1000)
   const float LOW_SCALE = 1.0f;
   const float MID_SCALE = 1.0f;
   const float HIGH_SCALE = 1.0f;
-  const float NORM = 2.0f / 255.0f; // Boosted to 2.0x to fill canvas and prevent empty space
+  const float NORM =
+      2.0f / 255.0f; // Boosted to 2.0x to fill canvas and prevent empty space
   const float PWV2_HSCALE = waveCenter / 31.0f;
-  const float ATK = 0.9f; // Fast attack
+  const float ATK = 0.9f;  // Fast attack
   const float REL = 0.12f; // Smooth release for that 'tail' look
 
   // hardware-accurate 3-band palette (Blue/Green/White)
@@ -422,71 +446,80 @@ static void Waveform_Draw(Component *base) {
   Color BL_HIGH = {246, 251, 246, 255}; // Teensy col_white
   Color colorHigh = BL_HIGH;
 
-  int wfType =
-      r->State->LoadedTrack->Analysis.WaveformType; // track data format (1, 2, or 3)
+  int wfType = r->State->LoadedTrack->Analysis
+                   .WaveformType; // track data format (1, 2, or 3)
 
   unsigned char *wfData = r->State->LoadedTrack->Analysis.DynamicWaveform;
   if (wfData == NULL) {
-      EndScissorMode();
-      return;
+    EndScissorMode();
+    return;
   }
   int64_t wfFrames = r->dynWfmFrames;
 
-/* 
-  // 1. Static Waveform (Deckstrip)
-  if (r->State->LoadedTrack != NULL && r->State->LoadedTrack->Analysis.StaticWaveformLen > 0) {
-      float dsY = wfY + waveH - S(10);
-      float dsH = S(8);
-      
-      // Background for the strip
-      DrawRectangleRec((Rectangle){ wfLeft, dsY, wfW, dsH }, (Color){ 20, 20, 20, 200 });
+  /*
+    // 1. Static Waveform (Deckstrip)
+    if (r->State->LoadedTrack != NULL &&
+    r->State->LoadedTrack->Analysis.StaticWaveformLen > 0) { float dsY = wfY +
+    waveH - S(10); float dsH = S(8);
 
-      for (int i = 0; i < r->State->LoadedTrack->Analysis.StaticWaveformLen; i++) {
-          float x = wfLeft + ((float)i / (float)r->State->LoadedTrack->Analysis.StaticWaveformLen) * wfW;
-          unsigned char val = r->State->LoadedTrack->Analysis.StaticWaveform[i];
-          
-          float h = (float)val / 255.0f * dsH;
-          Color c = ColorBlue;
-          if (r->State->LoadedTrack->Analysis.StaticWaveformType == 2) c = ColorRed; // Placeholder for Color
-          else if (r->State->LoadedTrack->Analysis.StaticWaveformType == 3) c = (Color){ 100, 200, 255, 255 };
+        // Background for the strip
+        DrawRectangleRec((Rectangle){ wfLeft, dsY, wfW, dsH }, (Color){ 20, 20,
+    20, 200 });
 
-          DrawLineV((Vector2){x, dsY + dsH}, (Vector2){x, dsY + dsH - h}, c);
-      }
-      
-      // Current position marker on deckstrip
-      float playPos = (float)((double)r->State->PositionMs / (double)r->State->TrackLengthMs) * wfW;
-      DrawRectangle(wfLeft + playPos - 1, dsY, 2, dsH, ColorWhite);
-  }
-*/
+        for (int i = 0; i < r->State->LoadedTrack->Analysis.StaticWaveformLen;
+    i++) { float x = wfLeft + ((float)i /
+    (float)r->State->LoadedTrack->Analysis.StaticWaveformLen) * wfW; unsigned
+    char val = r->State->LoadedTrack->Analysis.StaticWaveform[i];
+
+            float h = (float)val / 255.0f * dsH;
+            Color c = ColorBlue;
+            if (r->State->LoadedTrack->Analysis.StaticWaveformType == 2) c =
+    ColorRed; // Placeholder for Color else if
+    (r->State->LoadedTrack->Analysis.StaticWaveformType == 3) c = (Color){ 100,
+    200, 255, 255 };
+
+            DrawLineV((Vector2){x, dsY + dsH}, (Vector2){x, dsY + dsH - h}, c);
+        }
+
+        // Current position marker on deckstrip
+        float playPos = (float)((double)r->State->PositionMs / (double)r->State->TrackLengthMs) * wfW;
+        DrawRectangle(wfLeft + playPos - 1, dsY, 2, dsH, ColorWhite);
+    }
+  */
 
   float smLo = 0, smMi = 0, smHi = 0;
   Color smCol = {0, 0, 0, 0};
   float yy = wfY + waveCenter;
 
-  // --- DATA-DRIVEN RENDERING LOOP ---
-  // Frame-anchored binning: We align startFrame to exact multiples of renderStep.
-  // This guarantees that geometry segments have constant frame widths and frozen peak shapes
-  // during continuous scrolling, completely eliminating stuttering and canvas distortion.
   double framesPerPixel = zoomDelta;
-  
-  float minPx = (wfLeft - playheadX - 10.0f);
-  float maxPx = (wfRight - playheadX + 10.0f);
-  
-  int renderStep = (int)floor(framesPerPixel);
-  if (renderStep < 1) renderStep = 1;
+  if (framesPerPixel < 0.05) framesPerPixel = 0.05;
 
-  int64_t rawStart = (int64_t)floor(elapsedHalfFrames * r->dataDensity + minPx * framesPerPixel);
-  int64_t rawEnd = (int64_t)ceil(elapsedHalfFrames * r->dataDensity + maxPx * framesPerPixel);
+  // Re-sync effectiveZoom in case framesPerPixel was clamped at max zoom
+  effectiveZoom = (float)framesPerPixel / r->dataDensity;
 
-  int64_t startFrame = (rawStart / renderStep) * renderStep;
-  if (startFrame < 0) startFrame = 0;
-  int64_t endFrame = ((rawEnd + renderStep - 1) / renderStep) * renderStep;
+  double centerFrame = elapsedHalfFrames * r->dataDensity;
+  double centerBinExact = centerFrame / framesPerPixel;
+  
+  // Calculate rendering bounds in terms of absolute bins
+  int binsLeft = (int)ceilf(playheadX - wfLeft) + 2;
+  int binsRight = (int)ceilf(wfRight - playheadX) + 2;
+  
+  int startBinIndex = (int)floor(centerBinExact) - binsLeft;
+  int endBinIndex = (int)floor(centerBinExact) + binsRight;
+  if (startBinIndex < 0) startBinIndex = 0;
+  
+  int numBins = endBinIndex - startBinIndex + 1;
+  #define MAX_WAVE_BINS 3000
+  if (numBins > MAX_WAVE_BINS) numBins = MAX_WAVE_BINS;
+
+  int64_t startFrame = (int64_t)(startBinIndex * framesPerPixel);
+  int64_t endFrame = (int64_t)((endBinIndex + 1) * framesPerPixel);
   if (endFrame > wfFrames) endFrame = wfFrames;
 
-  // Warm-up: seed smoothed state using exact frame sequence locked to renderStep multiples
-  int64_t preRollStart = startFrame - (int64_t)(32 * renderStep);
+  // Warm-up IIR Filter to ensure stable smoothing phase
+  int64_t preRollStart = startFrame - (int64_t)(32.0 * framesPerPixel);
   if (preRollStart < 0) preRollStart = 0;
-
+  
   for (int64_t k = preRollStart; k < startFrame; k++) {
     float rL = 0, rM = 0, rH = 0;
     Color colRaw = {0, 0, 0, 255};
@@ -537,23 +570,17 @@ static void Waveform_Draw(Component *base) {
     }
   }
 
-  #define MAX_WAVE_W 3000
-  static float pixLo[MAX_WAVE_W];
-  static float pixMi[MAX_WAVE_W];
-  static float pixHi[MAX_WAVE_W];
-  static Color pixCol[MAX_WAVE_W];
+  static float pixLo[MAX_WAVE_BINS];
+  static float pixMi[MAX_WAVE_BINS];
+  static float pixHi[MAX_WAVE_BINS];
+  static Color pixCol[MAX_WAVE_BINS];
 
-  int iW = (int)ceilf(wfW);
-  if (iW > MAX_WAVE_W) iW = MAX_WAVE_W;
-
-  for (int p = 0; p < iW; p++) {
-      pixLo[p] = 0.0f; pixMi[p] = 0.0f; pixHi[p] = 0.0f;
-      pixCol[p] = (Color){0, 0, 0, 0};
+  for (int b = 0; b < numBins; b++) {
+      pixLo[b] = 0.0f; pixMi[b] = 0.0f; pixHi[b] = 0.0f;
+      pixCol[b] = (Color){0, 0, 0, 0};
   }
 
-  int last_p = -1;
-
-  for (int64_t i = startFrame + 1; i <= endFrame; i++) {
+  for (int64_t i = startFrame; i < endFrame; i++) {
     float rL = 0, rM = 0, rH = 0;
     Color colRaw = {0, 0, 0, 255};
 
@@ -602,119 +629,181 @@ static void Waveform_Draw(Component *base) {
       smCol.a = 255;
     }
 
-    float exactX = (float)(((double)i - elapsedHalfFrames * r->dataDensity) / framesPerPixel + playheadX);
-    int p = (int)roundf(exactX - wfLeft);
-
-    if (last_p == -1) last_p = p;
-
-    int pStart = (last_p < p) ? last_p : p;
-    int pEnd = (last_p < p) ? p : last_p;
-
-    for (int k = pStart; k <= pEnd; k++) {
-        if (k >= 0 && k < iW) {
-            if (smLo > pixLo[k]) pixLo[k] = smLo;
-            if (smMi > pixMi[k]) pixMi[k] = smMi;
-            if (smHi > pixHi[k]) pixHi[k] = smHi;
-            pixCol[k] = smCol;
+    // Sub-Pixel Bin Spreading: ensures no gaps when zoomed in (framesPerPixel < 1.0)
+    int trackBinStart = (int)(i / framesPerPixel);
+    int trackBinEnd = (int)((i + 0.999) / framesPerPixel);
+    
+    for (int k = trackBinStart; k <= trackBinEnd; k++) {
+        int b = k - startBinIndex;
+        if (b >= 0 && b < numBins) {
+            if (smLo > pixLo[b]) pixLo[b] = smLo;
+            if (smMi > pixMi[b]) pixMi[b] = smMi;
+            if (smHi > pixHi[b]) pixHi[b] = smHi;
+            pixCol[b] = smCol;
         }
     }
-    last_p = p;
   }
 
-  // Draw smooth continuous polygon (RL_QUADS) per physical screen pixel segment
+  // Draw smooth continuous polygon (RL_QUADS) using fractional scrolling
+  // Single-pass gradient-alpha rendering: transparent at edges fades to opaque at core.
+  // This halves vertex count while achieving soft anti-aliased slopes.
   rlBegin(RL_QUADS);
-  for (int p = 0; p < iW - 1; p++) {
-      float px0 = wfLeft + (float)p;
+  for (int b = 0; b < numBins - 1; b++) {
+      int binIdx = startBinIndex + b;
+      
+      // Exact fractional scrolling offset — always 1.0px apart, no wobble
+      float px0 = playheadX + (float)((double)binIdx - centerBinExact);
       float px1 = px0 + 1.0f;
       
+      // Frustum culling — skip bins outside canvas
+      if (px1 < wfLeft - 2.0f || px0 > wfRight + 2.0f) continue;
+      
       if (userStyle == WAVEFORM_STYLE_BLUE || userStyle == WAVEFORM_STYLE_RGB) {
-          float h0 = roundf(fmaxf(pixLo[p], fmaxf(pixMi[p], pixHi[p])));
-          float h1 = roundf(fmaxf(pixLo[p+1], fmaxf(pixMi[p+1], pixHi[p+1])));
+          // Use raw float heights (no roundf) for smooth sub-pixel slopes
+          float h0 = fmaxf(pixLo[b],   fmaxf(pixMi[b],   pixHi[b]));
+          float h1 = fmaxf(pixLo[b+1], fmaxf(pixMi[b+1], pixHi[b+1]));
           
           if (h0 > 0.1f || h1 > 0.1f) {
-              Color c = pixCol[p];
+              Color c = pixCol[b];
               if (userStyle == WAVEFORM_STYLE_RGB) {
                   c.r = (unsigned char)fminf(255.0f, (float)c.r * eqLowMult);
                   c.g = (unsigned char)fminf(255.0f, (float)c.g * eqMidMult);
                   c.b = (unsigned char)fminf(255.0f, (float)c.b * eqHighMult);
               }
-              // Vertical blur halo (Anti-alias glow for smooth slopes)
-              rlColor4ub(c.r, c.g, c.b, 60);
-              rlVertex2f(px0, yy - h0 - 1.5f); rlVertex2f(px0, yy + h0 + 1.5f);
-              rlVertex2f(px1, yy + h1 + 1.5f); rlVertex2f(px1, yy - h1 - 1.5f);
+              // Outer transparent edge (AA fringe)
+              rlColor4ub(c.r, c.g, c.b, 0);
+              rlVertex2f(px0, yy - h0 - 1.0f);
+              rlColor4ub(c.r, c.g, c.b, 0);
+              rlVertex2f(px0, yy + h0 + 1.0f);
+              rlColor4ub(c.r, c.g, c.b, 0);
+              rlVertex2f(px1, yy + h1 + 1.0f);
+              rlColor4ub(c.r, c.g, c.b, 0);
+              rlVertex2f(px1, yy - h1 - 1.0f);
               
-              // Solid core quad
+              // Inner solid core
               rlColor4ub(c.r, c.g, c.b, 255);
-              rlVertex2f(px0, yy - h0); rlVertex2f(px0, yy + h0);
-              rlVertex2f(px1, yy + h1); rlVertex2f(px1, yy - h1);
+              rlVertex2f(px0, yy - h0 + 0.5f);
+              rlColor4ub(c.r, c.g, c.b, 255);
+              rlVertex2f(px0, yy + h0 - 0.5f);
+              rlColor4ub(c.r, c.g, c.b, 255);
+              rlVertex2f(px1, yy + h1 - 0.5f);
+              rlColor4ub(c.r, c.g, c.b, 255);
+              rlVertex2f(px1, yy - h1 + 0.5f);
           }
       } else {
-          float pL0 = roundf(pixLo[p]); float pL1 = roundf(pixLo[p+1]);
-          float pM0 = roundf(pixMi[p]); float pM1 = roundf(pixMi[p+1]);
-          float pH0 = roundf(pixHi[p]); float pH1 = roundf(pixHi[p+1]);
+          float pL0 = pixLo[b];   float pL1 = pixLo[b+1];
+          float pM0 = pixMi[b];   float pM1 = pixMi[b+1];
+          float pH0 = pixHi[b];   float pH1 = pixHi[b+1];
           
           if (pL0 > 0.1f || pL1 > 0.1f) {
-              rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 60);
-              rlVertex2f(px0, yy - pL0 - 1.5f); rlVertex2f(px0, yy + pL0 + 1.5f);
-              rlVertex2f(px1, yy + pL1 + 1.5f); rlVertex2f(px1, yy - pL1 - 1.5f);
+              rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 0);
+              rlVertex2f(px0, yy - pL0 - 1.0f);
+              rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 0);
+              rlVertex2f(px0, yy + pL0 + 1.0f);
+              rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 0);
+              rlVertex2f(px1, yy + pL1 + 1.0f);
+              rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 0);
+              rlVertex2f(px1, yy - pL1 - 1.0f);
               
               rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 255);
-              rlVertex2f(px0, yy - pL0); rlVertex2f(px0, yy + pL0);
-              rlVertex2f(px1, yy + pL1); rlVertex2f(px1, yy - pL1);
+              rlVertex2f(px0, yy - pL0 + 0.5f);
+              rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 255);
+              rlVertex2f(px0, yy + pL0 - 0.5f);
+              rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 255);
+              rlVertex2f(px1, yy + pL1 - 0.5f);
+              rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 255);
+              rlVertex2f(px1, yy - pL1 + 0.5f);
           }
           if (pM0 > 0.1f || pM1 > 0.1f) {
-              rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 60);
-              rlVertex2f(px0, yy - pM0 - 1.5f); rlVertex2f(px0, yy + pM0 + 1.5f);
-              rlVertex2f(px1, yy + pM1 + 1.5f); rlVertex2f(px1, yy - pM1 - 1.5f);
+              rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 0);
+              rlVertex2f(px0, yy - pM0 - 1.0f);
+              rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 0);
+              rlVertex2f(px0, yy + pM0 + 1.0f);
+              rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 0);
+              rlVertex2f(px1, yy + pM1 + 1.0f);
+              rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 0);
+              rlVertex2f(px1, yy - pM1 - 1.0f);
               
               rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 255);
-              rlVertex2f(px0, yy - pM0); rlVertex2f(px0, yy + pM0);
-              rlVertex2f(px1, yy + pM1); rlVertex2f(px1, yy - pM1);
+              rlVertex2f(px0, yy - pM0 + 0.5f);
+              rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 255);
+              rlVertex2f(px0, yy + pM0 - 0.5f);
+              rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 255);
+              rlVertex2f(px1, yy + pM1 - 0.5f);
+              rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 255);
+              rlVertex2f(px1, yy - pM1 + 0.5f);
           }
           if (pH0 > 0.1f || pH1 > 0.1f) {
-              rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 60);
-              rlVertex2f(px0, yy - pH0 - 1.5f); rlVertex2f(px0, yy + pH0 + 1.5f);
-              rlVertex2f(px1, yy + pH1 + 1.5f); rlVertex2f(px1, yy - pH1 - 1.5f);
+              rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 0);
+              rlVertex2f(px0, yy - pH0 - 1.0f);
+              rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 0);
+              rlVertex2f(px0, yy + pH0 + 1.0f);
+              rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 0);
+              rlVertex2f(px1, yy + pH1 + 1.0f);
+              rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 0);
+              rlVertex2f(px1, yy - pH1 - 1.0f);
               
               rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 255);
-              rlVertex2f(px0, yy - pH0); rlVertex2f(px0, yy + pH0);
-              rlVertex2f(px1, yy + pH1); rlVertex2f(px1, yy - pH1);
+              rlVertex2f(px0, yy - pH0 + 0.5f);
+              rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 255);
+              rlVertex2f(px0, yy + pH0 - 0.5f);
+              rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 255);
+              rlVertex2f(px1, yy + pH1 - 0.5f);
+              rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 255);
+              rlVertex2f(px1, yy - pH1 + 0.5f);
           }
       }
   }
   rlEnd();
 
-  // Beat Grid — ticks use semi-transparent overlay to preserve waveform pixels beneath
+  // Beat Grid — ticks use semi-transparent overlay to preserve waveform pixels
+  // beneath
   if (r->State->LoadedTrack != NULL) {
-    double minVisibleMs = ((elapsedHalfFrames + (wfLeft - playheadX) * effectiveZoom) / 0.15) - 500.0;
-    double maxVisibleMs = ((elapsedHalfFrames + (wfRight - playheadX) * effectiveZoom) / 0.15) + 500.0;
+    double minVisibleMs =
+        ((elapsedHalfFrames + (wfLeft - playheadX) * effectiveZoom) / 0.15) -
+        500.0;
+    double maxVisibleMs =
+        ((elapsedHalfFrames + (wfRight - playheadX) * effectiveZoom) / 0.15) +
+        500.0;
 
     for (int i = 0; i < r->State->LoadedTrack->Analysis.BeatGridCount; i++) {
-      unsigned int originalMs = r->State->LoadedTrack->Analysis.BeatGrid[i].Time;
-      if (originalMs == 0xFFFFFFFF) break;
-      if ((double)originalMs < minVisibleMs) continue;
-      if ((double)originalMs > maxVisibleMs) break;
+      unsigned int originalMs =
+          r->State->LoadedTrack->Analysis.BeatGrid[i].Time;
+      if (originalMs == 0xFFFFFFFF)
+        break;
+      if ((double)originalMs < minVisibleMs)
+        continue;
+      if ((double)originalMs > maxVisibleMs)
+        break;
 
       uint16_t beatNum = r->State->LoadedTrack->Analysis.BeatGrid[i].BeatNumber;
       double beatPosHF = (double)originalMs * 0.15;
-      float px = (float)((beatPosHF - elapsedHalfFrames) / (double)effectiveZoom);
+      float px =
+          (float)((beatPosHF - elapsedHalfFrames) / (double)effectiveZoom);
       float bx = playheadX + px;
 
       if (bx >= wfLeft && bx <= wfRight) {
         bool isBar = (beatNum == 1);
-        bool isLastBeat = (i == r->State->LoadedTrack->Analysis.BeatGridCount - 1);
+        bool isLastBeat =
+            (i == r->State->LoadedTrack->Analysis.BeatGridCount - 1);
 
         Color capColor = isBar ? Fade(ColorRed, 0.85f) : Fade(colorHigh, 0.55f);
-        if (isLastBeat) capColor = ColorRed;
+        if (isLastBeat)
+          capColor = ColorRed;
 
-        DrawRectangleV((Vector2){bx - 1.0f, wfY}, (Vector2){3.0f, S(7)}, capColor);
-        DrawRectangleV((Vector2){bx - 1.0f, wfY + waveH - S(7)}, (Vector2){3.0f, S(7)}, capColor);
+        DrawRectangleV((Vector2){bx - 1.0f, wfY}, (Vector2){3.0f, S(7)},
+                       capColor);
+        DrawRectangleV((Vector2){bx - 1.0f, wfY + waveH - S(7)},
+                       (Vector2){3.0f, S(7)}, capColor);
 
-        Color lineColor = isBar ? Fade(ColorRed, 0.20f) : Fade(colorHigh, 0.12f);
+        Color lineColor =
+            isBar ? Fade(ColorRed, 0.20f) : Fade(colorHigh, 0.12f);
         if (isLastBeat) {
-          DrawRectangleV((Vector2){bx - 1.0f, wfY + S(7)}, (Vector2){3.0f, waveH - S(14)}, Fade(ColorRed, 0.8f));
+          DrawRectangleV((Vector2){bx - 1.0f, wfY + S(7)},
+                         (Vector2){3.0f, waveH - S(14)}, Fade(ColorRed, 0.8f));
         } else {
-          DrawRectangleV((Vector2){bx, wfY + S(7)}, (Vector2){1.0f, waveH - S(14)}, lineColor);
+          DrawRectangleV((Vector2){bx, wfY + S(7)},
+                         (Vector2){1.0f, waveH - S(14)}, lineColor);
         }
       }
     }
@@ -722,17 +811,19 @@ static void Waveform_Draw(Component *base) {
 
   // Main Cue Marker
   if (r->State->LoadedTrack != NULL) {
-      double cuePosHF = (double)r->State->MainCueMs * 0.15;
-      float px = (float)((cuePosHF - elapsedHalfFrames) / (double)effectiveZoom);
-      float bx = playheadX + px;
-      
-      if (bx >= wfLeft && bx <= wfRight) {
-          // Orange triangle at the bottom pointing up
-          DrawTriangle((Vector2){bx - S(6), wfY + waveH}, (Vector2){bx + S(6), wfY + waveH},
-                       (Vector2){bx, wfY + waveH - S(8)}, ColorOrange);
-          // Vertical white line
-          DrawLineEx((Vector2){bx, wfY}, (Vector2){bx, wfY + waveH}, 1.5f, ColorWhite);
-      }
+    double cuePosHF = (double)r->State->MainCueMs * 0.15;
+    float px = (float)((cuePosHF - elapsedHalfFrames) / (double)effectiveZoom);
+    float bx = playheadX + px;
+
+    if (bx >= wfLeft && bx <= wfRight) {
+      // Orange triangle at the bottom pointing up
+      DrawTriangle((Vector2){bx - S(6), wfY + waveH},
+                   (Vector2){bx + S(6), wfY + waveH},
+                   (Vector2){bx, wfY + waveH - S(8)}, ColorOrange);
+      // Vertical white line
+      DrawLineEx((Vector2){bx, wfY}, (Vector2){bx, wfY + waveH}, 1.5f,
+                 ColorWhite);
+    }
   }
 
   // Memory Cues
@@ -745,19 +836,21 @@ static void Waveform_Draw(Component *base) {
 
       if (bx >= wfLeft - S(2) && bx <= wfRight + S(2)) {
         // Vertical orange line
-        DrawLineEx((Vector2){bx, wfY}, (Vector2){bx, wfY + waveH}, 1.0f, ColorOrange);
+        DrawLineEx((Vector2){bx, wfY}, (Vector2){bx, wfY + waveH}, 1.0f,
+                   ColorOrange);
         // Small marker at bottom
-        DrawRectangleV((Vector2){bx - 1.0f, wfY + waveH - S(5)}, (Vector2){3.0f, S(5)}, ColorOrange);
+        DrawRectangleV((Vector2){bx - 1.0f, wfY + waveH - S(5)},
+                       (Vector2){3.0f, S(5)}, ColorOrange);
       }
     }
   }
 
   // Hot Cues — scrolling colored triangles with letter labels
   if (r->State->LoadedTrack != NULL) {
-    static const Color hcPalette[8] = {
-        {0, 255, 0, 255},   {255, 0, 0, 255},   {255, 128, 0, 255},
-        {255, 255, 0, 255}, {0, 0, 255, 255},   {255, 0, 255, 255},
-        {0, 255, 255, 255}, {128, 0, 255, 255}};
+    static const Color hcPalette[8] = {{0, 255, 0, 255},   {255, 0, 0, 255},
+                                       {255, 128, 0, 255}, {255, 255, 0, 255},
+                                       {0, 0, 255, 255},   {255, 0, 255, 255},
+                                       {0, 255, 255, 255}, {128, 0, 255, 255}};
 
     for (int i = 0; i < r->State->LoadedTrack->HotCuesCount; i++) {
       HotCue hc = r->State->LoadedTrack->HotCues[i];
@@ -767,21 +860,26 @@ static void Waveform_Draw(Component *base) {
 
       if (bx >= wfLeft - S(10) && bx <= wfRight + S(10)) {
         int idx = hc.ID - 1;
-        if (idx < 0) idx = 0; if (idx > 7) idx = 7;
+        if (idx < 0)
+          idx = 0;
+        if (idx > 7)
+          idx = 7;
         Color hcClr = GetCueColor(hc, hcPalette[idx]);
         // Triangle pointing down at top
         DrawTriangle((Vector2){bx - S(6), wfY}, (Vector2){bx + S(6), wfY},
                      (Vector2){bx, wfY + S(10)}, hcClr);
-        
+
         // Letter indicator with background
         char hcLabel[2] = {(char)('A' + hc.ID - 1), 0};
         Font hcFont = UIFonts_GetBoldFace(S(12));
         float txtW = MeasureTextEx(hcFont, hcLabel, S(12), 1).x;
-        DrawRectangleRec((Rectangle){bx + S(6), wfY, txtW + S(4), S(14)}, (Color){0, 0, 0, 220});
+        DrawRectangleRec((Rectangle){bx + S(6), wfY, txtW + S(4), S(14)},
+                         (Color){0, 0, 0, 220});
         UIDrawText(hcLabel, hcFont, bx + S(8), wfY + S(1), S(12), hcClr);
-        
+
         // Bold vertical line through waveform
-        DrawRectangleV((Vector2){bx - 1.0f, wfY + S(10)}, (Vector2){3.0f, waveH - S(10)}, Fade(hcClr, 0.85f));
+        DrawRectangleV((Vector2){bx - 1.0f, wfY + S(10)},
+                       (Vector2){3.0f, waveH - S(10)}, Fade(hcClr, 0.85f));
       }
     }
   }
@@ -792,64 +890,82 @@ static void Waveform_Draw(Component *base) {
   if (globalAudioEngine && r->ID >= 0 && r->ID < 2) {
     DeckAudioState *audio = &globalAudioEngine->Decks[r->ID];
     if (audio->IsLooping || r->State->LoopAdjustIn || r->State->LoopAdjustOut) {
-        double ratioHF = (audio->SampleRate > 0) ? ((double)audio->SampleRate / 150.0) : 294.0;
-        double loopStartHF = audio->LoopStartPos / ratioHF;
-        double loopEndHF = audio->LoopEndPos / ratioHF;
-        
-        float xStart = (float)((loopStartHF - elapsedHalfFrames) / (double)effectiveZoom);
-        float xEnd = (float)((loopEndHF - elapsedHalfFrames) / (double)effectiveZoom);
-        
-        float bxStart = playheadX + xStart;
-        float bxEnd = playheadX + xEnd;
-        
-        // Draw loop shaded region
-        if (bxEnd >= wfLeft && bxStart <= wfRight) {
-            float drawLeft = fmaxf(bxStart, wfLeft);
-            float drawRight = fminf(bxEnd, wfRight);
-            Color loopCol = (Color){ 255, 165, 0, 255 }; // Amber DJ loop color
-            DrawRectangleRec((Rectangle){drawLeft, wfY, drawRight - drawLeft, waveH}, Fade(loopCol, 0.25f));
-            
-            // Draw In boundary
-            if (bxStart >= wfLeft && bxStart <= wfRight) {
-                bool adjIn = r->State->LoopAdjustIn;
-                Color inCol = adjIn ? (Color){ 255, 230, 0, 255 } : loopCol;
-                float lineThick = adjIn ? 4.0f : 2.5f;
-                DrawLineEx((Vector2){bxStart, wfY}, (Vector2){bxStart, wfY + waveH}, lineThick, inCol);
-                DrawRectangleRec((Rectangle){bxStart, wfY + 2, 24, 16}, Fade(inCol, adjIn ? 0.95f : 0.7f));
-                DrawText("IN", (int)bxStart + 4, (int)wfY + 4, 10, BLACK);
-            }
-            // Draw Out boundary
-            if (bxEnd >= wfLeft && bxEnd <= wfRight) {
-                bool adjOut = r->State->LoopAdjustOut;
-                Color outCol = adjOut ? (Color){ 255, 230, 0, 255 } : loopCol;
-                float lineThick = adjOut ? 4.0f : 2.5f;
-                DrawLineEx((Vector2){bxEnd, wfY}, (Vector2){bxEnd, wfY + waveH}, lineThick, outCol);
-                DrawRectangleRec((Rectangle){bxEnd - 28, wfY + 2, 26, 16}, Fade(outCol, adjOut ? 0.95f : 0.7f));
-                DrawText("OUT", (int)bxEnd - 24, (int)wfY + 4, 10, BLACK);
-            }
+      double ratioHF =
+          (audio->SampleRate > 0) ? ((double)audio->SampleRate / 150.0) : 294.0;
+      double loopStartHF = audio->LoopStartPos / ratioHF;
+      double loopEndHF = audio->LoopEndPos / ratioHF;
+
+      float xStart =
+          (float)((loopStartHF - elapsedHalfFrames) / (double)effectiveZoom);
+      float xEnd =
+          (float)((loopEndHF - elapsedHalfFrames) / (double)effectiveZoom);
+
+      float bxStart = playheadX + xStart;
+      float bxEnd = playheadX + xEnd;
+
+      // Draw loop shaded region
+      if (bxEnd >= wfLeft && bxStart <= wfRight) {
+        float drawLeft = fmaxf(bxStart, wfLeft);
+        float drawRight = fminf(bxEnd, wfRight);
+        Color loopCol = (Color){255, 165, 0, 255}; // Amber DJ loop color
+        DrawRectangleRec(
+            (Rectangle){drawLeft, wfY, drawRight - drawLeft, waveH},
+            Fade(loopCol, 0.25f));
+
+        // Draw In boundary
+        if (bxStart >= wfLeft && bxStart <= wfRight) {
+          bool adjIn = r->State->LoopAdjustIn;
+          Color inCol = adjIn ? (Color){255, 230, 0, 255} : loopCol;
+          float lineThick = adjIn ? 4.0f : 2.5f;
+          DrawLineEx((Vector2){bxStart, wfY}, (Vector2){bxStart, wfY + waveH},
+                     lineThick, inCol);
+          DrawRectangleRec((Rectangle){bxStart, wfY + 2, 24, 16},
+                           Fade(inCol, adjIn ? 0.95f : 0.7f));
+          DrawText("IN", (int)bxStart + 4, (int)wfY + 4, 10, BLACK);
+        }
+        // Draw Out boundary
+        if (bxEnd >= wfLeft && bxEnd <= wfRight) {
+          bool adjOut = r->State->LoopAdjustOut;
+          Color outCol = adjOut ? (Color){255, 230, 0, 255} : loopCol;
+          float lineThick = adjOut ? 4.0f : 2.5f;
+          DrawLineEx((Vector2){bxEnd, wfY}, (Vector2){bxEnd, wfY + waveH},
+                     lineThick, outCol);
+          DrawRectangleRec((Rectangle){bxEnd - 28, wfY + 2, 26, 16},
+                           Fade(outCol, adjOut ? 0.95f : 0.7f));
+          DrawText("OUT", (int)bxEnd - 24, (int)wfY + 4, 10, BLACK);
+        }
+      }
+
+      // Active Loop Adjust Mode Badge & Running Live Playhead
+      if (r->State->LoopAdjustIn || r->State->LoopAdjustOut) {
+        if (r->State->LoopAdjustIn) {
+          DrawRectangleRec((Rectangle){wfLeft + 10, wfY + 6, 106, 20},
+                           Fade((Color){255, 220, 0, 255}, 0.9f));
+          DrawText("LOOP IN ADJ", (int)wfLeft + 16, (int)wfY + 10, 11, BLACK);
+        } else {
+          DrawRectangleRec((Rectangle){wfRight - 116, wfY + 6, 106, 20},
+                           Fade((Color){255, 220, 0, 255}, 0.9f));
+          DrawText("LOOP OUT ADJ", (int)wfRight - 110, (int)wfY + 10, 11,
+                   BLACK);
         }
 
-        // Active Loop Adjust Mode Badge & Running Live Playhead
-        if (r->State->LoopAdjustIn || r->State->LoopAdjustOut) {
-            if (r->State->LoopAdjustIn) {
-                DrawRectangleRec((Rectangle){wfLeft + 10, wfY + 6, 106, 20}, Fade((Color){255, 220, 0, 255}, 0.9f));
-                DrawText("LOOP IN ADJ", (int)wfLeft + 16, (int)wfY + 10, 11, BLACK);
-            } else {
-                DrawRectangleRec((Rectangle){wfRight - 116, wfY + 6, 106, 20}, Fade((Color){255, 220, 0, 255}, 0.9f));
-                DrawText("LOOP OUT ADJ", (int)wfRight - 110, (int)wfY + 10, 11, BLACK);
-            }
+        // Draw animated live playhead sweeping through loop area
+        double livePosHF = audio->Position / ratioHF;
+        float xLive =
+            (float)((livePosHF - elapsedHalfFrames) / (double)effectiveZoom);
+        float bxLive = playheadX + xLive;
 
-            // Draw animated live playhead sweeping through loop area
-            double livePosHF = audio->Position / ratioHF;
-            float xLive = (float)((livePosHF - elapsedHalfFrames) / (double)effectiveZoom);
-            float bxLive = playheadX + xLive;
-            
-            if (bxLive >= wfLeft && bxLive <= wfRight) {
-                DrawLineEx((Vector2){bxLive, wfY}, (Vector2){bxLive, wfY + waveH}, 2.5f, ColorRed);
-                DrawTriangle((Vector2){bxLive - S(4), wfY}, (Vector2){bxLive + S(4), wfY}, (Vector2){bxLive, wfY + S(6)}, ColorRed);
-                DrawTriangle((Vector2){bxLive - S(4), wfY + waveH}, (Vector2){bxLive + S(4), wfY + waveH}, (Vector2){bxLive, wfY + waveH - S(6)}, ColorRed);
-            }
+        if (bxLive >= wfLeft && bxLive <= wfRight) {
+          DrawLineEx((Vector2){bxLive, wfY}, (Vector2){bxLive, wfY + waveH},
+                     2.5f, ColorRed);
+          DrawTriangle((Vector2){bxLive - S(4), wfY},
+                       (Vector2){bxLive + S(4), wfY},
+                       (Vector2){bxLive, wfY + S(6)}, ColorRed);
+          DrawTriangle((Vector2){bxLive - S(4), wfY + waveH},
+                       (Vector2){bxLive + S(4), wfY + waveH},
+                       (Vector2){bxLive, wfY + waveH - S(6)}, ColorRed);
         }
+      }
     }
   }
 
@@ -857,29 +973,34 @@ static void Waveform_Draw(Component *base) {
   if (globalAudioEngine) {
     DeckAudioState *audio = &globalAudioEngine->Decks[r->ID];
     if (audio->SlipActive) {
-        double ratioHF = (double)audio->SampleRate / 150.0;
-        double slipPosHF = audio->SlipPosition / ratioHF;
-        float xSlip = (float)((slipPosHF - elapsedHalfFrames) / (double)effectiveZoom);
-        float bxSlip = playheadX + xSlip;
-        
-        if (bxSlip >= wfLeft && bxSlip <= wfRight) {
-            // Draw a dimmed/ghost playhead line
-            DrawLineEx((Vector2){bxSlip, wfY}, (Vector2){bxSlip, wfY + waveH}, 1.0f, Fade(ColorWhite, 0.4f));
-            // Tiny arrow at top
-            DrawTriangle((Vector2){bxSlip - S(3), wfY}, (Vector2){bxSlip + S(3), wfY}, (Vector2){bxSlip, wfY + S(5)}, Fade(ColorWhite, 0.6f));
-        }
+      double ratioHF = (double)audio->SampleRate / 150.0;
+      double slipPosHF = audio->SlipPosition / ratioHF;
+      float xSlip =
+          (float)((slipPosHF - elapsedHalfFrames) / (double)effectiveZoom);
+      float bxSlip = playheadX + xSlip;
+
+      if (bxSlip >= wfLeft && bxSlip <= wfRight) {
+        // Draw a dimmed/ghost playhead line
+        DrawLineEx((Vector2){bxSlip, wfY}, (Vector2){bxSlip, wfY + waveH}, 1.0f,
+                   Fade(ColorWhite, 0.4f));
+        // Tiny arrow at top
+        DrawTriangle((Vector2){bxSlip - S(3), wfY},
+                     (Vector2){bxSlip + S(3), wfY},
+                     (Vector2){bxSlip, wfY + S(5)}, Fade(ColorWhite, 0.6f));
+      }
     }
   }
 
-  // Playhead — solid bright line with subtle glow shadow behind it (only when not editing loop)
+  // Playhead — solid bright line with subtle glow shadow behind it (only when
+  // not editing loop)
   if (!r->State->LoopAdjustIn && !r->State->LoopAdjustOut) {
     Color playheadColor = colorHigh;
     // Shadow (slightly wider, low alpha)
-    DrawLineEx((Vector2){playheadX, wfY}, (Vector2){playheadX, wfY + waveH}, 3.0f,
-               Fade(colorHigh, 0.18f));
+    DrawLineEx((Vector2){playheadX, wfY}, (Vector2){playheadX, wfY + waveH},
+               3.0f, Fade(colorHigh, 0.18f));
     // Main hairline
-    DrawLineEx((Vector2){playheadX, wfY}, (Vector2){playheadX, wfY + waveH}, 1.0f,
-               playheadColor);
+    DrawLineEx((Vector2){playheadX, wfY}, (Vector2){playheadX, wfY + waveH},
+               1.0f, playheadColor);
   }
 
   if (r->ID == 0) {
@@ -897,7 +1018,8 @@ static void Waveform_Draw(Component *base) {
     float pmY = wfY + S(4);
 
     // Get current beat (1-4) and map it to a 0-3 index for the blocks
-    int myBeat = Quantize_GetCurrentBeat(r->State->LoadedTrack, r->State->PositionMs);
+    int myBeat =
+        Quantize_GetCurrentBeat(r->State->LoadedTrack, r->State->PositionMs);
     int myDisplayBeat = ((myBeat - 1) % 4);
 
     float blockSpacing = S(4);
@@ -906,10 +1028,10 @@ static void Waveform_Draw(Component *base) {
     // Draw Main Deck (This Deck) - Large Blocks
     for (int i = 0; i < 4; i++) {
       float bx = pmX + i * (blockW + blockSpacing);
-      
+
       // Draw empty box outline
       DrawRectangleLines(bx, pmY, blockW, pmH, ColorShadow);
-      
+
       // Fill the box if it's the current beat
       if (i == myDisplayBeat) {
         Color c = r->State->IsMaster ? ColorOrange : ColorWhite;
@@ -919,20 +1041,22 @@ static void Waveform_Draw(Component *base) {
 
     // Draw Other Deck - Small blocks underneath (for visual beat matching)
     if (r->OtherDeck && r->OtherDeck->LoadedTrack) {
-      int otherBeat = Quantize_GetCurrentBeat(r->OtherDeck->LoadedTrack, r->OtherDeck->PositionMs);
+      int otherBeat = Quantize_GetCurrentBeat(r->OtherDeck->LoadedTrack,
+                                              r->OtherDeck->PositionMs);
       int otherDisplayBeat = ((otherBeat - 1) % 4);
-      
+
       float otherY = pmY + pmH + S(2);
       float otherH = S(4); // Smaller height for the secondary track
-      
+
       for (int i = 0; i < 4; i++) {
         float bx = pmX + i * (blockW + blockSpacing);
-        
+
         DrawRectangleLines(bx, otherY, blockW, otherH, ColorShadow);
-        
+
         if (i == otherDisplayBeat) {
           // Dim the other deck's color slightly unless it's the master
-          Color c = r->OtherDeck->IsMaster ? ColorOrange : Fade(ColorWhite, 0.6f);
+          Color c =
+              r->OtherDeck->IsMaster ? ColorOrange : Fade(ColorWhite, 0.6f);
           DrawRectangle(bx, otherY, blockW, otherH, c);
         }
       }
@@ -941,11 +1065,14 @@ static void Waveform_Draw(Component *base) {
 
   // --- LOADING OVERLAY ---
   if (r->State->IsLoading) {
-      float pulse = (sinf(GetTime() * 10.0f) * 0.5f + 0.5f); // 0.0 to 1.0
-      DrawRectangle(wfLeft, wfY, wfRight - wfLeft, waveH, Fade(ColorOrange, 0.1f + pulse * 0.2f));
-      
-      Font faceBPM = UIFonts_GetFace(S(20));
-      DrawCentredText("LOADING TRACK...", faceBPM, wfLeft, wfW, wfY + waveCenter - S(10), S(20), Fade(ColorWhite, 0.6f + pulse * 0.4f));
+    float pulse = (sinf(GetTime() * 10.0f) * 0.5f + 0.5f); // 0.0 to 1.0
+    DrawRectangle(wfLeft, wfY, wfRight - wfLeft, waveH,
+                  Fade(ColorOrange, 0.1f + pulse * 0.2f));
+
+    Font faceBPM = UIFonts_GetFace(S(20));
+    DrawCentredText("LOADING TRACK...", faceBPM, wfLeft, wfW,
+                    wfY + waveCenter - S(10), S(20),
+                    Fade(ColorWhite, 0.6f + pulse * 0.4f));
   }
 }
 
