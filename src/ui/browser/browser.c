@@ -8,6 +8,7 @@
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
 #include "ui/player/player_state.h"
+#include "input/input.h"
 #include "library/unx_database.h"
 #include "core/system_info.h"
 #include <math.h>
@@ -978,7 +979,7 @@ static int Browser_Update(Component *base) {
   static int lastTrackTapIdx = -1;
 
   // Layout Variables
-  Vector2 mousePos = UIGetMousePosition();
+  Vector2 mousePos = Input_GetPointerPos();
   float sidebarW = S(40);
   float rowH = S(28.0f);
   float sbTrackW = S(14);
@@ -1005,13 +1006,13 @@ static int Browser_Update(Component *base) {
       float oskH = S(172);
       Rectangle oskPanelRect = {0, viewH - oskH, SCREEN_WIDTH, oskH};
       if (CheckCollisionPointRec(mousePos, oskPanelRect)) {
-        if (UI_IsPressed()) {
+        if (Input_IsPressed()) {
           // Touch absorbed by OSK overlay
         }
       }
     }
 
-    if (UI_IsReleased() && !s->IsDragging) {
+    if (Input_IsReleased() && !s->IsDragging) {
       double now = GetTime();
       if ((now - lastBrowserListTapTime) >= 0.18) {
         // Handle OSK Button Toggle
@@ -1174,7 +1175,7 @@ static int Browser_Update(Component *base) {
   static double lastPopupOpenedTime = 0.0;
   bool wasPopupOpen = s->ShowLoadPopup;
   if (wasPopupOpen) {
-    if ((GetTime() - lastPopupOpenedTime) >= 0.25 && UI_IsReleased()) {
+    if ((GetTime() - lastPopupOpenedTime) >= 0.25 && Input_IsReleased() && Input_GetDragDistance() < S(10.0f)) {
       float pw = S(240);
       float ph = S(120);
       float viewH = SCREEN_HEIGHT - DECK_STR_H;
@@ -1189,17 +1190,17 @@ static int Browser_Update(Component *base) {
         loadToDeck = 0;
         targetIdx = s->PopupTrackIdx;
         s->ShowLoadPopup = false;
-        UI_ConsumeTouch(); // Prevent bleed-through to list items below
+        Input_Consume(); // Prevent bleed-through to list items below
       } else if (CheckCollisionPointRec(mousePos, deckBRect)) {
         loadToDeck = 1;
         targetIdx = s->PopupTrackIdx;
         s->ShowLoadPopup = false;
-        UI_ConsumeTouch(); // Prevent bleed-through to list items below
+        Input_Consume(); // Prevent bleed-through to list items below
       } else if (!CheckCollisionPointRec(mousePos,
                                          (Rectangle){px, py, pw, ph})) {
         // Backdrop click
         s->ShowLoadPopup = false;
-        UI_ConsumeTouch();
+        Input_Consume();
       }
     }
     if (!s->IsSearching && (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) || s->MidiRequestBack)) {
@@ -1228,9 +1229,9 @@ static int Browser_Update(Component *base) {
 
     // BUG-03 FIX: Debounce sidebar click to prevent double-trigger
     double sidebarNow = GetTime();
-    if (UICheckClick(boxRect) && (sidebarNow - lastBrowserListTapTime) >= 0.14) {
+    if (Input_CheckClickEx(boxRect, 0.0f) && (sidebarNow - lastBrowserListTapTime) >= 0.14) {
         lastBrowserListTapTime = sidebarNow;
-        s->TouchDragAccumulator = 999.0f;
+        s->TouchDragAccumulator = 0.0f;
         // BUG-05 FIX: Reset scroll velocity when switching categories via sidebar
         s->ScrollVelocity = 0.0f;
         s->TouchVelocityY = 0.0f;
@@ -1287,7 +1288,7 @@ static int Browser_Update(Component *base) {
 
       // Handle Dropping into Bank
       bool isHovered = CheckCollisionPointRec(mousePos, boxRect);
-      if (s->IsDragging && UI_IsReleased() && isHovered) {
+      if (s->IsDragging && Input_IsReleased() && isHovered) {
         if (i >= 4) {
           int bankIdx = i - 4;
           if (s->DraggingType == 1) { // Only playlists can be banked
@@ -1394,10 +1395,10 @@ static int Browser_Update(Component *base) {
 
     float sbTrackX = SCREEN_WIDTH - sbTrackW;
     float sbTrackY = listYOffset;
-    float sbTrackH = viewH - listYOffset;
+    float sbTrackH = listAreaH;
     Rectangle sbRect = {sbTrackX, sbTrackY, sbTrackW, sbTrackH};
 
-    if (UI_IsPressed()) {
+    if (Input_IsPressed() && mousePos.y < SCREEN_HEIGHT - DECK_STR_H && mousePos.y > TOP_BAR_H) {
       s->TouchDragAccumulator = 0.0f;
       s->TouchVelocityY = 0.0f;
       s->LastTouchX = mousePos.x;
@@ -1411,7 +1412,7 @@ static int Browser_Update(Component *base) {
       }
     }
 
-    if (UI_IsDown()) {
+    if (Input_IsDown()) {
       if (s->IsScrollbarDragging) {
         float ratio = (mousePos.y - sbTrackY) / sbTrackH;
         if (ratio < 0.0f) ratio = 0.0f;
@@ -1461,7 +1462,7 @@ static int Browser_Update(Component *base) {
       }
     }
 
-    if (UI_IsReleased()) {
+    if (Input_IsReleased()) {
       if (s->IsDragging && fabsf(s->TouchVelocityY) > 60.0f) {
         s->ScrollVelocity = s->TouchVelocityY; // Apply touch flick velocity
       }
@@ -1470,7 +1471,7 @@ static int Browser_Update(Component *base) {
     }
 
     // Wheel Scroll
-    float wheelMove = GetMouseWheelMove();
+    float wheelMove = Mouse_GetWheel();
     if (wheelMove != 0) {
       s->VisualScroll -= wheelMove * rowH * 3.0f;
       s->ScrollVelocity = 0.0f; 
@@ -1501,49 +1502,44 @@ static int Browser_Update(Component *base) {
       // Visually within the list clip area
       if (ry < listYOffset - S(10) || ry > SCREEN_HEIGHT - DECK_STR_H - S(5)) continue;
 
-      if (CheckCollisionPointRec(mousePos, itemRect)) {
-        if (UI_IsPressed()) {
-          s->DraggingIdx = idx;
-          if (s->BrowseLevel == 1) s->DraggingType = 1; 
-          else if (s->BrowseLevel == 0) s->DraggingType = 0;
-          else s->DraggingType = -1;
-        }
+      if (Input_CheckPress(itemRect)) {
+        s->DraggingIdx = idx;
+        if (s->BrowseLevel == 1) s->DraggingType = 1; 
+        else if (s->BrowseLevel == 0) s->DraggingType = 0;
+        else s->DraggingType = -1;
+      }
 
-        if (UI_IsReleased() && !s->IsDragging) {
-          double now = GetTime();
-          if (s->TouchDragAccumulator < S(10.0f) && fabsf(s->ScrollVelocity) < 60.0f) {
-            s->ShowOSK = false; // Auto hide keyboard on list item tap
-            if (s->CursorPos + s->ScrollOffset != idx) {
-              s->CursorPos = idx - s->ScrollOffset;
-              s->MarqueeScrollX = 0; 
-            }
-            if (s->BrowseLevel == 0) {
-              // BUG-07 FIX: Double tap window minimum raised from 50ms to 80ms for reliable touch
-              double dt = now - lastTrackTapTime;
-              if (idx == lastTrackTapIdx && dt <= 0.38 && dt >= 0.08) {
-                s->ShowLoadPopup = true;
-                lastPopupOpenedTime = now;
-                s->PopupTrackIdx = idx;
-                lastTrackTapTime = 0.0;
-                lastTrackTapIdx = -1;
-              } else {
-                lastTrackTapTime = now;
-                lastTrackTapIdx = idx;
-                lastBrowserListTapTime = now;
-              }
-            } else if (!s->IsTagList) {
-              if ((now - lastBrowserListTapTime) >= 0.14) {
-                lastBrowserListTapTime = now;
-                triggerEnter = true;
-              }
-            }
+      if (Input_CheckClickEx(itemRect, 0.0f) && fabsf(s->ScrollVelocity) < 60.0f) {
+        double now = GetTime();
+        s->ShowOSK = false; // Auto hide keyboard on list item tap
+        if (s->CursorPos + s->ScrollOffset != idx) {
+          s->CursorPos = idx - s->ScrollOffset;
+          s->MarqueeScrollX = 0; 
+        }
+        if (s->BrowseLevel == 0) {
+          double dt = now - lastTrackTapTime;
+          if (idx == lastTrackTapIdx && dt <= 0.38 && dt >= 0.08) {
+            s->ShowLoadPopup = true;
+            lastPopupOpenedTime = now;
+            s->PopupTrackIdx = idx;
+            lastTrackTapTime = 0.0;
+            lastTrackTapIdx = -1;
+          } else {
+            lastTrackTapTime = now;
+            lastTrackTapIdx = idx;
+            lastBrowserListTapTime = now;
+          }
+        } else if (!s->IsTagList) {
+          if ((now - lastBrowserListTapTime) >= 0.14) {
+            lastBrowserListTapTime = now;
+            triggerEnter = true;
           }
         }
       }
     }
   }
 
-  if (UI_IsReleased())
+  if (TouchInput_GetState() == TOUCH_STATE_RELEASED)
     s->IsDragging = false;
 
   // 4. Keyboard Navigation (Sync with VisualScroll)
@@ -1580,53 +1576,54 @@ static int Browser_Update(Component *base) {
 
   if (IsKeyPressed(KEY_ENTER) || triggerEnter) {
     // BUG-04 FIX: Do not trigger enter during active drag
-    if (s->IsDragging) goto skip_enter;
-    lastBrowserListTapTime = GetTime();
-    s->TouchDragAccumulator = 999.0f; // Consume touch drag distance to prevent re-triggering sub-level
-    if (s->FocusArea == 1) {
-      int i = s->SidebarCursorPos;
-      s->FocusArea = 0;
+    if (!s->IsDragging) {
+      lastBrowserListTapTime = GetTime();
+      s->TouchDragAccumulator = 999.0f; // Consume touch drag distance to prevent re-triggering sub-level
       s->ShowOSK = false;
-      if (i < 4) {
-        s->ScrollOffset = 0;
-        s->VisualScroll = 0;
-        s->ScrollVelocity = 0;
-        if (i == 3) {
-          s->BrowseLevel = 3; // Source / Devices
-          s->CursorPos = 0;
-        } else if (i == 2) {
-          s->BrowseLevel = 1; // Playlists level
-          s->CursorPos = 0;
-        } else if (i == 1) {
-          s->BrowseLevel = 2; // Categories level
-          s->CursorPos = 0;
-        } else {
-          s->BrowseLevel = 0; // Tracks
-          s->CurrentPlaylistIdx = -1;
-          s->CameFromBank = false;
-          s->CursorPos = 0;
-          s->SortMode = 0;
-          s->SortAscending = true;
-          Browser_UpdateActiveTracks(s);
-        }
-      } else {
-        int bankIdx = i - 4;
-        if (s->PlaylistBank[bankIdx].PlaylistIdx >= 0) {
-          if (s->SelectedStorage && strcmp(s->PlaylistBank[bankIdx].StoragePath, s->SelectedStorage->Path) != 0) {
-            Browser_SwitchStorageByPath(s, s->PlaylistBank[bankIdx].StoragePath);
-          }
-          s->CurrentPlaylistIdx = s->PlaylistBank[bankIdx].PlaylistIdx;
-          s->CameFromBank = true;
-          s->BrowseLevel = 0;
-          s->SortMode = 0;
-          s->SortAscending = true;
-          Browser_UpdateActiveTracks(s);
-          s->CursorPos = s->ScrollOffset = 0;
+      
+      if (s->FocusArea == 1) {
+        int i = s->SidebarCursorPos;
+        s->FocusArea = 0;
+        if (i < 4) {
+          s->ScrollOffset = 0;
           s->VisualScroll = 0;
           s->ScrollVelocity = 0;
+          if (i == 3) {
+            s->BrowseLevel = 3; // Source / Devices
+            s->CursorPos = 0;
+          } else if (i == 2) {
+            s->BrowseLevel = 1; // Playlists level
+            s->CursorPos = 0;
+          } else if (i == 1) {
+            s->BrowseLevel = 2; // Categories level
+            s->CursorPos = 0;
+          } else {
+            s->BrowseLevel = 0; // Tracks
+            s->CurrentPlaylistIdx = -1;
+            s->CameFromBank = false;
+            s->CursorPos = 0;
+            s->SortMode = 0;
+            s->SortAscending = true;
+            Browser_UpdateActiveTracks(s);
+          }
+        } else {
+          int bankIdx = i - 4;
+          if (s->PlaylistBank[bankIdx].PlaylistIdx >= 0) {
+            if (s->SelectedStorage && strcmp(s->PlaylistBank[bankIdx].StoragePath, s->SelectedStorage->Path) != 0) {
+              Browser_SwitchStorageByPath(s, s->PlaylistBank[bankIdx].StoragePath);
+            }
+            s->CurrentPlaylistIdx = s->PlaylistBank[bankIdx].PlaylistIdx;
+            s->CameFromBank = true;
+            s->BrowseLevel = 0;
+            s->SortMode = 0;
+            s->SortAscending = true;
+            Browser_UpdateActiveTracks(s);
+            s->CursorPos = s->ScrollOffset = 0;
+            s->VisualScroll = 0;
+            s->ScrollVelocity = 0;
+          }
         }
-      }
-    } else if (s->BrowseLevel == 3) {
+      } else if (s->BrowseLevel == 3) {
       int idx = s->ScrollOffset + s->CursorPos;
       if (idx < s->StorageCount) {
         s->SelectedStorage = &s->AvailableStorages[idx];
@@ -1734,20 +1731,15 @@ static int Browser_Update(Component *base) {
       }
     }
   }
-  skip_enter:;
+}
 
-  if (!s->IsSearching && (IsKeyPressed(KEY_BACKSPACE) || s->MidiRequestBack)) {
+  if (!s->IsSearching && (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_ESCAPE) || s->MidiRequestBack)) {
     Browser_Back(s);
   }
 
   if (s->BrowseLevel == 0 && loadToDeck != -1) {
     int idx = s->ScrollOffset + s->CursorPos;
     return Browser_LoadTrackAtIndex(s, idx, loadToDeck, false);
-  }
-
-
-  if ((IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_ESCAPE))) {
-    Browser_Back(s);
   }
 
   s->MidiRequestBack = false;
@@ -2174,7 +2166,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
       char label[2] = { ch, '\0' };
       DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14), ColorWhite);
 
-      if (canPressOSK && UI_IsPressed() && isHover) {
+      if (canPressOSK && Input_IsPressed() && isHover) {
           lastOskKeyPressTime = now;
           if (strlen(s->SearchQuery) < 63) {
               int len = strlen(s->SearchQuery);
@@ -2205,7 +2197,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
       char label[2] = { ch, '\0' };
       DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14), ColorWhite);
 
-      if (canPressOSK && UI_IsPressed() && isHover) {
+      if (canPressOSK && Input_IsPressed() && isHover) {
           lastOskKeyPressTime = now;
           if (strlen(s->SearchQuery) < 63) {
               int len = strlen(s->SearchQuery);
@@ -2234,7 +2226,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(shiftRect, 1.0f, s->OSKShiftActive ? ColorWhite : ColorDark1);
   DrawCentredText("SHIFT", faceXS, shiftRect.x, shiftRect.width, shiftRect.y + S(12), S(10), ColorWhite);
 
-  if (canPressOSK && UI_IsPressed() && hoverShift) {
+  if (canPressOSK && Input_IsPressed() && hoverShift) {
       lastOskKeyPressTime = now;
       s->OSKShiftActive = !s->OSKShiftActive;
   }
@@ -2252,7 +2244,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
       char label[2] = { ch, '\0' };
       DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14), ColorWhite);
 
-      if (canPressOSK && UI_IsPressed() && isHover) {
+      if (canPressOSK && Input_IsPressed() && isHover) {
           lastOskKeyPressTime = now;
           if (strlen(s->SearchQuery) < 63) {
               int len = strlen(s->SearchQuery);
@@ -2272,7 +2264,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(bkspRect, 1.0f, hoverBksp ? ColorWhite : ColorDark1);
   DrawCentredText("BKSP", faceXS, bkspRect.x, bkspRect.width, bkspRect.y + S(12), S(10), ColorWhite);
 
-  if (canPressOSK && UI_IsPressed() && hoverBksp) {
+  if (canPressOSK && Input_IsPressed() && hoverBksp) {
       lastOskKeyPressTime = now;
       int len = strlen(s->SearchQuery);
       if (len > 0) {
@@ -2297,7 +2289,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(modeRect, 1.0f, ColorDark1);
   DrawCentredText((s->OSKMode == 0) ? "?123" : "ABC", faceSm, modeRect.x, modeRect.width, modeRect.y + S(11), S(12), ColorOrange);
 
-  if (canPressOSK && UI_IsPressed() && hoverMode) {
+  if (canPressOSK && Input_IsPressed() && hoverMode) {
       lastOskKeyPressTime = now;
       s->OSKMode = (s->OSKMode == 0) ? 1 : 0;
   }
@@ -2309,7 +2301,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(spaceRect, 1.0f, ColorDark1);
   DrawCentredText("SPACE", faceXS, spaceRect.x, spaceRect.width, spaceRect.y + S(12), S(10), ColorShadow);
 
-  if (canPressOSK && UI_IsPressed() && hoverSpace) {
+  if (canPressOSK && Input_IsPressed() && hoverSpace) {
       lastOskKeyPressTime = now;
       if (strlen(s->SearchQuery) < 63) {
           int len = strlen(s->SearchQuery);
@@ -2328,7 +2320,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(clearRect, 1.0f, ColorDark1);
   DrawCentredText("CLEAR", faceXS, clearRect.x, clearRect.width, clearRect.y + S(12), S(10), ColorWhite);
 
-  if (canPressOSK && UI_IsPressed() && hoverClear) {
+  if (canPressOSK && Input_IsPressed() && hoverClear) {
       lastOskKeyPressTime = now;
       s->SearchQuery[0] = '\0';
       s->CursorPos = s->ScrollOffset = 0;
@@ -2343,7 +2335,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   DrawRectangleLinesEx(hideBtnRect, 1.0f, ColorWhite);
   DrawCentredText("HIDE", faceSm, hideBtnRect.x, hideBtnRect.width, hideBtnRect.y + S(11), S(12), ColorWhite);
 
-  if (canPressOSK && UI_IsPressed() && hoverHide) {
+  if (canPressOSK && Input_IsPressed() && hoverHide) {
       lastOskKeyPressTime = now;
       s->ShowOSK = false;
       s->IsSearching = (strlen(s->SearchQuery) > 0);
@@ -2375,7 +2367,7 @@ static void Browser_Draw(Component *base) {
   (void)faceBrand;
 
   // Sidebar Boxes (1:1 Squares)
-  Vector2 mPos = UIGetMousePosition();
+  Vector2 mPos = Input_GetPointerPos();
   for (int i = 0; i < 7; i++) {
     float boxY = TOP_BAR_H + i * sidebarW;
     Rectangle boxRect = {0, boxY, sidebarW, sidebarW};

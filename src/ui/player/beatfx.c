@@ -5,7 +5,7 @@
 #include "core/logic/quantize.h"
 #include "audio/engine.h"
 #include "ui/player/waveform.h"
-#include "ui/components/touch_utility.h"
+#include "input/input.h"
 #include <stdio.h>
 #include <math.h>
 
@@ -18,7 +18,7 @@ static const char* AllFXNames[] = {
 
 static int BeatFX_Update(Component *base) {
     BeatFXPanel *b = (BeatFXPanel *)base;
-    Vector2 mouse = UIGetMousePosition();
+    Vector2 mouse = Input_GetPointerPos();
     
     float x = BEAT_FX_X;
     float y = TOP_BAR_H;
@@ -34,7 +34,6 @@ static int BeatFX_Update(Component *base) {
     cy += S(10); // Spacing after "CH SELECT" label
     
     Rectangle chRect = { x + S(4), cy, w - S(8), S(20) };
-    bool chHovered = CheckCollisionPointRec(mouse, chRect);
     
     // Sync UI State with Engine State (if engine exists)
     if (b->AudioPlugin) {
@@ -54,7 +53,7 @@ static int BeatFX_Update(Component *base) {
         float btnW = (modalW - pad * 4) / cols;
         float btnH = (modalH - S(45) - pad * 6) / 5;
 
-        if (UI_IsReleased()) {
+        if (Input_IsReleased()) {
             bool insideModal = CheckCollisionPointRec(mouse, (Rectangle){modalX, modalY, modalW, modalH});
             if (insideModal) {
                 for (int i = 0; i < ALL_FX_COUNT; i++) {
@@ -66,16 +65,16 @@ static int BeatFX_Update(Component *base) {
                         b->State->SelectedFX = i;
                         if (b->AudioPlugin) BeatFXManager_SetFX(&b->AudioPlugin->BeatFX, i);
                         b->State->FXDropdownOpen = false;
-                        UI_ConsumeTouch();
+                        Input_Consume();
                         break;
                     }
                 }
             } else {
                 b->State->FXDropdownOpen = false;
-                UI_ConsumeTouch();
+                Input_Consume();
             }
-        } else if (UI_IsPressed() || UI_IsDown()) {
-            UI_ConsumeTouch();
+        } else if (Input_IsPressed() || Input_IsDown()) {
+            Input_Consume();
         }
 
         if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
@@ -92,7 +91,7 @@ static int BeatFX_Update(Component *base) {
         float btnW = modalW - pad * 2;
         float btnH = S(44);
 
-        if (UI_IsReleased()) {
+        if (Input_IsReleased()) {
             bool insideModal = CheckCollisionPointRec(mouse, (Rectangle){modalX, modalY, modalW, modalH});
             if (insideModal) {
                 for (int i = 0; i < 3; i++) {
@@ -102,16 +101,16 @@ static int BeatFX_Update(Component *base) {
                         b->State->SelectedChannel = i;
                         if (b->AudioPlugin) b->AudioPlugin->BeatFX.targetChannel = i;
                         b->State->ChannelDropdownOpen = false;
-                        UI_ConsumeTouch();
+                        Input_Consume();
                         break;
                     }
                 }
             } else {
                 b->State->ChannelDropdownOpen = false;
-                UI_ConsumeTouch();
+                Input_Consume();
             }
-        } else if (UI_IsPressed() || UI_IsDown()) {
-            UI_ConsumeTouch();
+        } else if (Input_IsPressed() || Input_IsDown()) {
+            Input_Consume();
         }
 
         if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
@@ -124,8 +123,9 @@ static int BeatFX_Update(Component *base) {
             b->State->FXDropdownOpen = true;
         }
     
+        bool chHovered = CheckCollisionPointRec(mouse, chRect);
         if (chHovered) {
-            float wheel = GetMouseWheelMove();
+            float wheel = Mouse_GetWheel();
             if (wheel != 0) {
                 int next = b->State->SelectedChannel - (int)wheel;
                 if (next < 0) next = 2;
@@ -352,12 +352,16 @@ static void BeatFX_Draw(Component *base) {
 
     // 4b. +/- BUTTONS (Restored without ZOOM/GRID label)
     float halfB = (w - S(12)) / 2;
-    DrawRectangle(x + S(4), cy, halfB, S(20), ColorDark2);
-    DrawRectangleLines(x + S(4), cy, halfB, S(20), ColorShadow);
+    Rectangle minusRect = { x + S(4), cy, halfB, S(20) };
+    Color minusColor = (Input_IsDown() && CheckCollisionPointRec(Input_GetPointerPos(), minusRect)) ? ColorGray : ColorDark2;
+    DrawRectangleRec(minusRect, minusColor);
+    DrawRectangleLinesEx(minusRect, 1.0f, ColorShadow);
     DrawCentredText("-", faceSm, x + S(4), halfB, cy + S(5.5f), S(9), ColorWhite);
 
-    DrawRectangle(x + S(8) + halfB, cy, halfB, S(20), ColorDark2);
-    DrawRectangleLines(x + S(8) + halfB, cy, halfB, S(20), ColorShadow);
+    Rectangle plusRect = { x + S(8) + halfB, cy, halfB, S(20) };
+    Color plusColor = (Input_IsDown() && CheckCollisionPointRec(Input_GetPointerPos(), plusRect)) ? ColorGray : ColorDark2;
+    DrawRectangleRec(plusRect, plusColor);
+    DrawRectangleLinesEx(plusRect, 1.0f, ColorShadow);
     DrawCentredText("+", faceSm, x + S(8) + halfB, halfB, cy + S(5.5f), S(9), ColorWhite);
 
     cy = y + h - S(18); // Bottom alignment
@@ -386,7 +390,7 @@ void BeatFXPanel_DrawOverlays(BeatFXPanel *b) {
     Font faceMd = UIFonts_GetFace(S(10));
     Font faceLg = UIFonts_GetFace(S(12));
     
-    Vector2 mouse = UIGetMousePosition();
+    Vector2 mouse = Input_GetPointerPos();
     if (b->State->FXDropdownOpen) {
         DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, 200});
         

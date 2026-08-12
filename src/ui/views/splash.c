@@ -36,18 +36,18 @@ static void Splash_Draw(Component *base) {
     DrawTextureEx(*tex, (Vector2){dx, dy}, 0.0f, scale, WHITE);
   }
 
-  Font face = UIFonts_GetFace(14);
+  Font face = UIFonts_GetFace(S(14));
   char devInfo[128];
   sprintf(devInfo, "Developed by %s", APP_INSTAGRAM);
-  DrawCentredText(devInfo, face, 0, SCREEN_WIDTH, SCREEN_HEIGHT - 60, 14,
+  DrawCentredText(devInfo, face, 0, SCREEN_WIDTH, SCREEN_HEIGHT - S(60), S(14),
                   ColorWhite);
 
   // Loading Progress Bar
   if (s->Progress) {
     float barW = SCREEN_WIDTH * 0.4f;
-    float barH = 6.0f;
+    float barH = S(6.0f);
     float barX = (SCREEN_WIDTH - barW) / 2.0f;
-    float barY = SCREEN_HEIGHT - 100.0f;
+    float barY = SCREEN_HEIGHT - S(100.0f);
 
     DrawRectangleRounded((Rectangle){barX, barY, barW, barH}, 1.0f, 4,
                          ColorDark2);

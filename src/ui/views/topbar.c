@@ -2,7 +2,7 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
-#include "ui/components/touch_utility.h"
+#include "input/input.h"
 #include <stdio.h>
 
 static int TopBar_Update(Component *base) {

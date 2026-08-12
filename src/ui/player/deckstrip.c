@@ -4,6 +4,7 @@
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
 #include "ui/player/waveform.h"
+#include "input/input.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -98,35 +99,35 @@ static int DeckStrip_Update(Component *base) {
   float syncY = midY + bpmBoxH + S(2);
   float syncH = S(12);
 
-  Vector2 mouse = UIGetMousePosition();
+  Vector2 mouse = Input_GetPointerPos();
   bool isHoverTempoArea = (mouse.x >= tempoX && mouse.x <= bpmX + bpmBoxW &&
                            mouse.y >= midY && mouse.y <= midY + S(28));
 
   // Time Mode Toggle
   float tx = mtX + mtW + S(6);
 
-  if (UICheckClick((Rectangle){ x, y + S(50), lColW, S(16) })) {
+  if (Touch_CheckClick((Rectangle){ x, y + S(50), lColW, S(16) }, S(2.0f))) {
     d->State->PlayMode = (d->State->PlayMode == 0) ? 1 : 0;
   }
-  if (UICheckClick((Rectangle){ x, y + S(68), lColW, S(20) })) {
+  if (Touch_CheckClick((Rectangle){ x, y + S(68), lColW, S(20) }, S(2.0f))) {
     d->State->QuantizeEnabled = !d->State->QuantizeEnabled;
   }
-  if (UICheckClick((Rectangle){ mtX, mtY, mtW, mtH })) {
+  if (Touch_CheckClick((Rectangle){ mtX, mtY, mtW, mtH }, S(2.0f))) {
     d->State->MasterTempo = !d->State->MasterTempo;
   }
-  if (UICheckClick((Rectangle){ bpmX, syncY, bpmBoxW, syncH })) {
+  if (Touch_CheckClick((Rectangle){ bpmX, syncY, bpmBoxW, syncH }, S(2.0f))) {
     d->State->SyncMode = (d->State->SyncMode + 1) % 3;
   }
-  if (UICheckClick((Rectangle){ tx, midY, S(80), S(28) })) {
+  if (Touch_CheckClick((Rectangle){ tx, midY, S(80), S(28) }, S(2.0f))) {
     d->State->TimeMode = (d->State->TimeMode + 1) % 2;
   }
-  if (UICheckClick((Rectangle){ tempoX, midY, S(64), S(28) })) {
+  if (Touch_CheckClick((Rectangle){ tempoX, midY, S(64), S(28) }, S(2.0f))) {
     d->State->TempoRange = (d->State->TempoRange + 1) % 4;
   }
 
   // Mouse Wheel for Tempo
   if (isHoverTempoArea) {
-    float wheel = GetMouseWheelMove();
+    float wheel = Mouse_GetWheel();
     if (wheel != 0.0f) {
       float step = 0.02f;
       if (d->State->TempoRange == 1) step = 0.05f;
@@ -155,7 +156,7 @@ static int DeckStrip_Update(Component *base) {
     float wh = S(26);
     Rectangle wfmRect = {wx, wy, ww, wh};
 
-    if (UI_IsPressed() && CheckCollisionPointRec(mouse, wfmRect)) {
+    if (Input_IsPressed() && CheckCollisionPointRec(mouse, wfmRect)) {
       if (!uiTouching[d->ID]) {
         uiTouching[d->ID] = true;
         wasPlayingBeforeSeek[d->ID] = d->State->IsPlaying;
@@ -166,7 +167,7 @@ static int DeckStrip_Update(Component *base) {
     }
 
     if (uiTouching[d->ID]) {
-      if (UI_IsDown()) {
+      if (Input_IsDown()) {
         float ratio = (mouse.x - wx) / ww;
         if (ratio < 0.0f) ratio = 0.0f;
         if (ratio > 1.0f) ratio = 1.0f;
@@ -215,7 +216,6 @@ static void DeckStrip_Draw(Component *base) {
 
   float lColW = S(40);
   float lColX = x;
-  drawLeftBadgeColumn(d, x, y, DECK_STR_H);
 
   float mx = lColX + lColW + S(4);
   float titleBgH = S(16);

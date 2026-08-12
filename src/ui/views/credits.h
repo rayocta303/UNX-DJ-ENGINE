@@ -3,7 +3,7 @@
 #include "ui/components/component.h"
 #include <stdbool.h>
 
-#include "ui/components/touch_utility.h"
+#include "input/touch_utility.h"
 
 typedef struct {
     bool IsActive;

@@ -2,7 +2,7 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
-#include "ui/components/touch_utility.h"
+#include "input/input.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -17,10 +17,10 @@ static int Pad_Update(Component *base) {
   static int pressedPad = -1;
   static int pressedDeck = -1;
 
-  Vector2 mouse = UIGetMousePosition();
-  bool isDown = UI_IsDown();
-  bool isPressed = UI_IsPressed();
-  bool isReleased = UI_IsReleased();
+  Vector2 mouse = Input_GetPointerPos();
+  bool isDown = Input_IsDown();
+  bool isPressed = Input_IsPressed();
+  bool isReleased = Input_IsReleased();
 
   float availableH = SCREEN_HEIGHT - TOP_BAR_H - DECK_STR_H;
   float panelW = (SCREEN_WIDTH - S(24)) / 2.0f;
@@ -309,8 +309,8 @@ static void Pad_Draw(Component *base) {
       UIDrawText(lbl, faceLg, px + S(6), py + S(4), S(13),
                  hasData ? padColor : ColorShadow);
 
-      if (UI_IsDown() &&
-          CheckCollisionPointRec(UIGetMousePosition(), rect)) {
+      if (Input_IsDown() &&
+          CheckCollisionPointRec(Input_GetPointerPos(), rect)) {
         DrawRectangleRec(rect, Fade(ColorWhite, 0.3f));
       }
     }

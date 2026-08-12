@@ -3,7 +3,7 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
-#include "ui/components/touch_utility.h"
+#include "input/input.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -18,7 +18,7 @@ static int Settings_Update(Component *base) {
 
   double now = GetTime();
   bool canClick = (now - g_lastSettingsClickTime) >= 0.12;
-  Vector2 mouse = UIGetMousePosition();
+  Vector2 mouse = Input_GetPointerPos();
 
   // If a sub-window or modal popup is open, disable background item clicking
   if (r->State->IsDropdownOpen || r->State->IsEditMappingOpen ||
@@ -28,8 +28,8 @@ static int Settings_Update(Component *base) {
   }
 
   if (r->State->IsSystemInfoOpen) {
-    if (UI_IsReleased()) {
-      Vector2 mouse = UIGetMousePosition();
+    if (Input_IsReleased() && Input_GetDragDistance() < S(10.0f)) {
+      Vector2 mouse = Input_GetPointerPos();
       float winW = GetScreenWidth();
       float winH = GetScreenHeight() - DECK_STR_H;
       float modalW = S(360.0f);
@@ -47,7 +47,7 @@ static int Settings_Update(Component *base) {
           !CheckCollisionPointRec(
               mouse, (Rectangle){modalX, modalY, modalW, modalH})) {
         r->State->IsSystemInfoOpen = false;
-        UI_ConsumeTouch();
+        Input_Consume();
         return 1;
       }
     }
@@ -61,8 +61,8 @@ static int Settings_Update(Component *base) {
 
   // --- CONFIRMATION POPUP HANDLER ---
   if (r->State->IsConfirmPopupOpen) {
-    if (UI_IsReleased()) {
-      Vector2 mouse = UIGetMousePosition();
+    if (Input_IsReleased() && Input_GetDragDistance() < S(10.0f)) {
+      Vector2 mouse = Input_GetPointerPos();
       float winW = GetScreenWidth();
       float winH = GetScreenHeight() - DECK_STR_H;
       float modalW = S(320.0f);
@@ -75,7 +75,7 @@ static int Settings_Update(Component *base) {
 
       if (CheckCollisionPointRec(mouse, cancelBtn)) {
         r->State->IsConfirmPopupOpen = false;
-        UI_ConsumeTouch();
+        Input_Consume();
         return 1;
       }
       if (CheckCollisionPointRec(mouse, okBtn)) {
@@ -83,12 +83,12 @@ static int Settings_Update(Component *base) {
            r->OnAction(r->callbackCtx, r->State->ConfirmActionIdx);
         }
         r->State->IsConfirmPopupOpen = false;
-        UI_ConsumeTouch();
+        Input_Consume();
         return 1;
       }
       if (!CheckCollisionPointRec(mouse, (Rectangle){modalX, modalY, modalW, modalH})) {
         r->State->IsConfirmPopupOpen = false;
-        UI_ConsumeTouch();
+        Input_Consume();
         return 1;
       }
     }
@@ -136,8 +136,8 @@ static int Settings_Update(Component *base) {
       if (r->OnApply) r->OnApply(r->callbackCtx);
     }
 
-    if (UI_IsReleased()) {
-      Vector2 mouse = UIGetMousePosition();
+    if (Input_IsReleased()) {
+      Vector2 mouse = Input_GetPointerPos();
       Rectangle closeBtn = {modalX + modalW - S(32), modalY + S(3), S(28), S(24)};
       Rectangle okBtn = {modalX + (modalW - S(120))/2.0f, modalY + modalH - S(44), S(120), S(32)};
       
@@ -147,19 +147,19 @@ static int Settings_Update(Component *base) {
       
       if (CheckCollisionPointRec(mouse, closeBtn) || CheckCollisionPointRec(mouse, okBtn)) {
         r->State->IsSliderModalOpen = false;
-        UI_ConsumeTouch();
+        Input_Consume();
         return 1;
       }
       if (!inSlider && !CheckCollisionPointRec(mouse, (Rectangle){modalX, modalY, modalW, modalH})) {
         r->State->IsSliderModalOpen = false;
-        UI_ConsumeTouch();
+        Input_Consume();
         return 1;
       }
     }
     
     // Touch drag on slider
-    if (UI_IsDown()) {
-       Vector2 mouse = UIGetMousePosition();
+    if (Input_IsDown()) {
+       Vector2 mouse = Input_GetPointerPos();
        Rectangle sliderRect = {modalX + S(30), modalY + S(60), modalW - S(60), S(50)}; // wider touch area
        if (CheckCollisionPointRec(mouse, sliderRect)) {
           float relX = mouse.x - sliderRect.x;
@@ -221,12 +221,12 @@ static int Settings_Update(Component *base) {
 
     // BUG-13 FIX: Use drag accumulator to avoid dropdown jump on initial tap
     static float dropDragAccum = 0.0f;
-    if (UI_IsPressed()) {
+    if (Input_IsPressed()) {
       dropDragAccum = 0.0f;
       r->State->TouchDragAccumulator = 0.0f;
     }
-    if (UI_IsDown()) {
-      float dy = GetMouseDelta().y;
+    if (Input_IsDown()) {
+      float dy = Mouse_GetDelta().y;
       dropDragAccum += fabsf(dy);
       if (dropDragAccum > S(3.0f)) {
         r->State->DropdownScroll -= dy;
@@ -241,12 +241,12 @@ static int Settings_Update(Component *base) {
     if (r->State->DropdownScroll > maxScroll)
       r->State->DropdownScroll = maxScroll;
 
-    if (UI_IsReleased()) {
+    if (Input_IsReleased()) {
       g_lastSettingsClickTime = now;
       if (!CheckCollisionPointRec(mouse, dropRect)) {
         r->State->IsDropdownOpen = false;
         r->State->TouchDragAccumulator = 0.0f;
-        UI_ConsumeTouch();
+        Input_Consume();
       } else {
         float cy = dropdownY - r->State->DropdownScroll;
         for (int i = 0; i < item->OptionsCount; i++) {
@@ -261,7 +261,7 @@ static int Settings_Update(Component *base) {
                 r->OnValueChanged(r->callbackCtx, r->State->DropdownItemIdx);
               if (r->OnApply)
                 r->OnApply(r->callbackCtx);
-              UI_ConsumeTouch();
+              Input_Consume();
             }
           }
           cy += opHeight;
@@ -317,8 +317,8 @@ static int Settings_Update(Component *base) {
     Rectangle btn3 = {modalX + S(15), modalY + S(140), S(135), S(24)};
     Rectangle btn4 = {modalX + S(170), modalY + S(140), S(135), S(24)};
 
-    if (UI_IsReleased()) {
-      Vector2 mousePos = UIGetMousePosition();
+    if (Input_IsReleased()) {
+      Vector2 mousePos = Input_GetPointerPos();
       if (CheckCollisionPointRec(mousePos, btn1)) {
         g_lastSettingsClickTime = now;
         r->State->IsLearningMidi = true;
@@ -326,7 +326,7 @@ static int Settings_Update(Component *base) {
         uint8_t s, m;
         while (MIDI_GetLastMessage(&s, &m))
           ; // Flush
-        UI_ConsumeTouch();
+        Input_Consume();
       } else if (CheckCollisionPointRec(mousePos, btn2)) {
         g_lastSettingsClickTime = now;
         if (mapIdx >= 0 && mapIdx < map->count) {
@@ -343,7 +343,7 @@ static int Settings_Update(Component *base) {
           if (r->OnApply)
             r->OnApply(r->callbackCtx);
         }
-        UI_ConsumeTouch();
+        Input_Consume();
       } else if (CheckCollisionPointRec(mousePos, btn3)) {
         g_lastSettingsClickTime = now;
         if (mapIdx >= 0 && mapIdx < map->count) {
@@ -353,13 +353,13 @@ static int Settings_Update(Component *base) {
           if (r->OnApply)
             r->OnApply(r->callbackCtx);
         }
-        UI_ConsumeTouch();
+        Input_Consume();
       } else if (CheckCollisionPointRec(mousePos, btn4)) {
         g_lastSettingsClickTime = now;
         r->State->IsEditMappingOpen = false;
-        UI_ConsumeTouch();
+        Input_Consume();
       } else {
-        UI_ConsumeTouch();
+        Input_Consume();
       }
     }
 
@@ -390,15 +390,15 @@ static int Settings_Update(Component *base) {
     int visibleRows = (int)((divY - listY) / rowH);
 
     // Mouse click list item inside mapping list sub-window
-    if (UI_IsReleased()) {
-      Vector2 mousePos = UIGetMousePosition();
+    if (Input_IsReleased()) {
+      Vector2 mousePos = Input_GetPointerPos();
 
       // Back Button at the bottom
       Rectangle backRect = {S(15), divY + S(23), S(90), S(18)};
       if (CheckCollisionPointRec(mousePos, backRect)) {
         g_lastSettingsClickTime = now;
         r->State->IsMappingListOpen = false;
-        UI_ConsumeTouch();
+        Input_Consume();
         return 1;
       }
 
@@ -409,7 +409,7 @@ static int Settings_Update(Component *base) {
         g_lastSettingsClickTime = now;
         if (r->OnAction)
           r->OnAction(r->callbackCtx, 20);
-        UI_ConsumeTouch();
+        Input_Consume();
         return 1;
       }
 
@@ -419,7 +419,7 @@ static int Settings_Update(Component *base) {
         g_lastSettingsClickTime = now;
         if (r->OnAction)
           r->OnAction(r->callbackCtx, 21);
-        UI_ConsumeTouch();
+        Input_Consume();
         return 1;
       }
 
@@ -443,7 +443,7 @@ static int Settings_Update(Component *base) {
     }
 
     // Mouse Wheel Scroll inside sub-window
-    float wheel = GetMouseWheelMove();
+    float wheel = Mouse_GetWheel();
     if (wheel != 0) {
       if (wheel > 0) {
         if (r->State->MappingListScroll > 0)
@@ -489,13 +489,13 @@ static int Settings_Update(Component *base) {
     static float mapDragStartY = 0.0f;
     static float mapDragAccum = 0.0f;
     static bool mapIsDragging = false;
-    Vector2 mapMouse = UIGetMousePosition();
-    if (UI_IsPressed()) {
+    Vector2 mapMouse = Input_GetPointerPos();
+    if (Input_IsPressed()) {
       mapDragStartY = mapMouse.y;
       mapDragAccum = 0.0f;
       mapIsDragging = false;
     }
-    if (UI_IsDown()) {
+    if (Input_IsDown()) {
       float dy = mapMouse.y - mapDragStartY;
       mapDragAccum += fabsf(mapMouse.y - mapDragStartY);
       mapDragStartY = mapMouse.y;
@@ -516,7 +516,7 @@ static int Settings_Update(Component *base) {
         }
       }
     }
-    if (UI_IsReleased()) {
+    if (Input_IsReleased()) {
       mapIsDragging = false;
     }
 
@@ -675,15 +675,15 @@ static int Settings_Update(Component *base) {
     maxScroll = 0;
 
   // Touch Drag & Kinetic Swipe Scrubbing
-  Vector2 mousePos = UIGetMousePosition();
-  if (UI_IsPressed()) {
+  Vector2 mousePos = Input_GetPointerPos();
+  if (Input_IsPressed()) {
     r->State->LastTouchY = mousePos.y;
     r->State->TouchDragAccumulator = 0;
     r->State->IsDragging = false;
     r->State->ScrollVelocity = 0;
   }
 
-  if (UI_IsDown()) {
+  if (Input_IsDown()) {
     float frameTime = GetFrameTime();
     if (frameTime < 0.001f)
       frameTime = 0.016f;
@@ -726,7 +726,7 @@ static int Settings_Update(Component *base) {
     }
   }
 
-  if (UI_IsReleased()) {
+  if (Input_IsReleased()) {
     if (r->State->IsDragging && fabsf(r->State->TouchVelocityY) > 60.0f) {
       r->State->ScrollVelocity = r->State->TouchVelocityY;
     }
@@ -758,7 +758,7 @@ static int Settings_Update(Component *base) {
   }
 
   // Mouse Wheel Controls (Restricted Knob wheel area to prevent scroll interference)
-  float wheel = GetMouseWheelMove();
+  float wheel = Mouse_GetWheel();
   if (wheel != 0) {
     bool consumedByKnob = false;
     if (hoveredItemIdx >= 0 &&
@@ -792,12 +792,12 @@ static int Settings_Update(Component *base) {
   }
 
   // Mouse Drag Knob Controls (Restricted to knob control area only)
-  if (!r->State->IsDropdownOpen && UI_IsDown()) {
-    Vector2 mouseDelta = GetMouseDelta();
+  if (!r->State->IsDropdownOpen && Input_IsDown()) {
+    Vector2 mouseDelta = Mouse_GetDelta();
     if (hoveredItemIdx >= 0 &&
         r->State->Items[hoveredItemIdx].Type == SETTING_TYPE_KNOB) {
       Rectangle knobArea = { SCREEN_WIDTH - S(140), hoveredRowY, S(140), rowH };
-      Vector2 touchStartPos = UIGetTouchStartPos();
+      Vector2 touchStartPos = Input_GetStartPos();
       // Require touch start OR current mouse position to be in knob area
       if (CheckCollisionPointRec(mousePos, knobArea) || CheckCollisionPointRec(touchStartPos, knobArea)) {
         if (fabsf(mouseDelta.x) > 0.001f || fabsf(mouseDelta.y) > 0.001f) {
@@ -819,7 +819,7 @@ static int Settings_Update(Component *base) {
   }
 
   // OSK-style Touch Release & Debounced Tap Actions
-  if (canClick && UI_IsReleased() && !r->State->IsDragging) {
+  if (canClick && Input_IsReleased() && !r->State->IsDragging) {
     if (r->State->TouchDragAccumulator < S(10.0f) &&
         fabsf(r->State->ScrollVelocity) < 40.0f) {
       float divY = viewH - bottomH;
@@ -854,7 +854,7 @@ static int Settings_Update(Component *base) {
           continue;
         Rectangle rowRect = {0, ry, SCREEN_WIDTH, rowH};
 
-        if (UICheckClick(rowRect)) {
+        if (Input_CheckClick(rowRect)) {
           g_lastSettingsClickTime = now;
           r->State->CursorPos = i;
 
@@ -1108,7 +1108,7 @@ static void Settings_Draw(Component *base) {
                              S(1.5f), ColorOrange);
       }
     } else {
-      Vector2 mouse = UIGetMousePosition();
+      Vector2 mouse = Input_GetPointerPos();
       if (CheckCollisionPointRec(mouse, tRect)) {
         DrawRectangleRec(tRect, (Color){255, 255, 255, 15});
         DrawCentredText(tabs[i], faceSm, i * tabW, tabW, TOP_BAR_H + S(8),

@@ -5,11 +5,11 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
-#include "ui/components/touch_utility.h"
+#include "input/input.h"
 
 static int BottomStrip_Update(Component *base) {
     BeatFXSelectBar *b = (BeatFXSelectBar *)base;
-    Vector2 mouse = UIGetMousePosition();
+    Vector2 mouse = Input_GetPointerPos();
     float barY = TOP_BAR_H + WAVE_AREA_H;
     float halfW = SCREEN_WIDTH / 2.0f;
 
@@ -65,7 +65,7 @@ static int BottomStrip_Update(Component *base) {
         }
     }
 
-    if (b->State->ShowBeatFXTab && UI_IsDown()) {
+    if (b->State->ShowBeatFXTab && Input_IsDown()) {
         float btnY = barY + S(13);
         float btnH = S(23);
         float cx = halfW + S(2);

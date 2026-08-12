@@ -8,6 +8,14 @@
 extern "C" {
 #endif
 
+// Touch States
+typedef enum {
+    TOUCH_STATE_IDLE = 0,
+    TOUCH_STATE_PRESSED,
+    TOUCH_STATE_DRAGGING,
+    TOUCH_STATE_RELEASED
+} TouchState;
+
 // Smooth Kinetic Touch Scroll State
 typedef struct {
     float Scroll;            // Target visual scroll offset
@@ -26,6 +34,13 @@ typedef struct {
 typedef struct {
     double LastClickTime;
 } TouchDebounce;
+
+// Core Input System
+void TouchInput_Update(void);
+TouchState TouchInput_GetState(void);
+Vector2 TouchInput_GetPosition(void);
+Vector2 TouchInput_GetStartPos(void);
+float TouchInput_GetDragDistance(void);
 
 // Initialize touch scroll state
 void TouchScroll_Init(TouchScroll *ts);
@@ -50,6 +65,8 @@ bool Touch_CheckPress(Rectangle rect, float padding);
 
 // Reset global touch debounce timer
 void Touch_ResetGlobalDebounce(void);
+float Touch_GetDragDistance(void);
+Vector2 Touch_GetStartPos(void);
 
 // Reset instance touch debounce timer
 void Touch_ResetDebounce(TouchDebounce *td);

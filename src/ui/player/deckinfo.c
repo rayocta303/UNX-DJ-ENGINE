@@ -2,7 +2,7 @@
 #include "ui/components/theme.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
-#include "ui/components/touch_utility.h"
+#include "input/input.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -25,9 +25,6 @@ static int DeckInfo_Update(Component *base) {
     float headerH = S(14.0f);
     float contentY = y + headerH + S(6);
     float statusH = S(22);
-    float btnH = S(26);
-    float btnY = y + deckInfoH - btnH - S(6);
-    float btnW = (deckInfoW - margin * 2 - S(6)) / 2.0f;
 
     // 1. Eject Button (Touch Utility)
     float ejectW = S(20);
@@ -39,38 +36,44 @@ static int DeckInfo_Update(Component *base) {
     bool isEjectLocked = d->State->Waveform.LoadLock && d->State->IsPlaying;
 
     if (!isEjectLocked && d->State->LoadedTrack != NULL && Touch_CheckClick(ejectRect, S(8.0f))) {
-        DeckAudio_Unload(&d->Engine->Decks[d->ID]);
-        d->State->IsPlaying = false;
-        d->State->IsCueActive = false;
-        d->State->IsCueHeld = false;
-        d->State->IsTouching = false;
-        d->State->IsLooping = false;
-        d->State->LoopAdjustIn = false;
-        d->State->LoopAdjustOut = false;
-        d->State->JogRate = 0.0f;
-        d->State->JogDelta = 0.0;
-        d->State->Position = 0;
-        d->State->PositionMs = 0;
-        d->State->MainCueMs = 0;
-        d->State->TrackLengthMs = 0;
-        d->State->CurrentBPM = 0.0f;
-        d->State->OriginalBPM = 0.0f;
-        d->State->IsPhaseDrifted = false;
-        d->State->HasSeekRequest = false;
-        d->State->IsMaster = false;
-        if (d->State->LoadedTrack) {
-            TrackState *t = d->State->LoadedTrack;
-            d->State->LoadedTrack = NULL;
-            if (t->Analysis.BeatGrid != NULL) free(t->Analysis.BeatGrid);
-            if (t->Analysis.Phrases != NULL) free(t->Analysis.Phrases);
-            if (t->Analysis.Cues != NULL) free(t->Analysis.Cues);
-            if (t->Analysis.DynamicWaveform != NULL) free(t->Analysis.DynamicWaveform);
-            free(t);
+        double now = GetTime();
+        if (now - d->lastEjectTapTime < 2.0) { // 2 seconds window
+            DeckAudio_Unload(&d->Engine->Decks[d->ID]);
+            d->State->IsPlaying = false;
+            d->State->IsCueActive = false;
+            d->State->IsCueHeld = false;
+            d->State->IsTouching = false;
+            d->State->IsLooping = false;
+            d->State->LoopAdjustIn = false;
+            d->State->LoopAdjustOut = false;
+            d->State->JogRate = 0.0f;
+            d->State->JogDelta = 0.0;
+            d->State->Position = 0;
+            d->State->PositionMs = 0;
+            d->State->MainCueMs = 0;
+            d->State->TrackLengthMs = 0;
+            d->State->CurrentBPM = 0.0f;
+            d->State->OriginalBPM = 0.0f;
+            d->State->IsPhaseDrifted = false;
+            d->State->HasSeekRequest = false;
+            d->State->IsMaster = false;
+            if (d->State->LoadedTrack) {
+                TrackState *t = d->State->LoadedTrack;
+                d->State->LoadedTrack = NULL;
+                if (t->Analysis.BeatGrid != NULL) free(t->Analysis.BeatGrid);
+                if (t->Analysis.Phrases != NULL) free(t->Analysis.Phrases);
+                if (t->Analysis.Cues != NULL) free(t->Analysis.Cues);
+                if (t->Analysis.DynamicWaveform != NULL) free(t->Analysis.DynamicWaveform);
+                free(t);
+            }
+            d->State->TrackTitle[0] = '\0';
+            d->State->ArtistName[0] = '\0';
+            d->State->ArtworkPath[0] = '\0';
+            strcpy(d->State->TrackKey, "");
+            d->lastEjectTapTime = 0.0;
+        } else {
+            d->lastEjectTapTime = now;
         }
-        d->State->TrackTitle[0] = '\0';
-        d->State->ArtistName[0] = '\0';
-        d->State->ArtworkPath[0] = '\0';
-        strcpy(d->State->TrackKey, "");
     }
 
     // 2. Utility Buttons (2 Rows x 2 Columns Grid) - ENLARGED
@@ -106,8 +109,8 @@ static int DeckInfo_Update(Component *base) {
     /*
     Rectangle cueRect = { margin, btnY, btnW, btnH };
     
-    if (CheckCollisionPointRec(UIGetMousePosition(), cueRect)) {
-        if (UI_IsPressed()) {
+    if (CheckCollisionPointRec(Input_GetPointerPos(), cueRect)) {
+        if (Input_IsPressed()) {
             if (d->State->IsPlaying) {
                 // While playing: Instant stop and jump back to cue
                 DeckAudio_InstantStop(&d->Engine->Decks[d->ID]);
@@ -136,7 +139,7 @@ static int DeckInfo_Update(Component *base) {
         }
     }
     
-    if (d->State->IsCueHeld && UI_IsReleased()) {
+    if (d->State->IsCueHeld && Input_IsReleased()) {
         // When releasing a held CUE: Instant stop and return to cue point
         DeckAudio_InstantStop(&d->Engine->Decks[d->ID]);
         DeckAudio_ExitLoop(&d->Engine->Decks[d->ID]);
@@ -147,7 +150,7 @@ static int DeckInfo_Update(Component *base) {
     }
 
     Rectangle playRect = { margin + btnW + S(6), btnY, btnW, btnH };
-    if (UICheckClick(playRect)) {
+    if (Input_CheckClick(playRect)) {
         if (d->State->IsCueHeld) {
             // CUE + PLAY interlock: keep playing after CUE is released
             d->State->IsCueHeld = false;
@@ -204,7 +207,6 @@ static void DeckInfo_Draw(Component *base) {
     DrawRectangle(0, y + headerH - S(1.0f), deckInfoW, S(1.0f), d->ID == 0 ? ColorBlue : ColorOrange);
 
     Font faceXXS = UIFonts_GetFace(S(7));
-    Font faceXS = UIFonts_GetFace(S(8.5f));
     Font faceSm = UIFonts_GetFace(S(10));
     Font faceIcon = UIFonts_GetIcon(S(11));
 
@@ -246,14 +248,19 @@ static void DeckInfo_Draw(Component *base) {
     bool isEjectLocked = d->State->Waveform.LoadLock && d->State->IsPlaying;
 
     if (!isEjectLocked && d->State->LoadedTrack != NULL) {
-        bool hoverEject = CheckCollisionPointRec(UIGetMousePosition(), ejectRect);
+        bool hoverEject = CheckCollisionPointRec(Input_GetPointerPos(), ejectRect);
+        bool isConfirming = (GetTime() - d->lastEjectTapTime < 2.0);
         
         // Button Background
-        DrawRectangleRounded(ejectRect, 0.4f, 6, hoverEject ? ColorRed : Fade(ColorBlack, 0.4f));
-        DrawRectangleLinesEx(ejectRect, S(0.6f), hoverEject ? ColorWhite : ColorShadow);
+        DrawRectangleRounded(ejectRect, 0.4f, 6, isConfirming ? ColorRed : (hoverEject ? ColorRed : Fade(ColorBlack, 0.4f)));
+        DrawRectangleLinesEx(ejectRect, S(0.6f), isConfirming ? ColorWhite : (hoverEject ? ColorWhite : ColorShadow));
         
-        // Icon (Eject) - Adjusted size for better fit
-        UIDrawText("\uf052", faceIcon, ejectRect.x + (ejectW - S(7))/2.0f, ejectRect.y + S(1.0f), S(7), ColorWhite);
+        // Icon (Eject)
+        if (isConfirming) {
+            UIDrawText("SURE?", faceXXS, ejectRect.x + S(2), ejectRect.y + S(1.5f), S(7), ColorWhite);
+        } else {
+            UIDrawText("\uf052", faceIcon, ejectRect.x + (ejectW - S(7))/2.0f, ejectRect.y + S(1.0f), S(7), ColorWhite);
+        }
     }
 
     float contentY = y + headerH + S(6);
@@ -345,7 +352,7 @@ static void DeckInfo_Draw(Component *base) {
 
     // Cue
     Rectangle cueRect = { margin, btnY, btnW, btnH };
-    bool hoverCue = CheckCollisionPointRec(UIGetMousePosition(), cueRect);
+    bool hoverCue = CheckCollisionPointRec(Input_GetPointerPos(), cueRect);
     bool isCueing = d->State->IsCueActive;
     DrawRectangleRec(cueRect, isCueing ? Fade(ColorCue, 0.4f) : ColorDark1);
     DrawRectangleLinesEx(cueRect, S(1), isCueing ? ColorCue : ColorShadow);
@@ -354,7 +361,7 @@ static void DeckInfo_Draw(Component *base) {
 
     // Play/Pause
     Rectangle playRect = { margin + btnW + S(6), btnY, btnW, btnH };
-    bool hoverPlay = CheckCollisionPointRec(UIGetMousePosition(), playRect);
+    bool hoverPlay = CheckCollisionPointRec(Input_GetPointerPos(), playRect);
     bool isPlaying = d->State->IsPlaying;
     DrawRectangleRec(playRect, isPlaying ? Fade(ColorGreen, 0.4f) : ColorDark1);
     DrawRectangleLinesEx(playRect, S(1), isPlaying ? ColorGreen : ColorShadow);
@@ -369,4 +376,5 @@ void DeckInfoPanel_Init(DeckInfoPanel *p, int id, DeckState *state, AudioEngine 
     p->ID = id;
     p->State = state;
     p->Engine = engine;
+    p->lastEjectTapTime = 0.0;
 }

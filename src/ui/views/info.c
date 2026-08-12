@@ -4,6 +4,7 @@
 #include "ui/components/theme.h"
 #include <stdio.h>
 #include <string.h>
+#include "input/input.h"
 
 // Helper to truncate string (simple byte truncation for C)
 static void truncateStr(const char *src, char *dst, int maxLen) {
@@ -23,9 +24,28 @@ static int Info_Update(Component *base) {
   InfoRenderer *r = (InfoRenderer *)base;
   if (!r || !r->State || !r->State->IsActive) return 0;
 
-  if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
+  bool touchClose = false;
+  if (Touch_CheckClickInArea((Rectangle){0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}, 0)) {
+      Vector2 mouse = Input_GetPointerPos();
+      float availableH = SCREEN_HEIGHT - TOP_BAR_H - DECK_STR_H;
+      float halfH = availableH / 2.0f;
+      float panelH = halfH - S(4);
+      float panelW = SCREEN_WIDTH - S(16);
+      float panelX = S(8);
+      
+      Rectangle card1 = {panelX, TOP_BAR_H + S(4), panelW, panelH};
+      Rectangle card2 = {panelX, TOP_BAR_H + halfH + S(4), panelW, panelH};
+      
+      if (!CheckCollisionPointRec(mouse, card1) && !CheckCollisionPointRec(mouse, card2)) {
+          touchClose = true;
+      }
+  }
+
+  if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) || touchClose) {
     r->State->IsActive = false;
-    UI_ConsumeTouch();
+    if (touchClose) {
+        Input_Consume();
+    }
   }
   return 0;
 }

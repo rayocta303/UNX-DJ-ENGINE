@@ -2,6 +2,7 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
+#include "input/input.h"
 #include "ui/player/player_state.h"
 #include <math.h>
 #include <stdio.h>
@@ -44,7 +45,7 @@ static void HandleVerticalFader(MixerState *state, float *val, float fx, float f
       *val = 1.0f;
   }
 
-  float wheel = GetMouseWheelMove();
+  float wheel = Mouse_GetWheel();
   if (hovered && wheel != 0 && (state->ActiveHandle == NULL || state->ActiveHandle == val)) {
     *val += wheel * 0.05f;
     if (*val < 0.0f) *val = 0.0f;
@@ -92,8 +93,8 @@ static void DrawVerticalFader(float x, float y, float w, float h, float val,
 static bool DrawFXButton(const char *label, float x, float y, float w, float h,
                          bool active) {
   bool hovered =
-      CheckCollisionPointRec(UIGetMousePosition(), (Rectangle){x, y, w, h});
-  bool pressed = UICheckClick((Rectangle){x, y, w, h});
+      CheckCollisionPointRec(Input_GetPointerPos(), (Rectangle){x, y, w, h});
+  bool pressed = Input_CheckClick((Rectangle){x, y, w, h});
   bool isFxBlinking = (fmod(GetTime(), 0.5) < 0.25);
   Color bg = active ? (isFxBlinking ? (Color){0, 140, 255, 255} : (Color){0, 40, 110, 255}) : (hovered ? ColorDark1 : ColorBlack);
   Color fg = active ? ColorWhite : ColorOrange;
@@ -125,7 +126,7 @@ static void HandleKnob(MixerState *state, float *val, float cx, float cy, float 
 
   // Update if this is the active handle
   if (mDown && state->ActiveHandle == val) {
-    Vector2 delta = GetMouseDelta();
+    Vector2 delta = Mouse_GetDelta();
     float range = max - min;
     float center = min + range / 2.0f;
     float oldVal = *val;
@@ -145,7 +146,7 @@ static void HandleKnob(MixerState *state, float *val, float cx, float cy, float 
     if (*val > max) *val = max;
   }
 
-  float wheel = GetMouseWheelMove();
+  float wheel = Mouse_GetWheel();
   if (wheel != 0.0f && hovered && (state->ActiveHandle == NULL || state->ActiveHandle == val)) {
     float range = max - min;
     float center = min + range / 2.0f;
@@ -161,7 +162,7 @@ static void HandleKnob(MixerState *state, float *val, float cx, float cy, float 
     if (*val > max) *val = max;
   }
 
-  if (UI_IsPressed() && hovered) {
+  if (Input_IsPressed() && hovered) {
     static float lastClickTime = 0;
     if (GetTime() - lastClickTime < 0.3) {
       *val = centerZero ? (min + (max - min) / 2.0f) : min;
@@ -190,8 +191,8 @@ static void Mixer_Draw(Component *base) {
     return;
 
   AudioEngine *eng = r->State->AudioPlugin;
-  Vector2 mousePos = UIGetMousePosition();
-  bool mDown = UI_IsDown();
+  Vector2 mousePos = Input_GetPointerPos();
+  bool mDown = Input_IsDown();
 
   float viewH = SCREEN_HEIGHT - DECK_STR_H;
   DrawRectangle(0, 0, SCREEN_WIDTH, viewH, ColorBGUtil);
@@ -286,7 +287,7 @@ static void Mixer_Draw(Component *base) {
 
     Font iconFont = UIFonts_GetIcon(S(12));
     UIDrawText("\xef\x80\xa5", iconFont, fcx - S(6), cueBtnY + S(4), S(12), d->IsCueActive ? ColorOrange : ColorShadow);
-    if (UICheckClick((Rectangle){cueBtnX, cueBtnY, cueBtnSize, cueBtnSize})) {
+    if (Input_CheckClick((Rectangle){cueBtnX, cueBtnY, cueBtnSize, cueBtnSize})) {
         d->IsCueActive = !d->IsCueActive;
     }
 
@@ -379,7 +380,7 @@ static void Mixer_Draw(Component *base) {
   DrawRectangleRec(fxSelRect, ColorBlack);
   DrawRectangleLinesEx(fxSelRect, 1.0f, ColorWhite);
   DrawCentredText(bfxNames[fxs->SelectedFX % 14], fSub, rightX, colRightW, bSelectorY + S(8), S(9), ColorWhite);
-  if (UICheckClick(fxSelRect)) {
+  if (Input_CheckClick(fxSelRect)) {
       fxs->SelectedFX = (fxs->SelectedFX + 1) % 14;
       BeatFXManager_SetFX(&eng->BeatFX, fxs->SelectedFX);
   }
@@ -390,7 +391,7 @@ static void Mixer_Draw(Component *base) {
   DrawRectangleRec(chSelRect, ColorBlack);
   DrawRectangleLinesEx(chSelRect, 1.0f, ColorWhite);
   DrawCentredText(targetNames[fxs->SelectedChannel % 3], fSub, rightX, colRightW, targetY + S(8), S(9), ColorOrange);
-  if (UICheckClick(chSelRect)) {
+  if (Input_CheckClick(chSelRect)) {
       fxs->SelectedChannel = (fxs->SelectedChannel + 1) % 3;
   }
 

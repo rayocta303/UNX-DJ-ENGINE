@@ -9,6 +9,7 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
+#include "input/input.h"
 #include "core/midi/midi_handler.h"
 #include <math.h>
 #include <stdio.h>
@@ -65,7 +66,7 @@ static int Waveform_Update(Component *base) {
   float wfLeft = SIDE_PANEL_W;
   float wfRight = BEAT_FX_X;
 
-  Vector2 mouse = UIGetMousePosition();
+  Vector2 mouse = Input_GetPointerPos();
   bool inWaveform = (mouse.x >= wfLeft && mouse.x <= wfRight &&
                      mouse.y >= wfY && mouse.y <= wfY + waveH);
 
@@ -98,7 +99,7 @@ static int Waveform_Update(Component *base) {
   // Zoom & Jog Interaction Logic
   int gesture = GetGestureDetected();
   if (inWaveform) {
-    float wheel = GetMouseWheelMove();
+    float wheel = Mouse_GetWheel();
     
     // Support for Pinch Gesture (Touch)
     bool isPinch = (gesture == GESTURE_PINCH_IN || gesture == GESTURE_PINCH_OUT);
@@ -150,14 +151,14 @@ static int Waveform_Update(Component *base) {
   bool touchAllowed = r->State->Waveform.WaveformTouchEnabled && !midiConnected;
 
   // Waveform touch: disabled if WaveformTouchEnabled=false OR MIDI controller is connected
-  if (touchAllowed && inWaveform && UI_IsPressed()) {
+  if (touchAllowed && inWaveform && Input_IsPressed()) {
     r->State->IsTouching = true;
     isMouseTouchingWaveform[dId] = true;
     r->lastMouseX = mouse.x;
   }
 
   if (isMouseTouchingWaveform[dId]) {
-    if (touchAllowed && UI_IsDown()) {
+    if (touchAllowed && Input_IsDown()) {
       float dx = mouse.x - r->lastMouseX;
       r->lastMouseX = mouse.x;
 

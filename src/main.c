@@ -8,6 +8,7 @@
 #include "core/system_info.h"
 #include "core/memory_guard.h"
 #include "input/keyboard.h"
+#include "input/input.h"
 #include "raylib.h"
 #include "rlgl.h"
 #if defined(GRAPHICS_API_OPENGL_ES2) || defined(PLATFORM_DESKTOP)
@@ -769,7 +770,8 @@ void TopBar_OnInfo(void *ctx) {
     App_DeactivateAllViews(a);
     a->screen = ScreenInfo;
     a->infoState.IsActive = true;
-    
+    Input_Consume(); // Prevent Info_Update from instantly closing it
+
     // Sync Info State
     for (int i = 0; i < 2; i++) {
       DeckState *ds = (i == 0) ? &a->deckA : &a->deckB;
@@ -3838,7 +3840,7 @@ void UpdateDrawFrame(App *app) {
 
     // NO Button
     bool noHover = CheckCollisionPointRec(
-        UIGetMousePosition(), (Rectangle){px + S(30), py + S(65), btnW, btnH});
+        Input_GetPointerPos(), (Rectangle){px + S(30), py + S(65), btnW, btnH});
     DrawRectangle(px + S(30), py + S(65), btnW, btnH,
                   noHover ? ColorGray : ColorDark1);
     DrawRectangleLines(px + S(30), py + S(65), btnW, btnH, ColorShadow);
@@ -3846,7 +3848,7 @@ void UpdateDrawFrame(App *app) {
 
     // YES Button
     bool yesHover = CheckCollisionPointRec(
-        UIGetMousePosition(),
+        Input_GetPointerPos(),
         (Rectangle){px + pw - S(90), py + S(65), btnW, btnH});
     DrawRectangle(px + pw - S(90), py + S(65), btnW, btnH,
                   yesHover ? ColorRed : ColorDark1);
@@ -3854,13 +3856,13 @@ void UpdateDrawFrame(App *app) {
     DrawCentredText("YES", fMd, px + pw - S(90), btnW, py + S(68), S(11),
                     ColorWhite);
 
-    if (UI_IsReleased()) {
+    if (Input_IsReleased()) {
       if (noHover)
         app->showExitConfirm = false;
       if (yesHover) {
         exit(0);
       }
-      UI_ConsumeTouch();
+      Input_Consume();
     }
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE))
       app->showExitConfirm = false;
@@ -3885,7 +3887,7 @@ void UpdateDrawFrame(App *app) {
     float btnW = S(240);
     float btnH = S(28);
     float btnX = px + (pw - btnW) / 2.0f;
-    Vector2 mPos = UIGetMousePosition();
+    Vector2 mPos = Input_GetPointerPos();
 
     // 1. REBOOT OS
     Rectangle r1 = {btnX, py + S(46), btnW, btnH};
@@ -3915,12 +3917,12 @@ void UpdateDrawFrame(App *app) {
     DrawRectangleLinesEx(r4, 1.0f, ColorShadow);
     DrawCentredText("CANCEL", fSm, btnX, btnW, py + S(160), S(10), ColorWhite);
 
-    if (UI_IsReleased()) {
+    if (Input_IsReleased()) {
       if (h1) { app->showPowerPopup = false; app->pendingPowerAction = 1; app->showPowerActionConfirm = true; }
       else if (h2) { app->showPowerPopup = false; app->pendingPowerAction = 2; app->showPowerActionConfirm = true; }
       else if (h3) { app->showPowerPopup = false; app->pendingPowerAction = 3; app->showPowerActionConfirm = true; }
       else if (h4) { app->showPowerPopup = false; }
-      UI_ConsumeTouch();
+      Input_Consume();
     }
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) app->showPowerPopup = false;
   }
@@ -3949,7 +3951,7 @@ void UpdateDrawFrame(App *app) {
 
     float btnW = S(75);
     float btnH = S(24);
-    Vector2 mPos = UIGetMousePosition();
+    Vector2 mPos = Input_GetPointerPos();
 
     // CANCEL / NO
     Rectangle rNo = {px + S(25), py + S(68), btnW, btnH};
@@ -3965,7 +3967,7 @@ void UpdateDrawFrame(App *app) {
     DrawRectangleLinesEx(rYes, 1.0f, ColorRed);
     DrawCentredText("CONFIRM", fMd, px + pw - S(100), btnW, py + S(74), S(10), ColorWhite);
 
-    if (UI_IsReleased()) {
+    if (Input_IsReleased()) {
       if (noHover) app->showPowerActionConfirm = false;
       if (yesHover) {
         app->showPowerActionConfirm = false;
@@ -3973,7 +3975,7 @@ void UpdateDrawFrame(App *app) {
         else if (app->pendingPowerAction == 2) System_HibernateOS();
         else if (app->pendingPowerAction == 3) System_ShutdownOS();
       }
-      UI_ConsumeTouch();
+      Input_Consume();
     }
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) app->showPowerActionConfirm = false;
   }
@@ -3997,7 +3999,7 @@ void UpdateDrawFrame(App *app) {
 
     float btnW = S(75);
     float btnH = S(24);
-    Vector2 mPos = UIGetMousePosition();
+    Vector2 mPos = Input_GetPointerPos();
 
     // CANCEL / NO
     Rectangle rNo = {px + S(25), py + S(68), btnW, btnH};
@@ -4013,13 +4015,13 @@ void UpdateDrawFrame(App *app) {
     DrawRectangleLinesEx(rYes, 1.0f, (Color){255, 140, 0, 255});
     DrawCentredText("RESTART", fMd, px + pw - S(100), btnW, py + S(74), S(10), ColorWhite);
 
-    if (UI_IsReleased()) {
+    if (Input_IsReleased()) {
       if (noHover) app->showRestartAppConfirm = false;
       if (yesHover) {
         app->showRestartAppConfirm = false;
         System_RestartApp();
       }
-      UI_ConsumeTouch();
+      Input_Consume();
     }
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) app->showRestartAppConfirm = false;
   }

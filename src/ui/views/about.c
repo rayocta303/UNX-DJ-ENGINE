@@ -3,7 +3,7 @@
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
 #include "version.h"
-#include "ui/components/touch_utility.h"
+#include "input/input.h"
 #include <stdio.h>
 
 static int About_Update(Component *base) {
@@ -21,13 +21,13 @@ static int About_Update(Component *base) {
   float cardY = centerY - (cardH / 2.0f) + (TOP_BAR_H / 2.0f);
   Rectangle cardRect = {cardX, cardY, cardW, cardH};
 
-  Vector2 mouse = UIGetMousePosition();
+  Vector2 mouse = Input_GetPointerPos();
   bool closeClicked = false;
 
   // Tap outside card to close
   if (Touch_CheckClickInArea((Rectangle){0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}, 0) && !CheckCollisionPointRec(mouse, cardRect)) {
       closeClicked = true;
-      UI_ConsumeTouch();
+      Input_Consume();
   }
 
   // Close button hitbox
@@ -35,14 +35,14 @@ static int About_Update(Component *base) {
   float btnH = S(24);
   float btnX = cardX + cardW - btnW - S(20);
   float btnY = cardY + cardH - btnH - S(10);
-  if (Touch_CheckClickInArea((Rectangle){btnX, btnY, btnW, btnH}, S(5))) {
+  if (Touch_CheckClick((Rectangle){btnX, btnY, btnW, btnH}, S(5))) {
       closeClicked = true;
-      UI_ConsumeTouch();
+      Input_Consume();
   }
 
   if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) || closeClicked) {
     r->State->IsActive = false;
-    UI_ConsumeTouch();
+    Input_Consume();
   }
   return 0;
 }
@@ -109,7 +109,9 @@ static void About_Draw(Component *base) {
 
   // App Title & Version
   UIDrawText(APP_NAME, faceLg, contentX, startY, S(18), ColorOrange);
-  UIDrawText(r->State->Version, faceSm, contentX, startY + S(22), S(10),
+  char versionStr[128];
+  sprintf(versionStr, "Version %s", r->State->Version);
+  UIDrawText(versionStr, faceSm, contentX, startY + S(22), S(10),
              ColorShadow);
 
   float detailsY = startY + S(50);

@@ -3,7 +3,7 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
-#include "ui/components/touch_utility.h"
+#include "input/input.h"
 #include <stdio.h>
 #include <math.h>
 
@@ -22,14 +22,14 @@ static int Credits_Update(Component *base) {
   if (maxScroll < 0) maxScroll = 0;
 
   // Touch drag integration
-  Vector2 mouse = UIGetMousePosition();
-  if (UI_IsPressed()) {
+  Vector2 mouse = Input_GetPointerPos();
+  if (Input_IsPressed()) {
       r->State->ScrollPhysics.DragStartPos = mouse.y;
       r->State->ScrollPhysics.DragStartScroll = r->State->ScrollPhysics.Scroll;
       r->State->ScrollPhysics.IsDragging = false;
   }
   
-  if (UI_IsDown()) {
+  if (Input_IsDown()) {
       float dy = mouse.y - r->State->ScrollPhysics.DragStartPos;
       if (!r->State->ScrollPhysics.IsDragging && fabsf(dy) > S(4.0f)) {
           r->State->ScrollPhysics.IsDragging = true;
@@ -40,14 +40,14 @@ static int Credits_Update(Component *base) {
       if (r->State->ScrollPhysics.IsDragging) {
           float newDy = mouse.y - r->State->ScrollPhysics.DragStartPos;
           r->State->ScrollPhysics.Scroll = r->State->ScrollPhysics.DragStartScroll - newDy;
-          r->State->ScrollPhysics.Velocity = -GetMouseDelta().y / (GetFrameTime() > 0 ? GetFrameTime() : 0.016f);
+          r->State->ScrollPhysics.Velocity = -Mouse_GetDelta().y / (GetFrameTime() > 0 ? GetFrameTime() : 0.016f);
       }
-  } else if (UI_IsReleased()) {
+  } else if (Input_IsReleased()) {
       r->State->ScrollPhysics.IsDragging = false;
   }
 
   // Handle Wheel
-  float wheel = GetMouseWheelMove();
+  float wheel = Mouse_GetWheel();
   if (wheel != 0) {
     r->State->ScrollPhysics.Scroll -= wheel * S(20.0f);
     r->State->ScrollPhysics.Velocity = 0;
@@ -66,23 +66,23 @@ static int Credits_Update(Component *base) {
   bool closeClicked = false;
   if (Touch_CheckClickInArea((Rectangle){0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}, 0) && !CheckCollisionPointRec(mouse, cardRect)) {
       closeClicked = true;
-      UI_ConsumeTouch();
+      Input_Consume();
   }
   
   float btnW = S(120);
   float btnH = S(30);
   float btnX = cardX + (cardW - btnW) / 2.0f;
   float btnY = cardY + cardH - btnH - S(10);
-  if (Touch_CheckClickInArea((Rectangle){btnX, btnY, btnW, btnH}, S(5))) {
+  if (Touch_CheckClick((Rectangle){btnX, btnY, btnW, btnH}, S(5))) {
       closeClicked = true;
-      UI_ConsumeTouch();
+      Input_Consume();
   }
 
   if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) || closeClicked) {
     r->State->IsActive = false;
     TouchScroll_Reset(&r->State->ScrollPhysics);
     r->State->Scroll = 0;
-    UI_ConsumeTouch();
+    Input_Consume();
   }
 
   return 0;

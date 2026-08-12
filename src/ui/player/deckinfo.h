@@ -10,6 +10,7 @@ struct DeckInfoPanel {
     int ID;
     DeckState *State;
     AudioEngine *Engine;
+    double lastEjectTapTime;
 };
 
 void DeckInfoPanel_Init(DeckInfoPanel *p, int id, DeckState *state, AudioEngine *engine);
