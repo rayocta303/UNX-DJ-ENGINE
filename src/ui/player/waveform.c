@@ -621,53 +621,64 @@ static void Waveform_Draw(Component *base) {
     last_p = p;
   }
 
-  // Draw exactly one vertical line per physical screen pixel (Massive FPS boost & anti-wobble)
-  rlBegin(RL_LINES);
-  for (int p = 0; p < iW; p++) {
-      float px = wfLeft + (float)p;
+  // Draw smooth continuous polygon (RL_QUADS) per physical screen pixel segment
+  rlBegin(RL_QUADS);
+  for (int p = 0; p < iW - 1; p++) {
+      float px0 = wfLeft + (float)p;
+      float px1 = px0 + 1.0f;
       
       if (userStyle == WAVEFORM_STYLE_BLUE || userStyle == WAVEFORM_STYLE_RGB) {
-          float hMax = roundf(fmaxf(pixLo[p], fmaxf(pixMi[p], pixHi[p])));
-          if (hMax > 0.1f) {
+          float h0 = roundf(fmaxf(pixLo[p], fmaxf(pixMi[p], pixHi[p])));
+          float h1 = roundf(fmaxf(pixLo[p+1], fmaxf(pixMi[p+1], pixHi[p+1])));
+          
+          if (h0 > 0.1f || h1 > 0.1f) {
               Color c = pixCol[p];
               if (userStyle == WAVEFORM_STYLE_RGB) {
                   c.r = (unsigned char)fminf(255.0f, (float)c.r * eqLowMult);
                   c.g = (unsigned char)fminf(255.0f, (float)c.g * eqMidMult);
                   c.b = (unsigned char)fminf(255.0f, (float)c.b * eqHighMult);
               }
-              // Horizontal & Vertical Blur halo (Anti-alias glow to fix temporal boiling)
-              rlColor4ub(c.r, c.g, c.b, 40);
-              rlVertex2f(px - 1.0f, yy - hMax - 1.0f); rlVertex2f(px - 1.0f, yy + hMax + 1.0f);
-              rlVertex2f(px + 1.0f, yy - hMax - 1.0f); rlVertex2f(px + 1.0f, yy + hMax + 1.0f);
+              // Vertical blur halo (Anti-alias glow for smooth slopes)
+              rlColor4ub(c.r, c.g, c.b, 60);
+              rlVertex2f(px0, yy - h0 - 1.5f); rlVertex2f(px0, yy + h0 + 1.5f);
+              rlVertex2f(px1, yy + h1 + 1.5f); rlVertex2f(px1, yy - h1 - 1.5f);
               
-              // Solid core line
+              // Solid core quad
               rlColor4ub(c.r, c.g, c.b, 255);
-              rlVertex2f(px, yy - hMax); rlVertex2f(px, yy + hMax);
+              rlVertex2f(px0, yy - h0); rlVertex2f(px0, yy + h0);
+              rlVertex2f(px1, yy + h1); rlVertex2f(px1, yy - h1);
           }
       } else {
-          float pL = roundf(pixLo[p]);
-          float pM = roundf(pixMi[p]);
-          float pH = roundf(pixHi[p]);
-          if (pL > 0.1f) {
-              rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 40);
-              rlVertex2f(px - 1.0f, yy - pL - 1.0f); rlVertex2f(px - 1.0f, yy + pL + 1.0f);
-              rlVertex2f(px + 1.0f, yy - pL - 1.0f); rlVertex2f(px + 1.0f, yy + pL + 1.0f);
+          float pL0 = roundf(pixLo[p]); float pL1 = roundf(pixLo[p+1]);
+          float pM0 = roundf(pixMi[p]); float pM1 = roundf(pixMi[p+1]);
+          float pH0 = roundf(pixHi[p]); float pH1 = roundf(pixHi[p+1]);
+          
+          if (pL0 > 0.1f || pL1 > 0.1f) {
+              rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 60);
+              rlVertex2f(px0, yy - pL0 - 1.5f); rlVertex2f(px0, yy + pL0 + 1.5f);
+              rlVertex2f(px1, yy + pL1 + 1.5f); rlVertex2f(px1, yy - pL1 - 1.5f);
+              
               rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 255);
-              rlVertex2f(px, yy - pL); rlVertex2f(px, yy + pL);
+              rlVertex2f(px0, yy - pL0); rlVertex2f(px0, yy + pL0);
+              rlVertex2f(px1, yy + pL1); rlVertex2f(px1, yy - pL1);
           }
-          if (pM > 0.1f) {
-              rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 40);
-              rlVertex2f(px - 1.0f, yy - pM - 1.0f); rlVertex2f(px - 1.0f, yy + pM + 1.0f);
-              rlVertex2f(px + 1.0f, yy - pM - 1.0f); rlVertex2f(px + 1.0f, yy + pM + 1.0f);
+          if (pM0 > 0.1f || pM1 > 0.1f) {
+              rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 60);
+              rlVertex2f(px0, yy - pM0 - 1.5f); rlVertex2f(px0, yy + pM0 + 1.5f);
+              rlVertex2f(px1, yy + pM1 + 1.5f); rlVertex2f(px1, yy - pM1 - 1.5f);
+              
               rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 255);
-              rlVertex2f(px, yy - pM); rlVertex2f(px, yy + pM);
+              rlVertex2f(px0, yy - pM0); rlVertex2f(px0, yy + pM0);
+              rlVertex2f(px1, yy + pM1); rlVertex2f(px1, yy - pM1);
           }
-          if (pH > 0.1f) {
-              rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 40);
-              rlVertex2f(px - 1.0f, yy - pH - 1.0f); rlVertex2f(px - 1.0f, yy + pH + 1.0f);
-              rlVertex2f(px + 1.0f, yy - pH - 1.0f); rlVertex2f(px + 1.0f, yy + pH + 1.0f);
+          if (pH0 > 0.1f || pH1 > 0.1f) {
+              rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 60);
+              rlVertex2f(px0, yy - pH0 - 1.5f); rlVertex2f(px0, yy + pH0 + 1.5f);
+              rlVertex2f(px1, yy + pH1 + 1.5f); rlVertex2f(px1, yy - pH1 - 1.5f);
+              
               rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 255);
-              rlVertex2f(px, yy - pH); rlVertex2f(px, yy + pH);
+              rlVertex2f(px0, yy - pH0); rlVertex2f(px0, yy + pH0);
+              rlVertex2f(px1, yy + pH1); rlVertex2f(px1, yy - pH1);
           }
       }
   }
