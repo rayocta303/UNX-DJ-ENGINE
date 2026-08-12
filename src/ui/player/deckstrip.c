@@ -159,7 +159,9 @@ static int DeckStrip_Update(Component *base) {
       if (!uiTouching[d->ID]) {
         uiTouching[d->ID] = true;
         wasPlayingBeforeSeek[d->ID] = d->State->IsPlaying;
-        d->State->IsPlaying = false; // Mute/pause playback while dragging
+        if (d->State->IsPlaying) {
+            d->State->IsPreviewing = true; // Start preview mode
+        }
       }
     }
 
@@ -169,15 +171,22 @@ static int DeckStrip_Update(Component *base) {
         if (ratio < 0.0f) ratio = 0.0f;
         if (ratio > 1.0f) ratio = 1.0f;
         long long targetMs = (long long)(ratio * (double)d->State->TrackLengthMs);
-        d->State->SeekMs = targetMs;
-        d->State->PositionMs = targetMs; // Real-time 1:1 UI pointer position sync during drag
-        d->State->HasSeekRequest = true;
+        
+        if (wasPlayingBeforeSeek[d->ID]) {
+            // Just previewing, do not seek audio engine
+            d->State->PositionMs = targetMs;
+            d->State->Position = (targetMs / 1000.0) * 150.0;
+        } else {
+            // Paused, so we actually seek
+            d->State->SeekMs = targetMs;
+            d->State->PositionMs = targetMs;
+            d->State->Position = (targetMs / 1000.0) * 150.0;
+            d->State->HasSeekRequest = true;
+        }
       } else {
         uiTouching[d->ID] = false;
         if (wasPlayingBeforeSeek[d->ID]) {
-          d->State->IsPlaying = true;
-          d->State->SeekMs = d->State->PositionMs;
-          d->State->HasSeekRequest = true; // Resume playback on touch release
+          d->State->IsPreviewing = false; // Stop preview mode, snap back to playing pos
         }
       }
     }

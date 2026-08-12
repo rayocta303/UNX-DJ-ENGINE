@@ -28,7 +28,6 @@ static int BeatFX_Update(Component *base) {
     // Calculate FX Label and Select hit box
     float fxSelectY = y + S(4) + S(13); // Label + Spacing
     Rectangle fxSelectRect = { x + S(4), fxSelectY, w - S(8), S(26) };
-    bool fxHovered = CheckCollisionPointRec(mouse, fxSelectRect);
 
     // Calculate CH SELECT hit box (following Draw logic)
     float cy = fxSelectY + S(30); // FXSelect(26) + Spacing(4)
@@ -55,9 +54,6 @@ static int BeatFX_Update(Component *base) {
         float btnW = (modalW - pad * 4) / cols;
         float btnH = (modalH - S(45) - pad * 6) / 5;
 
-        // Use UI_IsReleased + current position directly:
-        // Touch_CheckClick would reject this because the original touchStart
-        // was on the FX bar (outside modal), making dragDist > threshold.
         if (UI_IsReleased()) {
             bool insideModal = CheckCollisionPointRec(mouse, (Rectangle){modalX, modalY, modalW, modalH});
             if (insideModal) {
@@ -78,6 +74,8 @@ static int BeatFX_Update(Component *base) {
                 b->State->FXDropdownOpen = false;
                 UI_ConsumeTouch();
             }
+        } else if (UI_IsPressed() || UI_IsDown()) {
+            UI_ConsumeTouch();
         }
 
         if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
@@ -94,7 +92,6 @@ static int BeatFX_Update(Component *base) {
         float btnW = modalW - pad * 2;
         float btnH = S(44);
 
-        // Same fix: use UI_IsReleased + current position directly
         if (UI_IsReleased()) {
             bool insideModal = CheckCollisionPointRec(mouse, (Rectangle){modalX, modalY, modalW, modalH});
             if (insideModal) {
@@ -113,6 +110,8 @@ static int BeatFX_Update(Component *base) {
                 b->State->ChannelDropdownOpen = false;
                 UI_ConsumeTouch();
             }
+        } else if (UI_IsPressed() || UI_IsDown()) {
+            UI_ConsumeTouch();
         }
 
         if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
@@ -121,7 +120,7 @@ static int BeatFX_Update(Component *base) {
 
         return 0; // Block other interactions
     } else {
-        if (fxHovered && UI_IsReleased()) {
+        if (Touch_CheckClick(fxSelectRect, S(4))) {
             b->State->FXDropdownOpen = true;
         }
     
@@ -134,25 +133,22 @@ static int BeatFX_Update(Component *base) {
                 b->State->SelectedChannel = next;
                 if (b->AudioPlugin) b->AudioPlugin->BeatFX.targetChannel = next;
             }
-            
-            if (UI_IsReleased()) {
-                b->State->ChannelDropdownOpen = true;
-            }
+        }
+
+        if (Touch_CheckClick(chRect, S(4))) {
+            b->State->ChannelDropdownOpen = true;
         }
     }
     
-    // ... (rest of the logic)
     float containerY = cy + S(20);
     float rowH = S(56) / 4.0f;
     Rectangle qRect = { x + S(4), containerY + 3 * rowH, w - S(8), rowH };
-    if (CheckCollisionPointRec(mouse, qRect) && UI_IsReleased()) {
+    if (Touch_CheckClick(qRect, S(2))) {
         b->State->Quantize = !b->State->Quantize;
     }
 
-    if (UI_IsReleased()) {
-        if (CheckCollisionPointRec(mouse, b->FXButton)) {
-            b->State->IsFXOn = !b->State->IsFXOn;
-        }
+    if (Touch_CheckClick(b->FXButton, S(2))) {
+        b->State->IsFXOn = !b->State->IsFXOn;
     }
 
     // 4. Tab Switching Logic
@@ -161,43 +157,39 @@ static int BeatFX_Update(Component *base) {
     Rectangle statusTab = { x + S(4), tabY, tabW, S(14) };
     Rectangle beatFxTab = { x + S(6) + tabW, tabY, tabW, S(14) };
 
-    if (UI_IsReleased()) {
-        if (CheckCollisionPointRec(mouse, statusTab)) {
-            b->State->ShowBeatFXTab = false;
-        } else if (CheckCollisionPointRec(mouse, beatFxTab)) {
-            b->State->ShowBeatFXTab = true;
-        }
+    if (Touch_CheckClick(statusTab, S(5))) {
+        b->State->ShowBeatFXTab = false;
+    } else if (Touch_CheckClick(beatFxTab, S(5))) {
+        b->State->ShowBeatFXTab = true;
     }
 
-    // --- ZOOM BUTTONS (RESTORED) ---
+    // --- ZOOM BUTTONS ---
     float plusMinusY = b->FXButton.y + b->FXButton.height + S(12);
     float halfB = (w - S(12)) / 2;
     Rectangle minusRect = { x + S(4), plusMinusY, halfB, S(20) };
     Rectangle plusRect = { x + S(8) + halfB, plusMinusY, halfB, S(20) };
 
-    if (UI_IsReleased()) {
-        int zoomDelta = 0;
-        if (CheckCollisionPointRec(mouse, minusRect)) zoomDelta = 1;  // Zoom OUT (Show more track)
-        if (CheckCollisionPointRec(mouse, plusRect)) zoomDelta = -1; // Zoom IN (Show more detail)
+    int zoomDelta = 0;
+    if (Touch_CheckClick(minusRect, S(4))) zoomDelta = 1;   // Zoom OUT
+    if (Touch_CheckClick(plusRect, S(4))) zoomDelta = -1;  // Zoom IN
 
-        if (zoomDelta != 0) {
-            DeckState* decks[2] = { b->DeckA, b->DeckB };
-            for (int d = 0; d < 2; d++) {
-                DeckState* ds = decks[d];
-                int currentIndex = 0;
-                float minDiff = 9999.0f;
-                for (int i = 0; i < NUM_ZOOM_LEVELS; i++) {
-                    float diff = fabsf(ds->ZoomScale - ZOOM_LEVELS[i]);
-                    if (diff < minDiff) {
-                        minDiff = diff;
-                        currentIndex = i;
-                    }
+    if (zoomDelta != 0) {
+        DeckState* decks[2] = { b->DeckA, b->DeckB };
+        for (int d = 0; d < 2; d++) {
+            DeckState* ds = decks[d];
+            int currentIndex = 0;
+            float minDiff = 9999.0f;
+            for (int i = 0; i < NUM_ZOOM_LEVELS; i++) {
+                float diff = fabsf(ds->ZoomScale - ZOOM_LEVELS[i]);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    currentIndex = i;
                 }
-                currentIndex += zoomDelta;
-                if (currentIndex < 0) currentIndex = 0;
-                if (currentIndex >= NUM_ZOOM_LEVELS) currentIndex = NUM_ZOOM_LEVELS - 1;
-                ds->ZoomScale = ZOOM_LEVELS[currentIndex];
             }
+            currentIndex += zoomDelta;
+            if (currentIndex < 0) currentIndex = 0;
+            if (currentIndex >= NUM_ZOOM_LEVELS) currentIndex = NUM_ZOOM_LEVELS - 1;
+            ds->ZoomScale = ZOOM_LEVELS[currentIndex];
         }
     }
 

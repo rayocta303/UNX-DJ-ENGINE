@@ -9,27 +9,27 @@ static int TopBar_Update(Component *base) {
   TopBar *t = (TopBar *)base;
 
 #if !defined(PLATFORM_DRM)
-  if (Touch_CheckClick((Rectangle){ 0, 0, t->btnFullX + t->btnFullW, TOP_BAR_H }, S(4.0f))) {
+  if (Touch_CheckClick((Rectangle){ 0, 0, t->btnFullX + t->btnFullW, TOP_BAR_H }, S(2.0f))) {
     ToggleFullscreen();
   }
 #endif
-  if (Touch_CheckClick((Rectangle){ t->btnBrowseX, 0, t->btnBrowseW, TOP_BAR_H }, S(4.0f))) {
+  if (Touch_CheckClick((Rectangle){ t->btnBrowseX, 0, t->btnBrowseW, TOP_BAR_H }, S(2.0f))) {
     if (t->OnBrowse)
       t->OnBrowse(t->callbackCtx);
   }
-  if (Touch_CheckClick((Rectangle){ t->btnMixerX, 0, t->btnMixerW, TOP_BAR_H }, S(4.0f))) {
+  if (Touch_CheckClick((Rectangle){ t->btnMixerX, 0, t->btnMixerW, TOP_BAR_H }, S(2.0f))) {
     if (t->OnMixer)
       t->OnMixer(t->callbackCtx);
   }
-  if (Touch_CheckClick((Rectangle){ t->btnPadX, 0, t->btnPadW, TOP_BAR_H }, S(4.0f))) {
+  if (Touch_CheckClick((Rectangle){ t->btnPadX, 0, t->btnPadW, TOP_BAR_H }, S(2.0f))) {
     if (t->OnPad)
       t->OnPad(t->callbackCtx);
   }
-  if (Touch_CheckClick((Rectangle){ t->btnInfoX, 0, t->btnInfoW, TOP_BAR_H }, S(4.0f))) {
+  if (Touch_CheckClick((Rectangle){ t->btnInfoX, 0, t->btnInfoW, TOP_BAR_H }, S(2.0f))) {
     if (t->OnInfo)
       t->OnInfo(t->callbackCtx);
   }
-  if (Touch_CheckClick((Rectangle){ t->btnSettingsX, 0, t->btnSettingsW, TOP_BAR_H }, S(4.0f))) {
+  if (Touch_CheckClick((Rectangle){ t->btnSettingsX, 0, t->btnSettingsW, TOP_BAR_H }, S(2.0f))) {
     if (t->OnSettings)
       t->OnSettings(t->callbackCtx);
   }

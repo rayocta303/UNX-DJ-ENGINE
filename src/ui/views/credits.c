@@ -64,7 +64,7 @@ static int Credits_Update(Component *base) {
   Rectangle cardRect = {cardX, cardY, cardW, cardH};
   
   bool closeClicked = false;
-  if (Touch_CheckClick((Rectangle){0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}, 0) && !CheckCollisionPointRec(mouse, cardRect)) {
+  if (Touch_CheckClickInArea((Rectangle){0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}, 0) && !CheckCollisionPointRec(mouse, cardRect)) {
       closeClicked = true;
       UI_ConsumeTouch();
   }
@@ -73,16 +73,16 @@ static int Credits_Update(Component *base) {
   float btnH = S(30);
   float btnX = cardX + (cardW - btnW) / 2.0f;
   float btnY = cardY + cardH - btnH - S(10);
-  if (Touch_CheckClick((Rectangle){btnX, btnY, btnW, btnH}, S(5))) {
+  if (Touch_CheckClickInArea((Rectangle){btnX, btnY, btnW, btnH}, S(5))) {
       closeClicked = true;
       UI_ConsumeTouch();
   }
 
   if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) || closeClicked) {
     r->State->IsActive = false;
-    r->State->ScrollPhysics.Scroll = 0;
-    r->State->ScrollPhysics.VisualScroll = 0;
+    TouchScroll_Reset(&r->State->ScrollPhysics);
     r->State->Scroll = 0;
+    UI_ConsumeTouch();
   }
 
   return 0;

@@ -91,6 +91,7 @@ typedef struct DeckState {
   bool IsTouching; // Renamed from IsScratching to be more general
   bool VinylModeEnabled;
   bool IsPlaying;
+  bool IsPreviewing;
   float JogRate;
   double JogDelta; // Pending jog/touch movement from UI (half-frames)
   float LoadAnimTimer; // >0 when track load animation is active (seconds)

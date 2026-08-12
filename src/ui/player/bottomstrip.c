@@ -5,6 +5,7 @@
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
+#include "ui/components/touch_utility.h"
 
 static int BottomStrip_Update(Component *base) {
     BeatFXSelectBar *b = (BeatFXSelectBar *)base;
@@ -12,55 +13,54 @@ static int BottomStrip_Update(Component *base) {
     float barY = TOP_BAR_H + WAVE_AREA_H;
     float halfW = SCREEN_WIDTH / 2.0f;
 
-    if (UI_IsReleased()) {
-        if (mouse.y >= barY && mouse.y <= barY + S(12)) {
-            b->State->ShowBeatFXTab = !b->State->ShowBeatFXTab;
+    Rectangle topBarRect = { 0, barY, SCREEN_WIDTH, S(12) };
+    if (Touch_CheckClick(topBarRect, 0)) {
+        b->State->ShowBeatFXTab = !b->State->ShowBeatFXTab;
+        return 1;
+    }
+
+    if (b->State->ShowBeatFXTab) {
+        float btnY = barY + S(13);
+        float btnH = S(23);
+        
+        // FX Selection
+        float trashW = S(22);
+        float gap = S(2);
+        static const int FXNamesCount = 3;
+        float fxBtnW = (halfW - trashW - S(4) - (FXNamesCount - 1) * gap) / FXNamesCount;
+        
+        float cx = S(2);
+        for (int i = 0; i < FXNamesCount; i++) {
+            Rectangle r = { cx, btnY, fxBtnW, btnH };
+            if (Touch_CheckClick(r, S(2))) {
+                static const int FXEnumMap[] = { 0, 1, 2 }; // DELAY, ECHO, REVERB
+                b->State->SelectedFX = FXEnumMap[i];
+                return 1;
+            }
+            cx += fxBtnW + gap;
+        }
+
+        // Clear/Toggle FX
+        Rectangle trashRect = { cx, btnY, trashW - S(2), btnH };
+        if (Touch_CheckClick(trashRect, S(2))) {
+            b->State->IsFXOn = !b->State->IsFXOn;
             return 1;
         }
 
-        if (b->State->ShowBeatFXTab) {
-            float btnY = barY + S(13);
-            float btnH = S(23);
-            
-            // FX Selection
-            float trashW = S(22);
-            float gap = S(2);
-            static const int FXNamesCount = 3;
-            float fxBtnW = (halfW - trashW - S(4) - (FXNamesCount - 1) * gap) / FXNamesCount;
-            
-            float cx = S(2);
-            for (int i = 0; i < FXNamesCount; i++) {
-                Rectangle r = { cx, btnY, fxBtnW, btnH };
-                if (CheckCollisionPointRec(mouse, r)) {
-                    static const int FXEnumMap[] = { 0, 1, 2 }; // DELAY, ECHO, REVERB
-                    b->State->SelectedFX = FXEnumMap[i];
+        // X-Pad Interaction
+        cx = halfW + S(2);
+        float padAreaW = halfW - S(4);
+        bool isScrubMode = (b->State->SelectedFX == 3 || b->State->SelectedFX == 5);
+        if (!isScrubMode) {
+            static const int XPadLabelsCount = 6;
+            float padBtnW = padAreaW / XPadLabelsCount;
+            for (int i = 0; i < XPadLabelsCount; i++) {
+                Rectangle padRect = { cx, btnY, padBtnW - 1, btnH };
+                if (Touch_CheckClick(padRect, S(2))) {
+                    b->State->SelectedPad = i;
                     return 1;
                 }
-                cx += fxBtnW + gap;
-            }
-
-            // Clear/Toggle FX
-            Rectangle trashRect = { cx, btnY, trashW - S(2), btnH };
-            if (CheckCollisionPointRec(mouse, trashRect)) {
-                b->State->IsFXOn = !b->State->IsFXOn;
-                return 1;
-            }
-
-            // X-Pad Interaction
-            cx = halfW + S(2);
-            float padAreaW = halfW - S(4);
-            bool isScrubMode = (b->State->SelectedFX == 3 || b->State->SelectedFX == 5);
-            if (!isScrubMode) {
-                static const int XPadLabelsCount = 6;
-                float padBtnW = padAreaW / XPadLabelsCount;
-                for (int i = 0; i < XPadLabelsCount; i++) {
-                    Rectangle padRect = { cx, btnY, padBtnW - 1, btnH };
-                    if (CheckCollisionPointRec(mouse, padRect)) {
-                        b->State->SelectedPad = i;
-                        return 1;
-                    }
-                    cx += padBtnW;
-                }
+                cx += padBtnW;
             }
         }
     }

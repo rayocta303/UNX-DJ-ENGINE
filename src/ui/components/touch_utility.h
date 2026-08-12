@@ -22,6 +22,11 @@ typedef struct {
     float BounceEffect;      // Elastic rubber-band displacement
 } TouchScroll;
 
+// Per-instance touch debounce state
+typedef struct {
+    double LastClickTime;
+} TouchDebounce;
+
 // Initialize touch scroll state
 void TouchScroll_Init(TouchScroll *ts);
 
@@ -31,11 +36,23 @@ void TouchScroll_Update(TouchScroll *ts, float maxScroll, float dt);
 // Reset touch scroll position and velocity
 void TouchScroll_Reset(TouchScroll *ts);
 
-// Expanded Hitbox Click Checker (with configurable touch padding)
+// Expanded Hitbox Click Checker (with configurable touch padding using global debounce)
 bool Touch_CheckClick(Rectangle rect, float padding);
 
-// Check if touch inside padded hitbox on press (instant down response)
+// Expanded Hitbox Click Checker with custom per-instance debounce state
+bool Touch_CheckClickEx(Rectangle rect, float padding, TouchDebounce *td, float debounceTimeSec);
+
+// Click checker without time debounce, only enforcing drag-distance threshold and release inside bounds
+bool Touch_CheckClickInArea(Rectangle rect, float padding);
+
+// Check if touch inside padded hitbox on press (instant down response, with drag distance guard)
 bool Touch_CheckPress(Rectangle rect, float padding);
+
+// Reset global touch debounce timer
+void Touch_ResetGlobalDebounce(void);
+
+// Reset instance touch debounce timer
+void Touch_ResetDebounce(TouchDebounce *td);
 
 // Calculate swipe velocity delta between drag updates
 float Touch_GetSwipeVelocity(Vector2 startPos, Vector2 currentPos, float deltaTime);

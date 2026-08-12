@@ -25,7 +25,7 @@ static int About_Update(Component *base) {
   bool closeClicked = false;
 
   // Tap outside card to close
-  if (Touch_CheckClick((Rectangle){0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}, 0) && !CheckCollisionPointRec(mouse, cardRect)) {
+  if (Touch_CheckClickInArea((Rectangle){0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}, 0) && !CheckCollisionPointRec(mouse, cardRect)) {
       closeClicked = true;
       UI_ConsumeTouch();
   }
@@ -35,13 +35,14 @@ static int About_Update(Component *base) {
   float btnH = S(24);
   float btnX = cardX + cardW - btnW - S(20);
   float btnY = cardY + cardH - btnH - S(10);
-  if (Touch_CheckClick((Rectangle){btnX, btnY, btnW, btnH}, S(5))) {
+  if (Touch_CheckClickInArea((Rectangle){btnX, btnY, btnW, btnH}, S(5))) {
       closeClicked = true;
       UI_ConsumeTouch();
   }
 
   if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) || closeClicked) {
     r->State->IsActive = false;
+    UI_ConsumeTouch();
   }
   return 0;
 }

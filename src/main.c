@@ -2579,11 +2579,15 @@ void UpdateDrawFrame(App *app) {
     if (srA < 8000)
       srA = 44100.0;
 
-    app->deckA.Position = (playheadFrames * 150.0) / srA;
+    if (!app->deckA.IsPreviewing) {
+      app->deckA.Position = (playheadFrames * 150.0) / srA;
+    }
     app->deckA.IsPlaying = audioEngine->Decks[0].IsPlaying;
 
     double posSec = playheadFrames / srA;
-    app->deckA.PositionMs = (long long)(posSec * 1000.0);
+    if (!app->deckA.IsPreviewing) {
+      app->deckA.PositionMs = (long long)(posSec * 1000.0);
+    }
 
     double lenSec =
         ((double)audioEngine->Decks[0].TotalSamples / (double)CHANNELS) / srA;
@@ -2595,11 +2599,15 @@ void UpdateDrawFrame(App *app) {
     if (srB < 8000)
       srB = 44100.0;
 
-    app->deckB.Position = (playheadFrames * 150.0) / srB;
+    if (!app->deckB.IsPreviewing) {
+      app->deckB.Position = (playheadFrames * 150.0) / srB;
+    }
     app->deckB.IsPlaying = audioEngine->Decks[1].IsPlaying;
 
     double posSec = playheadFrames / srB;
-    app->deckB.PositionMs = (long long)(posSec * 1000.0);
+    if (!app->deckB.IsPreviewing) {
+      app->deckB.PositionMs = (long long)(posSec * 1000.0);
+    }
 
     double lenSec =
         ((double)audioEngine->Decks[1].TotalSamples / (double)CHANNELS) / srB;

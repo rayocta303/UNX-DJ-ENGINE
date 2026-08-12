@@ -1,5 +1,6 @@
 #include "ui/components/touch_utility.h"
 #include "ui/components/theme.h"
+#include <stddef.h>
 #include <math.h>
 
 void TouchScroll_Init(TouchScroll *ts) {
@@ -59,8 +60,16 @@ void TouchScroll_Update(TouchScroll *ts, float maxScroll, float dt) {
 
 static double g_lastTouchClickTime = -1.0;
 
-bool Touch_CheckClick(Rectangle rect, float padding) {
-    if (padding <= 0.0f) padding = S(8.0f);
+void Touch_ResetGlobalDebounce(void) {
+    g_lastTouchClickTime = -1.0;
+}
+
+void Touch_ResetDebounce(TouchDebounce *td) {
+    if (td) td->LastClickTime = -1.0;
+}
+
+bool Touch_CheckClickEx(Rectangle rect, float padding, TouchDebounce *td, float debounceTimeSec) {
+    if (padding < 0.0f) padding = 0.0f;
     Rectangle paddedRect = {
         rect.x - padding,
         rect.y - padding,
@@ -69,9 +78,16 @@ bool Touch_CheckClick(Rectangle rect, float padding) {
     };
 
     double now = GetTime();
-    // 180ms UI touchscreen debounce to eliminate accidental double taps / re-triggers
-    if (g_lastTouchClickTime > 0.0 && (now - g_lastTouchClickTime) < 0.18) {
-        return false;
+    float dtThreshold = (debounceTimeSec > 0.0f) ? debounceTimeSec : 0.18f;
+
+    if (td) {
+        if (td->LastClickTime > 0.0 && (now - td->LastClickTime) < dtThreshold) {
+            return false;
+        }
+    } else {
+        if (g_lastTouchClickTime > 0.0 && (now - g_lastTouchClickTime) < dtThreshold) {
+            return false;
+        }
     }
 
     Vector2 touchStart = UIGetTouchStartPos();
@@ -81,9 +97,36 @@ bool Touch_CheckClick(Rectangle rect, float padding) {
     bool isHitStart = CheckCollisionPointRec(touchStart, paddedRect);
     bool isHitCurr = CheckCollisionPointRec(currPos, paddedRect);
 
-    // Tap Release Trigger: finger release with tight drag threshold (<= 10px) so scrolling won't trigger clicks
     if (UI_IsReleased() && (isHitStart || isHitCurr) && dragDist < S(10.0f)) {
+        if (td) td->LastClickTime = now;
         g_lastTouchClickTime = now;
+        return true;
+    }
+
+    return false;
+}
+
+bool Touch_CheckClick(Rectangle rect, float padding) {
+    return Touch_CheckClickEx(rect, padding, NULL, 0.18f);
+}
+
+bool Touch_CheckClickInArea(Rectangle rect, float padding) {
+    if (padding < 0.0f) padding = 0.0f;
+    Rectangle paddedRect = {
+        rect.x - padding,
+        rect.y - padding,
+        rect.width + padding * 2.0f,
+        rect.height + padding * 2.0f
+    };
+
+    Vector2 touchStart = UIGetTouchStartPos();
+    Vector2 currPos = UIGetMousePosition();
+    float dragDist = UIGetTouchDragDistance();
+
+    bool isHitStart = CheckCollisionPointRec(touchStart, paddedRect);
+    bool isHitCurr = CheckCollisionPointRec(currPos, paddedRect);
+
+    if (UI_IsReleased() && (isHitStart || isHitCurr) && dragDist < S(10.0f)) {
         return true;
     }
 
@@ -92,7 +135,8 @@ bool Touch_CheckClick(Rectangle rect, float padding) {
 
 bool Touch_CheckPress(Rectangle rect, float padding) {
     if (!UI_IsPressed() && !UI_IsDown()) return false;
-    if (padding <= 0.0f) padding = S(8.0f);
+    if (UIGetTouchDragDistance() >= S(10.0f)) return false;
+    if (padding < 0.0f) padding = 0.0f;
     Rectangle paddedRect = {
         rect.x - padding,
         rect.y - padding,
@@ -109,3 +153,4 @@ float Touch_GetSwipeVelocity(Vector2 startPos, Vector2 currentPos, float deltaTi
     float dy = currentPos.y - startPos.y;
     return dy / deltaTime;
 }
+

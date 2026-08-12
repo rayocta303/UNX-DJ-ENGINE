@@ -38,7 +38,7 @@ static int DeckInfo_Update(Component *base) {
     
     bool isEjectLocked = d->State->Waveform.LoadLock && d->State->IsPlaying;
 
-    if (!isEjectLocked && d->State->LoadedTrack != NULL && Touch_CheckClick(ejectRect, S(5.0f))) {
+    if (!isEjectLocked && d->State->LoadedTrack != NULL && Touch_CheckClick(ejectRect, S(8.0f))) {
         DeckAudio_Unload(&d->Engine->Decks[d->ID]);
         d->State->IsPlaying = false;
         d->State->IsCueActive = false;
@@ -82,23 +82,23 @@ static int DeckInfo_Update(Component *base) {
 
     // Row 1: Master (Top-Left), Sync (Top-Right)
     Rectangle msRect = { margin, utilY, utilW, utilH };
-    if (Touch_CheckClick(msRect, S(4.0f))) {
+    if (Touch_CheckClick(msRect, S(2.0f))) {
         d->State->IsMaster = true; // Exclusivity handled in main.c loop
     }
 
     Rectangle syRect = { margin + utilW + utilGap, utilY, utilW, utilH };
-    if (Touch_CheckClick(syRect, S(4.0f))) {
+    if (Touch_CheckClick(syRect, S(2.0f))) {
         d->State->SyncMode = (d->State->SyncMode + 1) % 3;
     }
 
     // Row 2: MT (Bottom-Left), Vinyl / CDJ (Bottom-Right)
     Rectangle mtRect = { margin, utilY2, utilW, utilH };
-    if (Touch_CheckClick(mtRect, S(4.0f))) {
+    if (Touch_CheckClick(mtRect, S(2.0f))) {
         d->State->MasterTempo = !d->State->MasterTempo;
     }
 
     Rectangle viRect = { margin + utilW + utilGap, utilY2, utilW, utilH };
-    if (Touch_CheckClick(viRect, S(4.0f))) {
+    if (Touch_CheckClick(viRect, S(2.0f))) {
         d->State->VinylModeEnabled = !d->State->VinylModeEnabled;
     }
 

@@ -221,8 +221,10 @@ static int Settings_Update(Component *base) {
 
     // BUG-13 FIX: Use drag accumulator to avoid dropdown jump on initial tap
     static float dropDragAccum = 0.0f;
-    if (UI_IsPressed())
+    if (UI_IsPressed()) {
       dropDragAccum = 0.0f;
+      r->State->TouchDragAccumulator = 0.0f;
+    }
     if (UI_IsDown()) {
       float dy = GetMouseDelta().y;
       dropDragAccum += fabsf(dy);
@@ -243,6 +245,7 @@ static int Settings_Update(Component *base) {
       g_lastSettingsClickTime = now;
       if (!CheckCollisionPointRec(mouse, dropRect)) {
         r->State->IsDropdownOpen = false;
+        r->State->TouchDragAccumulator = 0.0f;
         UI_ConsumeTouch();
       } else {
         float cy = dropdownY - r->State->DropdownScroll;
@@ -250,9 +253,10 @@ static int Settings_Update(Component *base) {
           Rectangle opRect = {dropdownX, cy, dropdownW, opHeight};
           if (CheckCollisionPointRec(mouse, opRect) && cy >= dropdownY &&
               (cy + opHeight) <= (dropdownY + dropdownH)) {
-            if (fabsf(r->State->TouchDragAccumulator) < 10.0f) {
+            if (dropDragAccum < S(10.0f)) {
               item->Current = i;
               r->State->IsDropdownOpen = false;
+              r->State->TouchDragAccumulator = 0.0f;
               if (r->OnValueChanged)
                 r->OnValueChanged(r->callbackCtx, r->State->DropdownItemIdx);
               if (r->OnApply)
@@ -267,6 +271,7 @@ static int Settings_Update(Component *base) {
 
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
       r->State->IsDropdownOpen = false;
+      r->State->TouchDragAccumulator = 0.0f;
     }
     return 1; // block background UI interaction
   }
@@ -738,36 +743,45 @@ static int Settings_Update(Component *base) {
   if (r->State->Scroll > maxOffset)
     r->State->Scroll = maxOffset;
 
-  // Calculate hovered item row
+  // Calculate hovered item row and row Y position
   int hoveredItemIdx = -1;
+  float hoveredRowY = 0.0f;
   if (mousePos.y >= effectiveListY && mousePos.y < (viewH - bottomH)) {
     int rowIdx = (int)((mousePos.y - effectiveListY) / rowH);
     if (rowIdx >= 0 && rowIdx < visibleRows) {
       int idx_f = r->State->Scroll + rowIdx;
       if (idx_f < filteredCount) {
         hoveredItemIdx = filteredIndices[idx_f];
+        hoveredRowY = effectiveListY + (rowIdx * rowH);
       }
     }
   }
 
-  // Mouse Wheel & Click & Drag Knob Controls
+  // Mouse Wheel Controls (Restricted Knob wheel area to prevent scroll interference)
   float wheel = GetMouseWheelMove();
   if (wheel != 0) {
+    bool consumedByKnob = false;
     if (hoveredItemIdx >= 0 &&
         r->State->Items[hoveredItemIdx].Type == SETTING_TYPE_KNOB) {
-      SettingItem *kItem = &r->State->Items[hoveredItemIdx];
-      float step =
-          (kItem->Step > 0) ? kItem->Step : (kItem->Max - kItem->Min) / 50.0f;
-      if (step < 1.0f && (kItem->Max - kItem->Min) > 50.0f)
-        step = 10.0f;
-      kItem->Value += (wheel > 0 ? step : -step);
-      if (kItem->Value < kItem->Min)
-        kItem->Value = kItem->Min;
-      if (kItem->Value > kItem->Max)
-        kItem->Value = kItem->Max;
-      if (r->OnApply)
-        r->OnApply(r->callbackCtx);
-    } else {
+      Rectangle knobArea = { SCREEN_WIDTH - S(140), hoveredRowY, S(140), rowH };
+      if (CheckCollisionPointRec(mousePos, knobArea)) {
+        consumedByKnob = true;
+        SettingItem *kItem = &r->State->Items[hoveredItemIdx];
+        float step =
+            (kItem->Step > 0) ? kItem->Step : (kItem->Max - kItem->Min) / 50.0f;
+        if (step < 1.0f && (kItem->Max - kItem->Min) > 50.0f)
+          step = 10.0f;
+        kItem->Value += (wheel > 0 ? step : -step);
+        if (kItem->Value < kItem->Min)
+          kItem->Value = kItem->Min;
+        if (kItem->Value > kItem->Max)
+          kItem->Value = kItem->Max;
+        if (r->OnApply)
+          r->OnApply(r->callbackCtx);
+      }
+    }
+    
+    if (!consumedByKnob) {
       r->State->VisualScroll -= wheel * rowH * 3.0f;
       r->State->ScrollVelocity = 0;
       if (r->State->VisualScroll < 0.0f)
@@ -777,24 +791,29 @@ static int Settings_Update(Component *base) {
     }
   }
 
-  // BUG-19 FIX: Block mouse drag knob when dropdown is open
+  // Mouse Drag Knob Controls (Restricted to knob control area only)
   if (!r->State->IsDropdownOpen && UI_IsDown()) {
     Vector2 mouseDelta = GetMouseDelta();
     if (hoveredItemIdx >= 0 &&
         r->State->Items[hoveredItemIdx].Type == SETTING_TYPE_KNOB) {
-      if (fabsf(mouseDelta.x) > 0.001f || fabsf(mouseDelta.y) > 0.001f) {
-        SettingItem *kItem = &r->State->Items[hoveredItemIdx];
-        float deltaVal = (mouseDelta.x - mouseDelta.y);
-        float range = (kItem->Max - kItem->Min);
-        float sensitivity =
-            (range > 100.0f) ? (range / 150.0f) : (range / 80.0f);
-        kItem->Value += deltaVal * sensitivity;
-        if (kItem->Value < kItem->Min)
-          kItem->Value = kItem->Min;
-        if (kItem->Value > kItem->Max)
-          kItem->Value = kItem->Max;
-        if (r->OnApply)
-          r->OnApply(r->callbackCtx);
+      Rectangle knobArea = { SCREEN_WIDTH - S(140), hoveredRowY, S(140), rowH };
+      Vector2 touchStartPos = UIGetTouchStartPos();
+      // Require touch start OR current mouse position to be in knob area
+      if (CheckCollisionPointRec(mousePos, knobArea) || CheckCollisionPointRec(touchStartPos, knobArea)) {
+        if (fabsf(mouseDelta.x) > 0.001f || fabsf(mouseDelta.y) > 0.001f) {
+          SettingItem *kItem = &r->State->Items[hoveredItemIdx];
+          float deltaVal = (mouseDelta.x - mouseDelta.y);
+          float range = (kItem->Max - kItem->Min);
+          float sensitivity =
+              (range > 100.0f) ? (range / 150.0f) : (range / 80.0f);
+          kItem->Value += deltaVal * sensitivity;
+          if (kItem->Value < kItem->Min)
+            kItem->Value = kItem->Min;
+          if (kItem->Value > kItem->Max)
+            kItem->Value = kItem->Max;
+          if (r->OnApply)
+            r->OnApply(r->callbackCtx);
+        }
       }
     }
   }

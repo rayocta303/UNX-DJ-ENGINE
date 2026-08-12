@@ -20,8 +20,14 @@ static void truncateStr(const char *src, char *dst, int maxLen) {
 }
 
 static int Info_Update(Component *base) {
-  (void)base;
-  return 0; // nothing to do
+  InfoRenderer *r = (InfoRenderer *)base;
+  if (!r || !r->State || !r->State->IsActive) return 0;
+
+  if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
+    r->State->IsActive = false;
+    UI_ConsumeTouch();
+  }
+  return 0;
 }
 
 static void Info_Draw(Component *base) {
