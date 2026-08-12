@@ -9,8 +9,8 @@ typedef struct SplashRenderer SplashRenderer;
 struct SplashRenderer {
   Component base;
   Texture2D Logo;
-  int *Progress;
+  double StartTime;
 };
 
-void SplashRenderer_Init(SplashRenderer *s, int *progress);
+void SplashRenderer_Init(SplashRenderer *s);
 void SplashRenderer_Unload(SplashRenderer *s);

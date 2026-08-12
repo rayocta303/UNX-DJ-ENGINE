@@ -1,11 +1,12 @@
 #include "ui/views/splash.h"
-#include "version.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
+#include "version.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+
 
 static int Splash_Update(Component *base) {
   (void)base;
@@ -39,7 +40,7 @@ static void Splash_Draw(Component *base) {
                   ColorWhite);
 
   // Loading Progress Bar
-  if (s->Progress) {
+  if (s->StartTime > 0) {
     float barW = SCREEN_WIDTH * 0.4f;
     float barH = S(6.0f);
     float barX = (SCREEN_WIDTH - barW) / 2.0f;
@@ -48,7 +49,7 @@ static void Splash_Draw(Component *base) {
     DrawRectangleRounded((Rectangle){barX, barY, barW, barH}, 1.0f, 4,
                          ColorDark2);
 
-    float progress = (120.0f - (float)*s->Progress) / 90.0f; // Target 90 frames (1.5s at 60fps)
+    float progress = (float)(GetTime() - s->StartTime) / 1.5f; // Target 1.5s
     if (progress < 0)
       progress = 0;
     if (progress > 1)
@@ -57,8 +58,7 @@ static void Splash_Draw(Component *base) {
     DrawRectangleRounded((Rectangle){barX, barY, barW * progress, barH}, 1.0f,
                          4, ColorBlue);
 
-    static float pulse = 0;
-    pulse += GetFrameTime() * 4.0f;
+    float pulse = (float)GetTime() * 4.0f;
     Color textClr = ColorWhite;
     textClr.a = (unsigned char)(150 + 105 * sinf(pulse));
 
@@ -69,14 +69,14 @@ static void Splash_Draw(Component *base) {
 
 #include "ui/components/assets_bundle.h"
 
-void SplashRenderer_Init(SplashRenderer *s, int *progress) {
+void SplashRenderer_Init(SplashRenderer *s) {
   // Silence Raylib logs during loading to speed up startup
   SetTraceLogLevel(LOG_WARNING);
 
   s->base.Update = Splash_Update;
   s->base.Draw = Splash_Draw;
-  
-  s->Progress = progress;
+
+  s->StartTime = GetTime();
   s->Logo = (Texture2D){0};
 
   bool loaded = false;
@@ -113,8 +113,6 @@ void SplashRenderer_Init(SplashRenderer *s, int *progress) {
 
   // Restore Raylib logs
   SetTraceLogLevel(LOG_INFO);
-
-  s->Progress = progress;
 }
 
 void SplashRenderer_Unload(SplashRenderer *s) {

@@ -98,7 +98,6 @@ Image LoadImageManual(const char *path) { return LoadImage(path); }
 
 typedef struct {
   CurrentScreen screen;
-  int splashCounter;
 
   DeckState deckA;
   DeckState deckB;
@@ -1123,7 +1122,6 @@ void App_Init(App *a) {
   SetGesturesEnabled(GESTURE_PINCH_IN | GESTURE_PINCH_OUT);
 #endif
   a->screen = ScreenSplash;
-  a->splashCounter = 120; // 2 seconds at 60 FPS
 
   // Init Deck States
   UNX_LOG_INFO("[APP] Initializing Decks...");
@@ -1440,7 +1438,7 @@ void App_Init(App *a) {
   a->pad.OnPadRelease = OnPadRelease;
   a->pad.callbackCtx = a;
 
-  SplashRenderer_Init(&a->splash, &a->splashCounter);
+  SplashRenderer_Init(&a->splash);
   a->keyMap = GetDefaultMapping();
   memset(&a->midiCtx, 0, sizeof(MidiContext));
 }
@@ -2637,7 +2635,7 @@ void UpdateDrawFrame(App *app) {
       ds->IsPlaying = false;
       ds->IsCueActive = false;
       audioEngine->Decks[i].IsPlaying = false;
-    } else if (ds->IsPlaying) {
+    } else if (ds->IsPlaying && !ds->IsPreviewing) {
       long long endMs = ds->TrackLengthMs;
       if (ds->LoadedTrack->Analysis.BeatGridCount > 0) {
         endMs = (long long)ds->LoadedTrack
@@ -3658,8 +3656,6 @@ void UpdateDrawFrame(App *app) {
   }
   if (app->screen == ScreenSplash) {
     app->splash.base.Update((Component *)&app->splash);
-    if (app->splashCounter > 0)
-      app->splashCounter--;
   }
 
   if (app->screen != ScreenSplash && app->screen != ScreenDebug) {

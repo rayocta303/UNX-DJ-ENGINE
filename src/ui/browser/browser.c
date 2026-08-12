@@ -706,6 +706,24 @@ static void Linux_AutoMountUSBStorages(void) {
   if (fmounts) {
     size_t len = fread(mountsContent, 1, sizeof(mountsContent) - 1, fmounts);
     mountsContent[len] = '\0';
+    fseek(fmounts, 0, SEEK_SET);
+
+    char line[512];
+    while (fgets(line, sizeof(line), fmounts)) {
+      char devNode[128];
+      char mountPoint[128];
+      if (sscanf(line, "%127s %127s", devNode, mountPoint) == 2) {
+        if (strncmp(mountPoint, "/media/", 7) == 0 && strncmp(devNode, "/dev/", 5) == 0) {
+          struct stat st;
+          // If block device is missing, the USB was detached
+          if (stat(devNode, &st) != 0) {
+            char cmd[512];
+            snprintf(cmd, sizeof(cmd), "umount -l -f %s 2>/dev/null && rmdir %s 2>/dev/null", mountPoint, mountPoint);
+            system(cmd);
+          }
+        }
+      }
+    }
     fclose(fmounts);
   }
 
