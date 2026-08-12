@@ -2649,7 +2649,7 @@ void UpdateDrawFrame(App *app) {
           UNX_LOG_INFO("[MAIN] Track end reached on Deck %c in CONTINUE mode -> Loading next track...", i == 0 ? 'A' : 'B');
           Browser_LoadNextTrack(&app->browserState, i);
         } else {
-          DeckAudio_Stop(&audioEngine->Decks[i]);
+          DeckAudio_InstantStop(&audioEngine->Decks[i]);
           // Also ensure position doesn't drift too far past
           DeckAudio_JumpToMs(&audioEngine->Decks[i], endMs);
           ds->IsPlaying = false;

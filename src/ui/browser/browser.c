@@ -694,13 +694,12 @@ void Browser_CheckStorageConnection(BrowserState *s) {
 }
 
 #if defined(__linux__) && !defined(__ANDROID__)
-static void Linux_AutoMountUSBStorages(void) {
-  static double lastMountCheck = 0;
-  double now = GetTime();
-  if (now - lastMountCheck < 5.0)
-    return;
-  lastMountCheck = now;
+#include <pthread.h>
 
+static volatile int g_MountWorkerRunning = 0;
+
+static void *Linux_MountWorker(void *arg) {
+  (void)arg;
   char mountsContent[4096] = "";
   FILE *fmounts = fopen("/proc/mounts", "r");
   if (fmounts) {
@@ -755,6 +754,27 @@ static void Linux_AutoMountUSBStorages(void) {
       }
     }
     closedir(ddev);
+  }
+  
+  g_MountWorkerRunning = 0;
+  return NULL;
+}
+
+static void Linux_AutoMountUSBStorages(void) {
+  static double lastMountCheck = 0;
+  double now = GetTime();
+  if (now - lastMountCheck < 5.0)
+    return;
+  lastMountCheck = now;
+  
+  if (g_MountWorkerRunning) return;
+  g_MountWorkerRunning = 1;
+
+  pthread_t tid;
+  if (pthread_create(&tid, NULL, Linux_MountWorker, NULL) == 0) {
+      pthread_detach(tid);
+  } else {
+      g_MountWorkerRunning = 0;
   }
 }
 
