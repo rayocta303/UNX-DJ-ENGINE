@@ -28,12 +28,6 @@ echo #define ASSETS_BUNDLE_H >> src\ui\components\assets_bundle.h
 ".\tools\bin2c.exe" "assets\icons\crown.png" src\ui\components\assets_bundle.h icon_crown append
 ".\tools\bin2c.exe" "assets\icons\star.png" src\ui\components\assets_bundle.h icon_star append
 
-%CC% tools/gen_splash_bundle.c -o tools/gen_splash_bundle.exe
-
-echo [Generating Splash Bundle...]
-.\tools\gen_splash_bundle.exe assets\splash src\ui\components\splash_bundle_tmp.h
-type src\ui\components\splash_bundle_tmp.h >> src\ui\components\assets_bundle.h
-del src\ui\components\splash_bundle_tmp.h
 
 echo #endif >> src\ui\components\assets_bundle.h
 

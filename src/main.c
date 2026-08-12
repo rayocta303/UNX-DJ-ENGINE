@@ -2706,12 +2706,12 @@ void UpdateDrawFrame(App *app) {
   lastSyncA = app->deckA.SyncMode;
   lastSyncB = app->deckB.SyncMode;
 
-  // Auto Takeover: If Master stops or is unloaded, other deck becomes Master if playing
-  if (app->deckA.IsMaster && (!app->deckA.IsPlaying || !app->deckA.LoadedTrack) && app->deckB.IsPlaying && app->deckB.LoadedTrack) {
+  // Auto Takeover: If Master stops or is unloaded, other deck becomes Master if playing (instant switch via Motor state)
+  if (app->deckA.IsMaster && (!audioEngine->Decks[0].IsMotorOn || !app->deckA.LoadedTrack) && audioEngine->Decks[1].IsMotorOn && app->deckB.LoadedTrack) {
     app->deckA.IsMaster = false;
     app->deckB.IsMaster = true;
-  } else if (app->deckB.IsMaster && (!app->deckB.IsPlaying || !app->deckB.LoadedTrack) &&
-             app->deckA.IsPlaying && app->deckA.LoadedTrack) {
+  } else if (app->deckB.IsMaster && (!audioEngine->Decks[1].IsMotorOn || !app->deckB.LoadedTrack) &&
+             audioEngine->Decks[0].IsMotorOn && app->deckA.LoadedTrack) {
     app->deckB.IsMaster = false;
     app->deckA.IsMaster = true;
   }
@@ -2955,7 +2955,11 @@ void UpdateDrawFrame(App *app) {
         ds->IsPlaying = true;
       } else {
         bool target = !audio->IsMotorOn;
-        DeckAudio_SetPlaying(audio, target);
+        if (target && ds->SyncMode == 2 && !ds->IsMaster) {
+          DeckAudio_InstantPlay(audio);
+        } else {
+          DeckAudio_SetPlaying(audio, target);
+        }
         ds->IsPlaying = target;
         if (target && ds->SyncMode == 2 && !ds->IsMaster) {
           DeckState *otherDeck = (i == 0) ? &app->deckB : &app->deckA;
