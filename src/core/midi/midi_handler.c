@@ -137,8 +137,8 @@ void MIDI_SendSysEx(const uint8_t *data, uint32_t length) {
     snd_seq_ev_set_subs(&ev);
     snd_seq_ev_set_direct(&ev);
     int err = snd_seq_event_output((snd_seq_t *)seq_handle, &ev);
-    snd_seq_drain_output((snd_seq_t *)seq_handle);
-    printf("[MIDI] SysEx sent (%u bytes): err=%d\n", length, err);
+    // Removed blocking snd_seq_drain_output to prevent ALSA drops during fast bursts
+    // printf("[MIDI] SysEx sent (%u bytes): err=%d\n", length, err);
   }
 #endif
 #else
@@ -166,7 +166,7 @@ void MIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
     snd_seq_ev_set_subs(&ev);
     snd_seq_ev_set_direct(&ev);
     snd_seq_event_output((snd_seq_t *)seq_handle, &ev);
-    snd_seq_drain_output((snd_seq_t *)seq_handle);
+    // Removed blocking snd_seq_drain_output
   } else {
     // Fallback direct event construction
     snd_seq_ev_clear(&ev);
@@ -184,7 +184,7 @@ void MIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
       snd_seq_ev_set_controller(&ev, status & 0x0F, data1, data2);
     }
     snd_seq_event_output((snd_seq_t *)seq_handle, &ev);
-    snd_seq_drain_output((snd_seq_t *)seq_handle);
+    // Removed blocking snd_seq_drain_output
   }
 #endif
 #else
@@ -202,6 +202,14 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2,
     MIDI_UpdateVuMeters(engine, false);
   }
   MIDI_UpdateLoopAndPadLEDs(d1, d2, engine, false);
+
+#if defined(__linux__) && !defined(__ANDROID__)
+#ifdef HAS_ALSA
+  if (seq_handle) {
+    snd_seq_drain_output((snd_seq_t *)seq_handle);
+  }
+#endif
+#endif
 }
 
 
@@ -376,6 +384,14 @@ bool MIDI_Init(MidiContext *ctx) {
   MIDI_SendSysEx(sysexInit1, sizeof(sysexInit1));
   MIDI_SendSysEx(sysexInit2, sizeof(sysexInit2));
   MIDI_SendSysEx(sysexInit3, sizeof(sysexInit3));
+
+#if defined(__linux__) && !defined(__ANDROID__)
+#ifdef HAS_ALSA
+  if (seq_handle) {
+    snd_seq_drain_output((snd_seq_t *)seq_handle);
+  }
+#endif
+#endif
 
   char toastMsg[160];
   snprintf(toastMsg, sizeof(toastMsg), "MIDI CONNECTED: %s", deviceName);

@@ -381,7 +381,7 @@ static void Waveform_Draw(Component *base) {
     }
   }
 
-  float centerX = SCREEN_WIDTH / 2.0f;
+  float centerX = wfLeft + (wfW / 2.0f);
   float playheadX = centerX;
 
   // Position is updated in real-time by main.c (including during Loop In/Out jog edit)
@@ -537,29 +537,22 @@ static void Waveform_Draw(Component *base) {
     }
   }
 
-#define DRAW_TRAP(pA, cA, cR, cG, cB)                                          \
-  do {                                                                         \
-    rlColor4ub((cR), (cG), (cB), 60);                                          \
-    rlVertex2f(cx0 - 0.5f, yy - (pA) - 1.0f);                                  \
-    rlVertex2f(cx0 - 0.5f, yy + (pA) + 1.0f);                                  \
-    rlVertex2f(cx1 + 0.5f, yy + (cA) + 1.0f);                                  \
-    rlVertex2f(cx0 - 0.5f, yy - (pA) - 1.0f);                                  \
-    rlVertex2f(cx1 + 0.5f, yy + (cA) + 1.0f);                                  \
-    rlVertex2f(cx1 + 0.5f, yy - (cA) - 1.0f);                                  \
-    rlColor4ub((cR), (cG), (cB), 255);                                         \
-    rlVertex2f(cx0, yy - (pA));                                                \
-    rlVertex2f(cx0, yy + (pA));                                                \
-    rlVertex2f(cx1, yy + (cA));                                                \
-    rlVertex2f(cx0, yy - (pA));                                                \
-    rlVertex2f(cx1, yy + (cA));                                                \
-    rlVertex2f(cx1, yy - (cA));                                                \
-  } while (0)
+  #define MAX_WAVE_W 3000
+  static float pixLo[MAX_WAVE_W];
+  static float pixMi[MAX_WAVE_W];
+  static float pixHi[MAX_WAVE_W];
+  static Color pixCol[MAX_WAVE_W];
 
-  int64_t lastDrawnFrame = startFrame;
-  float pLo = smLo, pMi = smMi, pHi = smHi;
-  Color pCol = smCol;
+  int iW = (int)ceilf(wfW);
+  if (iW > MAX_WAVE_W) iW = MAX_WAVE_W;
 
-  rlBegin(RL_TRIANGLES);
+  for (int p = 0; p < iW; p++) {
+      pixLo[p] = 0.0f; pixMi[p] = 0.0f; pixHi[p] = 0.0f;
+      pixCol[p] = (Color){0, 0, 0, 0};
+  }
+
+  int last_p = -1;
+
   for (int64_t i = startFrame + 1; i <= endFrame; i++) {
     float rL = 0, rM = 0, rH = 0;
     Color colRaw = {0, 0, 0, 255};
@@ -609,57 +602,76 @@ static void Waveform_Draw(Component *base) {
       smCol.a = 255;
     }
 
-    if ((i % renderStep == 0) || (i == endFrame)) {
-      float cx0 = (float)(((double)lastDrawnFrame - elapsedHalfFrames * r->dataDensity) / framesPerPixel + playheadX);
-      float cx1 = (float)(((double)i - elapsedHalfFrames * r->dataDensity) / framesPerPixel + playheadX);
+    float exactX = (float)(((double)i - elapsedHalfFrames * r->dataDensity) / framesPerPixel + playheadX);
+    int p = (int)roundf(exactX - wfLeft);
 
-      if (cx1 >= wfLeft - 2 && cx0 <= wfRight + 2) {
-        if (userStyle == WAVEFORM_STYLE_BLUE || userStyle == WAVEFORM_STYLE_RGB) {
-          float h0 = fmaxf(pLo, fmaxf(pMi, pHi));
-          float h1 = fmaxf(smLo, fmaxf(smMi, smHi));
-          if (h0 > 0.1f || h1 > 0.1f) {
-            Color c0 = pCol;
-            Color c1 = smCol;
-            if (userStyle == WAVEFORM_STYLE_RGB) {
-              c0.r = (unsigned char)fminf(255.0f, (float)pCol.r * eqLowMult);
-              c0.g = (unsigned char)fminf(255.0f, (float)pCol.g * eqMidMult);
-              c0.b = (unsigned char)fminf(255.0f, (float)pCol.b * eqHighMult);
-              c1.r = (unsigned char)fminf(255.0f, (float)smCol.r * eqLowMult);
-              c1.g = (unsigned char)fminf(255.0f, (float)smCol.g * eqMidMult);
-              c1.b = (unsigned char)fminf(255.0f, (float)smCol.b * eqHighMult);
-            }
-            // Draw blurred halo for anti-flickering
-            rlColor4ub(c0.r, c0.g, c0.b, 60);
-            rlVertex2f(cx0 - 0.5f, yy - h0 - 1.0f); rlVertex2f(cx0 - 0.5f, yy + h0 + 1.0f);
-            rlColor4ub(c1.r, c1.g, c1.b, 60);
-            rlVertex2f(cx1 + 0.5f, yy + h1 + 1.0f);
-            rlColor4ub(c0.r, c0.g, c0.b, 60);
-            rlVertex2f(cx0 - 0.5f, yy - h0 - 1.0f);
-            rlColor4ub(c1.r, c1.g, c1.b, 60);
-            rlVertex2f(cx1 + 0.5f, yy + h1 + 1.0f); rlVertex2f(cx1 + 0.5f, yy - h1 - 1.0f);
-            
-            // Draw solid core
-            rlColor4ub(c0.r, c0.g, c0.b, 255);
-            rlVertex2f(cx0, yy - h0); rlVertex2f(cx0, yy + h0);
-            rlColor4ub(c1.r, c1.g, c1.b, 255);
-            rlVertex2f(cx1, yy + h1);
-            rlColor4ub(c0.r, c0.g, c0.b, 255);
-            rlVertex2f(cx0, yy - h0);
-            rlColor4ub(c1.r, c1.g, c1.b, 255);
-            rlVertex2f(cx1, yy + h1); rlVertex2f(cx1, yy - h1);
-          }
-        } else {
-          if (pLo > 0.1f || smLo > 0.1f) { DRAW_TRAP(pLo, smLo, BL_LOW.r, BL_LOW.g, BL_LOW.b); }
-          if (pMi > 0.1f || smMi > 0.1f) { DRAW_TRAP(pMi, smMi, BL_MID.r, BL_MID.g, BL_MID.b); }
-          if (pHi > 0.1f || smHi > 0.1f) { DRAW_TRAP(pHi, smHi, BL_HIGH.r, BL_HIGH.g, BL_HIGH.b); }
+    if (last_p == -1) last_p = p;
+
+    int pStart = (last_p < p) ? last_p : p;
+    int pEnd = (last_p < p) ? p : last_p;
+
+    for (int k = pStart; k <= pEnd; k++) {
+        if (k >= 0 && k < iW) {
+            if (smLo > pixLo[k]) pixLo[k] = smLo;
+            if (smMi > pixMi[k]) pixMi[k] = smMi;
+            if (smHi > pixHi[k]) pixHi[k] = smHi;
+            pixCol[k] = smCol;
         }
-      }
-      lastDrawnFrame = i;
-      pLo = smLo; pMi = smMi; pHi = smHi; pCol = smCol;
     }
+    last_p = p;
+  }
+
+  // Draw exactly one vertical line per physical screen pixel (Massive FPS boost & anti-wobble)
+  rlBegin(RL_LINES);
+  for (int p = 0; p < iW; p++) {
+      float px = wfLeft + (float)p;
+      
+      if (userStyle == WAVEFORM_STYLE_BLUE || userStyle == WAVEFORM_STYLE_RGB) {
+          float hMax = roundf(fmaxf(pixLo[p], fmaxf(pixMi[p], pixHi[p])));
+          if (hMax > 0.1f) {
+              Color c = pixCol[p];
+              if (userStyle == WAVEFORM_STYLE_RGB) {
+                  c.r = (unsigned char)fminf(255.0f, (float)c.r * eqLowMult);
+                  c.g = (unsigned char)fminf(255.0f, (float)c.g * eqMidMult);
+                  c.b = (unsigned char)fminf(255.0f, (float)c.b * eqHighMult);
+              }
+              // Horizontal & Vertical Blur halo (Anti-alias glow to fix temporal boiling)
+              rlColor4ub(c.r, c.g, c.b, 40);
+              rlVertex2f(px - 1.0f, yy - hMax - 1.0f); rlVertex2f(px - 1.0f, yy + hMax + 1.0f);
+              rlVertex2f(px + 1.0f, yy - hMax - 1.0f); rlVertex2f(px + 1.0f, yy + hMax + 1.0f);
+              
+              // Solid core line
+              rlColor4ub(c.r, c.g, c.b, 255);
+              rlVertex2f(px, yy - hMax); rlVertex2f(px, yy + hMax);
+          }
+      } else {
+          float pL = roundf(pixLo[p]);
+          float pM = roundf(pixMi[p]);
+          float pH = roundf(pixHi[p]);
+          if (pL > 0.1f) {
+              rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 40);
+              rlVertex2f(px - 1.0f, yy - pL - 1.0f); rlVertex2f(px - 1.0f, yy + pL + 1.0f);
+              rlVertex2f(px + 1.0f, yy - pL - 1.0f); rlVertex2f(px + 1.0f, yy + pL + 1.0f);
+              rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 255);
+              rlVertex2f(px, yy - pL); rlVertex2f(px, yy + pL);
+          }
+          if (pM > 0.1f) {
+              rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 40);
+              rlVertex2f(px - 1.0f, yy - pM - 1.0f); rlVertex2f(px - 1.0f, yy + pM + 1.0f);
+              rlVertex2f(px + 1.0f, yy - pM - 1.0f); rlVertex2f(px + 1.0f, yy + pM + 1.0f);
+              rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 255);
+              rlVertex2f(px, yy - pM); rlVertex2f(px, yy + pM);
+          }
+          if (pH > 0.1f) {
+              rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 40);
+              rlVertex2f(px - 1.0f, yy - pH - 1.0f); rlVertex2f(px - 1.0f, yy + pH + 1.0f);
+              rlVertex2f(px + 1.0f, yy - pH - 1.0f); rlVertex2f(px + 1.0f, yy + pH + 1.0f);
+              rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 255);
+              rlVertex2f(px, yy - pH); rlVertex2f(px, yy + pH);
+          }
+      }
   }
   rlEnd();
-#undef DRAW_TRAP
 
   // Beat Grid — ticks use semi-transparent overlay to preserve waveform pixels beneath
   if (r->State->LoadedTrack != NULL) {
