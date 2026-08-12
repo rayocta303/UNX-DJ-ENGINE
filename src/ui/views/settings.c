@@ -1169,6 +1169,11 @@ static void Settings_Draw(Component *base) {
     bool selected = (r->State->FocusLevel >= 1 && i == r->State->CursorPos);
     bool isEditingThis = (r->State->FocusLevel == 2 && selected);
 
+    bool isHover = false;
+    if (Input_IsDown() && CheckCollisionPointRec(Input_GetPointerPos(), (Rectangle){S(5), ry, SCREEN_WIDTH - S(10), rowH})) {
+      isHover = true;
+    }
+
     if (isEditingThis) {
       DrawRectangleRounded(
           (Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)},
@@ -1185,6 +1190,10 @@ static void Settings_Draw(Component *base) {
           (Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)},
           0.15f, 4, 1.0f, ColorOrange);
       DrawCircle(S(14), ry + (rowH / 2.0f), S(3.5f), ColorOrange);
+    } else if (isHover) {
+      DrawRectangleRounded(
+          (Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)},
+          0.15f, 4, (Color){45, 45, 55, 255});
     } else if (idx_f % 2 == 0) {
       DrawRectangleRounded(
           (Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)},

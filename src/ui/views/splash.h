@@ -8,10 +8,7 @@ typedef struct SplashRenderer SplashRenderer;
 
 struct SplashRenderer {
   Component base;
-  Texture2D *frames;
-  int frameCount;
-  int currentFrame;
-  float frameTimer;
+  Texture2D Logo;
   int *Progress;
 };
 

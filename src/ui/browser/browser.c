@@ -1,36 +1,40 @@
 #include "ui/browser/browser.h"
-#include "core/memory_guard.h"
+#include "audio/engine.h"
 #include "core/logger.h"
 #include "core/logic/control_object.h"
-#include "audio/engine.h"
+#include "core/memory_guard.h"
+#include "core/system_info.h"
+#include "input/input.h"
+#include "library/unx_database.h"
 #include "rlgl.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
 #include "ui/player/player_state.h"
-#include "input/input.h"
-#include "library/unx_database.h"
-#include "core/system_info.h"
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <ctype.h>
 #include <sys/stat.h>
+#include <time.h>
+
 
 // Case-insensitive substring search helper
-static const char* stristr_local(const char* haystack, const char* needle) {
-  if (!*needle) return haystack;
+static const char *stristr_local(const char *haystack, const char *needle) {
+  if (!*needle)
+    return haystack;
   for (; *haystack; ++haystack) {
     if (tolower((unsigned char)*haystack) == tolower((unsigned char)*needle)) {
-      const char* h = haystack;
-      const char* n = needle;
-      while (*h && *n && tolower((unsigned char)*h) == tolower((unsigned char)*n)) {
+      const char *h = haystack;
+      const char *n = needle;
+      while (*h && *n &&
+             tolower((unsigned char)*h) == tolower((unsigned char)*n)) {
         ++h;
         ++n;
       }
-      if (!*n) return haystack;
+      if (!*n)
+        return haystack;
     }
   }
   return NULL;
@@ -56,26 +60,33 @@ static const char* stristr_local(const char* haystack, const char* needle) {
 static const char *categories[] = {"COLLECTION", "PLAYLIST", "TRACK"};
 
 static uint32_t GetMaxTrackCapacity_RB(RBDatabase *db) {
-    if (!db) return 0;
-    uint32_t max = db->TrackCount;
-    for (uint32_t i = 0; i < db->PlaylistCount; i++) {
-        if (db->Playlists[i].TrackCount > max) max = db->Playlists[i].TrackCount;
-    }
-    for (uint32_t i = 0; i < db->HistoryCount; i++) {
-        if (db->History[i].TrackCount > max) max = db->History[i].TrackCount;
-    }
-    if (100 > max) max = 100; // TagList max capacity
-    return max;
+  if (!db)
+    return 0;
+  uint32_t max = db->TrackCount;
+  for (uint32_t i = 0; i < db->PlaylistCount; i++) {
+    if (db->Playlists[i].TrackCount > max)
+      max = db->Playlists[i].TrackCount;
+  }
+  for (uint32_t i = 0; i < db->HistoryCount; i++) {
+    if (db->History[i].TrackCount > max)
+      max = db->History[i].TrackCount;
+  }
+  if (100 > max)
+    max = 100; // TagList max capacity
+  return max;
 }
 
 static uint32_t GetMaxTrackCapacity_Serato(SeratoDatabase *db) {
-    if (!db) return 0;
-    uint32_t max = db->TrackCount;
-    for (uint32_t i = 0; i < db->PlaylistCount; i++) {
-        if (db->Playlists[i].TrackCount > max) max = db->Playlists[i].TrackCount;
-    }
-    if (100 > max) max = 100;
-    return max;
+  if (!db)
+    return 0;
+  uint32_t max = db->TrackCount;
+  for (uint32_t i = 0; i < db->PlaylistCount; i++) {
+    if (db->Playlists[i].TrackCount > max)
+      max = db->Playlists[i].TrackCount;
+  }
+  if (100 > max)
+    max = 100;
+  return max;
 }
 
 static void Browser_SwitchStorageByPath(BrowserState *s, const char *path) {
@@ -107,12 +118,14 @@ static void Browser_SwitchStorageByPath(BrowserState *s, const char *path) {
       s->DatabaseType = 0;
       if (s->TrackPointers)
         free(s->TrackPointers);
-      s->TrackPointers = (RBTrack **)malloc(GetMaxTrackCapacity_RB(s->DB) * sizeof(RBTrack *));
+      s->TrackPointers =
+          (RBTrack **)malloc(GetMaxTrackCapacity_RB(s->DB) * sizeof(RBTrack *));
     }
     if (s->SeratoDB) {
       if (s->SeratoTrackPointers)
         free(s->SeratoTrackPointers);
-      s->SeratoTrackPointers = (SeratoTrack **)malloc(GetMaxTrackCapacity_Serato(s->SeratoDB) * sizeof(SeratoTrack *));
+      s->SeratoTrackPointers = (SeratoTrack **)malloc(
+          GetMaxTrackCapacity_Serato(s->SeratoDB) * sizeof(SeratoTrack *));
       if (!s->DB)
         s->DatabaseType = 1;
     }
@@ -121,194 +134,256 @@ static void Browser_SwitchStorageByPath(BrowserState *s, const char *path) {
 
 // Camelot Wheel Key Representation and Harmonic Compatibility Parser
 typedef struct {
-    int Number;   // 1 to 12, or 0 if invalid
-    char Letter;  // 'A' (Minor) or 'B' (Major)
+  int Number;  // 1 to 12, or 0 if invalid
+  char Letter; // 'A' (Minor) or 'B' (Major)
 } CamelotKey;
 
 static CamelotKey ParseCamelotKey(const char *rawKey) {
-    CamelotKey ck = {0, 0};
-    if (!rawKey || rawKey[0] == '\0') return ck;
-
-    // 1. Direct Camelot notation check (e.g. "8A", "12B", "08A")
-    int num = 0;
-    char letter = 0;
-    if (sscanf(rawKey, "%d%c", &num, &letter) == 2 && num >= 1 && num <= 12 &&
-        (letter == 'A' || letter == 'a' || letter == 'B' || letter == 'b')) {
-        ck.Number = num;
-        ck.Letter = (letter >= 'a') ? (letter - 32) : letter;
-        return ck;
-    }
-
-    // 2. Musical notation parsing
-    char buf[16];
-    strncpy(buf, rawKey, 15);
-    buf[15] = '\0';
-
-    bool isMinor = false;
-    size_t len = strlen(buf);
-    if (len > 1 && (buf[len - 1] == 'm' || buf[len - 1] == 'M')) {
-        isMinor = true;
-        buf[len - 1] = '\0';
-    }
-
-    if (isMinor) {
-        ck.Letter = 'A';
-        if (strcmp(buf, "Ab") == 0 || strcmp(buf, "G#") == 0) ck.Number = 1;
-        else if (strcmp(buf, "Eb") == 0 || strcmp(buf, "D#") == 0) ck.Number = 2;
-        else if (strcmp(buf, "Bb") == 0 || strcmp(buf, "A#") == 0) ck.Number = 3;
-        else if (strcmp(buf, "F") == 0) ck.Number = 4;
-        else if (strcmp(buf, "C") == 0) ck.Number = 5;
-        else if (strcmp(buf, "G") == 0) ck.Number = 6;
-        else if (strcmp(buf, "D") == 0) ck.Number = 7;
-        else if (strcmp(buf, "A") == 0) ck.Number = 8;
-        else if (strcmp(buf, "E") == 0) ck.Number = 9;
-        else if (strcmp(buf, "B") == 0) ck.Number = 10;
-        else if (strcmp(buf, "F#") == 0 || strcmp(buf, "Gb") == 0) ck.Number = 11;
-        else if (strcmp(buf, "C#") == 0 || strcmp(buf, "Db") == 0) ck.Number = 12;
-    } else {
-        ck.Letter = 'B';
-        if (strcmp(buf, "B") == 0 || strcmp(buf, "Cb") == 0) ck.Number = 1;
-        else if (strcmp(buf, "F#") == 0 || strcmp(buf, "Gb") == 0) ck.Number = 2;
-        else if (strcmp(buf, "Db") == 0 || strcmp(buf, "C#") == 0) ck.Number = 3;
-        else if (strcmp(buf, "Ab") == 0 || strcmp(buf, "G#") == 0) ck.Number = 4;
-        else if (strcmp(buf, "Eb") == 0 || strcmp(buf, "D#") == 0) ck.Number = 5;
-        else if (strcmp(buf, "Bb") == 0 || strcmp(buf, "A#") == 0) ck.Number = 6;
-        else if (strcmp(buf, "F") == 0) ck.Number = 7;
-        else if (strcmp(buf, "C") == 0) ck.Number = 8;
-        else if (strcmp(buf, "G") == 0) ck.Number = 9;
-        else if (strcmp(buf, "D") == 0) ck.Number = 10;
-        else if (strcmp(buf, "A") == 0) ck.Number = 11;
-        else if (strcmp(buf, "E") == 0) ck.Number = 12;
-    }
-
+  CamelotKey ck = {0, 0};
+  if (!rawKey || rawKey[0] == '\0')
     return ck;
+
+  // 1. Direct Camelot notation check (e.g. "8A", "12B", "08A")
+  int num = 0;
+  char letter = 0;
+  if (sscanf(rawKey, "%d%c", &num, &letter) == 2 && num >= 1 && num <= 12 &&
+      (letter == 'A' || letter == 'a' || letter == 'B' || letter == 'b')) {
+    ck.Number = num;
+    ck.Letter = (letter >= 'a') ? (letter - 32) : letter;
+    return ck;
+  }
+
+  // 2. Musical notation parsing
+  char buf[16];
+  strncpy(buf, rawKey, 15);
+  buf[15] = '\0';
+
+  bool isMinor = false;
+  size_t len = strlen(buf);
+  if (len > 1 && (buf[len - 1] == 'm' || buf[len - 1] == 'M')) {
+    isMinor = true;
+    buf[len - 1] = '\0';
+  }
+
+  if (isMinor) {
+    ck.Letter = 'A';
+    if (strcmp(buf, "Ab") == 0 || strcmp(buf, "G#") == 0)
+      ck.Number = 1;
+    else if (strcmp(buf, "Eb") == 0 || strcmp(buf, "D#") == 0)
+      ck.Number = 2;
+    else if (strcmp(buf, "Bb") == 0 || strcmp(buf, "A#") == 0)
+      ck.Number = 3;
+    else if (strcmp(buf, "F") == 0)
+      ck.Number = 4;
+    else if (strcmp(buf, "C") == 0)
+      ck.Number = 5;
+    else if (strcmp(buf, "G") == 0)
+      ck.Number = 6;
+    else if (strcmp(buf, "D") == 0)
+      ck.Number = 7;
+    else if (strcmp(buf, "A") == 0)
+      ck.Number = 8;
+    else if (strcmp(buf, "E") == 0)
+      ck.Number = 9;
+    else if (strcmp(buf, "B") == 0)
+      ck.Number = 10;
+    else if (strcmp(buf, "F#") == 0 || strcmp(buf, "Gb") == 0)
+      ck.Number = 11;
+    else if (strcmp(buf, "C#") == 0 || strcmp(buf, "Db") == 0)
+      ck.Number = 12;
+  } else {
+    ck.Letter = 'B';
+    if (strcmp(buf, "B") == 0 || strcmp(buf, "Cb") == 0)
+      ck.Number = 1;
+    else if (strcmp(buf, "F#") == 0 || strcmp(buf, "Gb") == 0)
+      ck.Number = 2;
+    else if (strcmp(buf, "Db") == 0 || strcmp(buf, "C#") == 0)
+      ck.Number = 3;
+    else if (strcmp(buf, "Ab") == 0 || strcmp(buf, "G#") == 0)
+      ck.Number = 4;
+    else if (strcmp(buf, "Eb") == 0 || strcmp(buf, "D#") == 0)
+      ck.Number = 5;
+    else if (strcmp(buf, "Bb") == 0 || strcmp(buf, "A#") == 0)
+      ck.Number = 6;
+    else if (strcmp(buf, "F") == 0)
+      ck.Number = 7;
+    else if (strcmp(buf, "C") == 0)
+      ck.Number = 8;
+    else if (strcmp(buf, "G") == 0)
+      ck.Number = 9;
+    else if (strcmp(buf, "D") == 0)
+      ck.Number = 10;
+    else if (strcmp(buf, "A") == 0)
+      ck.Number = 11;
+    else if (strcmp(buf, "E") == 0)
+      ck.Number = 12;
+  }
+
+  return ck;
 }
 
 // Rekordbox / Mixed In Key Traffic Light Harmonic Mixing Match Level
 // 2 = Perfect Harmonic Match (Same key, Relative Major/Minor, +1/-1 Semitone)
 // 1 = Energy Shift / Semi-compatible Match
 // 0 = Incompatible
-static int GetCamelotHarmonicMatchLevel(const char *keyTrackStr, const char *keyMasterStr) {
-    if (!keyTrackStr || !keyMasterStr || keyTrackStr[0] == '\0' || keyMasterStr[0] == '\0') return 0;
-    
-    CamelotKey tKey = ParseCamelotKey(keyTrackStr);
-    CamelotKey mKey = ParseCamelotKey(keyMasterStr);
-
-    if (tKey.Number == 0 || mKey.Number == 0) return 0;
-
-    // 1. Same Key (e.g. 8A & 8A)
-    if (tKey.Number == mKey.Number && tKey.Letter == mKey.Letter) return 2;
-
-    // 2. Relative Major / Minor (e.g. 8A & 8B)
-    if (tKey.Number == mKey.Number && tKey.Letter != mKey.Letter) return 2;
-
-    // 3. +1 Step (Dominant) (e.g. 8A & 9A)
-    int plus1 = (mKey.Number % 12) + 1;
-    if (tKey.Number == plus1 && tKey.Letter == mKey.Letter) return 2;
-
-    // 4. -1 Step (Subdominant) (e.g. 8A & 7A)
-    int minus1 = (mKey.Number == 1) ? 12 : (mKey.Number - 1);
-    if (tKey.Number == minus1 && tKey.Letter == mKey.Letter) return 2;
-
-    // 5. Energy Shift / Semi-compatible Match (+1/-1 Step with letter flip or +2 steps)
-    if (tKey.Number == plus1 && tKey.Letter != mKey.Letter) return 1;
-    if (tKey.Number == minus1 && tKey.Letter != mKey.Letter) return 1;
-    int plus2 = ((mKey.Number + 1) % 12) + 1;
-    if (tKey.Number == plus2 && tKey.Letter == mKey.Letter) return 1;
-
+static int GetCamelotHarmonicMatchLevel(const char *keyTrackStr,
+                                        const char *keyMasterStr) {
+  if (!keyTrackStr || !keyMasterStr || keyTrackStr[0] == '\0' ||
+      keyMasterStr[0] == '\0')
     return 0;
+
+  CamelotKey tKey = ParseCamelotKey(keyTrackStr);
+  CamelotKey mKey = ParseCamelotKey(keyMasterStr);
+
+  if (tKey.Number == 0 || mKey.Number == 0)
+    return 0;
+
+  // 1. Same Key (e.g. 8A & 8A)
+  if (tKey.Number == mKey.Number && tKey.Letter == mKey.Letter)
+    return 2;
+
+  // 2. Relative Major / Minor (e.g. 8A & 8B)
+  if (tKey.Number == mKey.Number && tKey.Letter != mKey.Letter)
+    return 2;
+
+  // 3. +1 Step (Dominant) (e.g. 8A & 9A)
+  int plus1 = (mKey.Number % 12) + 1;
+  if (tKey.Number == plus1 && tKey.Letter == mKey.Letter)
+    return 2;
+
+  // 4. -1 Step (Subdominant) (e.g. 8A & 7A)
+  int minus1 = (mKey.Number == 1) ? 12 : (mKey.Number - 1);
+  if (tKey.Number == minus1 && tKey.Letter == mKey.Letter)
+    return 2;
+
+  // 5. Energy Shift / Semi-compatible Match (+1/-1 Step with letter flip or +2
+  // steps)
+  if (tKey.Number == plus1 && tKey.Letter != mKey.Letter)
+    return 1;
+  if (tKey.Number == minus1 && tKey.Letter != mKey.Letter)
+    return 1;
+  int plus2 = ((mKey.Number + 1) % 12) + 1;
+  if (tKey.Number == plus2 && tKey.Letter == mKey.Letter)
+    return 1;
+
+  return 0;
 }
 
 // Sorter Helpers
 static int CompareTracks_No_RB(const void *a, const void *b) {
-    RBTrack *ta = *(RBTrack **)a;
-    RBTrack *tb = *(RBTrack **)b;
-    if (!ta && !tb) return 0;
-    if (!ta) return 1;
-    if (!tb) return -1;
-    if (ta->BrowserDisplayNumber < tb->BrowserDisplayNumber) return -1;
-    if (ta->BrowserDisplayNumber > tb->BrowserDisplayNumber) return 1;
+  RBTrack *ta = *(RBTrack **)a;
+  RBTrack *tb = *(RBTrack **)b;
+  if (!ta && !tb)
     return 0;
+  if (!ta)
+    return 1;
+  if (!tb)
+    return -1;
+  if (ta->BrowserDisplayNumber < tb->BrowserDisplayNumber)
+    return -1;
+  if (ta->BrowserDisplayNumber > tb->BrowserDisplayNumber)
+    return 1;
+  return 0;
 }
 
 static int CompareTracks_No_Serato(const void *a, const void *b) {
-    SeratoTrack *ta = *(SeratoTrack **)a;
-    SeratoTrack *tb = *(SeratoTrack **)b;
-    if (!ta && !tb) return 0;
-    if (!ta) return 1;
-    if (!tb) return -1;
-    if (ta->BrowserDisplayNumber < tb->BrowserDisplayNumber) return -1;
-    if (ta->BrowserDisplayNumber > tb->BrowserDisplayNumber) return 1;
+  SeratoTrack *ta = *(SeratoTrack **)a;
+  SeratoTrack *tb = *(SeratoTrack **)b;
+  if (!ta && !tb)
     return 0;
+  if (!ta)
+    return 1;
+  if (!tb)
+    return -1;
+  if (ta->BrowserDisplayNumber < tb->BrowserDisplayNumber)
+    return -1;
+  if (ta->BrowserDisplayNumber > tb->BrowserDisplayNumber)
+    return 1;
+  return 0;
 }
 
 static int CompareTracks_BPM_RB(const void *a, const void *b) {
-    RBTrack *ta = *(RBTrack **)a;
-    RBTrack *tb = *(RBTrack **)b;
-    if (!ta || !tb) return 0;
-    if (ta->BPM < tb->BPM) return -1;
-    if (ta->BPM > tb->BPM) return 1;
+  RBTrack *ta = *(RBTrack **)a;
+  RBTrack *tb = *(RBTrack **)b;
+  if (!ta || !tb)
     return 0;
+  if (ta->BPM < tb->BPM)
+    return -1;
+  if (ta->BPM > tb->BPM)
+    return 1;
+  return 0;
 }
 
 static int CompareTracks_Key_RB(const void *a, const void *b) {
-    RBTrack *ta = *(RBTrack **)a;
-    RBTrack *tb = *(RBTrack **)b;
-    if (!ta || !tb) return 0;
-    CamelotKey ka = ParseCamelotKey(ta->Key);
-    CamelotKey kb = ParseCamelotKey(tb->Key);
-    if (ka.Number != kb.Number) return ka.Number - kb.Number;
-    return ka.Letter - kb.Letter;
+  RBTrack *ta = *(RBTrack **)a;
+  RBTrack *tb = *(RBTrack **)b;
+  if (!ta || !tb)
+    return 0;
+  CamelotKey ka = ParseCamelotKey(ta->Key);
+  CamelotKey kb = ParseCamelotKey(tb->Key);
+  if (ka.Number != kb.Number)
+    return ka.Number - kb.Number;
+  return ka.Letter - kb.Letter;
 }
 
 static int CompareTracks_BPM_Serato(const void *a, const void *b) {
-    SeratoTrack *ta = *(SeratoTrack **)a;
-    SeratoTrack *tb = *(SeratoTrack **)b;
-    if (!ta || !tb) return 0;
-    if (ta->BPM < tb->BPM) return -1;
-    if (ta->BPM > tb->BPM) return 1;
+  SeratoTrack *ta = *(SeratoTrack **)a;
+  SeratoTrack *tb = *(SeratoTrack **)b;
+  if (!ta || !tb)
     return 0;
+  if (ta->BPM < tb->BPM)
+    return -1;
+  if (ta->BPM > tb->BPM)
+    return 1;
+  return 0;
 }
 
 static int CompareTracks_Key_Serato(const void *a, const void *b) {
-    SeratoTrack *ta = *(SeratoTrack **)a;
-    SeratoTrack *tb = *(SeratoTrack **)b;
-    if (!ta || !tb) return 0;
-    CamelotKey ka = ParseCamelotKey(ta->Key);
-    CamelotKey kb = ParseCamelotKey(tb->Key);
-    if (ka.Number != kb.Number) return ka.Number - kb.Number;
-    return ka.Letter - kb.Letter;
+  SeratoTrack *ta = *(SeratoTrack **)a;
+  SeratoTrack *tb = *(SeratoTrack **)b;
+  if (!ta || !tb)
+    return 0;
+  CamelotKey ka = ParseCamelotKey(ta->Key);
+  CamelotKey kb = ParseCamelotKey(tb->Key);
+  if (ka.Number != kb.Number)
+    return ka.Number - kb.Number;
+  return ka.Letter - kb.Letter;
 }
 static int CompareTracks_Title_RB(const void *a, const void *b) {
-    RBTrack *ta = *(RBTrack **)a;
-    RBTrack *tb = *(RBTrack **)b;
-    if (!ta || !tb) return 0;
-    return strcmp(ta->Title, tb->Title);
+  RBTrack *ta = *(RBTrack **)a;
+  RBTrack *tb = *(RBTrack **)b;
+  if (!ta || !tb)
+    return 0;
+  return strcmp(ta->Title, tb->Title);
 }
 
 static int CompareTracks_Rating_RB(const void *a, const void *b) {
-    RBTrack *ta = *(RBTrack **)a;
-    RBTrack *tb = *(RBTrack **)b;
-    if (!ta || !tb) return 0;
-    // Sort ratings descending (5 stars first)
-    if (ta->Rating > tb->Rating) return -1;
-    if (ta->Rating < tb->Rating) return 1;
+  RBTrack *ta = *(RBTrack **)a;
+  RBTrack *tb = *(RBTrack **)b;
+  if (!ta || !tb)
     return 0;
+  // Sort ratings descending (5 stars first)
+  if (ta->Rating > tb->Rating)
+    return -1;
+  if (ta->Rating < tb->Rating)
+    return 1;
+  return 0;
 }
 
 static int CompareTracks_Title_Serato(const void *a, const void *b) {
-    SeratoTrack *ta = *(SeratoTrack **)a;
-    SeratoTrack *tb = *(SeratoTrack **)b;
-    if (!ta || !tb) return 0;
-    return strcmp(ta->Title, tb->Title);
+  SeratoTrack *ta = *(SeratoTrack **)a;
+  SeratoTrack *tb = *(SeratoTrack **)b;
+  if (!ta || !tb)
+    return 0;
+  return strcmp(ta->Title, tb->Title);
 }
 
 static int CompareTracks_Rating_Serato(const void *a, const void *b) {
-    (void)a;
-    (void)b;
-    // SeratoTrack struct currently lacks a Rating field in the DB v2 parser.
-    // Retain original order.
-    return 0;
+  (void)a;
+  (void)b;
+  // SeratoTrack struct currently lacks a Rating field in the DB v2 parser.
+  // Retain original order.
+  return 0;
 }
 
 static void Browser_UpdateActiveTracks(BrowserState *s) {
@@ -323,7 +398,8 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
       for (int i = 0; i < s->TagListCount; i++) {
         s->TrackPointers[i] = NULL;
         uint32_t tid = s->TagList[i];
-        if (tid > 0 && tid <= s->DB->TrackCount && s->DB->Tracks[tid - 1].ID == tid) {
+        if (tid > 0 && tid <= s->DB->TrackCount &&
+            s->DB->Tracks[tid - 1].ID == tid) {
           s->TrackPointers[i] = &s->DB->Tracks[tid - 1];
         } else {
           for (uint32_t j = 0; j < s->DB->TrackCount; j++) {
@@ -333,7 +409,8 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
             }
           }
         }
-        if (s->TrackPointers[i]) s->TrackPointers[i]->BrowserDisplayNumber = i + 1;
+        if (s->TrackPointers[i])
+          s->TrackPointers[i]->BrowserDisplayNumber = i + 1;
       }
     } else if (s->CurrentPlaylistIdx >= 0 &&
                s->CurrentPlaylistIdx < (int)s->DB->PlaylistCount) {
@@ -342,7 +419,8 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
       for (uint32_t i = 0; i < pl->TrackCount; i++) {
         uint32_t tid = pl->TrackIDs[i];
         s->TrackPointers[i] = NULL;
-        if (tid > 0 && tid <= s->DB->TrackCount && s->DB->Tracks[tid - 1].ID == tid) {
+        if (tid > 0 && tid <= s->DB->TrackCount &&
+            s->DB->Tracks[tid - 1].ID == tid) {
           s->TrackPointers[i] = &s->DB->Tracks[tid - 1];
         } else {
           for (uint32_t j = 0; j < s->DB->TrackCount; j++) {
@@ -352,13 +430,17 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
             }
           }
         }
-        if (s->TrackPointers[i]) s->TrackPointers[i]->BrowserDisplayNumber = i + 1;
+        if (s->TrackPointers[i])
+          s->TrackPointers[i]->BrowserDisplayNumber = i + 1;
       }
     } else {
       s->ActiveTrackCount = s->DB->TrackCount;
       for (uint32_t i = 0; i < s->DB->TrackCount; i++) {
         s->TrackPointers[i] = &s->DB->Tracks[i];
-        s->TrackPointers[i]->BrowserDisplayNumber = (s->TrackPointers[i]->TrackNumber > 0) ? s->TrackPointers[i]->TrackNumber : (i + 1);
+        s->TrackPointers[i]->BrowserDisplayNumber =
+            (s->TrackPointers[i]->TrackNumber > 0)
+                ? s->TrackPointers[i]->TrackNumber
+                : (i + 1);
       }
     }
   } else { // Serato
@@ -377,7 +459,8 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
       for (uint32_t i = 0; i < pl->TrackCount; i++) {
         uint32_t tid = pl->TrackIDs[i];
         s->SeratoTrackPointers[i] = NULL;
-        if (tid > 0 && tid <= s->SeratoDB->TrackCount && s->SeratoDB->Tracks[tid - 1].ID == tid) {
+        if (tid > 0 && tid <= s->SeratoDB->TrackCount &&
+            s->SeratoDB->Tracks[tid - 1].ID == tid) {
           s->SeratoTrackPointers[i] = &s->SeratoDB->Tracks[tid - 1];
         } else {
           for (uint32_t j = 0; j < s->SeratoDB->TrackCount; j++) {
@@ -388,14 +471,15 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
           }
         }
         if (s->SeratoTrackPointers[i]) {
-            s->SeratoTrackPointers[i]->BrowserDisplayNumber = i + 1;
+          s->SeratoTrackPointers[i]->BrowserDisplayNumber = i + 1;
         }
       }
     } else {
       s->ActiveTrackCount = s->SeratoDB->TrackCount;
       for (uint32_t i = 0; i < s->SeratoDB->TrackCount; i++) {
         s->SeratoTrackPointers[i] = &s->SeratoDB->Tracks[i];
-        s->SeratoTrackPointers[i]->BrowserDisplayNumber = i + 1; // Serato has no TrackNumber in V2 DB
+        s->SeratoTrackPointers[i]->BrowserDisplayNumber =
+            i + 1; // Serato has no TrackNumber in V2 DB
       }
     }
   }
@@ -407,7 +491,8 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
       for (int i = 0; i < s->ActiveTrackCount; i++) {
         RBTrack *t = s->TrackPointers[i];
         if (t) {
-          if (stristr_local(t->Title, s->SearchQuery) || stristr_local(t->Artist, s->SearchQuery)) {
+          if (stristr_local(t->Title, s->SearchQuery) ||
+              stristr_local(t->Artist, s->SearchQuery)) {
             s->TrackPointers[filteredCount++] = t;
           }
         }
@@ -416,7 +501,8 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
       for (int i = 0; i < s->ActiveTrackCount; i++) {
         SeratoTrack *t = s->SeratoTrackPointers[i];
         if (t) {
-          if (stristr_local(t->Title, s->SearchQuery) || stristr_local(t->Artist, s->SearchQuery)) {
+          if (stristr_local(t->Title, s->SearchQuery) ||
+              stristr_local(t->Artist, s->SearchQuery)) {
             s->SeratoTrackPointers[filteredCount++] = t;
           }
         }
@@ -426,41 +512,63 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
   }
   // Apply Sort
   if (s->SortMode >= 0 && s->ActiveTrackCount > 0) {
-      if (s->DatabaseType == 0 && s->TrackPointers) { // Rekordbox
-          if (s->SortMode == 0) qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *), CompareTracks_No_RB);
-          else if (s->SortMode == 1) qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *), CompareTracks_BPM_RB);
-          else if (s->SortMode == 2) qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *), CompareTracks_Key_RB);
-          else if (s->SortMode == 3) qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *), CompareTracks_Title_RB);
-          else if (s->SortMode == 4) qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *), CompareTracks_Rating_RB);
-      } else if (s->DatabaseType == 1 && s->SeratoTrackPointers) { // Serato
-          if (s->SortMode == 0) qsort(s->SeratoTrackPointers, s->ActiveTrackCount, sizeof(SeratoTrack *), CompareTracks_No_Serato);
-          else if (s->SortMode == 1) qsort(s->SeratoTrackPointers, s->ActiveTrackCount, sizeof(SeratoTrack *), CompareTracks_BPM_Serato);
-          else if (s->SortMode == 2) qsort(s->SeratoTrackPointers, s->ActiveTrackCount, sizeof(SeratoTrack *), CompareTracks_Key_Serato);
-          else if (s->SortMode == 3) qsort(s->SeratoTrackPointers, s->ActiveTrackCount, sizeof(SeratoTrack *), CompareTracks_Title_Serato);
-          else if (s->SortMode == 4) qsort(s->SeratoTrackPointers, s->ActiveTrackCount, sizeof(SeratoTrack *), CompareTracks_Rating_Serato);
-      }
+    if (s->DatabaseType == 0 && s->TrackPointers) { // Rekordbox
+      if (s->SortMode == 0)
+        qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *),
+              CompareTracks_No_RB);
+      else if (s->SortMode == 1)
+        qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *),
+              CompareTracks_BPM_RB);
+      else if (s->SortMode == 2)
+        qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *),
+              CompareTracks_Key_RB);
+      else if (s->SortMode == 3)
+        qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *),
+              CompareTracks_Title_RB);
+      else if (s->SortMode == 4)
+        qsort(s->TrackPointers, s->ActiveTrackCount, sizeof(RBTrack *),
+              CompareTracks_Rating_RB);
+    } else if (s->DatabaseType == 1 && s->SeratoTrackPointers) { // Serato
+      if (s->SortMode == 0)
+        qsort(s->SeratoTrackPointers, s->ActiveTrackCount,
+              sizeof(SeratoTrack *), CompareTracks_No_Serato);
+      else if (s->SortMode == 1)
+        qsort(s->SeratoTrackPointers, s->ActiveTrackCount,
+              sizeof(SeratoTrack *), CompareTracks_BPM_Serato);
+      else if (s->SortMode == 2)
+        qsort(s->SeratoTrackPointers, s->ActiveTrackCount,
+              sizeof(SeratoTrack *), CompareTracks_Key_Serato);
+      else if (s->SortMode == 3)
+        qsort(s->SeratoTrackPointers, s->ActiveTrackCount,
+              sizeof(SeratoTrack *), CompareTracks_Title_Serato);
+      else if (s->SortMode == 4)
+        qsort(s->SeratoTrackPointers, s->ActiveTrackCount,
+              sizeof(SeratoTrack *), CompareTracks_Rating_Serato);
+    }
   }
 
   // Reverse if DESC order
   if (!s->SortAscending && s->ActiveTrackCount > 1) {
-      if (s->DatabaseType == 0 && s->TrackPointers) {
-          for (int i = 0; i < s->ActiveTrackCount / 2; i++) {
-              RBTrack *tmp = s->TrackPointers[i];
-              s->TrackPointers[i] = s->TrackPointers[s->ActiveTrackCount - 1 - i];
-              s->TrackPointers[s->ActiveTrackCount - 1 - i] = tmp;
-          }
-      } else if (s->DatabaseType == 1 && s->SeratoTrackPointers) {
-          for (int i = 0; i < s->ActiveTrackCount / 2; i++) {
-              SeratoTrack *tmp = s->SeratoTrackPointers[i];
-              s->SeratoTrackPointers[i] = s->SeratoTrackPointers[s->ActiveTrackCount - 1 - i];
-              s->SeratoTrackPointers[s->ActiveTrackCount - 1 - i] = tmp;
-          }
+    if (s->DatabaseType == 0 && s->TrackPointers) {
+      for (int i = 0; i < s->ActiveTrackCount / 2; i++) {
+        RBTrack *tmp = s->TrackPointers[i];
+        s->TrackPointers[i] = s->TrackPointers[s->ActiveTrackCount - 1 - i];
+        s->TrackPointers[s->ActiveTrackCount - 1 - i] = tmp;
       }
+    } else if (s->DatabaseType == 1 && s->SeratoTrackPointers) {
+      for (int i = 0; i < s->ActiveTrackCount / 2; i++) {
+        SeratoTrack *tmp = s->SeratoTrackPointers[i];
+        s->SeratoTrackPointers[i] =
+            s->SeratoTrackPointers[s->ActiveTrackCount - 1 - i];
+        s->SeratoTrackPointers[s->ActiveTrackCount - 1 - i] = tmp;
+      }
+    }
   }
 }
 
 void Browser_Back(BrowserState *s) {
-  if (!s || !s->IsActive) return;
+  if (!s || !s->IsActive)
+    return;
 
   if (s->ShowLoadPopup) {
     s->ShowLoadPopup = false;
@@ -482,7 +590,8 @@ void Browser_Back(BrowserState *s) {
 
   if (s->FocusArea == 0) {
     if (s->BrowseLevel == 0) {
-      // NAV-03: if entered via Playlist list → return there; if via bank/category shortcut → skip to Categories
+      // NAV-03: if entered via Playlist list → return there; if via
+      // bank/category shortcut → skip to Categories
       if (s->CurrentPlaylistIdx >= 0 && !s->CameFromBank) {
         s->CurrentPlaylistIdx = -1;
         s->BrowseLevel = 1; // Return to Playlists List
@@ -504,7 +613,8 @@ void Browser_Back(BrowserState *s) {
       s->CursorPos = s->ScrollOffset = 0;
       s->VisualScroll = 0.0f;
     } else if (s->BrowseLevel == 3) {
-      s->FocusArea = 1; // Level 2a (Device) backspace -> Level 1 (Sidebar focus)
+      s->FocusArea =
+          1; // Level 2a (Device) backspace -> Level 1 (Sidebar focus)
       s->SidebarCursorPos = 3; // Source icon
     }
   } else {
@@ -514,10 +624,13 @@ void Browser_Back(BrowserState *s) {
 }
 
 void Browser_CheckStorageConnection(BrowserState *s) {
-  if (!s || !s->SelectedStorage) return;
+  if (!s || !s->SelectedStorage)
+    return;
 
-  // Only perform disconnection check if user has selected a storage and is actively inside it (BrowseLevel < 3)
-  if (s->BrowseLevel >= 3) return;
+  // Only perform disconnection check if user has selected a storage and is
+  // actively inside it (BrowseLevel < 3)
+  if (s->BrowseLevel >= 3)
+    return;
 
   struct stat st;
   bool isConnected = false;
@@ -531,7 +644,8 @@ void Browser_CheckStorageConnection(BrowserState *s) {
   if (!isConnected) {
     char devName[128];
     snprintf(devName, sizeof(devName), "%s",
-             (s->SelectedStorage->Name[0] != '\0') ? s->SelectedStorage->Name : "USB Device");
+             (s->SelectedStorage->Name[0] != '\0') ? s->SelectedStorage->Name
+                                                   : "USB Device");
 
     char toastMsg[160];
     snprintf(toastMsg, sizeof(toastMsg), "USB DISCONNECTED: %s", devName);
@@ -539,7 +653,8 @@ void Browser_CheckStorageConnection(BrowserState *s) {
     // 1. Alert Toast Notification (Red warning banner)
     Toast_Show(toastMsg, 4.0f, (Color){240, 50, 50, 255});
 
-    UNX_LOG_WARN("[BROWSER] Storage device disconnected unexpectedly: %s (%s). Resetting browser state.",
+    UNX_LOG_WARN("[BROWSER] Storage device disconnected unexpectedly: %s (%s). "
+                 "Resetting browser state.",
                  devName, s->SelectedStorage->Path);
 
     // 2. Free memory allocated for this storage DB
@@ -580,92 +695,100 @@ void Browser_CheckStorageConnection(BrowserState *s) {
 
 #if defined(__linux__) && !defined(__ANDROID__)
 static void Linux_AutoMountUSBStorages(void) {
-    static double lastMountCheck = 0;
-    double now = GetTime();
-    if (now - lastMountCheck < 5.0) return;
-    lastMountCheck = now;
+  static double lastMountCheck = 0;
+  double now = GetTime();
+  if (now - lastMountCheck < 5.0)
+    return;
+  lastMountCheck = now;
 
-    char mountsContent[4096] = "";
-    FILE *fmounts = fopen("/proc/mounts", "r");
-    if (fmounts) {
-        size_t len = fread(mountsContent, 1, sizeof(mountsContent) - 1, fmounts);
-        mountsContent[len] = '\0';
-        fclose(fmounts);
-    }
+  char mountsContent[4096] = "";
+  FILE *fmounts = fopen("/proc/mounts", "r");
+  if (fmounts) {
+    size_t len = fread(mountsContent, 1, sizeof(mountsContent) - 1, fmounts);
+    mountsContent[len] = '\0';
+    fclose(fmounts);
+  }
 
-    DIR *ddev = opendir("/dev");
-    if (ddev) {
-        struct dirent *ent;
-        while ((ent = readdir(ddev)) != NULL) {
-            if ((strncmp(ent->d_name, "sd", 2) == 0 && strlen(ent->d_name) >= 4) ||
-                (strncmp(ent->d_name, "mmcblk", 6) == 0 && strstr(ent->d_name, "p"))) {
-                
-                char devPath[128];
-                snprintf(devPath, sizeof(devPath), "/dev/%s", ent->d_name);
-                
-                if (strstr(mountsContent, devPath) == NULL) {
-                    char mountPoint[128];
-                    snprintf(mountPoint, sizeof(mountPoint), "/media/%s", ent->d_name);
-                    
-                    char cmd[512];
-                    snprintf(cmd, sizeof(cmd),
-                             "mkdir -p %s 2>/dev/null && "
-                             "(mount -o rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=utf8,utf8 %s %s 2>/dev/null || "
-                             " mount %s %s 2>/dev/null || true)",
-                             mountPoint, devPath, mountPoint, devPath, mountPoint);
-                    system(cmd);
-                }
-            }
+  DIR *ddev = opendir("/dev");
+  if (ddev) {
+    struct dirent *ent;
+    while ((ent = readdir(ddev)) != NULL) {
+      if ((strncmp(ent->d_name, "sd", 2) == 0 && strlen(ent->d_name) >= 4) ||
+          (strncmp(ent->d_name, "mmcblk", 6) == 0 &&
+           strstr(ent->d_name, "p"))) {
+
+        char devPath[128];
+        snprintf(devPath, sizeof(devPath), "/dev/%s", ent->d_name);
+
+        if (strstr(mountsContent, devPath) == NULL) {
+          char mountPoint[128];
+          snprintf(mountPoint, sizeof(mountPoint), "/media/%s", ent->d_name);
+
+          char cmd[512];
+          snprintf(cmd, sizeof(cmd),
+                   "mkdir -p %s 2>/dev/null && "
+                   "(mount -o "
+                   "rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset="
+                   "utf8,utf8 %s %s 2>/dev/null || "
+                   " mount %s %s 2>/dev/null || true)",
+                   mountPoint, devPath, mountPoint, devPath, mountPoint);
+          system(cmd);
         }
-        closedir(ddev);
+      }
     }
+    closedir(ddev);
+  }
 }
 
 static bool IsValidStorageDir(const char *fullPath) {
-    struct stat st;
-    if (stat(fullPath, &st) != 0 || !S_ISDIR(st.st_mode) || access(fullPath, R_OK) != 0) {
-        return false;
-    }
-
-    FILE *f = fopen("/proc/mounts", "r");
-    bool isMounted = false;
-    if (f) {
-        char line[512];
-        while (fgets(line, sizeof(line), f)) {
-            if (strstr(line, fullPath)) {
-                isMounted = true;
-                break;
-            }
-        }
-        fclose(f);
-    }
-
-    if (isMounted) return true;
-
-    // Under /media, /mnt, or /run/media: if NOT in /proc/mounts, it is disconnected!
-    if (strncmp(fullPath, "/media", 6) == 0 ||
-        strncmp(fullPath, "/mnt", 4) == 0 ||
-        strncmp(fullPath, "/run/media", 10) == 0) {
-        // Clean up empty orphaned mount directory
-        rmdir(fullPath);
-        return false;
-    }
-
-    DIR *d = opendir(fullPath);
-    if (d) {
-        struct dirent *ent;
-        bool hasFiles = false;
-        while ((ent = readdir(d)) != NULL) {
-            if (ent->d_name[0] != '.') {
-                hasFiles = true;
-                break;
-            }
-        }
-        closedir(d);
-        if (hasFiles) return true;
-    }
-
+  struct stat st;
+  if (stat(fullPath, &st) != 0 || !S_ISDIR(st.st_mode) ||
+      access(fullPath, R_OK) != 0) {
     return false;
+  }
+
+  FILE *f = fopen("/proc/mounts", "r");
+  bool isMounted = false;
+  if (f) {
+    char line[512];
+    while (fgets(line, sizeof(line), f)) {
+      if (strstr(line, fullPath)) {
+        isMounted = true;
+        break;
+      }
+    }
+    fclose(f);
+  }
+
+  if (isMounted)
+    return true;
+
+  // Under /media, /mnt, or /run/media: if NOT in /proc/mounts, it is
+  // disconnected!
+  if (strncmp(fullPath, "/media", 6) == 0 ||
+      strncmp(fullPath, "/mnt", 4) == 0 ||
+      strncmp(fullPath, "/run/media", 10) == 0) {
+    // Clean up empty orphaned mount directory
+    rmdir(fullPath);
+    return false;
+  }
+
+  DIR *d = opendir(fullPath);
+  if (d) {
+    struct dirent *ent;
+    bool hasFiles = false;
+    while ((ent = readdir(d)) != NULL) {
+      if (ent->d_name[0] != '.') {
+        hasFiles = true;
+        break;
+      }
+    }
+    closedir(d);
+    if (hasFiles)
+      return true;
+  }
+
+  return false;
 }
 #endif
 
@@ -696,13 +819,16 @@ void Browser_RefreshStorages(BrowserState *s) {
     char dbCheck[512];
     const char *sep = "";
     size_t pLen = strlen(docPath);
-    if (pLen > 0 && docPath[pLen-1] != '/' && docPath[pLen-1] != '\\') sep = "/";
+    if (pLen > 0 && docPath[pLen - 1] != '/' && docPath[pLen - 1] != '\\')
+      sep = "/";
 
-    snprintf(dbCheck, sizeof(dbCheck), "%s%sPIONEER/rekordbox/export.pdb", docPath, sep);
+    snprintf(dbCheck, sizeof(dbCheck), "%s%sPIONEER/rekordbox/export.pdb",
+             docPath, sep);
     if (stat(dbCheck, &st) == 0) {
       strcpy(s->AvailableStorages[s->StorageCount].Type, "Rekordbox");
     } else {
-      snprintf(dbCheck, sizeof(dbCheck), "%s%s_Serato_/database V2", docPath, sep);
+      snprintf(dbCheck, sizeof(dbCheck), "%s%s_Serato_/database V2", docPath,
+               sep);
       if (stat(dbCheck, &st) == 0) {
         strcpy(s->AvailableStorages[s->StorageCount].Type, "Serato");
       }
@@ -747,8 +873,8 @@ void Browser_RefreshStorages(BrowserState *s) {
       } else {
         sprintf(path, "%c:/_Serato_/database V2", drive);
         if (stat(path, &st) == 0) {
-          sprintf(s->AvailableStorages[s->StorageCount].Name, "USB (%c:) Serato",
-                  drive);
+          sprintf(s->AvailableStorages[s->StorageCount].Name,
+                  "USB (%c:) Serato", drive);
           sprintf(s->AvailableStorages[s->StorageCount].Path, "%c:/", drive);
           strcpy(s->AvailableStorages[s->StorageCount].Type, "Serato");
           s->StorageCount++;
@@ -768,13 +894,13 @@ void Browser_RefreshStorages(BrowserState *s) {
 
 #ifdef PLATFORM_IOS
   extern const char *ios_get_documents_path(const char *filename);
-  const char *scanDirs[] = {"DOCUMENTS_DIR", "/var/mobile/Media",
-                            "/storage",      "/mnt",
-                            "/media",        "/run/media",
-                            "/media/root",   "/run/media/root"};
+  const char *scanDirs[] = {
+      "DOCUMENTS_DIR", "/var/mobile/Media", "/storage",    "/mnt",
+      "/media",        "/run/media",        "/media/root", "/run/media/root"};
   int scanDirCount = 8;
 #else
-  const char *scanDirs[] = {"/storage", "/mnt", "/media", "/run/media", "/media/root", "/run/media/root"};
+  const char *scanDirs[] = {"/storage",   "/mnt",        "/media",
+                            "/run/media", "/media/root", "/run/media/root"};
   int scanDirCount = 6;
 #endif
 
@@ -806,24 +932,36 @@ void Browser_RefreshStorages(BrowserState *s) {
 
         // Skip system folders, internal mount points, and system partitions
         bool skip = false;
-        const char* toSkip[] = {"self", "emulated", "knox-emulated", "container", "secure", "asec", "obb", "runtime", "appfuse", "shared", "user", "media_rw", "temp", "expand", "legacy", "boot", "root", "system", "etc", "usr", "var", "dev", "proc", "sys"};
-        for(int k=0; k<24; k++) {
-            if(strcmp(dir->d_name, toSkip[k]) == 0) { skip = true; break; }
+        const char *toSkip[] = {
+            "self", "emulated", "knox-emulated", "container", "secure",
+            "asec", "obb",      "runtime",       "appfuse",   "shared",
+            "user", "media_rw", "temp",          "expand",    "legacy",
+            "boot", "root",     "system",        "etc",       "usr",
+            "var",  "dev",      "proc",          "sys"};
+        for (int k = 0; k < 24; k++) {
+          if (strcmp(dir->d_name, toSkip[k]) == 0) {
+            skip = true;
+            break;
+          }
         }
         if (strncmp(dir->d_name, "nand-sata", 9) == 0 ||
             strncmp(dir->d_name, "mmcblk", 6) == 0) {
-            skip = true;
+          skip = true;
         }
-        if (skip) continue;
+        if (skip)
+          continue;
 
         char fullPath[512];
         snprintf(fullPath, sizeof(fullPath), "%s/%s", dirToScan, dir->d_name);
 
 #if defined(__linux__) && !defined(__ANDROID__)
-        if (!IsValidStorageDir(fullPath)) continue;
+        if (!IsValidStorageDir(fullPath))
+          continue;
 #else
         struct stat st_dir;
-        if (stat(fullPath, &st_dir) != 0 || !S_ISDIR(st_dir.st_mode) || access(fullPath, R_OK) != 0) continue;
+        if (stat(fullPath, &st_dir) != 0 || !S_ISDIR(st_dir.st_mode) ||
+            access(fullPath, R_OK) != 0)
+          continue;
 #endif
 
         UNX_LOG_INFO("[BROWSER] Scanning storage: %s", fullPath);
@@ -843,14 +981,22 @@ void Browser_RefreshStorages(BrowserState *s) {
         bool hasRB = false;
         bool hasSerato = false;
 
-        snprintf(dbPath, sizeof(dbPath), "%s/PIONEER/rekordbox/export.pdb", fullPath);
-        if (stat(dbPath, &st) == 0) hasRB = true;
-        snprintf(dbPath, sizeof(dbPath), "%s/PIONEER/Rekordbox/export.pdb", fullPath);
-        if (stat(dbPath, &st) == 0) hasRB = true;
-        snprintf(dbPath, sizeof(dbPath), "%s/PIONEER/REKORDBOX/export.pdb", fullPath);
-        if (stat(dbPath, &st) == 0) hasRB = true;
-        snprintf(dbPath, sizeof(dbPath), "%s/pioneer/rekordbox/export.pdb", fullPath);
-        if (stat(dbPath, &st) == 0) hasRB = true;
+        snprintf(dbPath, sizeof(dbPath), "%s/PIONEER/rekordbox/export.pdb",
+                 fullPath);
+        if (stat(dbPath, &st) == 0)
+          hasRB = true;
+        snprintf(dbPath, sizeof(dbPath), "%s/PIONEER/Rekordbox/export.pdb",
+                 fullPath);
+        if (stat(dbPath, &st) == 0)
+          hasRB = true;
+        snprintf(dbPath, sizeof(dbPath), "%s/PIONEER/REKORDBOX/export.pdb",
+                 fullPath);
+        if (stat(dbPath, &st) == 0)
+          hasRB = true;
+        snprintf(dbPath, sizeof(dbPath), "%s/pioneer/rekordbox/export.pdb",
+                 fullPath);
+        if (stat(dbPath, &st) == 0)
+          hasRB = true;
 
         snprintf(dbPath, sizeof(dbPath), "%s/_Serato_/database V2", fullPath);
         if (stat(dbPath, &st) == 0)
@@ -867,14 +1013,17 @@ void Browser_RefreshStorages(BrowserState *s) {
         // Display name formatting (e.g. sda1 -> USB1)
         char displayName[64];
         if (strncmp(dir->d_name, "sd", 2) == 0 && strlen(dir->d_name) >= 3) {
-            int driveNum = dir->d_name[2] - 'a' + 1;
-            if (driveNum >= 1 && driveNum <= 9) {
-                snprintf(displayName, sizeof(displayName), "USB%d (%s)", driveNum, type);
-            } else {
-                snprintf(displayName, sizeof(displayName), "USB %s (%s)", dir->d_name, type);
-            }
+          int driveNum = dir->d_name[2] - 'a' + 1;
+          if (driveNum >= 1 && driveNum <= 9) {
+            snprintf(displayName, sizeof(displayName), "USB%d (%s)", driveNum,
+                     type);
+          } else {
+            snprintf(displayName, sizeof(displayName), "USB %s (%s)",
+                     dir->d_name, type);
+          }
         } else {
-            snprintf(displayName, sizeof(displayName), "%s (%s)", dir->d_name, type);
+          snprintf(displayName, sizeof(displayName), "%s (%s)", dir->d_name,
+                   type);
         }
 
         snprintf(s->AvailableStorages[s->StorageCount].Name,
@@ -913,7 +1062,8 @@ void Browser_RefreshStorages(BrowserState *s) {
       }
       if (isNew) {
         char toastMsg[160];
-        snprintf(toastMsg, sizeof(toastMsg), "USB CONNECTED: %s", s->AvailableStorages[i].Name);
+        snprintf(toastMsg, sizeof(toastMsg), "USB CONNECTED: %s",
+                 s->AvailableStorages[i].Name);
         Toast_Show(toastMsg, 3.5f, (Color){40, 200, 80, 255}); // Green Toast
       }
     }
@@ -929,7 +1079,8 @@ void Browser_RefreshStorages(BrowserState *s) {
       }
       if (isRemoved) {
         char toastMsg[160];
-        snprintf(toastMsg, sizeof(toastMsg), "USB DISCONNECTED: %s", s_knownNames[k]);
+        snprintf(toastMsg, sizeof(toastMsg), "USB DISCONNECTED: %s",
+                 s_knownNames[k]);
         Toast_Show(toastMsg, 4.0f, (Color){240, 50, 50, 255}); // Red Toast
       }
     }
@@ -944,8 +1095,10 @@ void Browser_RefreshStorages(BrowserState *s) {
   // Clamp cursor bounds when in Source selection mode (BrowseLevel == 3)
   if (s->BrowseLevel == 3) {
     if (s->StorageCount > 0) {
-      if (s->CursorPos >= s->StorageCount) s->CursorPos = s->StorageCount - 1;
-      if (s->ScrollOffset > s->CursorPos) s->ScrollOffset = s->CursorPos;
+      if (s->CursorPos >= s->StorageCount)
+        s->CursorPos = s->StorageCount - 1;
+      if (s->ScrollOffset > s->CursorPos)
+        s->ScrollOffset = s->CursorPos;
     } else {
       s->CursorPos = 0;
       s->ScrollOffset = 0;
@@ -984,21 +1137,26 @@ static int Browser_Update(Component *base) {
   float rowH = S(28.0f);
   float sbTrackW = S(14);
   float listW = SCREEN_WIDTH - sidebarW - sbTrackW - S(4);
-  if (s->InfoEnabled) listW = SCREEN_WIDTH - sidebarW - S(160);
+  if (s->InfoEnabled)
+    listW = SCREEN_WIDTH - sidebarW - S(160);
 
   // Dropdown and Search Box Interaction
   if (s->BrowseLevel == 0) {
     float oskButtonW = S(36);
-    Rectangle searchBoxRect = {sidebarW, TOP_BAR_H, listW - oskButtonW - S(4), rowH};
-    Rectangle oskButtonRect = {sidebarW + listW - oskButtonW, TOP_BAR_H, oskButtonW, rowH};
+    Rectangle searchBoxRect = {sidebarW, TOP_BAR_H, listW - oskButtonW - S(4),
+                               rowH};
+    Rectangle oskButtonRect = {sidebarW + listW - oskButtonW, TOP_BAR_H,
+                               oskButtonW, rowH};
 
     // Table Header Column Rectangles (Row 2)
     float headerH = S(24.0f);
     float headerY = TOP_BAR_H + rowH;
-    Rectangle headNoRect    = {sidebarW, headerY, S(46), headerH};
-    Rectangle headTitleRect = {sidebarW + S(46), headerY, listW - S(110) - S(46), headerH};
-    Rectangle headBpmRect   = {sidebarW + listW - S(110), headerY, S(55), headerH};
-    Rectangle headKeyRect   = {sidebarW + listW - S(55), headerY, S(55), headerH};
+    Rectangle headNoRect = {sidebarW, headerY, S(46), headerH};
+    Rectangle headTitleRect = {sidebarW + S(46), headerY,
+                               listW - S(110) - S(46), headerH};
+    Rectangle headBpmRect = {sidebarW + listW - S(110), headerY, S(55),
+                             headerH};
+    Rectangle headKeyRect = {sidebarW + listW - S(55), headerY, S(55), headerH};
 
     // Handle OSK Panel Touch Absorption
     if (s->ShowOSK) {
@@ -1104,32 +1262,33 @@ static int Browser_Update(Component *base) {
       if ((key >= 32) && (key <= 125) && (strlen(s->SearchQuery) < 63)) {
         int len = strlen(s->SearchQuery);
         s->SearchQuery[len] = (char)key;
-        s->SearchQuery[len+1] = '\0';
+        s->SearchQuery[len + 1] = '\0';
         queryChanged = true;
       }
       key = GetCharPressed();
     }
-    
+
     if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) {
       int len = strlen(s->SearchQuery);
       if (len > 0) {
-        s->SearchQuery[len-1] = '\0';
+        s->SearchQuery[len - 1] = '\0';
         queryChanged = true;
       }
       // BUG-15 FIX: Always return after processing backspace in search mode.
-      // Prevents the same KEY_BACKSPACE from reaching Browser_Back in the same frame.
+      // Prevents the same KEY_BACKSPACE from reaching Browser_Back in the same
+      // frame.
       if (queryChanged) {
         s->CursorPos = s->ScrollOffset = 0;
         Browser_UpdateActiveTracks(s);
       }
       return 0;
     }
-    
+
     if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_ESCAPE)) {
       s->IsSearching = false;
       System_ShowKeyboard(false);
     }
-    
+
     if (queryChanged) {
       s->CursorPos = s->ScrollOffset = 0;
       Browser_UpdateActiveTracks(s);
@@ -1138,44 +1297,43 @@ static int Browser_Update(Component *base) {
 
   // MIDI Navigation
   if (s->MidiBrowseDelta != 0) {
-      bool isShift = (CO_GetValue("[Channel1]", "shift") > 0.5f) ||
-                     (CO_GetValue("[Channel2]", "shift") > 0.5f) ||
-                     (CO_GetValue("[Channel3]", "shift") > 0.5f) ||
-                     (CO_GetValue("[Channel4]", "shift") > 0.5f);
-      if (isShift) {
-          CO_AddValue("[Master]", "waveform_zoom_step", (float)s->MidiBrowseDelta);
-          s->MidiBrowseDelta = 0;
-      }
+    bool isShift = (CO_GetValue("[Channel1]", "shift") > 0.5f) ||
+                   (CO_GetValue("[Channel2]", "shift") > 0.5f) ||
+                   (CO_GetValue("[Channel3]", "shift") > 0.5f) ||
+                   (CO_GetValue("[Channel4]", "shift") > 0.5f);
+    if (isShift) {
+      CO_AddValue("[Master]", "waveform_zoom_step", (float)s->MidiBrowseDelta);
+      s->MidiBrowseDelta = 0;
+    }
   }
-  
+
   if (s->MidiRequestEnter || s->MidiRequestMoveFocusForward) {
-      triggerEnter = true;
-      s->MidiRequestEnter = false;
-      s->MidiRequestMoveFocusForward = false;
+    triggerEnter = true;
+    s->MidiRequestEnter = false;
+    s->MidiRequestMoveFocusForward = false;
   }
-  
+
   if (s->MidiRequestMoveFocusBackward) {
-      Browser_Back(s);
-      s->MidiRequestMoveFocusBackward = false;
+    Browser_Back(s);
+    s->MidiRequestMoveFocusBackward = false;
   }
 
   if (s->MidiRequestLoadA) {
-      loadToDeck = 0;
-      s->MidiRequestLoadA = false;
+    loadToDeck = 0;
+    s->MidiRequestLoadA = false;
   }
   if (s->MidiRequestLoadB) {
-      loadToDeck = 1;
-      s->MidiRequestLoadB = false;
+    loadToDeck = 1;
+    s->MidiRequestLoadB = false;
   }
-
-
 
   // Load Popup Dialog Interaction handled FIRST to prevent same-frame double
   // triggers
   static double lastPopupOpenedTime = 0.0;
   bool wasPopupOpen = s->ShowLoadPopup;
   if (wasPopupOpen) {
-    if ((GetTime() - lastPopupOpenedTime) >= 0.25 && Input_IsReleased() && Input_GetDragDistance() < S(10.0f)) {
+    if ((GetTime() - lastPopupOpenedTime) >= 0.25 && Input_IsReleased() &&
+        Input_GetDragDistance() < S(10.0f)) {
       float pw = S(240);
       float ph = S(120);
       float viewH = SCREEN_HEIGHT - DECK_STR_H;
@@ -1203,7 +1361,9 @@ static int Browser_Update(Component *base) {
         Input_Consume();
       }
     }
-    if (!s->IsSearching && (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) || s->MidiRequestBack)) {
+    if (!s->IsSearching &&
+        (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) ||
+         s->MidiRequestBack)) {
       s->ShowLoadPopup = false;
     }
 
@@ -1214,8 +1374,9 @@ static int Browser_Update(Component *base) {
       return 0;
     }
   } else {
-    // BUG-01 FIX: KEY_LEFT/RIGHT removed per design - navigation uses only UP/DOWN, Backspace, Enter
-    // No load deck shortcut via keyboard in browser view
+    // BUG-01 FIX: KEY_LEFT/RIGHT removed per design - navigation uses only
+    // UP/DOWN, Backspace, Enter No load deck shortcut via keyboard in browser
+    // view
     (void)0;
   }
 
@@ -1229,84 +1390,96 @@ static int Browser_Update(Component *base) {
 
     // BUG-03 FIX: Debounce sidebar click to prevent double-trigger
     double sidebarNow = GetTime();
-    if (Input_CheckClickEx(boxRect, 0.0f) && (sidebarNow - lastBrowserListTapTime) >= 0.14) {
-        lastBrowserListTapTime = sidebarNow;
-        s->TouchDragAccumulator = 0.0f;
-        // BUG-05 FIX: Reset scroll velocity when switching categories via sidebar
-        s->ScrollVelocity = 0.0f;
-        s->TouchVelocityY = 0.0f;
-        s->ShowOSK = false;
-        s->FocusArea = 0;
-        s->SidebarCursorPos = i;
-        if (i < 4) {
-          s->ScrollOffset = 0;
-          s->VisualScroll = 0;
-          s->ScrollVelocity = 0;
-          if (i == 3) {
-            // Navigate to Drive / Source
-            s->BrowseLevel = 3;
+    if (Input_CheckClickEx(boxRect, 0.0f) &&
+        (sidebarNow - lastBrowserListTapTime) >= 0.14) {
+      lastBrowserListTapTime = sidebarNow;
+      s->TouchDragAccumulator = 0.0f;
+      // BUG-05 FIX: Reset scroll velocity when switching categories via sidebar
+      s->ScrollVelocity = 0.0f;
+      s->TouchVelocityY = 0.0f;
+      s->ShowOSK = false;
+      s->FocusArea = 0;
+      s->SidebarCursorPos = i;
+      if (i < 4) {
+        s->ScrollOffset = 0;
+        s->VisualScroll = 0;
+        s->ScrollVelocity = 0;
+        if (i == 3) {
+          // Navigate to Drive / Source
+          s->BrowseLevel = 3;
+          s->CursorPos = 0;
+        } else {
+          // Navigate to categories
+          if (i == 2) {
+            s->BrowseLevel = 1; // Playlists level
             s->CursorPos = 0;
           } else {
-            // Navigate to categories
-            if (i == 2) {
-              s->BrowseLevel = 1; // Playlists level
-              s->CursorPos = 0;
-            } else {
-              // NAV-04 FIX: Both FILENAME (0) and FOLDER (1) go to tracks view consistently
-              s->BrowseLevel = 0; // Tracks
-              s->CurrentPlaylistIdx = -1;
-              s->CameFromBank = false;
-              s->CursorPos = 0;
-              // BUG-06 FIX: Reset SortMode when switching category from sidebar
-              s->SortMode = 0;
-              s->SortAscending = true;
-              Browser_UpdateActiveTracks(s);
-            }
-          }
-        } else {
-          // Playlist Bank Jump
-          // BUG-18 FIX: Show toast if bank slot is empty
-          int bankIdx = i - 4;
-          if (s->PlaylistBank[bankIdx].PlaylistIdx >= 0) {
-            // Check if we need to switch storage
-            if (s->SelectedStorage && strcmp(s->PlaylistBank[bankIdx].StoragePath, s->SelectedStorage->Path) != 0) {
-              Browser_SwitchStorageByPath(s, s->PlaylistBank[bankIdx].StoragePath);
-            }
-            
-            s->CurrentPlaylistIdx = s->PlaylistBank[bankIdx].PlaylistIdx;
-            s->CameFromBank = true; // NAV-03 FIX: Mark that we jumped directly from bank shortcut
+            // NAV-04 FIX: Both FILENAME (0) and FOLDER (1) go to tracks view
+            // consistently
             s->BrowseLevel = 0; // Tracks
+            s->CurrentPlaylistIdx = -1;
+            s->CameFromBank = false;
+            s->CursorPos = 0;
+            // BUG-06 FIX: Reset SortMode when switching category from sidebar
+            s->SortMode = 0;
+            s->SortAscending = true;
             Browser_UpdateActiveTracks(s);
-            s->CursorPos = s->ScrollOffset = 0;
-            s->VisualScroll = 0;
-            s->ScrollVelocity = 0;
-          } else {
-            Toast_Show("Bank slot empty. Drag a playlist to assign.", 2.0f, (Color){180, 130, 0, 255});
           }
         }
-      }
-
-      // Handle Dropping into Bank
-      bool isHovered = CheckCollisionPointRec(mousePos, boxRect);
-      if (s->IsDragging && Input_IsReleased() && isHovered) {
-        if (i >= 4) {
-          int bankIdx = i - 4;
-          if (s->DraggingType == 1) { // Only playlists can be banked
-            s->PlaylistBank[bankIdx].PlaylistIdx = s->DraggingIdx;
-            if (s->SelectedStorage) {
-              strncpy(s->PlaylistBank[bankIdx].StoragePath, s->SelectedStorage->Path, 511);
-            }
-            // Cache the name
-            if (s->DatabaseType == 0 && s->DB && s->DraggingIdx < (int)s->DB->PlaylistCount) {
-              strncpy(s->PlaylistBank[bankIdx].Name, s->DB->Playlists[s->DraggingIdx].Name, 63);
-            } else if (s->DatabaseType == 1 && s->SeratoDB && s->DraggingIdx < (int)s->SeratoDB->PlaylistCount) {
-              strncpy(s->PlaylistBank[bankIdx].Name, s->SeratoDB->Playlists[s->DraggingIdx].Name, 63);
-            }
-
-            UNX_LOG_INFO("[BROWSER] Banked Playlist '%s' to Slot %d", s->PlaylistBank[bankIdx].Name, bankIdx + 1);
+      } else {
+        // Playlist Bank Jump
+        // BUG-18 FIX: Show toast if bank slot is empty
+        int bankIdx = i - 4;
+        if (s->PlaylistBank[bankIdx].PlaylistIdx >= 0) {
+          // Check if we need to switch storage
+          if (s->SelectedStorage && strcmp(s->PlaylistBank[bankIdx].StoragePath,
+                                           s->SelectedStorage->Path) != 0) {
+            Browser_SwitchStorageByPath(s,
+                                        s->PlaylistBank[bankIdx].StoragePath);
           }
+
+          s->CurrentPlaylistIdx = s->PlaylistBank[bankIdx].PlaylistIdx;
+          s->CameFromBank = true; // NAV-03 FIX: Mark that we jumped directly
+                                  // from bank shortcut
+          s->BrowseLevel = 0;     // Tracks
+          Browser_UpdateActiveTracks(s);
+          s->CursorPos = s->ScrollOffset = 0;
+          s->VisualScroll = 0;
+          s->ScrollVelocity = 0;
+        } else {
+          Toast_Show("Bank slot empty. Drag a playlist to assign.", 2.0f,
+                     (Color){180, 130, 0, 255});
         }
       }
+    }
+
+    // Handle Dropping into Bank
+    bool isHovered = CheckCollisionPointRec(mousePos, boxRect);
+    if (s->IsDragging && Input_IsReleased() && isHovered) {
+      if (i >= 4) {
+        int bankIdx = i - 4;
+        if (s->DraggingType == 1) { // Only playlists can be banked
+          s->PlaylistBank[bankIdx].PlaylistIdx = s->DraggingIdx;
+          if (s->SelectedStorage) {
+            strncpy(s->PlaylistBank[bankIdx].StoragePath,
+                    s->SelectedStorage->Path, 511);
+          }
+          // Cache the name
+          if (s->DatabaseType == 0 && s->DB &&
+              s->DraggingIdx < (int)s->DB->PlaylistCount) {
+            strncpy(s->PlaylistBank[bankIdx].Name,
+                    s->DB->Playlists[s->DraggingIdx].Name, 63);
+          } else if (s->DatabaseType == 1 && s->SeratoDB &&
+                     s->DraggingIdx < (int)s->SeratoDB->PlaylistCount) {
+            strncpy(s->PlaylistBank[bankIdx].Name,
+                    s->SeratoDB->Playlists[s->DraggingIdx].Name, 63);
+          }
+
+          UNX_LOG_INFO("[BROWSER] Banked Playlist '%s' to Slot %d",
+                       s->PlaylistBank[bankIdx].Name, bankIdx + 1);
+        }
+      }
+    }
   }
 
   // 2. Data State
@@ -1341,48 +1514,62 @@ static int Browser_Update(Component *base) {
   if (s->ShowOSK) {
     listAreaH -= oskH;
   }
-  if (listAreaH < S(50)) listAreaH = S(50);
+  if (listAreaH < S(50))
+    listAreaH = S(50);
   totalVisible = (int)floorf(listAreaH / rowH);
-  if (totalVisible < 1) totalVisible = 1;
+  if (totalVisible < 1)
+    totalVisible = 1;
 
   if (s->MidiBrowseDelta != 0) {
-      float itemRowH = S(28.0f);
-      int delta = s->MidiBrowseDelta;
-      s->MidiBrowseDelta = 0;
-      if (s->FocusArea == 1) {
-          s->SidebarCursorPos += delta;
-          if (s->SidebarCursorPos < 0) s->SidebarCursorPos = 0;
-          if (s->SidebarCursorPos > 6) s->SidebarCursorPos = 6;
-      } else {
-          if (delta > 0) {
-              for (int i = 0; i < delta; i++) {
-                  if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
-                      if (s->CursorPos < totalVisible - 1) s->CursorPos++;
-                      else s->ScrollOffset++;
-                  }
-              }
-          } else if (delta < 0) {
-              for (int i = 0; i < -delta; i++) {
-                  if (s->CursorPos > 0) s->CursorPos--;
-                  else if (s->ScrollOffset > 0) s->ScrollOffset--;
-              }
+    float itemRowH = S(28.0f);
+    int delta = s->MidiBrowseDelta;
+    s->MidiBrowseDelta = 0;
+    if (s->FocusArea == 1) {
+      s->SidebarCursorPos += delta;
+      if (s->SidebarCursorPos < 0)
+        s->SidebarCursorPos = 0;
+      if (s->SidebarCursorPos > 6)
+        s->SidebarCursorPos = 6;
+    } else {
+      if (delta > 0) {
+        for (int i = 0; i < delta; i++) {
+          if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
+            if (s->CursorPos < totalVisible - 1)
+              s->CursorPos++;
+            else
+              s->ScrollOffset++;
           }
-          s->VisualScroll = (float)(s->ScrollOffset * itemRowH);
-          s->ScrollVelocity = 0;
+        }
+      } else if (delta < 0) {
+        for (int i = 0; i < -delta; i++) {
+          if (s->CursorPos > 0)
+            s->CursorPos--;
+          else if (s->ScrollOffset > 0)
+            s->ScrollOffset--;
+        }
       }
+      s->VisualScroll = (float)(s->ScrollOffset * itemRowH);
+      s->ScrollVelocity = 0;
+    }
   }
 
   // Strict Bounds Clamping for Cursor and ScrollOffset
   if (totalItems > 0) {
-    if (s->ScrollOffset > totalItems - 1) s->ScrollOffset = totalItems - 1;
-    if (s->ScrollOffset < 0) s->ScrollOffset = 0;
+    if (s->ScrollOffset > totalItems - 1)
+      s->ScrollOffset = totalItems - 1;
+    if (s->ScrollOffset < 0)
+      s->ScrollOffset = 0;
 
     int maxCursor = totalItems - 1 - s->ScrollOffset;
-    if (maxCursor > totalVisible - 1) maxCursor = totalVisible - 1;
-    if (maxCursor < 0) maxCursor = 0;
+    if (maxCursor > totalVisible - 1)
+      maxCursor = totalVisible - 1;
+    if (maxCursor < 0)
+      maxCursor = 0;
 
-    if (s->CursorPos > maxCursor) s->CursorPos = maxCursor;
-    if (s->CursorPos < 0) s->CursorPos = 0;
+    if (s->CursorPos > maxCursor)
+      s->CursorPos = maxCursor;
+    if (s->CursorPos < 0)
+      s->CursorPos = 0;
   } else {
     s->CursorPos = 0;
     s->ScrollOffset = 0;
@@ -1391,14 +1578,16 @@ static int Browser_Update(Component *base) {
   // 3. Touch Kinetic Scrolling & Interactive Scrollbar Logic
   if (!s->ShowLoadPopup) {
     float maxScroll = (totalItems - totalVisible) * rowH;
-    if (maxScroll < 0) maxScroll = 0;
+    if (maxScroll < 0)
+      maxScroll = 0;
 
     float sbTrackX = SCREEN_WIDTH - sbTrackW;
     float sbTrackY = listYOffset;
     float sbTrackH = listAreaH;
     Rectangle sbRect = {sbTrackX, sbTrackY, sbTrackW, sbTrackH};
 
-    if (Input_IsPressed() && mousePos.y < SCREEN_HEIGHT - DECK_STR_H && mousePos.y > TOP_BAR_H) {
+    if (Input_IsPressed() && mousePos.y < SCREEN_HEIGHT - DECK_STR_H &&
+        mousePos.y > TOP_BAR_H) {
       s->TouchDragAccumulator = 0.0f;
       s->TouchVelocityY = 0.0f;
       s->LastTouchX = mousePos.x;
@@ -1415,13 +1604,16 @@ static int Browser_Update(Component *base) {
     if (Input_IsDown()) {
       if (s->IsScrollbarDragging) {
         float ratio = (mousePos.y - sbTrackY) / sbTrackH;
-        if (ratio < 0.0f) ratio = 0.0f;
-        if (ratio > 1.0f) ratio = 1.0f;
+        if (ratio < 0.0f)
+          ratio = 0.0f;
+        if (ratio > 1.0f)
+          ratio = 1.0f;
         s->VisualScroll = ratio * maxScroll;
         s->ScrollVelocity = 0.0f;
       } else {
         float frameTime = GetFrameTime();
-        if (frameTime < 0.001f) frameTime = 0.016f;
+        if (frameTime < 0.001f)
+          frameTime = 0.016f;
         float dx = mousePos.x - s->LastTouchX;
         float dy = mousePos.y - s->LastTouchY;
         s->LastTouchX = mousePos.x;
@@ -1450,7 +1642,8 @@ static int Browser_Update(Component *base) {
       // Kinetic Inertia Decay (Smooth Flick)
       s->VisualScroll += s->ScrollVelocity * GetFrameTime();
       s->ScrollVelocity *= 0.95f; // Friction
-      if (fabsf(s->ScrollVelocity) < 5.0f) s->ScrollVelocity = 0.0f;
+      if (fabsf(s->ScrollVelocity) < 5.0f)
+        s->ScrollVelocity = 0.0f;
 
       // Strict Boundary Clamping (No overscroll bounce / sembul / pantul)
       if (s->VisualScroll < 0.0f) {
@@ -1463,9 +1656,6 @@ static int Browser_Update(Component *base) {
     }
 
     if (Input_IsReleased()) {
-      if (s->IsDragging && fabsf(s->TouchVelocityY) > 60.0f) {
-        s->ScrollVelocity = s->TouchVelocityY; // Apply touch flick velocity
-      }
       s->IsDragging = false;
       s->IsScrollbarDragging = false;
     }
@@ -1474,19 +1664,25 @@ static int Browser_Update(Component *base) {
     float wheelMove = Mouse_GetWheel();
     if (wheelMove != 0) {
       s->VisualScroll -= wheelMove * rowH * 3.0f;
-      s->ScrollVelocity = 0.0f; 
+      s->ScrollVelocity = 0.0f;
     }
 
-    // Constraints for interaction safety (Strict boundary clamping - No overscroll bounce)
-    if (s->VisualScroll < 0.0f) s->VisualScroll = 0.0f;
-    if (s->VisualScroll > maxScroll) s->VisualScroll = maxScroll;
+    // Constraints for interaction safety (Strict boundary clamping - No
+    // overscroll bounce)
+    if (s->VisualScroll < 0.0f)
+      s->VisualScroll = 0.0f;
+    if (s->VisualScroll > maxScroll)
+      s->VisualScroll = maxScroll;
 
     // Sync back to discrete offsets for logic compatibility
     s->ScrollOffset = (int)(s->VisualScroll / rowH);
-    if (s->ScrollOffset < 0) s->ScrollOffset = 0;
+    if (s->ScrollOffset < 0)
+      s->ScrollOffset = 0;
     int maxOffset = totalItems - totalVisible;
-    if (maxOffset < 0) maxOffset = 0;
-    if (s->ScrollOffset > maxOffset) s->ScrollOffset = maxOffset;
+    if (maxOffset < 0)
+      maxOffset = 0;
+    if (s->ScrollOffset > maxOffset)
+      s->ScrollOffset = maxOffset;
   }
 
   // 3. List Item Interaction (Tap & Load trigger)
@@ -1494,27 +1690,33 @@ static int Browser_Update(Component *base) {
     float pixelOffset = fmodf(s->VisualScroll, rowH);
     for (int i = 0; i < totalVisible + 1; i++) {
       int idx = s->ScrollOffset + i;
-      if (idx < 0 || idx >= totalItems) continue;
+      if (idx < 0 || idx >= totalItems)
+        continue;
 
       float ry = listYOffset - pixelOffset + i * rowH;
       Rectangle itemRect = {sidebarW, ry, listW - S(28), rowH};
 
       // Visually within the list clip area
-      if (ry < listYOffset - S(10) || ry > SCREEN_HEIGHT - DECK_STR_H - S(5)) continue;
+      if (ry < listYOffset - S(10) || ry > SCREEN_HEIGHT - DECK_STR_H - S(5))
+        continue;
 
       if (Input_CheckPress(itemRect)) {
         s->DraggingIdx = idx;
-        if (s->BrowseLevel == 1) s->DraggingType = 1; 
-        else if (s->BrowseLevel == 0) s->DraggingType = 0;
-        else s->DraggingType = -1;
+        if (s->BrowseLevel == 1)
+          s->DraggingType = 1;
+        else if (s->BrowseLevel == 0)
+          s->DraggingType = 0;
+        else
+          s->DraggingType = -1;
       }
 
-      if (Input_CheckClickEx(itemRect, 0.0f) && fabsf(s->ScrollVelocity) < 60.0f) {
+      if (Input_CheckClickEx(itemRect, 0.0f) &&
+          fabsf(s->ScrollVelocity) < 60.0f) {
         double now = GetTime();
         s->ShowOSK = false; // Auto hide keyboard on list item tap
         if (s->CursorPos + s->ScrollOffset != idx) {
           s->CursorPos = idx - s->ScrollOffset;
-          s->MarqueeScrollX = 0; 
+          s->MarqueeScrollX = 0;
         }
         if (s->BrowseLevel == 0) {
           double dt = now - lastTrackTapTime;
@@ -1546,28 +1748,30 @@ static int Browser_Update(Component *base) {
   if (!s->IsSearching && !s->ShowLoadPopup) {
     if (IsKeyPressed(KEY_DOWN)) {
       if (s->FocusArea == 1) {
-        if (s->SidebarCursorPos < 6) s->SidebarCursorPos++;
+        if (s->SidebarCursorPos < 6)
+          s->SidebarCursorPos++;
       } else {
         if (s->CursorPos + s->ScrollOffset < totalItems - 1) {
           s->CursorPos++;
           if (s->CursorPos >= totalVisible) {
-              s->CursorPos = totalVisible - 1;
-              s->VisualScroll += rowH;
-              s->ScrollVelocity = 0;
+            s->CursorPos = totalVisible - 1;
+            s->VisualScroll += rowH;
+            s->ScrollVelocity = 0;
           }
         }
       }
     }
     if (IsKeyPressed(KEY_UP)) {
       if (s->FocusArea == 1) {
-        if (s->SidebarCursorPos > 0) s->SidebarCursorPos--;
+        if (s->SidebarCursorPos > 0)
+          s->SidebarCursorPos--;
       } else {
         if (s->CursorPos + s->ScrollOffset > 0) {
           s->CursorPos--;
           if (s->CursorPos < 0) {
-              s->CursorPos = 0;
-              s->VisualScroll -= rowH;
-              s->ScrollVelocity = 0;
+            s->CursorPos = 0;
+            s->VisualScroll -= rowH;
+            s->ScrollVelocity = 0;
           }
         }
       }
@@ -1578,9 +1782,10 @@ static int Browser_Update(Component *base) {
     // BUG-04 FIX: Do not trigger enter during active drag
     if (!s->IsDragging) {
       lastBrowserListTapTime = GetTime();
-      s->TouchDragAccumulator = 999.0f; // Consume touch drag distance to prevent re-triggering sub-level
+      s->TouchDragAccumulator = 999.0f; // Consume touch drag distance to
+                                        // prevent re-triggering sub-level
       s->ShowOSK = false;
-      
+
       if (s->FocusArea == 1) {
         int i = s->SidebarCursorPos;
         s->FocusArea = 0;
@@ -1609,8 +1814,11 @@ static int Browser_Update(Component *base) {
         } else {
           int bankIdx = i - 4;
           if (s->PlaylistBank[bankIdx].PlaylistIdx >= 0) {
-            if (s->SelectedStorage && strcmp(s->PlaylistBank[bankIdx].StoragePath, s->SelectedStorage->Path) != 0) {
-              Browser_SwitchStorageByPath(s, s->PlaylistBank[bankIdx].StoragePath);
+            if (s->SelectedStorage &&
+                strcmp(s->PlaylistBank[bankIdx].StoragePath,
+                       s->SelectedStorage->Path) != 0) {
+              Browser_SwitchStorageByPath(s,
+                                          s->PlaylistBank[bankIdx].StoragePath);
             }
             s->CurrentPlaylistIdx = s->PlaylistBank[bankIdx].PlaylistIdx;
             s->CameFromBank = true;
@@ -1624,116 +1832,120 @@ static int Browser_Update(Component *base) {
           }
         }
       } else if (s->BrowseLevel == 3) {
-      int idx = s->ScrollOffset + s->CursorPos;
-      if (idx < s->StorageCount) {
-        s->SelectedStorage = &s->AvailableStorages[idx];
-        s->ActiveTrackCount = 0;
-        s->CurrentPlaylistIdx = -1;
-        if (s->DB)
-          RB_FreeDatabase(s->DB);
-        if (s->SeratoDB)
-          Serato_FreeDatabase(s->SeratoDB);
-        s->DB = NULL;
-        s->SeratoDB = NULL;
+        int idx = s->ScrollOffset + s->CursorPos;
+        if (idx < s->StorageCount) {
+          s->SelectedStorage = &s->AvailableStorages[idx];
+          s->ActiveTrackCount = 0;
+          s->CurrentPlaylistIdx = -1;
+          if (s->DB)
+            RB_FreeDatabase(s->DB);
+          if (s->SeratoDB)
+            Serato_FreeDatabase(s->SeratoDB);
+          s->DB = NULL;
+          s->SeratoDB = NULL;
 
-        // Attempt to load both databases if they exist
-        s->DB = RB_LoadDatabase(s->SelectedStorage->Path);
-        s->SeratoDB = Serato_LoadDatabase(s->SelectedStorage->Path);
-        s->HasBothDatabases = (s->DB != NULL && s->SeratoDB != NULL);
+          // Attempt to load both databases if they exist
+          s->DB = RB_LoadDatabase(s->SelectedStorage->Path);
+          s->SeratoDB = Serato_LoadDatabase(s->SelectedStorage->Path);
+          s->HasBothDatabases = (s->DB != NULL && s->SeratoDB != NULL);
 
-        if (s->DB) {
-          s->DatabaseType = 0; // Default to Rekordbox if present
-          if (s->TrackPointers)
-            free(s->TrackPointers);
-          s->TrackPointers =
-              (RBTrack **)malloc(GetMaxTrackCapacity_RB(s->DB) * sizeof(RBTrack *));
-        } else if (s->SeratoDB) {
-          s->DatabaseType = 1; // Fallback to Serato
+          if (s->DB) {
+            s->DatabaseType = 0; // Default to Rekordbox if present
+            if (s->TrackPointers)
+              free(s->TrackPointers);
+            s->TrackPointers = (RBTrack **)malloc(
+                GetMaxTrackCapacity_RB(s->DB) * sizeof(RBTrack *));
+          } else if (s->SeratoDB) {
+            s->DatabaseType = 1; // Fallback to Serato
+          } else {
+            s->DatabaseType = 0; // Default
+          }
+
+          if (s->SeratoDB) {
+            if (s->SeratoTrackPointers)
+              free(s->SeratoTrackPointers);
+            s->SeratoTrackPointers =
+                (SeratoTrack **)malloc(GetMaxTrackCapacity_Serato(s->SeratoDB) *
+                                       sizeof(SeratoTrack *));
+          }
+
+          s->BrowseLevel = 2; // Categories level
+          s->CursorPos = s->ScrollOffset = 0;
+          s->VisualScroll = 0;
+          s->ScrollVelocity = 0;
+          UNX_LOG_INFO("[BROWSER] Selected storage: %s (DB Found: %s)",
+                       s->SelectedStorage->Path,
+                       (s->DB || s->SeratoDB) ? "YES" : "NO");
+        }
+      } else if (s->BrowseLevel == 2) {
+        int catIdx = s->ScrollOffset + s->CursorPos;
+        if (catIdx == 3 && s->HasBothDatabases) {
+          // TOGGLE DATABASE
+          s->DatabaseType = (s->DatabaseType == 0) ? 1 : 0;
+          UNX_LOG_INFO("[BROWSER] Switched database to %s",
+                       s->DatabaseType == 0 ? "Rekordbox" : "Serato");
+          s->CurrentPlaylistIdx = -1; // Reset playlist selection on switch
+          s->CursorPos = s->ScrollOffset = 0;
+          s->VisualScroll = 0.0f;
+          s->ScrollVelocity = 0.0f;
+          Browser_UpdateActiveTracks(s);
+        } else if (catIdx == 1) {
+          s->BrowseLevel = 1; // Categories to Playlists
+          s->CursorPos = s->ScrollOffset = 0;
+          s->VisualScroll = 0.0f;
+          s->ScrollVelocity = 0.0f;
         } else {
-          s->DatabaseType = 0; // Default
-        }
-
-        if (s->SeratoDB) {
-          if (s->SeratoTrackPointers)
-            free(s->SeratoTrackPointers);
-          s->SeratoTrackPointers = (SeratoTrack **)malloc(
-              GetMaxTrackCapacity_Serato(s->SeratoDB) * sizeof(SeratoTrack *));
-        }
-
-        s->BrowseLevel = 2; // Categories level
-        s->CursorPos = s->ScrollOffset = 0;
-        s->VisualScroll = 0;
-        s->ScrollVelocity = 0;
-        UNX_LOG_INFO("[BROWSER] Selected storage: %s (DB Found: %s)", 
-               s->SelectedStorage->Path, (s->DB || s->SeratoDB) ? "YES" : "NO");
-
-      }
-    } else if (s->BrowseLevel == 2) {
-      int catIdx = s->ScrollOffset + s->CursorPos;
-      if (catIdx == 3 && s->HasBothDatabases) {
-        // TOGGLE DATABASE
-        s->DatabaseType = (s->DatabaseType == 0) ? 1 : 0;
-        UNX_LOG_INFO("[BROWSER] Switched database to %s",
-               s->DatabaseType == 0 ? "Rekordbox" : "Serato");
-        s->CurrentPlaylistIdx = -1; // Reset playlist selection on switch
-        s->CursorPos = s->ScrollOffset = 0;
-        s->VisualScroll = 0.0f;
-        s->ScrollVelocity = 0.0f;
-        Browser_UpdateActiveTracks(s);
-      } else if (catIdx == 1) {
-        s->BrowseLevel = 1; // Categories to Playlists
-        s->CursorPos = s->ScrollOffset = 0;
-        s->VisualScroll = 0.0f;
-        s->ScrollVelocity = 0.0f;
-      } else {
-        // BUG-06 FIX: Reset SortMode when entering tracks from category selection
-        s->BrowseLevel = 0; // Categories to Tracks (0: FILENAME, 1: FOLDER, 3: TRACK)
-        s->CurrentPlaylistIdx = -1;
-        s->CursorPos = s->ScrollOffset = 0;
-        s->VisualScroll = 0.0f;
-        s->ScrollVelocity = 0.0f;
-        s->SortMode = 0;
-        s->SortAscending = true;
-        Browser_UpdateActiveTracks(s);
-      }
-    } else if (s->BrowseLevel == 1) {
-
-      int idx = s->ScrollOffset + s->CursorPos;
-      if (s->DatabaseType == 0) {
-        if (s->DB && idx < (int)s->DB->PlaylistCount) {
-          s->CurrentPlaylistIdx = idx;
-          s->BrowseLevel = 0;
+          // BUG-06 FIX: Reset SortMode when entering tracks from category
+          // selection
+          s->BrowseLevel =
+              0; // Categories to Tracks (0: FILENAME, 1: FOLDER, 3: TRACK)
+          s->CurrentPlaylistIdx = -1;
+          s->CursorPos = s->ScrollOffset = 0;
+          s->VisualScroll = 0.0f;
+          s->ScrollVelocity = 0.0f;
           s->SortMode = 0;
           s->SortAscending = true;
           Browser_UpdateActiveTracks(s);
-          s->CursorPos = s->ScrollOffset = 0;
-        s->VisualScroll = 0;
-        s->ScrollVelocity = 0;
         }
-      } else {
-        if (s->SeratoDB && idx < (int)s->SeratoDB->PlaylistCount) {
-          s->CurrentPlaylistIdx = idx;
-          s->BrowseLevel = 0;
-          s->SortMode = 0;
-          s->SortAscending = true;
-          Browser_UpdateActiveTracks(s);
-          s->CursorPos = s->ScrollOffset = 0;
-        s->VisualScroll = 0;
-        s->ScrollVelocity = 0;
+      } else if (s->BrowseLevel == 1) {
+
+        int idx = s->ScrollOffset + s->CursorPos;
+        if (s->DatabaseType == 0) {
+          if (s->DB && idx < (int)s->DB->PlaylistCount) {
+            s->CurrentPlaylistIdx = idx;
+            s->BrowseLevel = 0;
+            s->SortMode = 0;
+            s->SortAscending = true;
+            Browser_UpdateActiveTracks(s);
+            s->CursorPos = s->ScrollOffset = 0;
+            s->VisualScroll = 0;
+            s->ScrollVelocity = 0;
+          }
+        } else {
+          if (s->SeratoDB && idx < (int)s->SeratoDB->PlaylistCount) {
+            s->CurrentPlaylistIdx = idx;
+            s->BrowseLevel = 0;
+            s->SortMode = 0;
+            s->SortAscending = true;
+            Browser_UpdateActiveTracks(s);
+            s->CursorPos = s->ScrollOffset = 0;
+            s->VisualScroll = 0;
+            s->ScrollVelocity = 0;
+          }
         }
-      }
-    } else if (s->BrowseLevel == 0) {
-      // Track selected -> Show Load Popup
-      int idx = s->ScrollOffset + s->CursorPos;
-      if (idx < s->ActiveTrackCount) {
-        s->ShowLoadPopup = true;
-        s->PopupTrackIdx = idx;
+      } else if (s->BrowseLevel == 0) {
+        // Track selected -> Show Load Popup
+        int idx = s->ScrollOffset + s->CursorPos;
+        if (idx < s->ActiveTrackCount) {
+          s->ShowLoadPopup = true;
+          s->PopupTrackIdx = idx;
+        }
       }
     }
   }
-}
 
-  if (!s->IsSearching && (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_ESCAPE) || s->MidiRequestBack)) {
+  if (!s->IsSearching && (IsKeyPressed(KEY_BACKSPACE) ||
+                          IsKeyPressed(KEY_ESCAPE) || s->MidiRequestBack)) {
     Browser_Back(s);
   }
 
@@ -1747,38 +1959,41 @@ static int Browser_Update(Component *base) {
 }
 
 static bool IsFormatSupported(const char *filepath) {
-    if (!filepath) return false;
-    const char *ext = strrchr(filepath, '.');
-    if (!ext) return false;
-    
-    char lowerExt[16] = {0};
-    for (int i = 0; i < 15 && ext[i] != '\0'; i++) {
-        lowerExt[i] = (ext[i] >= 'A' && ext[i] <= 'Z') ? (ext[i] + 32) : ext[i];
-    }
-    
-    if (strcmp(lowerExt, ".mp3") == 0 ||
-        strcmp(lowerExt, ".wav") == 0 ||
-        strcmp(lowerExt, ".flac") == 0 ||
-        strcmp(lowerExt, ".aiff") == 0 ||
-        strcmp(lowerExt, ".aif") == 0 ||
-        strcmp(lowerExt, ".m4a") == 0 ||
-        strcmp(lowerExt, ".aac") == 0 ||
-        strcmp(lowerExt, ".ogg") == 0) {
-        return true;
-    }
+  if (!filepath)
     return false;
+  const char *ext = strrchr(filepath, '.');
+  if (!ext)
+    return false;
+
+  char lowerExt[16] = {0};
+  for (int i = 0; i < 15 && ext[i] != '\0'; i++) {
+    lowerExt[i] = (ext[i] >= 'A' && ext[i] <= 'Z') ? (ext[i] + 32) : ext[i];
+  }
+
+  if (strcmp(lowerExt, ".mp3") == 0 || strcmp(lowerExt, ".wav") == 0 ||
+      strcmp(lowerExt, ".flac") == 0 || strcmp(lowerExt, ".aiff") == 0 ||
+      strcmp(lowerExt, ".aif") == 0 || strcmp(lowerExt, ".m4a") == 0 ||
+      strcmp(lowerExt, ".aac") == 0 || strcmp(lowerExt, ".ogg") == 0) {
+    return true;
+  }
+  return false;
 }
 
-int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool autoPlay) {
-  if (!s || loadToDeck < 0 || loadToDeck > 1) return 0;
-  if (idx < 0 || idx >= s->ActiveTrackCount) return 0;
+int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck,
+                             bool autoPlay) {
+  if (!s || loadToDeck < 0 || loadToDeck > 1)
+    return 0;
+  if (idx < 0 || idx >= s->ActiveTrackCount)
+    return 0;
 
   struct DeckState *targetDeck = (loadToDeck == 0) ? s->DeckA : s->DeckB;
-  if (!targetDeck) return 0;
+  if (!targetDeck)
+    return 0;
 
   targetDeck->IsLoading = true;
   if (!autoPlay && targetDeck->Waveform.LoadLock && targetDeck->IsPlaying) {
-    UNX_LOG_WARN("[BROWSER] LOAD LOCKED: Deck %c is playing", loadToDeck == 0 ? 'A' : 'B');
+    UNX_LOG_WARN("[BROWSER] LOAD LOCKED: Deck %c is playing",
+                 loadToDeck == 0 ? 'A' : 'B');
     return 0;
   }
 
@@ -1787,7 +2002,8 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
   if (s->DatabaseType == 0) { // Rekordbox
     if (s->TrackPointers[idx]) {
       RBTrack *t = s->TrackPointers[idx];
-      UNX_LOG_INFO("[BROWSER] Loading RB track: %s to Deck %c (Index %d)", t->Title, loadToDeck == 0 ? 'A' : 'B', idx);
+      UNX_LOG_INFO("[BROWSER] Loading RB track: %s to Deck %c (Index %d)",
+                   t->Title, loadToDeck == 0 ? 'A' : 'B', idx);
 
       if (MemoryGuard_GetLevel() == MEM_MODE_CRITICAL) {
         UNX_LOG_ERR("[BROWSER] LOAD BLOCKED: Memory is critical.");
@@ -1796,7 +2012,8 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
       }
 
       if (!IsFormatSupported(t->FilePath)) {
-        UNX_LOG_WARN("[BROWSER] LOAD BLOCKED: Unsupported format %s", t->FilePath);
+        UNX_LOG_WARN("[BROWSER] LOAD BLOCKED: Unsupported format %s",
+                     t->FilePath);
         Toast_Show("UNSUPPORTED TRACK FORMAT", 3.0f, (Color){240, 50, 50, 255});
         s->ShowLoadPopup = false;
         targetDeck->IsLoading = false;
@@ -1804,27 +2021,39 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
       }
 
       if (s->SelectedStorage) {
-        RB_LoadTrackData(&t->Analysis, t->AnalyzePath, t->Title, t->ID, s->SelectedStorage->Path);
+        RB_LoadTrackData(&t->Analysis, t->AnalyzePath, t->Title, t->ID,
+                         s->SelectedStorage->Path);
 
         char trackFullPath[1024] = {0};
         const char *relPath = t->FilePath;
-        if (relPath[0] == '/' || relPath[0] == '\\') relPath++;
-        snprintf(trackFullPath, sizeof(trackFullPath), "%s/%s", s->SelectedStorage->Path, relPath);
+        if (relPath[0] == '/' || relPath[0] == '\\')
+          relPath++;
+        snprintf(trackFullPath, sizeof(trackFullPath), "%s/%s",
+                 s->SelectedStorage->Path, relPath);
 
         if (s->AudioPlugin) {
-          DeckAudio_LoadTrackAsync(&s->AudioPlugin->Decks[loadToDeck], trackFullPath);
+          DeckAudio_LoadTrackAsync(&s->AudioPlugin->Decks[loadToDeck],
+                                   trackFullPath);
         }
 
-        strncpy(targetDeck->TrackTitle, t->Title, 127); targetDeck->TrackTitle[127] = '\0';
-        strncpy(targetDeck->ArtistName, t->Artist, 127); targetDeck->ArtistName[127] = '\0';
-        strncpy(targetDeck->AlbumName, t->Album, 127); targetDeck->AlbumName[127] = '\0';
-        strncpy(targetDeck->GenreName, t->Genre, 63); targetDeck->GenreName[63] = '\0';
-        strncpy(targetDeck->TrackKey, t->Key, 15); targetDeck->TrackKey[15] = '\0';
-        strncpy(targetDeck->LabelName, t->Label, 127); targetDeck->LabelName[127] = '\0';
-        strncpy(targetDeck->Comment, t->Comment, 255); targetDeck->Comment[255] = '\0';
+        strncpy(targetDeck->TrackTitle, t->Title, 127);
+        targetDeck->TrackTitle[127] = '\0';
+        strncpy(targetDeck->ArtistName, t->Artist, 127);
+        targetDeck->ArtistName[127] = '\0';
+        strncpy(targetDeck->AlbumName, t->Album, 127);
+        targetDeck->AlbumName[127] = '\0';
+        strncpy(targetDeck->GenreName, t->Genre, 63);
+        targetDeck->GenreName[63] = '\0';
+        strncpy(targetDeck->TrackKey, t->Key, 15);
+        targetDeck->TrackKey[15] = '\0';
+        strncpy(targetDeck->LabelName, t->Label, 127);
+        targetDeck->LabelName[127] = '\0';
+        strncpy(targetDeck->Comment, t->Comment, 255);
+        targetDeck->Comment[255] = '\0';
         targetDeck->Rating = t->Rating;
         targetDeck->Year = t->Year;
-        targetDeck->TrackNumber = (t->TrackNumber > 0) ? t->TrackNumber : (idx + 1);
+        targetDeck->TrackNumber =
+            (t->TrackNumber > 0) ? t->TrackNumber : (idx + 1);
 
         float validBpm = (t->BPM > 0) ? t->BPM : 120.0f;
         targetDeck->OriginalBPM = validBpm;
@@ -1836,12 +2065,17 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
 
         if (t->ArtworkPath[0] != '\0') {
           const char *artRel = t->ArtworkPath;
-          while (artRel[0] == '/' || artRel[0] == '\\') artRel++;
+          while (artRel[0] == '/' || artRel[0] == '\\')
+            artRel++;
           const char *sep = "";
           size_t pLen = strlen(s->SelectedStorage->Path);
-          if (pLen > 0 && s->SelectedStorage->Path[pLen-1] != '/' && s->SelectedStorage->Path[pLen-1] != '\\') sep = "/";
-          snprintf(targetDeck->ArtworkPath, sizeof(targetDeck->ArtworkPath), "%s%s%s", s->SelectedStorage->Path, sep, artRel);
-        } else targetDeck->ArtworkPath[0] = '\0';
+          if (pLen > 0 && s->SelectedStorage->Path[pLen - 1] != '/' &&
+              s->SelectedStorage->Path[pLen - 1] != '\\')
+            sep = "/";
+          snprintf(targetDeck->ArtworkPath, sizeof(targetDeck->ArtworkPath),
+                   "%s%s%s", s->SelectedStorage->Path, sep, artRel);
+        } else
+          targetDeck->ArtworkPath[0] = '\0';
 
         TrackState *newTrack = (TrackState *)malloc(sizeof(TrackState));
         if (!newTrack) {
@@ -1852,75 +2086,100 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
         memset(newTrack, 0, sizeof(TrackState));
 
         if (s->SelectedStorage) {
-          snprintf(newTrack->AnalyzePath, sizeof(newTrack->AnalyzePath), "%s/%s", s->SelectedStorage->Path, t->AnalyzePath);
+          snprintf(newTrack->AnalyzePath, sizeof(newTrack->AnalyzePath),
+                   "%s/%s", s->SelectedStorage->Path, t->AnalyzePath);
         }
 
         newTrack->Analysis.StaticWaveformLen = t->Analysis.StaticWaveformLen;
         newTrack->Analysis.StaticWaveformType = t->Analysis.StaticWaveformType;
         memcpy(newTrack->Analysis.StaticWaveform, t->Analysis.StaticWaveform,
-               t->Analysis.StaticWaveformLen > 8192 ? 8192 : t->Analysis.StaticWaveformLen);
-        
+               t->Analysis.StaticWaveformLen > 8192
+                   ? 8192
+                   : t->Analysis.StaticWaveformLen);
+
         newTrack->Analysis.DynamicWaveformLen = t->Analysis.DynamicWaveformLen;
-        if (newTrack->Analysis.DynamicWaveformLen > 0 && t->Analysis.DynamicWaveform != NULL) {
-          newTrack->Analysis.DynamicWaveform = (unsigned char*)malloc(newTrack->Analysis.DynamicWaveformLen);
+        if (newTrack->Analysis.DynamicWaveformLen > 0 &&
+            t->Analysis.DynamicWaveform != NULL) {
+          newTrack->Analysis.DynamicWaveform =
+              (unsigned char *)malloc(newTrack->Analysis.DynamicWaveformLen);
           if (newTrack->Analysis.DynamicWaveform) {
-            memcpy(newTrack->Analysis.DynamicWaveform, t->Analysis.DynamicWaveform, newTrack->Analysis.DynamicWaveformLen);
+            memcpy(newTrack->Analysis.DynamicWaveform,
+                   t->Analysis.DynamicWaveform,
+                   newTrack->Analysis.DynamicWaveformLen);
             newTrack->Analysis.WaveformType = t->Analysis.WaveformType;
           }
         }
 
         newTrack->Analysis.BeatGridCount = t->Analysis.BeatGridCount;
-        if (newTrack->Analysis.BeatGridCount > 0 && t->Analysis.BeatGrid != NULL) {
-          newTrack->Analysis.BeatGrid = (RBBeat*)malloc(sizeof(RBBeat) * newTrack->Analysis.BeatGridCount);
+        if (newTrack->Analysis.BeatGridCount > 0 &&
+            t->Analysis.BeatGrid != NULL) {
+          newTrack->Analysis.BeatGrid = (RBBeat *)malloc(
+              sizeof(RBBeat) * newTrack->Analysis.BeatGridCount);
           if (newTrack->Analysis.BeatGrid) {
-            memcpy(newTrack->Analysis.BeatGrid, t->Analysis.BeatGrid, sizeof(RBBeat) * newTrack->Analysis.BeatGridCount);
+            memcpy(newTrack->Analysis.BeatGrid, t->Analysis.BeatGrid,
+                   sizeof(RBBeat) * newTrack->Analysis.BeatGridCount);
           }
         }
 
         newTrack->Analysis.PhraseCount = t->Analysis.PhraseCount;
         if (newTrack->Analysis.PhraseCount > 0 && t->Analysis.Phrases != NULL) {
-          newTrack->Analysis.Phrases = (RBPhrase*)malloc(sizeof(RBPhrase) * newTrack->Analysis.PhraseCount);
+          newTrack->Analysis.Phrases = (RBPhrase *)malloc(
+              sizeof(RBPhrase) * newTrack->Analysis.PhraseCount);
           if (newTrack->Analysis.Phrases) {
-            memcpy(newTrack->Analysis.Phrases, t->Analysis.Phrases, sizeof(RBPhrase) * newTrack->Analysis.PhraseCount);
+            memcpy(newTrack->Analysis.Phrases, t->Analysis.Phrases,
+                   sizeof(RBPhrase) * newTrack->Analysis.PhraseCount);
           }
         }
 
         newTrack->Analysis.CueCount = t->Analysis.CueCount;
         if (newTrack->Analysis.CueCount > 0 && t->Analysis.Cues != NULL) {
-          newTrack->Analysis.Cues = (RBCue*)malloc(sizeof(RBCue) * newTrack->Analysis.CueCount);
+          newTrack->Analysis.Cues =
+              (RBCue *)malloc(sizeof(RBCue) * newTrack->Analysis.CueCount);
           if (newTrack->Analysis.Cues) {
-            memcpy(newTrack->Analysis.Cues, t->Analysis.Cues, sizeof(RBCue) * newTrack->Analysis.CueCount);
+            memcpy(newTrack->Analysis.Cues, t->Analysis.Cues,
+                   sizeof(RBCue) * newTrack->Analysis.CueCount);
           }
         }
 
         for (uint32_t c = 0; c < t->Analysis.CueCount && c < 32; c++) {
           if (t->Analysis.Cues[c].ID >= 1 && t->Analysis.Cues[c].ID <= 8) {
-            newTrack->HotCues[newTrack->HotCuesCount].ID = t->Analysis.Cues[c].ID;
-            newTrack->HotCues[newTrack->HotCuesCount].Start = t->Analysis.Cues[c].Time;
-            memcpy(newTrack->HotCues[newTrack->HotCuesCount].Color, t->Analysis.Cues[c].Color, 3);
+            newTrack->HotCues[newTrack->HotCuesCount].ID =
+                t->Analysis.Cues[c].ID;
+            newTrack->HotCues[newTrack->HotCuesCount].Start =
+                t->Analysis.Cues[c].Time;
+            memcpy(newTrack->HotCues[newTrack->HotCuesCount].Color,
+                   t->Analysis.Cues[c].Color, 3);
             newTrack->HotCuesCount++;
           } else if (t->Analysis.Cues[c].ID == 0) {
-            newTrack->Cues[newTrack->CuesCount].Start = t->Analysis.Cues[c].Time;
-            memcpy(newTrack->Cues[newTrack->CuesCount].Color, t->Analysis.Cues[c].Color, 3);
+            newTrack->Cues[newTrack->CuesCount].Start =
+                t->Analysis.Cues[c].Time;
+            memcpy(newTrack->Cues[newTrack->CuesCount].Color,
+                   t->Analysis.Cues[c].Color, 3);
             newTrack->CuesCount++;
           }
         }
 
-        strncpy(newTrack->FilePath, trackFullPath, sizeof(newTrack->FilePath) - 1);
+        strncpy(newTrack->FilePath, trackFullPath,
+                sizeof(newTrack->FilePath) - 1);
         strncpy(newTrack->Title, t->Title, sizeof(newTrack->Title) - 1);
         strncpy(newTrack->Artist, t->Artist, sizeof(newTrack->Artist) - 1);
 
         HotCue dbCues[8];
         int dbCount = 0;
-        const char *storagePath = s->SelectedStorage ? s->SelectedStorage->Path : NULL;
-        if (UNXDatabase_GetTrack(storagePath, newTrack->FilePath, newTrack->Title, newTrack->Artist, dbCues, &dbCount)) {
+        const char *storagePath =
+            s->SelectedStorage ? s->SelectedStorage->Path : NULL;
+        if (UNXDatabase_GetTrack(storagePath, newTrack->FilePath,
+                                 newTrack->Title, newTrack->Artist, dbCues,
+                                 &dbCount)) {
           newTrack->HotCuesCount = dbCount;
           memset(newTrack->HotCues, 0, sizeof(newTrack->HotCues));
-          if (dbCount > 0) memcpy(newTrack->HotCues, dbCues, sizeof(HotCue) * dbCount);
-          if (newTrack->Analysis.Cues) free(newTrack->Analysis.Cues);
+          if (dbCount > 0)
+            memcpy(newTrack->HotCues, dbCues, sizeof(HotCue) * dbCount);
+          if (newTrack->Analysis.Cues)
+            free(newTrack->Analysis.Cues);
           newTrack->Analysis.CueCount = dbCount;
           if (dbCount > 0) {
-            newTrack->Analysis.Cues = (RBCue*)malloc(sizeof(RBCue) * dbCount);
+            newTrack->Analysis.Cues = (RBCue *)malloc(sizeof(RBCue) * dbCount);
             if (newTrack->Analysis.Cues) {
               for (int h = 0; h < dbCount; h++) {
                 memset(&newTrack->Analysis.Cues[h], 0, sizeof(RBCue));
@@ -1931,10 +2190,12 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
                 memcpy(newTrack->Analysis.Cues[h].Color, dbCues[h].Color, 3);
               }
             }
-          } else newTrack->Analysis.Cues = NULL;
+          } else
+            newTrack->Analysis.Cues = NULL;
         }
 
-        newTrack->PhraseCount = t->Analysis.PhraseCount > 64 ? 64 : t->Analysis.PhraseCount;
+        newTrack->PhraseCount =
+            t->Analysis.PhraseCount > 64 ? 64 : t->Analysis.PhraseCount;
         for (int p = 0; p < newTrack->PhraseCount; p++) {
           newTrack->Phrases[p].Index = t->Analysis.Phrases[p].Index;
           newTrack->Phrases[p].Beat = t->Analysis.Phrases[p].Beat;
@@ -1945,16 +2206,26 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
         TrackState *oldTrack = targetDeck->LoadedTrack;
         targetDeck->LoadedTrack = newTrack;
         if (oldTrack) {
-          if (oldTrack->Analysis.BeatGrid != NULL) free(oldTrack->Analysis.BeatGrid);
-          if (oldTrack->Analysis.Cues != NULL) free(oldTrack->Analysis.Cues);
-          if (oldTrack->Analysis.Phrases != NULL) free(oldTrack->Analysis.Phrases);
-          if (oldTrack->Analysis.DynamicWaveform != NULL) free(oldTrack->Analysis.DynamicWaveform);
+          if (oldTrack->Analysis.BeatGrid != NULL)
+            free(oldTrack->Analysis.BeatGrid);
+          if (oldTrack->Analysis.Cues != NULL)
+            free(oldTrack->Analysis.Cues);
+          if (oldTrack->Analysis.Phrases != NULL)
+            free(oldTrack->Analysis.Phrases);
+          if (oldTrack->Analysis.DynamicWaveform != NULL)
+            free(oldTrack->Analysis.DynamicWaveform);
           free(oldTrack);
         }
 
-        targetDeck->PositionMs = (newTrack->CuesCount > 0) ? newTrack->Cues[0].Start : (newTrack->Analysis.BeatGridCount > 0 ? newTrack->Analysis.BeatGrid[0].Time : 0);
+        targetDeck->PositionMs =
+            (newTrack->CuesCount > 0)
+                ? newTrack->Cues[0].Start
+                : (newTrack->Analysis.BeatGridCount > 0
+                       ? newTrack->Analysis.BeatGrid[0].Time
+                       : 0);
         targetDeck->LoadAnimTimer = 0.5f;
-        DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck], (uint32_t)targetDeck->PositionMs);
+        DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck],
+                           (uint32_t)targetDeck->PositionMs);
 
         if (autoPlay) {
           DeckAudio_SetPlaying(&s->AudioPlugin->Decks[loadToDeck], true);
@@ -1967,9 +2238,11 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
   } else { // Serato
     if (s->SeratoTrackPointers[idx]) {
       SeratoTrack *t = s->SeratoTrackPointers[idx];
-      UNX_LOG_INFO("[BROWSER] Loading Serato track: %s to Deck %c (Index %d)", t->Title, loadToDeck == 0 ? 'A' : 'B', idx);
+      UNX_LOG_INFO("[BROWSER] Loading Serato track: %s to Deck %c (Index %d)",
+                   t->Title, loadToDeck == 0 ? 'A' : 'B', idx);
       if (!IsFormatSupported(t->FilePath)) {
-        UNX_LOG_WARN("[BROWSER] LOAD BLOCKED: Unsupported format %s", t->FilePath);
+        UNX_LOG_WARN("[BROWSER] LOAD BLOCKED: Unsupported format %s",
+                     t->FilePath);
         Toast_Show("UNSUPPORTED TRACK FORMAT", 3.0f, (Color){240, 50, 50, 255});
         s->ShowLoadPopup = false;
         targetDeck->IsLoading = false;
@@ -1981,27 +2254,38 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
 
         char trackFullPath[1024] = {0};
         const char *relPath = t->FilePath;
-        if (relPath[0] == '/' || relPath[0] == '\\') relPath++;
-        snprintf(trackFullPath, sizeof(trackFullPath), "%s/%s", s->SelectedStorage->Path, relPath);
+        if (relPath[0] == '/' || relPath[0] == '\\')
+          relPath++;
+        snprintf(trackFullPath, sizeof(trackFullPath), "%s/%s",
+                 s->SelectedStorage->Path, relPath);
 
         if (s->AudioPlugin) {
-          DeckAudio_LoadTrackAsync(&s->AudioPlugin->Decks[loadToDeck], trackFullPath);
+          DeckAudio_LoadTrackAsync(&s->AudioPlugin->Decks[loadToDeck],
+                                   trackFullPath);
         }
 
-        strncpy(targetDeck->TrackTitle, t->Title, 127); targetDeck->TrackTitle[127] = '\0';
-        strncpy(targetDeck->ArtistName, t->Artist, 127); targetDeck->ArtistName[127] = '\0';
-        strncpy(targetDeck->AlbumName, t->Album, 127); targetDeck->AlbumName[127] = '\0';
-        strncpy(targetDeck->GenreName, t->Genre, 63); targetDeck->GenreName[63] = '\0';
-        strncpy(targetDeck->TrackKey, t->Key, 15); targetDeck->TrackKey[15] = '\0';
-        strncpy(targetDeck->LabelName, t->Label, 127); targetDeck->LabelName[127] = '\0';
-        strncpy(targetDeck->Comment, t->Comment, 255); targetDeck->Comment[255] = '\0';
+        strncpy(targetDeck->TrackTitle, t->Title, 127);
+        targetDeck->TrackTitle[127] = '\0';
+        strncpy(targetDeck->ArtistName, t->Artist, 127);
+        targetDeck->ArtistName[127] = '\0';
+        strncpy(targetDeck->AlbumName, t->Album, 127);
+        targetDeck->AlbumName[127] = '\0';
+        strncpy(targetDeck->GenreName, t->Genre, 63);
+        targetDeck->GenreName[63] = '\0';
+        strncpy(targetDeck->TrackKey, t->Key, 15);
+        targetDeck->TrackKey[15] = '\0';
+        strncpy(targetDeck->LabelName, t->Label, 127);
+        targetDeck->LabelName[127] = '\0';
+        strncpy(targetDeck->Comment, t->Comment, 255);
+        targetDeck->Comment[255] = '\0';
         targetDeck->Rating = 0;
         targetDeck->Year = t->Year;
         targetDeck->TrackNumber = (idx + 1);
         targetDeck->OriginalBPM = (t->BPM > 0) ? t->BPM : 120.0f;
         targetDeck->CurrentBPM = targetDeck->OriginalBPM;
 
-        if (s->SelectedStorage) strncpy(targetDeck->SourceName, s->SelectedStorage->Name, 31);
+        if (s->SelectedStorage)
+          strncpy(targetDeck->SourceName, s->SelectedStorage->Name, 31);
         targetDeck->ArtworkPath[0] = '\0';
 
         TrackState *newTrack = (TrackState *)malloc(sizeof(TrackState));
@@ -2009,21 +2293,26 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
           memset(newTrack, 0, sizeof(TrackState));
           newTrack->Analysis.CueCount = t->CueCount;
           if (newTrack->Analysis.CueCount > 0 && t->Cues != NULL) {
-            newTrack->Analysis.Cues = (RBCue*)malloc(sizeof(RBCue) * newTrack->Analysis.CueCount);
+            newTrack->Analysis.Cues =
+                (RBCue *)malloc(sizeof(RBCue) * newTrack->Analysis.CueCount);
             if (newTrack->Analysis.Cues) {
-              memcpy(newTrack->Analysis.Cues, t->Cues, sizeof(RBCue) * newTrack->Analysis.CueCount);
+              memcpy(newTrack->Analysis.Cues, t->Cues,
+                     sizeof(RBCue) * newTrack->Analysis.CueCount);
             }
           }
 
-          if (newTrack->Analysis.BeatGridCount == 0 && targetDeck->OriginalBPM > 30.0f) {
+          if (newTrack->Analysis.BeatGridCount == 0 &&
+              targetDeck->OriginalBPM > 30.0f) {
             double beatMs = 60000.0 / (double)targetDeck->OriginalBPM;
             uint32_t totalBeats = (uint32_t)(3600000.0 / beatMs);
-            newTrack->Analysis.BeatGrid = (RBBeat*)malloc(sizeof(RBBeat) * totalBeats);
+            newTrack->Analysis.BeatGrid =
+                (RBBeat *)malloc(sizeof(RBBeat) * totalBeats);
             if (newTrack->Analysis.BeatGrid) {
               newTrack->Analysis.BeatGridCount = totalBeats;
               for (uint32_t b = 0; b < totalBeats; b++) {
                 newTrack->Analysis.BeatGrid[b].Time = (uint32_t)(b * beatMs);
-                newTrack->Analysis.BeatGrid[b].BeatNumber = (uint16_t)((b % 4) + 1);
+                newTrack->Analysis.BeatGrid[b].BeatNumber =
+                    (uint16_t)((b % 4) + 1);
               }
             }
           }
@@ -2031,31 +2320,42 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
           for (uint32_t c = 0; c < t->CueCount && c < 32; c++) {
             if (t->Cues[c].ID >= 1 && t->Cues[c].ID <= 8) {
               newTrack->HotCues[newTrack->HotCuesCount].ID = t->Cues[c].ID;
-              newTrack->HotCues[newTrack->HotCuesCount].Start = (uint32_t)t->Cues[c].Time;
-              memcpy(newTrack->HotCues[newTrack->HotCuesCount].Color, t->Cues[c].Color, 3);
+              newTrack->HotCues[newTrack->HotCuesCount].Start =
+                  (uint32_t)t->Cues[c].Time;
+              memcpy(newTrack->HotCues[newTrack->HotCuesCount].Color,
+                     t->Cues[c].Color, 3);
               newTrack->HotCuesCount++;
             } else if (t->Cues[c].ID == 0) {
-              newTrack->Cues[newTrack->CuesCount].Start = (uint32_t)t->Cues[c].Time;
-              memcpy(newTrack->Cues[newTrack->CuesCount].Color, t->Cues[c].Color, 3);
+              newTrack->Cues[newTrack->CuesCount].Start =
+                  (uint32_t)t->Cues[c].Time;
+              memcpy(newTrack->Cues[newTrack->CuesCount].Color,
+                     t->Cues[c].Color, 3);
               newTrack->CuesCount++;
             }
           }
 
-          strncpy(newTrack->FilePath, trackFullPath, sizeof(newTrack->FilePath) - 1);
+          strncpy(newTrack->FilePath, trackFullPath,
+                  sizeof(newTrack->FilePath) - 1);
           strncpy(newTrack->Title, t->Title, sizeof(newTrack->Title) - 1);
           strncpy(newTrack->Artist, t->Artist, sizeof(newTrack->Artist) - 1);
 
           HotCue dbCues[8];
           int dbCount = 0;
-          const char *storagePath = s->SelectedStorage ? s->SelectedStorage->Path : NULL;
-          if (UNXDatabase_GetTrack(storagePath, newTrack->FilePath, newTrack->Title, newTrack->Artist, dbCues, &dbCount)) {
+          const char *storagePath =
+              s->SelectedStorage ? s->SelectedStorage->Path : NULL;
+          if (UNXDatabase_GetTrack(storagePath, newTrack->FilePath,
+                                   newTrack->Title, newTrack->Artist, dbCues,
+                                   &dbCount)) {
             newTrack->HotCuesCount = dbCount;
             memset(newTrack->HotCues, 0, sizeof(newTrack->HotCues));
-            if (dbCount > 0) memcpy(newTrack->HotCues, dbCues, sizeof(HotCue) * dbCount);
-            if (newTrack->Analysis.Cues) free(newTrack->Analysis.Cues);
+            if (dbCount > 0)
+              memcpy(newTrack->HotCues, dbCues, sizeof(HotCue) * dbCount);
+            if (newTrack->Analysis.Cues)
+              free(newTrack->Analysis.Cues);
             newTrack->Analysis.CueCount = dbCount;
             if (dbCount > 0) {
-              newTrack->Analysis.Cues = (RBCue*)malloc(sizeof(RBCue) * dbCount);
+              newTrack->Analysis.Cues =
+                  (RBCue *)malloc(sizeof(RBCue) * dbCount);
               if (newTrack->Analysis.Cues) {
                 for (int h = 0; h < dbCount; h++) {
                   memset(&newTrack->Analysis.Cues[h], 0, sizeof(RBCue));
@@ -2066,22 +2366,29 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
                   memcpy(newTrack->Analysis.Cues[h].Color, dbCues[h].Color, 3);
                 }
               }
-            } else newTrack->Analysis.Cues = NULL;
+            } else
+              newTrack->Analysis.Cues = NULL;
           }
 
           TrackState *oldTrack = targetDeck->LoadedTrack;
           targetDeck->LoadedTrack = newTrack;
           if (oldTrack) {
-            if (oldTrack->Analysis.BeatGrid != NULL) free(oldTrack->Analysis.BeatGrid);
-            if (oldTrack->Analysis.Cues != NULL) free(oldTrack->Analysis.Cues);
-            if (oldTrack->Analysis.Phrases != NULL) free(oldTrack->Analysis.Phrases);
-            if (oldTrack->Analysis.DynamicWaveform != NULL) free(oldTrack->Analysis.DynamicWaveform);
+            if (oldTrack->Analysis.BeatGrid != NULL)
+              free(oldTrack->Analysis.BeatGrid);
+            if (oldTrack->Analysis.Cues != NULL)
+              free(oldTrack->Analysis.Cues);
+            if (oldTrack->Analysis.Phrases != NULL)
+              free(oldTrack->Analysis.Phrases);
+            if (oldTrack->Analysis.DynamicWaveform != NULL)
+              free(oldTrack->Analysis.DynamicWaveform);
             free(oldTrack);
           }
 
-          targetDeck->PositionMs = (newTrack->CuesCount > 0) ? newTrack->Cues[0].Start : 0;
+          targetDeck->PositionMs =
+              (newTrack->CuesCount > 0) ? newTrack->Cues[0].Start : 0;
           targetDeck->LoadAnimTimer = 0.5f;
-          DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck], (uint32_t)targetDeck->PositionMs);
+          DeckAudio_JumpToMs(&s->AudioPlugin->Decks[loadToDeck],
+                             (uint32_t)targetDeck->PositionMs);
 
           if (autoPlay) {
             DeckAudio_SetPlaying(&s->AudioPlugin->Decks[loadToDeck], true);
@@ -2099,12 +2406,15 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck, bool auto
 }
 
 int Browser_LoadNextTrack(BrowserState *s, int deckIdx) {
-  if (!s || deckIdx < 0 || deckIdx > 1) return 0;
+  if (!s || deckIdx < 0 || deckIdx > 1)
+    return 0;
   struct DeckState *ds = (deckIdx == 0) ? s->DeckA : s->DeckB;
-  if (!ds) return 0;
-  
-  if (s->ActiveTrackCount <= 0) return 0;
-  
+  if (!ds)
+    return 0;
+
+  if (s->ActiveTrackCount <= 0)
+    return 0;
+
   int nextIdx = ds->LoadedTrackIndex + 1;
   if (nextIdx >= s->ActiveTrackCount) {
     nextIdx = 0; // Wrap around to first track
@@ -2115,7 +2425,8 @@ int Browser_LoadNextTrack(BrowserState *s, int deckIdx) {
 
 // On-Screen Keyboard (OSK) Touch Rendering & Interaction
 static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
-  if (!s->ShowOSK) return;
+  if (!s->ShowOSK)
+    return;
 
   static double lastOskKeyPressTime = 0.0;
   double now = GetTime();
@@ -2128,7 +2439,8 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   float oskY = viewH - oskH;
 
   // Outer Overlay Background & Sleek Top Accent Line
-  DrawRectangle((int)oskX, (int)oskY, (int)oskW, (int)oskH, (Color){ 12, 14, 20, 252 });
+  DrawRectangle((int)oskX, (int)oskY, (int)oskW, (int)oskH,
+                (Color){12, 14, 20, 252});
   DrawRectangle((int)oskX, (int)oskY, (int)oskW, (int)S(2), ColorBlue);
 
   Font faceXS = UIFonts_GetFace(S(9));
@@ -2138,10 +2450,10 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   // Key Definitions
   const char *row1_letters = "QWERTYUIOP";
   const char *row1_symbols = "1234567890";
-  
+
   const char *row2_letters = "ASDFGHJKL";
   const char *row2_symbols = "-/:;()$&@\"";
-  
+
   const char *row3_letters = "ZXCVBNM";
   const char *row3_symbols = ".,?!'#%*";
 
@@ -2155,59 +2467,66 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   int count1 = 10;
   float kw1 = (availW - (count1 - 1) * gap) / (float)count1;
   for (int i = 0; i < count1; i++) {
-      char ch = (s->OSKMode == 0) ? row1_letters[i] : row1_symbols[i];
-      if (s->OSKMode == 0 && !s->OSKShiftActive) ch = (char)tolower((unsigned char)ch);
+    char ch = (s->OSKMode == 0) ? row1_letters[i] : row1_symbols[i];
+    if (s->OSKMode == 0 && !s->OSKShiftActive)
+      ch = (char)tolower((unsigned char)ch);
 
-      Rectangle kRect = { oskX + padX + i * (kw1 + gap), startY, kw1, keyH };
-      bool isHover = CheckCollisionPointRec(mPos, kRect);
-      DrawRectangleRec(kRect, isHover ? ColorBlue : ColorDark2);
-      DrawRectangleLinesEx(kRect, 1.0f, isHover ? ColorWhite : ColorDark1);
+    Rectangle kRect = {oskX + padX + i * (kw1 + gap), startY, kw1, keyH};
+    bool isHover = CheckCollisionPointRec(mPos, kRect);
+    DrawRectangleRec(kRect, isHover ? ColorBlue : ColorDark2);
+    DrawRectangleLinesEx(kRect, 1.0f, isHover ? ColorWhite : ColorDark1);
 
-      char label[2] = { ch, '\0' };
-      DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14), ColorWhite);
+    char label[2] = {ch, '\0'};
+    DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14),
+                    ColorWhite);
 
-      if (canPressOSK && Input_IsPressed() && isHover) {
-          lastOskKeyPressTime = now;
-          if (strlen(s->SearchQuery) < 63) {
-              int len = strlen(s->SearchQuery);
-              s->SearchQuery[len] = ch;
-              s->SearchQuery[len + 1] = '\0';
-              s->CursorPos = s->ScrollOffset = 0;
-              s->VisualScroll = 0;
-              Browser_UpdateActiveTracks(s);
-          }
+    if (canPressOSK && Input_IsPressed() && isHover) {
+      lastOskKeyPressTime = now;
+      if (strlen(s->SearchQuery) < 63) {
+        int len = strlen(s->SearchQuery);
+        s->SearchQuery[len] = ch;
+        s->SearchQuery[len + 1] = '\0';
+        s->CursorPos = s->ScrollOffset = 0;
+        s->VisualScroll = 0;
+        Browser_UpdateActiveTracks(s);
       }
+    }
   }
 
   // ROW 2 (9 Keys for Letters, 10 for Symbols)
   float startY2 = startY + keyH + gap;
   int count2 = (s->OSKMode == 0) ? 9 : 10;
-  float kw2 = (s->OSKMode == 0) ? kw1 : ((availW - (count2 - 1) * gap) / (float)count2);
-  float offset2 = (s->OSKMode == 0) ? ((availW - (9 * kw1 + 8 * gap)) / 2.0f) : 0;
+  float kw2 =
+      (s->OSKMode == 0) ? kw1 : ((availW - (count2 - 1) * gap) / (float)count2);
+  float offset2 =
+      (s->OSKMode == 0) ? ((availW - (9 * kw1 + 8 * gap)) / 2.0f) : 0;
 
   for (int i = 0; i < count2; i++) {
-      char ch = (s->OSKMode == 0) ? row2_letters[i] : row2_symbols[i];
-      if (s->OSKMode == 0 && !s->OSKShiftActive) ch = (char)tolower((unsigned char)ch);
+    char ch = (s->OSKMode == 0) ? row2_letters[i] : row2_symbols[i];
+    if (s->OSKMode == 0 && !s->OSKShiftActive)
+      ch = (char)tolower((unsigned char)ch);
 
-      Rectangle kRect = { oskX + padX + offset2 + i * (kw2 + gap), startY2, kw2, keyH };
-      bool isHover = CheckCollisionPointRec(mPos, kRect);
-      DrawRectangleRec(kRect, isHover ? ColorBlue : ColorDark2);
-      DrawRectangleLinesEx(kRect, 1.0f, isHover ? ColorWhite : ColorDark1);
+    Rectangle kRect = {oskX + padX + offset2 + i * (kw2 + gap), startY2, kw2,
+                       keyH};
+    bool isHover = CheckCollisionPointRec(mPos, kRect);
+    DrawRectangleRec(kRect, isHover ? ColorBlue : ColorDark2);
+    DrawRectangleLinesEx(kRect, 1.0f, isHover ? ColorWhite : ColorDark1);
 
-      char label[2] = { ch, '\0' };
-      DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14), ColorWhite);
+    char label[2] = {ch, '\0'};
+    DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14),
+                    ColorWhite);
 
-      if (canPressOSK && Input_IsPressed() && isHover) {
-          lastOskKeyPressTime = now;
-          if (strlen(s->SearchQuery) < 63) {
-              int len = strlen(s->SearchQuery);
-              s->SearchQuery[len] = ch;
-              s->SearchQuery[len + 1] = '\0';
-              s->CursorPos = s->ScrollOffset = 0;
-              s->VisualScroll = 0;
-              Browser_UpdateActiveTracks(s);
-          }
+    if (canPressOSK && Input_IsPressed() && isHover) {
+      lastOskKeyPressTime = now;
+      if (strlen(s->SearchQuery) < 63) {
+        int len = strlen(s->SearchQuery);
+        s->SearchQuery[len] = ch;
+        s->SearchQuery[len + 1] = '\0';
+        s->CursorPos = s->ScrollOffset = 0;
+        s->VisualScroll = 0;
+        Browser_UpdateActiveTracks(s);
       }
+    }
   }
 
   // ROW 3: SHIFT | 7-8 KEYS | BKSP
@@ -2215,64 +2534,72 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   int count3 = (s->OSKMode == 0) ? 7 : 8;
   float kw3 = kw1;
   float kwShift = (availW - (count3 * kw3 + (count3 + 1) * gap)) / 2.0f;
-  if (kwShift < S(40)) kwShift = S(40);
+  if (kwShift < S(40))
+    kwShift = S(40);
   float kwBksp = kwShift;
 
   // SHIFT KEY
-  Rectangle shiftRect = { oskX + padX, startY3, kwShift, keyH };
+  Rectangle shiftRect = {oskX + padX, startY3, kwShift, keyH};
   bool hoverShift = CheckCollisionPointRec(mPos, shiftRect);
-  Color shiftBg = s->OSKShiftActive ? ColorOrange : (hoverShift ? ColorBlue : ColorDark2);
+  Color shiftBg =
+      s->OSKShiftActive ? ColorOrange : (hoverShift ? ColorBlue : ColorDark2);
   DrawRectangleRec(shiftRect, shiftBg);
-  DrawRectangleLinesEx(shiftRect, 1.0f, s->OSKShiftActive ? ColorWhite : ColorDark1);
-  DrawCentredText("SHIFT", faceXS, shiftRect.x, shiftRect.width, shiftRect.y + S(12), S(10), ColorWhite);
+  DrawRectangleLinesEx(shiftRect, 1.0f,
+                       s->OSKShiftActive ? ColorWhite : ColorDark1);
+  DrawCentredText("SHIFT", faceXS, shiftRect.x, shiftRect.width,
+                  shiftRect.y + S(12), S(10), ColorWhite);
 
   if (canPressOSK && Input_IsPressed() && hoverShift) {
-      lastOskKeyPressTime = now;
-      s->OSKShiftActive = !s->OSKShiftActive;
+    lastOskKeyPressTime = now;
+    s->OSKShiftActive = !s->OSKShiftActive;
   }
 
   // ROW 3 LETTERS / SYMBOLS
   for (int i = 0; i < count3; i++) {
-      char ch = (s->OSKMode == 0) ? row3_letters[i] : row3_symbols[i];
-      if (s->OSKMode == 0 && !s->OSKShiftActive) ch = (char)tolower((unsigned char)ch);
+    char ch = (s->OSKMode == 0) ? row3_letters[i] : row3_symbols[i];
+    if (s->OSKMode == 0 && !s->OSKShiftActive)
+      ch = (char)tolower((unsigned char)ch);
 
-      Rectangle kRect = { oskX + padX + kwShift + gap + i * (kw3 + gap), startY3, kw3, keyH };
-      bool isHover = CheckCollisionPointRec(mPos, kRect);
-      DrawRectangleRec(kRect, isHover ? ColorBlue : ColorDark2);
-      DrawRectangleLinesEx(kRect, 1.0f, isHover ? ColorWhite : ColorDark1);
+    Rectangle kRect = {oskX + padX + kwShift + gap + i * (kw3 + gap), startY3,
+                       kw3, keyH};
+    bool isHover = CheckCollisionPointRec(mPos, kRect);
+    DrawRectangleRec(kRect, isHover ? ColorBlue : ColorDark2);
+    DrawRectangleLinesEx(kRect, 1.0f, isHover ? ColorWhite : ColorDark1);
 
-      char label[2] = { ch, '\0' };
-      DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14), ColorWhite);
+    char label[2] = {ch, '\0'};
+    DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14),
+                    ColorWhite);
 
-      if (canPressOSK && Input_IsPressed() && isHover) {
-          lastOskKeyPressTime = now;
-          if (strlen(s->SearchQuery) < 63) {
-              int len = strlen(s->SearchQuery);
-              s->SearchQuery[len] = ch;
-              s->SearchQuery[len + 1] = '\0';
-              s->CursorPos = s->ScrollOffset = 0;
-              s->VisualScroll = 0;
-              Browser_UpdateActiveTracks(s);
-          }
+    if (canPressOSK && Input_IsPressed() && isHover) {
+      lastOskKeyPressTime = now;
+      if (strlen(s->SearchQuery) < 63) {
+        int len = strlen(s->SearchQuery);
+        s->SearchQuery[len] = ch;
+        s->SearchQuery[len + 1] = '\0';
+        s->CursorPos = s->ScrollOffset = 0;
+        s->VisualScroll = 0;
+        Browser_UpdateActiveTracks(s);
       }
+    }
   }
 
   // BKSP KEY
-  Rectangle bkspRect = { oskX + padX + availW - kwBksp, startY3, kwBksp, keyH };
+  Rectangle bkspRect = {oskX + padX + availW - kwBksp, startY3, kwBksp, keyH};
   bool hoverBksp = CheckCollisionPointRec(mPos, bkspRect);
   DrawRectangleRec(bkspRect, hoverBksp ? ColorRed : ColorDark2);
   DrawRectangleLinesEx(bkspRect, 1.0f, hoverBksp ? ColorWhite : ColorDark1);
-  DrawCentredText("BKSP", faceXS, bkspRect.x, bkspRect.width, bkspRect.y + S(12), S(10), ColorWhite);
+  DrawCentredText("BKSP", faceXS, bkspRect.x, bkspRect.width,
+                  bkspRect.y + S(12), S(10), ColorWhite);
 
   if (canPressOSK && Input_IsPressed() && hoverBksp) {
-      lastOskKeyPressTime = now;
-      int len = strlen(s->SearchQuery);
-      if (len > 0) {
-          s->SearchQuery[len - 1] = '\0';
-          s->CursorPos = s->ScrollOffset = 0;
-          s->VisualScroll = 0;
-          Browser_UpdateActiveTracks(s);
-      }
+    lastOskKeyPressTime = now;
+    int len = strlen(s->SearchQuery);
+    if (len > 0) {
+      s->SearchQuery[len - 1] = '\0';
+      s->CursorPos = s->ScrollOffset = 0;
+      s->VisualScroll = 0;
+      Browser_UpdateActiveTracks(s);
+    }
   }
 
   // ROW 4: ?123/ABC | SPACE | CLEAR | HIDE
@@ -2283,62 +2610,66 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   float kwSpace = availW - kwMode - kwClear - kwHide - 3 * gap;
 
   // MODE KEY (?123 / ABC)
-  Rectangle modeRect = { oskX + padX, startY4, kwMode, keyH };
+  Rectangle modeRect = {oskX + padX, startY4, kwMode, keyH};
   bool hoverMode = CheckCollisionPointRec(mPos, modeRect);
   DrawRectangleRec(modeRect, hoverMode ? ColorBlue : ColorDark2);
   DrawRectangleLinesEx(modeRect, 1.0f, ColorDark1);
-  DrawCentredText((s->OSKMode == 0) ? "?123" : "ABC", faceSm, modeRect.x, modeRect.width, modeRect.y + S(11), S(12), ColorOrange);
+  DrawCentredText((s->OSKMode == 0) ? "?123" : "ABC", faceSm, modeRect.x,
+                  modeRect.width, modeRect.y + S(11), S(12), ColorOrange);
 
   if (canPressOSK && Input_IsPressed() && hoverMode) {
-      lastOskKeyPressTime = now;
-      s->OSKMode = (s->OSKMode == 0) ? 1 : 0;
+    lastOskKeyPressTime = now;
+    s->OSKMode = (s->OSKMode == 0) ? 1 : 0;
   }
 
   // SPACE BAR
-  Rectangle spaceRect = { oskX + padX + kwMode + gap, startY4, kwSpace, keyH };
+  Rectangle spaceRect = {oskX + padX + kwMode + gap, startY4, kwSpace, keyH};
   bool hoverSpace = CheckCollisionPointRec(mPos, spaceRect);
   DrawRectangleRec(spaceRect, hoverSpace ? ColorBlue : ColorDark2);
   DrawRectangleLinesEx(spaceRect, 1.0f, ColorDark1);
-  DrawCentredText("SPACE", faceXS, spaceRect.x, spaceRect.width, spaceRect.y + S(12), S(10), ColorShadow);
+  DrawCentredText("SPACE", faceXS, spaceRect.x, spaceRect.width,
+                  spaceRect.y + S(12), S(10), ColorShadow);
 
   if (canPressOSK && Input_IsPressed() && hoverSpace) {
-      lastOskKeyPressTime = now;
-      if (strlen(s->SearchQuery) < 63) {
-          int len = strlen(s->SearchQuery);
-          s->SearchQuery[len] = ' ';
-          s->SearchQuery[len + 1] = '\0';
-          s->CursorPos = s->ScrollOffset = 0;
-          s->VisualScroll = 0;
-          Browser_UpdateActiveTracks(s);
-      }
-  }
-
-  // CLEAR KEY
-  Rectangle clearRect = { spaceRect.x + kwSpace + gap, startY4, kwClear, keyH };
-  bool hoverClear = CheckCollisionPointRec(mPos, clearRect);
-  DrawRectangleRec(clearRect, hoverClear ? ColorRed : ColorDark2);
-  DrawRectangleLinesEx(clearRect, 1.0f, ColorDark1);
-  DrawCentredText("CLEAR", faceXS, clearRect.x, clearRect.width, clearRect.y + S(12), S(10), ColorWhite);
-
-  if (canPressOSK && Input_IsPressed() && hoverClear) {
-      lastOskKeyPressTime = now;
-      s->SearchQuery[0] = '\0';
+    lastOskKeyPressTime = now;
+    if (strlen(s->SearchQuery) < 63) {
+      int len = strlen(s->SearchQuery);
+      s->SearchQuery[len] = ' ';
+      s->SearchQuery[len + 1] = '\0';
       s->CursorPos = s->ScrollOffset = 0;
       s->VisualScroll = 0;
       Browser_UpdateActiveTracks(s);
+    }
+  }
+
+  // CLEAR KEY
+  Rectangle clearRect = {spaceRect.x + kwSpace + gap, startY4, kwClear, keyH};
+  bool hoverClear = CheckCollisionPointRec(mPos, clearRect);
+  DrawRectangleRec(clearRect, hoverClear ? ColorRed : ColorDark2);
+  DrawRectangleLinesEx(clearRect, 1.0f, ColorDark1);
+  DrawCentredText("CLEAR", faceXS, clearRect.x, clearRect.width,
+                  clearRect.y + S(12), S(10), ColorWhite);
+
+  if (canPressOSK && Input_IsPressed() && hoverClear) {
+    lastOskKeyPressTime = now;
+    s->SearchQuery[0] = '\0';
+    s->CursorPos = s->ScrollOffset = 0;
+    s->VisualScroll = 0;
+    Browser_UpdateActiveTracks(s);
   }
 
   // HIDE KEY
-  Rectangle hideBtnRect = { clearRect.x + kwClear + gap, startY4, kwHide, keyH };
+  Rectangle hideBtnRect = {clearRect.x + kwClear + gap, startY4, kwHide, keyH};
   bool hoverHide = CheckCollisionPointRec(mPos, hideBtnRect);
   DrawRectangleRec(hideBtnRect, hoverHide ? ColorOrange : ColorBlue);
   DrawRectangleLinesEx(hideBtnRect, 1.0f, ColorWhite);
-  DrawCentredText("HIDE", faceSm, hideBtnRect.x, hideBtnRect.width, hideBtnRect.y + S(11), S(12), ColorWhite);
+  DrawCentredText("HIDE", faceSm, hideBtnRect.x, hideBtnRect.width,
+                  hideBtnRect.y + S(11), S(12), ColorWhite);
 
   if (canPressOSK && Input_IsPressed() && hoverHide) {
-      lastOskKeyPressTime = now;
-      s->ShowOSK = false;
-      s->IsSearching = (strlen(s->SearchQuery) > 0);
+    lastOskKeyPressTime = now;
+    s->ShowOSK = false;
+    s->IsSearching = (strlen(s->SearchQuery) > 0);
   }
 }
 
@@ -2408,7 +2739,8 @@ static void Browser_Draw(Component *base) {
       DrawRectangle(0, boxY, S(3), sidebarW, ColorBlue);
     if (isSidebarFocused) {
       DrawRectangleLinesEx(boxRect, 2.0f, (Color){0, 220, 255, 255});
-      DrawSelectionTriangle(sidebarW - S(4), boxY + (sidebarW / 2.0f), (Color){0, 220, 255, 255});
+      DrawSelectionTriangle(sidebarW - S(4), boxY + (sidebarW / 2.0f),
+                            (Color){0, 220, 255, 255});
     } else {
       DrawRectangleLinesEx(boxRect, 1.0f, ColorDark1);
     }
@@ -2428,12 +2760,15 @@ static void Browser_Draw(Component *base) {
         char displayName[8];
         strncpy(displayName, s->PlaylistBank[bankIdx].Name, 7);
         displayName[7] = '\0';
-        DrawCentredText(displayName, faceXS, 0, sidebarW, boxY + S(15), S(9), ColorWhite);
+        DrawCentredText(displayName, faceXS, 0, sidebarW, boxY + S(15), S(9),
+                        ColorWhite);
       } else {
         char bankNum[4];
         sprintf(bankNum, "P%d", bankIdx + 1);
-        DrawCentredText("\uf02e", faceIcon, 0, sidebarW, boxY + S(8), S(14), ColorShadow);
-        DrawCentredText(bankNum, faceXS, 0, sidebarW, boxY + S(24), S(10), ColorShadow);
+        DrawCentredText("\uf02e", faceIcon, 0, sidebarW, boxY + S(8), S(14),
+                        ColorShadow);
+        DrawCentredText(bankNum, faceXS, 0, sidebarW, boxY + S(24), S(10),
+                        ColorShadow);
       }
     }
   }
@@ -2486,83 +2821,120 @@ static void Browser_Draw(Component *base) {
   if (s->BrowseLevel == 0) {
     float headerH = S(24.0f);
     float oskButtonW = S(36);
-    Rectangle searchBoxRect = {listX, listYOffset, listW - oskButtonW - S(4), rowH};
-    Rectangle oskButtonRect = {listX + listW - oskButtonW, listYOffset, oskButtonW, rowH};
-    
+    Rectangle searchBoxRect = {listX, listYOffset, listW - oskButtonW - S(4),
+                               rowH};
+    Rectangle oskButtonRect = {listX + listW - oskButtonW, listYOffset,
+                               oskButtonW, rowH};
+
     // Draw Search Input
     DrawRectangleRec(searchBoxRect, s->IsSearching ? ColorDark1 : ColorDark2);
-    DrawRectangleLinesEx(searchBoxRect, 1.0f, s->IsSearching ? ColorBlue : ColorDark1);
-    
+    DrawRectangleLinesEx(searchBoxRect, 1.0f,
+                         s->IsSearching ? ColorBlue : ColorDark1);
+
     char displayQuery[128];
     if (strlen(s->SearchQuery) > 0) {
-        snprintf(displayQuery, sizeof(displayQuery), "%s", s->SearchQuery);
+      snprintf(displayQuery, sizeof(displayQuery), "%s", s->SearchQuery);
     } else {
-        snprintf(displayQuery, sizeof(displayQuery), s->IsSearching ? "" : "Search...");
+      snprintf(displayQuery, sizeof(displayQuery),
+               s->IsSearching ? "" : "Search...");
     }
     if (s->IsSearching && (int)(GetTime() * 2) % 2 == 0) {
-        strncat(displayQuery, "|", sizeof(displayQuery) - strlen(displayQuery) - 1);
+      strncat(displayQuery, "|",
+              sizeof(displayQuery) - strlen(displayQuery) - 1);
     }
-    UIDrawText("\uf002", faceIcon, searchBoxRect.x + S(8), searchBoxRect.y + S(8), S(12), s->IsSearching ? ColorWhite : ColorShadow);
-    UIDrawText(displayQuery, faceXS, searchBoxRect.x + S(30), searchBoxRect.y + S(9), S(10), s->IsSearching ? ColorWhite : ColorShadow);
+    UIDrawText("\uf002", faceIcon, searchBoxRect.x + S(8),
+               searchBoxRect.y + S(8), S(12),
+               s->IsSearching ? ColorWhite : ColorShadow);
+    UIDrawText(displayQuery, faceXS, searchBoxRect.x + S(30),
+               searchBoxRect.y + S(9), S(10),
+               s->IsSearching ? ColorWhite : ColorShadow);
 
     // Draw OSK Button (Keyboard Icon)
     bool isOskHover = CheckCollisionPointRec(mPos, oskButtonRect);
     Color oskBg = (s->ShowOSK || isOskHover) ? ColorBlue : ColorDark2;
     DrawRectangleRec(oskButtonRect, oskBg);
-    DrawRectangleLinesEx(oskButtonRect, 1.0f, s->ShowOSK ? ColorWhite : ColorDark1);
-    UIDrawText("\uf11c", faceIcon, oskButtonRect.x + S(11), oskButtonRect.y + S(8), S(12), ColorWhite);
+    DrawRectangleLinesEx(oskButtonRect, 1.0f,
+                         s->ShowOSK ? ColorWhite : ColorDark1);
+    UIDrawText("\uf11c", faceIcon, oskButtonRect.x + S(11),
+               oskButtonRect.y + S(8), S(12), ColorWhite);
 
     listYOffset += rowH;
 
     // Draw Table Header Bar (Row 2) - Reference Image 2
     Rectangle tableHeaderRect = {listX, listYOffset, listW, headerH};
-    DrawRectangleRec(tableHeaderRect, (Color){ 28, 28, 35, 255 });
+    DrawRectangleRec(tableHeaderRect, (Color){28, 28, 35, 255});
     DrawRectangleLinesEx(tableHeaderRect, 1.0f, ColorDark1);
 
     // Column Dividers
-    DrawLine(listX + S(46), listYOffset, listX + S(46), listYOffset + headerH, ColorDark1); // NO. | TITLE
-    DrawLine(listX + listW - S(110), listYOffset, listX + listW - S(110), listYOffset + headerH, ColorDark1);
-    DrawLine(listX + listW - S(55), listYOffset, listX + listW - S(55), listYOffset + headerH, ColorDark1);
+    DrawLine(listX + S(46), listYOffset, listX + S(46), listYOffset + headerH,
+             ColorDark1); // NO. | TITLE
+    DrawLine(listX + listW - S(110), listYOffset, listX + listW - S(110),
+             listYOffset + headerH, ColorDark1);
+    DrawLine(listX + listW - S(55), listYOffset, listX + listW - S(55),
+             listYOffset + headerH, ColorDark1);
 
     // Column 1: NO.
-    UIDrawText("NO.", faceXS, listX + S(6), listYOffset + S(5), S(10), (s->SortMode == 0) ? ColorWhite : ColorShadow);
+    UIDrawText("NO.", faceXS, listX + S(6), listYOffset + S(5), S(10),
+               (s->SortMode == 0) ? ColorWhite : ColorShadow);
     if (s->SortMode == 0) {
       float cx = listX + S(28);
       float cy = listYOffset + S(8);
-      if (s->SortAscending) DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)}, (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
-      else DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy}, (Vector2){cx, cy}, ColorWhite);
+      if (s->SortAscending)
+        DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)},
+                     (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
+      else
+        DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy},
+                     (Vector2){cx, cy}, ColorWhite);
     }
 
     // Column 2: TITLE
-    UIDrawText("TITLE", faceXS, listX + S(52), listYOffset + S(5), S(10), (s->SortMode == 3) ? ColorWhite : ColorShadow);
+    UIDrawText("TITLE", faceXS, listX + S(52), listYOffset + S(5), S(10),
+               (s->SortMode == 3) ? ColorWhite : ColorShadow);
     if (s->SortMode == 3) {
       float cx = listX + S(82);
       float cy = listYOffset + S(8);
-      if (s->SortAscending) DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)}, (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
-      else DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy}, (Vector2){cx, cy}, ColorWhite);
+      if (s->SortAscending)
+        DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)},
+                     (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
+      else
+        DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy},
+                     (Vector2){cx, cy}, ColorWhite);
     }
 
     // Column 3: BPM
-    DrawCentredText("BPM", faceXS, listX + listW - S(110), S(55), listYOffset + S(5), S(10), (s->SortMode == 1) ? ColorWhite : ColorShadow);
+    DrawCentredText("BPM", faceXS, listX + listW - S(110), S(55),
+                    listYOffset + S(5), S(10),
+                    (s->SortMode == 1) ? ColorWhite : ColorShadow);
     if (s->SortMode == 1) {
       float cx = listX + listW - S(110) + S(42);
       float cy = listYOffset + S(8);
-      if (s->SortAscending) DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)}, (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
-      else DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy}, (Vector2){cx, cy}, ColorWhite);
+      if (s->SortAscending)
+        DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)},
+                     (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
+      else
+        DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy},
+                     (Vector2){cx, cy}, ColorWhite);
     }
 
     // Column 4: KEY
-    DrawCentredText("KEY", faceXS, listX + listW - S(55), S(55), listYOffset + S(5), S(10), (s->SortMode == 2) ? ColorWhite : ColorShadow);
+    DrawCentredText("KEY", faceXS, listX + listW - S(55), S(55),
+                    listYOffset + S(5), S(10),
+                    (s->SortMode == 2) ? ColorWhite : ColorShadow);
     if (s->SortMode == 2) {
       float cx = listX + listW - S(55) + S(42);
       float cy = listYOffset + S(8);
-      if (s->SortAscending) DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)}, (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
-      else DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy}, (Vector2){cx, cy}, ColorWhite);
+      if (s->SortAscending)
+        DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)},
+                     (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
+      else
+        DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy},
+                     (Vector2){cx, cy}, ColorWhite);
     }
 
     listYOffset += headerH;
     totalVisible = (int)floorf((viewH - listYOffset) / rowH);
-    if (totalVisible < 1) totalVisible = 1;
+    if (totalVisible < 1)
+      totalVisible = 1;
   }
 
   int totalItems = 0;
@@ -2582,16 +2954,19 @@ static void Browser_Draw(Component *base) {
   if (s->ShowOSK) {
     float oskH = S(172);
     listAreaH -= oskH;
-    if (listAreaH < S(50)) listAreaH = S(50);
+    if (listAreaH < S(50))
+      listAreaH = S(50);
   }
-  BeginScissorMode((int)listX, (int)listYOffset, (int)listW + S(10), (int)listAreaH);
+  BeginScissorMode((int)listX, (int)listYOffset, (int)listW + S(10),
+                   (int)listAreaH);
 
   float pixelOffset = fmodf(s->VisualScroll, rowH);
   int itemsToDraw = totalVisible + 1;
 
   for (int i = 0; i < itemsToDraw; i++) {
     int idx = s->ScrollOffset + i;
-    if (idx < 0 || idx >= totalItems) continue;
+    if (idx < 0 || idx >= totalItems)
+      continue;
 
     const char *title = "";
     const char *artist = "";
@@ -2658,15 +3033,25 @@ static void Browser_Draw(Component *base) {
     if (filePath[0] != '\0' && s->SelectedStorage) {
       char trackFullPath[1024] = {0};
       const char *relPath = filePath;
-      if (relPath[0] == '/' || relPath[0] == '\\') relPath++;
-      snprintf(trackFullPath, sizeof(trackFullPath), "%s/%s", s->SelectedStorage->Path, relPath);
+      if (relPath[0] == '/' || relPath[0] == '\\')
+        relPath++;
+      snprintf(trackFullPath, sizeof(trackFullPath), "%s/%s",
+               s->SelectedStorage->Path, relPath);
 
-      if (s->DeckA && s->DeckA->LoadedTrack && strcmp(s->DeckA->LoadedTrack->FilePath, trackFullPath) == 0) isPlaying = true;
-      if (s->DeckB && s->DeckB->LoadedTrack && strcmp(s->DeckB->LoadedTrack->FilePath, trackFullPath) == 0) isPlaying = true;
+      if (s->DeckA && s->DeckA->LoadedTrack &&
+          strcmp(s->DeckA->LoadedTrack->FilePath, trackFullPath) == 0)
+        isPlaying = true;
+      if (s->DeckB && s->DeckB->LoadedTrack &&
+          strcmp(s->DeckB->LoadedTrack->FilePath, trackFullPath) == 0)
+        isPlaying = true;
     }
 
     float ry = listYOffset - pixelOffset + i * rowH;
     bool isCursor = (idx == s->CursorPos + s->ScrollOffset);
+    bool isHover = false;
+    if (Input_IsDown() && CheckCollisionPointRec(Input_GetPointerPos(), (Rectangle){listX, ry, listW, rowH})) {
+      isHover = true;
+    }
 
     if (isCursor) {
       DrawRectangle(listX, ry + 1, listW, rowH - 2, ColorBlue);
@@ -2674,26 +3059,33 @@ static void Browser_Draw(Component *base) {
         DrawSelectionTriangle(listX + S(2), ry + (rowH / 2.0f), ColorWhite);
       }
     } else if (isPlaying) {
-      DrawRectangle(listX, ry + 1, listW, rowH - 2, (Color){ 255, 121, 0, 45 });
+      DrawRectangle(listX, ry + 1, listW, rowH - 2, (Color){255, 121, 0, 45});
+    } else if (isHover) {
+      DrawRectangle(listX, ry + 1, listW, rowH - 2, (Color){45, 45, 55, 255});
     } else if (i % 2 != 0) {
       DrawRectangle(listX, ry + 1, listW, rowH - 2, ColorDark2);
     }
 
-    Color textCol = isCursor ? ColorWhite : (isPlaying ? ColorOrange : ColorShadow);
-    Color titleCol = isCursor ? ColorWhite : (isPlaying ? ColorOrange : ColorWhite);
+    Color textCol =
+        isCursor ? ColorWhite : (isPlaying ? ColorOrange : ColorShadow);
+    Color titleCol =
+        isCursor ? ColorWhite : (isPlaying ? ColorOrange : ColorWhite);
 
     // Render Track Index Number - only for Track List (BrowseLevel 0)
     if (s->BrowseLevel == 0) {
       char numBuf[16];
       int displayNum = idx + 1;
-      if (s->DatabaseType == 0 && idx < s->ActiveTrackCount && s->TrackPointers[idx]) {
-          displayNum = s->TrackPointers[idx]->BrowserDisplayNumber;
-      } else if (s->DatabaseType == 1 && idx < s->ActiveTrackCount && s->SeratoTrackPointers[idx]) {
-          displayNum = s->SeratoTrackPointers[idx]->BrowserDisplayNumber;
+      if (s->DatabaseType == 0 && idx < s->ActiveTrackCount &&
+          s->TrackPointers[idx]) {
+        displayNum = s->TrackPointers[idx]->BrowserDisplayNumber;
+      } else if (s->DatabaseType == 1 && idx < s->ActiveTrackCount &&
+                 s->SeratoTrackPointers[idx]) {
+        displayNum = s->SeratoTrackPointers[idx]->BrowserDisplayNumber;
       }
       sprintf(numBuf, "%d.", displayNum);
       UIDrawText(numBuf, faceXS, listX + S(4), ry + S(9), S(10), textCol);
-      UIDrawText(isPlaying ? "\uf04b" : "\uf001", faceIcon, listX + S(32), ry + S(9), S(9), textCol);
+      UIDrawText(isPlaying ? "\uf04b" : "\uf001", faceIcon, listX + S(32),
+                 ry + S(9), S(9), textCol);
     }
 
     float textX = listX + S(36);
@@ -2711,18 +3103,22 @@ static void Browser_Draw(Component *base) {
     // Marquee Logic for Title
     static int lastCursor = -1;
     if (s->CursorPos != lastCursor) {
-        s->MarqueeScrollX = 0;
-        lastCursor = s->CursorPos;
+      s->MarqueeScrollX = 0;
+      lastCursor = s->CursorPos;
     }
-    if (isCursor) s->MarqueeScrollX += GetFrameTime();
+    if (isCursor)
+      s->MarqueeScrollX += GetFrameTime();
 
     float maxTitleW = listW - (textX - listX) - S(115);
-    Rectangle titleRect = { textX, textY, maxTitleW, rowH };
-    UIDrawScrollingText(title, faceSm, titleRect, S(13), titleCol, isCursor ? s->MarqueeScrollX : 0.0f);
+    Rectangle titleRect = {textX, textY, maxTitleW, rowH};
+    UIDrawScrollingText(title, faceSm, titleRect, S(13), titleCol,
+                        isCursor ? s->MarqueeScrollX : 0.0f);
 
-    // BUG FIX: UIDrawScrollingText terminates ScissorMode internally when active.
-    // We must restore the main list's ScissorMode so subsequent items and text don't bleed over the table header!
-    BeginScissorMode((int)listX, (int)listYOffset, (int)listW + S(10), (int)listAreaH);
+    // BUG FIX: UIDrawScrollingText terminates ScissorMode internally when
+    // active. We must restore the main list's ScissorMode so subsequent items
+    // and text don't bleed over the table header!
+    BeginScissorMode((int)listX, (int)listYOffset, (int)listW + S(10),
+                     (int)listAreaH);
 
     if (artist[0] != '\0' && s->BrowseLevel == 0 && !s->InfoEnabled) {
       UIDrawText(artist, faceXS, textX, ry + S(15), S(10), textCol);
@@ -2730,15 +3126,18 @@ static void Browser_Draw(Component *base) {
 
     // BPM & Key Badge (Reference Image 1 & 2 - NO LOAD BUTTON)
     if (s->BrowseLevel == 0 && !s->InfoEnabled) {
-      DrawCentredText(bpmText, faceXS, listX + listW - S(110), S(55), ry + S(9), S(11), textCol);
+      DrawCentredText(bpmText, faceXS, listX + listW - S(110), S(55), ry + S(9),
+                      S(11), textCol);
 
       // Key Badge with Camelot Wheel Traffic Light Harmonic Matching
-      Rectangle keyBadgeRect = { listX + listW - S(52), ry + S(4), S(48), rowH - S(8) };
-      
+      Rectangle keyBadgeRect = {listX + listW - S(52), ry + S(4), S(48),
+                                rowH - S(8)};
+
       const char *masterKey = NULL;
       if (s->DeckA && s->DeckA->IsPlaying && s->DeckA->TrackKey[0] != '\0') {
         masterKey = s->DeckA->TrackKey;
-      } else if (s->DeckB && s->DeckB->IsPlaying && s->DeckB->TrackKey[0] != '\0') {
+      } else if (s->DeckB && s->DeckB->IsPlaying &&
+                 s->DeckB->TrackKey[0] != '\0') {
         masterKey = s->DeckB->TrackKey;
       } else if (s->DeckA && s->DeckA->TrackKey[0] != '\0') {
         masterKey = s->DeckA->TrackKey;
@@ -2750,17 +3149,21 @@ static void Browser_Draw(Component *base) {
 
       if (matchLevel == 2) {
         // Perfect Camelot Harmonic Match (Traffic Light Green)
-        DrawRectangleRec(keyBadgeRect, (Color){ 0, 230, 0, 255 });
-        DrawCentredText(keyStr, faceXS, keyBadgeRect.x, keyBadgeRect.width, keyBadgeRect.y + S(5), S(10), ColorBlack);
+        DrawRectangleRec(keyBadgeRect, (Color){0, 230, 0, 255});
+        DrawCentredText(keyStr, faceXS, keyBadgeRect.x, keyBadgeRect.width,
+                        keyBadgeRect.y + S(5), S(10), ColorBlack);
       } else if (matchLevel == 1) {
         // Energy Shift / Semi-compatible Match (Traffic Light Amber/Yellow)
-        DrawRectangleRec(keyBadgeRect, (Color){ 245, 180, 0, 255 });
-        DrawCentredText(keyStr, faceXS, keyBadgeRect.x, keyBadgeRect.width, keyBadgeRect.y + S(5), S(10), ColorBlack);
+        DrawRectangleRec(keyBadgeRect, (Color){245, 180, 0, 255});
+        DrawCentredText(keyStr, faceXS, keyBadgeRect.x, keyBadgeRect.width,
+                        keyBadgeRect.y + S(5), S(10), ColorBlack);
       } else {
         // Incompatible key or no master key loaded
-        DrawRectangleRec(keyBadgeRect, (Color){ 35, 35, 42, 255 });
+        DrawRectangleRec(keyBadgeRect, (Color){35, 35, 42, 255});
         DrawRectangleLinesEx(keyBadgeRect, 1.0f, ColorDark1);
-        DrawCentredText(keyStr, faceXS, keyBadgeRect.x, keyBadgeRect.width, keyBadgeRect.y + S(5), S(10), isCursor ? ColorWhite : ColorShadow);
+        DrawCentredText(keyStr, faceXS, keyBadgeRect.x, keyBadgeRect.width,
+                        keyBadgeRect.y + S(5), S(10),
+                        isCursor ? ColorWhite : ColorShadow);
       }
     }
 
@@ -2803,22 +3206,32 @@ static void Browser_Draw(Component *base) {
     float sbTrackH = viewH - listYOffset;
 
     // Background Track
-    DrawRectangle(sbTrackX, sbTrackY, sbTrackW, sbTrackH, (Color){ 20, 20, 20, 180 });
+    DrawRectangle(sbTrackX, sbTrackY, sbTrackW, sbTrackH,
+                  (Color){20, 20, 20, 180});
     DrawLine(sbTrackX, sbTrackY, sbTrackX, sbTrackY + sbTrackH, ColorDark1);
 
     // Calculate handle height and Y position
     float maxScroll = (maxItems - totalVisible) * rowH;
     float handleH = (sbTrackH * totalVisible) / (float)maxItems;
-    if (handleH < S(35)) handleH = S(35);
-    if (handleH > sbTrackH) handleH = sbTrackH;
+    if (handleH < S(35))
+      handleH = S(35);
+    if (handleH > sbTrackH)
+      handleH = sbTrackH;
 
     float scrollRatio = (maxScroll > 0) ? (s->VisualScroll / maxScroll) : 0.0f;
-    if (scrollRatio < 0.0f) scrollRatio = 0.0f;
-    if (scrollRatio > 1.0f) scrollRatio = 1.0f;
+    if (scrollRatio < 0.0f)
+      scrollRatio = 0.0f;
+    if (scrollRatio > 1.0f)
+      scrollRatio = 1.0f;
     float handleY = sbTrackY + scrollRatio * (sbTrackH - handleH);
 
-    Color handleColor = s->IsScrollbarDragging ? ColorOrange : (s->IsDragging ? ColorWhite : (Color){ 160, 160, 160, 200 });
-    DrawRectangleRounded((Rectangle){ sbTrackX + S(3), handleY, sbTrackW - S(6), handleH }, 0.5f, 4, handleColor);
+    Color handleColor =
+        s->IsScrollbarDragging
+            ? ColorOrange
+            : (s->IsDragging ? ColorWhite : (Color){160, 160, 160, 200});
+    DrawRectangleRounded(
+        (Rectangle){sbTrackX + S(3), handleY, sbTrackW - S(6), handleH}, 0.5f,
+        4, handleColor);
   }
 
   // Load Deck Popup Modal
@@ -2889,22 +3302,28 @@ static void Browser_Draw(Component *base) {
   // Overlay Dropdown Menu
   if (s->BrowseLevel == 0 && s->ShowSortDropdown) {
     float listW = SCREEN_WIDTH - sidebarW - S(8);
-    if (s->InfoEnabled) listW = SCREEN_WIDTH - sidebarW - S(160);
+    if (s->InfoEnabled)
+      listW = SCREEN_WIDTH - sidebarW - S(160);
     float sortButtonW = S(80);
-    
-    Rectangle dropdownRect = {sidebarW + listW - sortButtonW, TOP_BAR_H + rowH, sortButtonW, rowH * 5};
+
+    Rectangle dropdownRect = {sidebarW + listW - sortButtonW, TOP_BAR_H + rowH,
+                              sortButtonW, rowH * 5};
     DrawRectangleRec(dropdownRect, ColorDark2);
     DrawRectangleLinesEx(dropdownRect, 1.0f, ColorShadow);
 
-    const char* sortLabelsList[] = {"Default", "BPM", "Key", "Title", "Rating"};
+    const char *sortLabelsList[] = {"Default", "BPM", "Key", "Title", "Rating"};
     for (int i = 0; i < 5; i++) { // Loop to 5
-        Rectangle itemRect = {dropdownRect.x, dropdownRect.y + i * rowH, dropdownRect.width, rowH};
-        bool hover = CheckCollisionPointRec(mPos, itemRect);
-        
-        if (hover) DrawRectangleRec(itemRect, ColorDark1);
-        if (s->SortMode == i) DrawRectangle(itemRect.x, itemRect.y, S(3), itemRect.height, ColorBlue);
+      Rectangle itemRect = {dropdownRect.x, dropdownRect.y + i * rowH,
+                            dropdownRect.width, rowH};
+      bool hover = CheckCollisionPointRec(mPos, itemRect);
 
-        UIDrawText(sortLabelsList[i], faceXS, itemRect.x + S(10), itemRect.y + S(9), S(10), hover ? ColorWhite : ColorShadow);
+      if (hover)
+        DrawRectangleRec(itemRect, ColorDark1);
+      if (s->SortMode == i)
+        DrawRectangle(itemRect.x, itemRect.y, S(3), itemRect.height, ColorBlue);
+
+      UIDrawText(sortLabelsList[i], faceXS, itemRect.x + S(10),
+                 itemRect.y + S(9), S(10), hover ? ColorWhite : ColorShadow);
     }
   }
 

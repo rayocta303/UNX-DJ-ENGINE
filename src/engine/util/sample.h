@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef __cplusplus
+
 #if !defined(__ANDROID__) && !defined(PLATFORM_IOS)
 #include <QFlags>
 #else
@@ -473,3 +475,5 @@ class SampleUtil {
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(SampleUtil::CLIP_STATUS);
+
+#endif // __cplusplus

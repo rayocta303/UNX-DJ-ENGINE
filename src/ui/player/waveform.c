@@ -537,8 +537,16 @@ static void Waveform_Draw(Component *base) {
     }
   }
 
-#define DRAW_TRAP(pA, cA)                                                      \
+#define DRAW_TRAP(pA, cA, cR, cG, cB)                                          \
   do {                                                                         \
+    rlColor4ub((cR), (cG), (cB), 60);                                          \
+    rlVertex2f(cx0 - 0.5f, yy - (pA) - 1.0f);                                  \
+    rlVertex2f(cx0 - 0.5f, yy + (pA) + 1.0f);                                  \
+    rlVertex2f(cx1 + 0.5f, yy + (cA) + 1.0f);                                  \
+    rlVertex2f(cx0 - 0.5f, yy - (pA) - 1.0f);                                  \
+    rlVertex2f(cx1 + 0.5f, yy + (cA) + 1.0f);                                  \
+    rlVertex2f(cx1 + 0.5f, yy - (cA) - 1.0f);                                  \
+    rlColor4ub((cR), (cG), (cB), 255);                                         \
     rlVertex2f(cx0, yy - (pA));                                                \
     rlVertex2f(cx0, yy + (pA));                                                \
     rlVertex2f(cx1, yy + (cA));                                                \
@@ -620,6 +628,17 @@ static void Waveform_Draw(Component *base) {
               c1.g = (unsigned char)fminf(255.0f, (float)smCol.g * eqMidMult);
               c1.b = (unsigned char)fminf(255.0f, (float)smCol.b * eqHighMult);
             }
+            // Draw blurred halo for anti-flickering
+            rlColor4ub(c0.r, c0.g, c0.b, 60);
+            rlVertex2f(cx0 - 0.5f, yy - h0 - 1.0f); rlVertex2f(cx0 - 0.5f, yy + h0 + 1.0f);
+            rlColor4ub(c1.r, c1.g, c1.b, 60);
+            rlVertex2f(cx1 + 0.5f, yy + h1 + 1.0f);
+            rlColor4ub(c0.r, c0.g, c0.b, 60);
+            rlVertex2f(cx0 - 0.5f, yy - h0 - 1.0f);
+            rlColor4ub(c1.r, c1.g, c1.b, 60);
+            rlVertex2f(cx1 + 0.5f, yy + h1 + 1.0f); rlVertex2f(cx1 + 0.5f, yy - h1 - 1.0f);
+            
+            // Draw solid core
             rlColor4ub(c0.r, c0.g, c0.b, 255);
             rlVertex2f(cx0, yy - h0); rlVertex2f(cx0, yy + h0);
             rlColor4ub(c1.r, c1.g, c1.b, 255);
@@ -630,9 +649,9 @@ static void Waveform_Draw(Component *base) {
             rlVertex2f(cx1, yy + h1); rlVertex2f(cx1, yy - h1);
           }
         } else {
-          if (pLo > 0.1f || smLo > 0.1f) { rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 255); DRAW_TRAP(pLo, smLo); }
-          if (pMi > 0.1f || smMi > 0.1f) { rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 255); DRAW_TRAP(pMi, smMi); }
-          if (pHi > 0.1f || smHi > 0.1f) { rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 255); DRAW_TRAP(pHi, smHi); }
+          if (pLo > 0.1f || smLo > 0.1f) { DRAW_TRAP(pLo, smLo, BL_LOW.r, BL_LOW.g, BL_LOW.b); }
+          if (pMi > 0.1f || smMi > 0.1f) { DRAW_TRAP(pMi, smMi, BL_MID.r, BL_MID.g, BL_MID.b); }
+          if (pHi > 0.1f || smHi > 0.1f) { DRAW_TRAP(pHi, smHi, BL_HIGH.r, BL_HIGH.g, BL_HIGH.b); }
         }
       }
       lastDrawnFrame = i;
