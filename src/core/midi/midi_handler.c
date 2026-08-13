@@ -33,8 +33,35 @@ static int dest_client = -1;
 static int dest_port = -1;
 static int raw_midi_fd = -1;
 
+// =============================================================================
+// IMPORTANT NOTE FOR DEVELOPERS — LINUX MIDI OUTPUT ARCHITECTURE (DO NOT REMOVE)
+// =============================================================================
+//
+// On Armbian/Linux DRM (S905X kernel), the ALSA USB Audio driver (snd-usb-audio)
+// does NOT reliably forward MIDI events from the ALSA Sequencer (snd_seq) queue
+// to the physical Pioneer DDJ-FLX6 USB controller.
+//
+// This is a known kernel-level buffering issue on embedded ARM platforms where
+// snd_seq events sent via snd_seq_event_output() may never reach the USB endpoint,
+// even after calling snd_seq_drain_output(). The LEDs simply do not respond.
+//
+// THE SOLUTION — Dual-Path MIDI Output:
+//   1. Direct RawMIDI write to /dev/snd/midiCxD0 (character device, bypasses
+//      the snd_seq scheduler entirely — this is what makes LEDs respond).
+//   2. ALSA Sequencer write for compatibility (kept as secondary path).
+//
+// The debug tool debug/test-all-leds.c proved that ONLY the direct RawMIDI path
+// works reliably for LED commands on this hardware. The app now uses both paths.
+//
+// WARNING: If you refactor MIDI_SendShortMsg / MIDI_SendSysEx on Linux and remove
+// the raw_midi_fd write, LEDs WILL STOP working on Armbian DRM even if aconnect
+// shows the controller is subscribed. This is not a mapping issue.
+//
+// TESTED ON: Armbian (S905X), kernel 6.x, Pioneer DDJ-FLX6 — August 2026.
+// =============================================================================
 static void LinuxMIDI_OpenRawMIDI(void) {
   if (raw_midi_fd >= 0) return;
+  // NOTE: Order matters — try the most likely device first (DDJ-FLX6 is usually C1).
   const char *paths[] = {
       "/dev/snd/midiC1D0",
       "/dev/snd/midiC0D0",
