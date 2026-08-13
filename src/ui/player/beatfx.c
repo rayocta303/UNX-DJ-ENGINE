@@ -41,34 +41,29 @@ static int BeatFX_Update(Component *base) {
         float modalH = S(270);
         float modalX = (SCREEN_WIDTH - modalW) / 2.0f;
         float modalY = (SCREEN_HEIGHT - modalH) / 2.0f;
+        Rectangle modalRect = { modalX, modalY, modalW, modalH };
 
-        float cols = 3;
-        float pad = S(10);
-        float btnW = (modalW - pad * 4) / cols;
-        float btnH = (modalH - S(45) - pad * 6) / 5;
+        if (UI_UpdateModal(modalRect)) {
+            b->State->FXDropdownOpen = false;
+        } else if (Input_IsReleased()) {
+            float cols = 3;
+            float pad = S(10);
+            float btnW = (modalW - pad * 4) / cols;
+            float btnH = (modalH - S(45) - pad * 6) / 5;
 
-        if (Input_IsReleased()) {
-            bool insideModal = CheckCollisionPointRec(mouse, (Rectangle){modalX, modalY, modalW, modalH});
-            if (insideModal) {
-                for (int i = 0; i < ALL_FX_COUNT; i++) {
-                    int row = i / (int)cols;
-                    int col = i % (int)cols;
-                    float bx = modalX + pad + col * (btnW + pad);
-                    float by = modalY + S(45) + row * (btnH + pad);
-                    if (CheckCollisionPointRec(mouse, (Rectangle){bx, by, btnW, btnH})) {
-                        b->State->SelectedFX = i;
-                        if (b->AudioPlugin) BeatFXManager_SetFX(&b->AudioPlugin->BeatFX, i);
-                        b->State->FXDropdownOpen = false;
-                        Input_Consume();
-                        break;
-                    }
+            for (int i = 0; i < ALL_FX_COUNT; i++) {
+                int row = i / (int)cols;
+                int col = i % (int)cols;
+                float bx = modalX + pad + col * (btnW + pad);
+                float by = modalY + S(45) + row * (btnH + pad);
+                if (CheckCollisionPointRec(mouse, (Rectangle){bx, by, btnW, btnH})) {
+                    b->State->SelectedFX = i;
+                    if (b->AudioPlugin) BeatFXManager_SetFX(&b->AudioPlugin->BeatFX, i);
+                    b->State->FXDropdownOpen = false;
+                    Input_Consume();
+                    break;
                 }
-            } else {
-                b->State->FXDropdownOpen = false;
-                Input_Consume();
             }
-        } else if (Input_IsPressed() || Input_IsDown()) {
-            Input_Consume();
         }
 
         if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
@@ -80,31 +75,26 @@ static int BeatFX_Update(Component *base) {
         float modalH = S(220);
         float modalX = (SCREEN_WIDTH - modalW) / 2.0f;
         float modalY = (SCREEN_HEIGHT - modalH) / 2.0f;
+        Rectangle modalRect = { modalX, modalY, modalW, modalH };
 
-        float pad = S(12);
-        float btnW = modalW - pad * 2;
-        float btnH = S(44);
+        if (UI_UpdateModal(modalRect)) {
+            b->State->ChannelDropdownOpen = false;
+        } else if (Input_IsReleased()) {
+            float pad = S(12);
+            float btnW = modalW - pad * 2;
+            float btnH = S(44);
 
-        if (Input_IsReleased()) {
-            bool insideModal = CheckCollisionPointRec(mouse, (Rectangle){modalX, modalY, modalW, modalH});
-            if (insideModal) {
-                for (int i = 0; i < 3; i++) {
-                    float bx = modalX + pad;
-                    float by = modalY + S(45) + i * (btnH + pad);
-                    if (CheckCollisionPointRec(mouse, (Rectangle){bx, by, btnW, btnH})) {
-                        b->State->SelectedChannel = i;
-                        if (b->AudioPlugin) b->AudioPlugin->BeatFX.targetChannel = i;
-                        b->State->ChannelDropdownOpen = false;
-                        Input_Consume();
-                        break;
-                    }
+            for (int i = 0; i < 3; i++) {
+                float bx = modalX + pad;
+                float by = modalY + S(45) + i * (btnH + pad);
+                if (CheckCollisionPointRec(mouse, (Rectangle){bx, by, btnW, btnH})) {
+                    b->State->SelectedChannel = i;
+                    if (b->AudioPlugin) b->AudioPlugin->BeatFX.targetChannel = i;
+                    b->State->ChannelDropdownOpen = false;
+                    Input_Consume();
+                    break;
                 }
-            } else {
-                b->State->ChannelDropdownOpen = false;
-                Input_Consume();
             }
-        } else if (Input_IsPressed() || Input_IsDown()) {
-            Input_Consume();
         }
 
         if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
@@ -386,18 +376,14 @@ void BeatFXPanel_DrawOverlays(BeatFXPanel *b) {
     
     Vector2 mouse = Input_GetPointerPos();
     if (b->State->FXDropdownOpen) {
-        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, 200});
+        UI_DrawModalBackdrop();
         
         float modalW = S(420);
         float modalH = S(270);
         float modalX = (SCREEN_WIDTH - modalW) / 2.0f;
         float modalY = (SCREEN_HEIGHT - modalH) / 2.0f;
         
-        // Sharp non-rounded modal window frame
-        DrawRectangle(modalX, modalY, modalW, modalH, ColorDark1);
-        DrawRectangleLinesEx((Rectangle){modalX, modalY, modalW, modalH}, 2.0f, ColorOrange);
-        DrawCentredText("SELECT BEAT FX", faceLg, modalX, modalW, modalY + S(12), S(12), ColorWhite);
-        DrawLine(modalX + S(10), modalY + S(36), modalX + modalW - S(10), modalY + S(36), ColorDark2);
+        Rectangle body = UI_DrawModalFrame((Rectangle){modalX, modalY, modalW, modalH}, "SELECT BEAT FX");
         
         float cols = 3;
         float rows = 5;
@@ -421,18 +407,14 @@ void BeatFXPanel_DrawOverlays(BeatFXPanel *b) {
             DrawCentredText(AllFXNames[i], faceSm, optRect.x, optRect.width, optRect.y + (btnH - S(10)) / 2.0f, S(10), ColorWhite);
         }
     } else if (b->State->ChannelDropdownOpen) {
-        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, 200});
+        UI_DrawModalBackdrop();
         
         float modalW = S(280);
         float modalH = S(220);
         float modalX = (SCREEN_WIDTH - modalW) / 2.0f;
         float modalY = (SCREEN_HEIGHT - modalH) / 2.0f;
         
-        // Sharp non-rounded modal window frame
-        DrawRectangle(modalX, modalY, modalW, modalH, ColorDark1);
-        DrawRectangleLinesEx((Rectangle){modalX, modalY, modalW, modalH}, 2.0f, ColorOrange);
-        DrawCentredText("SELECT CHANNEL", faceLg, modalX, modalW, modalY + S(12), S(12), ColorWhite);
-        DrawLine(modalX + S(10), modalY + S(36), modalX + modalW - S(10), modalY + S(36), ColorDark2);
+        Rectangle body = UI_DrawModalFrame((Rectangle){modalX, modalY, modalW, modalH}, "SELECT CHANNEL");
         
         const char* chNames[] = { "MASTER", "DECK 1", "DECK 2" };
         float pad = S(12);

@@ -113,6 +113,10 @@ typedef struct DeckAudioState {
 
   double BPM; // Current BPM for beat-based limits
   
+  float KeyShiftSemitones;         // Master Tempo Dynamic Key shift (+/- semitones)
+  volatile bool IsProcessingAudio; // Spinlock flag for load thread safety
+  volatile bool SuspendProcessing; // UI lock flag to safely bypass audio loop
+  
   // Release FX State
   int ReleaseFXType;   // 0=None, 1=Brake, 2=Spin, 3=Echo
   float ReleaseFXTimer; 
@@ -146,8 +150,8 @@ void AudioEngine_SetPCMBitDepth(AudioEngine *engine, int bitDepth);
 void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames);
 void AudioEngine_SetFXRouting(AudioEngine *engine, FXRoutingMode mode);
 
-bool DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath);
-void DeckAudio_LoadTrackAsync(DeckAudioState *deck, const char *filePath);
+bool DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath, bool autoPlay);
+void DeckAudio_LoadTrackAsync(DeckAudioState *deck, const char *filePath, bool autoPlay);
 void DeckAudio_Play(DeckAudioState *deck);
 void DeckAudio_Stop(DeckAudioState *deck);
 void DeckAudio_SetPlaying(DeckAudioState *deck, bool playing);
@@ -161,6 +165,7 @@ void DeckAudio_QueueJumpMs(DeckAudioState *deck, uint32_t targetMs,
                            uint32_t waitMs);
 void DeckAudio_SetPitch(DeckAudioState *deck, uint16_t pitch);
 void DeckAudio_Unload(DeckAudioState *deck);
+void DeckAudio_SetVinylPhysics(DeckAudioState *deck, float startAccel, float stopAccel);
 void DeckAudio_TriggerReleaseFX(DeckAudioState *deck, int type);
 
 void DeckAudio_SetSlip(DeckAudioState *deck, bool active);

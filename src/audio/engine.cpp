@@ -28,7 +28,7 @@ extern "C" void Toast_ShowError(const char *message);
 
 using namespace soundtouch;
 
-void DeckAudio_LoadTrackAsync(DeckAudioState *deck, const char *filePath) {
+void DeckAudio_LoadTrackAsync(DeckAudioState *deck, const char *filePath, bool autoPlay) {
   // Increment LoadID and capture it for this thread
   uint32_t myID = ++(deck->LastLoadID);
   
@@ -36,8 +36,8 @@ void DeckAudio_LoadTrackAsync(DeckAudioState *deck, const char *filePath) {
   deck->LoadingProgress = 0.0f;
 
   std::string path = filePath;
-  std::thread([deck, path, myID]() {
-    bool success = DeckAudio_LoadTrack(deck, path.c_str());
+  std::thread([deck, path, myID, autoPlay]() {
+    bool success = DeckAudio_LoadTrack(deck, path.c_str(), autoPlay);
     
     // Only clear IsLoading if this was the latest request
     if (deck->LastLoadID == myID) {
@@ -114,6 +114,11 @@ void AudioEngine_SetOutputSampleRate(AudioEngine *engine, uint32_t sampleRate) {
     return;
   engine->OutputSampleRate = sampleRate;
   for (int i = 0; i < MAX_DECKS; i++) {
+    engine->Decks[i].SuspendProcessing = true;
+    while (engine->Decks[i].IsProcessingAudio) {
+      std::this_thread::yield();
+    }
+
     if (engine->Decks[i].SoundTouchHandle) {
       ((SoundTouch *)engine->Decks[i].SoundTouchHandle)
           ->setSampleRate(sampleRate);
@@ -122,6 +127,8 @@ void AudioEngine_SetOutputSampleRate(AudioEngine *engine, uint32_t sampleRate) {
     uint32_t srcRate = engine->Decks[i].SampleRate > 0 ? engine->Decks[i].SampleRate : sampleRate;
     ASRCResampler_SetRates(&engine->Decks[i].ASRC, (double)srcRate, (double)sampleRate);
     engine->Decks[i].ASRCRatio = (double)srcRate / (double)sampleRate;
+
+    engine->Decks[i].SuspendProcessing = false;
   }
 }
 
@@ -131,11 +138,18 @@ void AudioEngine_SetPCMBitDepth(AudioEngine *engine, int bitDepth) {
       engine->Decks[i].BitDepth = bitDepth;
       // Auto-reinit audio if a track is loaded
       if (engine->Decks[i].FilePath[0] != '\0') {
+        engine->Decks[i].SuspendProcessing = true;
+        while (engine->Decks[i].IsProcessingAudio) {
+          std::this_thread::yield();
+        }
+
         double currentPos = engine->Decks[i].Position;
         bool wasPlaying = engine->Decks[i].IsPlaying;
-        DeckAudio_LoadTrack(&engine->Decks[i], engine->Decks[i].FilePath);
+        DeckAudio_LoadTrack(&engine->Decks[i], engine->Decks[i].FilePath, wasPlaying);
         engine->Decks[i].Position = currentPos;
         engine->Decks[i].IsPlaying = wasPlaying;
+
+        engine->Decks[i].SuspendProcessing = false;
       }
     }
   }
@@ -150,13 +164,22 @@ void AudioEngine_Destroy(AudioEngine *engine) {
   }
 }
 
-bool DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
+void DeckAudio_SetVinylPhysics(DeckAudioState *deck, float startAccel, float stopAccel) {
+  if (!deck) return;
+  deck->VinylStartAccel = startAccel;
+  deck->VinylStopAccel = stopAccel;
+}
+
+bool DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath, bool autoPlay) {
   uint32_t myID = deck->LastLoadID;
   
   if (!filePath || strlen(filePath) == 0) {
     if (deck->PCMBuffer) {
       void *oldBuf = deck->PCMBuffer;
       deck->PCMBuffer = NULL;
+      while (deck->IsProcessingAudio) {
+          std::this_thread::yield();
+      }
       deck->TotalSamples = 0;
       free(oldBuf);
     }
@@ -303,7 +326,10 @@ bool DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
   // Final apply to deck (Safe update)
   void *oldBuf = deck->PCMBuffer;
   deck->PCMBuffer = NULL; 
-  std::this_thread::sleep_for(std::chrono::milliseconds(15)); // Wait for active audio block
+  // Wait for the audio thread to finish its current block using spinlock
+  while (deck->IsProcessingAudio) {
+      std::this_thread::yield();
+  }
 
   deck->PCMBuffer = localPCM;
   deck->TotalSamples = localSamples;
@@ -315,8 +341,8 @@ bool DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath) {
 
   deck->Position = 0;
   deck->MT_ReadPos = 0;
-  deck->IsPlaying = false;
-  deck->IsMotorOn = false;
+  deck->IsPlaying = autoPlay;
+  deck->IsMotorOn = autoPlay;
   deck->IsTouching = false;
   deck->VinylModeEnabled = true;
   deck->OutlinedRate = 0;
@@ -447,6 +473,15 @@ static inline void AudioEngine_GetSample(DeckAudioState *deck, void *buffer, dou
 static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
                              float *outCue, int frames, AudioEngine *engine,
                              int deckIndex, float *outCleanMaster) {
+  // RAII lock to ensure IsProcessingAudio is correctly toggled on all returns
+  struct AudioLock {
+    volatile bool& flag;
+    AudioLock(volatile bool& f) : flag(f) { flag = true; }
+    ~AudioLock() { flag = false; }
+  } _lock(deck->IsProcessingAudio);
+
+  if (deck->SuspendProcessing) return;
+
   void *pcm = deck->PCMBuffer;
   bool noiseActive = (deck->ColorFX.activeFX == COLORFX_NOISE &&
                       deck->ColorFX.colorValue != 0.0f);
@@ -549,8 +584,8 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
   float sampleRateRatio =
       (float)deck->SampleRate / (float)engine->OutputSampleRate;
 
-  // Audio Buffering — per-invocation stack buffer (NOT static: thread-safe, no shared state)
-  float outBuf[4096 * 2];
+  // Audio Buffering — Thread-safe static buffer for the current deck (16384 max)
+  static float outBuf[MAX_DECKS][16384 * 2];
   uint32_t received = 0;
 
   // Bypass MT during motor start/stop or scratching/spinning inertia
@@ -568,7 +603,10 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     }
     double effectiveTempo = fabs(targetRate) * (double)sampleRateRatio;
     st->setTempo(effectiveTempo);
-    st->setPitch((double)sampleRateRatio);
+    
+    // Apply Dynamic Key Shift (Semitones)
+    double keyRatio = pow(2.0, (double)deck->KeyShiftSemitones / 12.0);
+    st->setPitch((double)sampleRateRatio * keyRatio);
 
     int maxIterations = 15;
     while (st->numSamples() < (uint32_t)frames && maxIterations-- > 0) {
@@ -592,7 +630,7 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
       }
       st->putSamples(inBuf, 512);
     }
-    received = st->receiveSamples(outBuf, frames);
+    received = st->receiveSamples(outBuf[deckIndex], frames);
     deck->Position += (double)received * targetRate * (double)sampleRateRatio;
 
     if (deck->IsLooping) {
@@ -621,8 +659,8 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     for (int i = 0; i < frames; i++) {
       currentRate += rateDelta;
       AudioEngine_GetSample(deck, pcm, deck->Position, deck->BitDepth,
-                            deck->TotalSamples, &outBuf[i * 2],
-                            &outBuf[i * 2 + 1]);
+                            deck->TotalSamples, &outBuf[deckIndex][i * 2],
+                            &outBuf[deckIndex][i * 2 + 1]);
       deck->Position += currentRate * (double)sampleRateRatio;
 
       if (deck->SlipActive) {
@@ -656,7 +694,7 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
       st->clear();
       wasMTActive[deckIndex] = false;
     }
-    memset(outBuf, 0, frames * 2 * sizeof(float));
+    memset(outBuf[deckIndex], 0, frames * 2 * sizeof(float));
     received = frames;
   }
 
@@ -672,7 +710,7 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
 
   // Common Post-Processing Loop
   for (int i = 0; i < (int)received; i++) {
-    float l = outBuf[i * 2], r = outBuf[i * 2 + 1];
+    float l = outBuf[deckIndex][i * 2], r = outBuf[deckIndex][i * 2 + 1];
 
     // EQ
     float lowL = EngineLR4_Process(&deck->EqLowStateL, l);
@@ -785,12 +823,15 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
     g_audioThreadId = std::this_thread::get_id();
     g_audioThreadIdSet = true;
   } else if (g_audioThreadId != std::this_thread::get_id()) {
-    UNX_LOG_ERR("[AUDIO] Race Condition! AudioEngine_Process called from multiple threads!");
+    UNX_LOG_ERR("[AUDIO] Race Condition Warning: Audio Thread ID changed (Device Restarted?). Updating...");
+    g_audioThreadId = std::this_thread::get_id();
   }
 
-  static float masterMix[4096 * 2];
-  static float cleanMasterMix[4096 * 2];
-  static float cueMix[4096 * 2];
+  if (frames > 16384) frames = 16384;
+
+  static float masterMix[16384 * 2];
+  static float cleanMasterMix[16384 * 2];
+  static float cueMix[16384 * 2];
   memset(masterMix, 0, frames * 2 * sizeof(float));
   memset(cleanMasterMix, 0, frames * 2 * sizeof(float));
   memset(cueMix, 0, frames * 2 * sizeof(float));

@@ -1720,8 +1720,7 @@ static void Settings_Draw(Component *base) {
   }
 
   if (r->State->IsEditMappingOpen) {
-    // Dark glassmorphic backdrop
-    DrawRectangle(0, 0, SCREEN_WIDTH, viewH, (Color){10, 10, 15, 230});
+    UI_DrawModalBackdrop();
 
     // Dialog Card layout
     float cardW = S(340.0f);
@@ -1729,15 +1728,7 @@ static void Settings_Draw(Component *base) {
     Rectangle cardRect = {(SCREEN_WIDTH - cardW) / 2.0f, (viewH - cardH) / 2.0f,
                           cardW, cardH};
 
-    // Sharp non-rounded modal window frame
-    DrawRectangleRec(cardRect, ColorBGUtil);
-    DrawRectangleLinesEx(cardRect, 2.0f, ColorOrange);
-
-    // Header Title
-    DrawCentredText("EDIT MIDI MAPPING", faceMd, cardRect.x, cardRect.width,
-                    cardRect.y + S(12), S(13), ColorOrange);
-    DrawLine(cardRect.x, cardRect.y + S(28), cardRect.x + cardW,
-             cardRect.y + S(28), ColorGray);
+    Rectangle body = UI_DrawModalFrame(cardRect, "EDIT MIDI MAPPING");
 
     // Details Info
     SettingItem *item = &r->State->Items[r->State->EditMappingItemIdx];

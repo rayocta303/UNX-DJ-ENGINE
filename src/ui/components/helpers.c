@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+#include "input/input.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -353,4 +354,52 @@ Color GetCamelotColor(const char* keyStr) {
         baseCol.b = (unsigned char)(baseCol.b + (255 - baseCol.b) * 0.3f);
     }
     return baseCol;
+}
+
+// ============================================================================
+// MODAL HELPERS
+// ============================================================================
+
+void UI_DrawModalBackdrop(void) {
+    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), (Color){0, 0, 0, 200});
+}
+
+Rectangle UI_DrawModalFrame(Rectangle modalRect, const char* title) {
+    // Sharp non-rounded modal window frame
+    DrawRectangleRec(modalRect, ColorDark1);
+    DrawRectangleLinesEx(modalRect, 2.0f, ColorOrange);
+    
+    if (title && title[0] != '\0') {
+        Font faceLg = UIFonts_GetFace(S(12));
+        DrawCentredText(title, faceLg, modalRect.x, modalRect.width, modalRect.y + S(12), S(12), ColorWhite);
+        DrawLine(modalRect.x + S(10), modalRect.y + S(36), modalRect.x + modalRect.width - S(10), modalRect.y + S(36), ColorDark2);
+        
+        // Return the body rectangle (area below the title)
+        return (Rectangle){ 
+            modalRect.x, 
+            modalRect.y + S(45), 
+            modalRect.width, 
+            modalRect.height - S(45) 
+        };
+    }
+    
+    return modalRect;
+}
+
+bool UI_UpdateModal(Rectangle modalRect) {
+    // If the user clicked outside the modal, we return true to let the caller close it.
+    if (Input_IsReleased()) {
+        if (!CheckCollisionPointRec(Input_GetPointerPos(), modalRect)) {
+            Input_Consume();
+            return true; 
+        }
+    }
+    
+    // Always consume the input so it doesn't fall through to the UI underneath
+    if (Input_IsPressed() || Input_IsDown() || Input_IsReleased()) {
+        // Only consume if the click was inside the modal (outside was handled above)
+        Input_Consume();
+    }
+    
+    return false;
 }

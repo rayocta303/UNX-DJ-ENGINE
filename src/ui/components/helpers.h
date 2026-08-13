@@ -18,3 +18,8 @@ void Toast_ShowError(const char *message);
 void Toast_UpdateAndDraw(float dt);
 void GetDynamicKey(const char* originalKey, float tempoPercent, bool isMasterTempoOn, char* outKey);
 Color GetCamelotColor(const char* keyStr);
+
+// Modal Helpers
+void UI_DrawModalBackdrop(void);
+Rectangle UI_DrawModalFrame(Rectangle modalRect, const char* title);
+bool UI_UpdateModal(Rectangle modalRect);

@@ -9,12 +9,16 @@
 
 static int Player_Update(Component *base) {
   PlayerRenderer *p = (PlayerRenderer *)base;
+  
+  // Overlays and Modals get priority on input
+  p->BeatFX.base.Update((Component *)&p->BeatFX);
+  p->FXBar.base.Update((Component *)&p->FXBar);
+  
+  // Then the lower UI layers
   p->WaveA.base.Update((Component *)&p->WaveA);
   p->WaveB.base.Update((Component *)&p->WaveB);
   p->InfoA.base.Update((Component *)&p->InfoA);
   p->InfoB.base.Update((Component *)&p->InfoB);
-  p->BeatFX.base.Update((Component *)&p->BeatFX);
-  p->FXBar.base.Update((Component *)&p->FXBar);
   
   p->DeckA->IsLoading = p->AudioPlugin->Decks[0].IsLoading;
   p->DeckB->IsLoading = p->AudioPlugin->Decks[1].IsLoading;

@@ -1,7 +1,11 @@
 {
-  "wfmA": { "style": 1, "low": 0.40, "mid": 0.40, "high": 0.40, "start": 500.0, "stop": 1200.0, "lock": 1 },
-  "wfmB": { "style": 1, "low": 0.40, "mid": 0.40, "high": 0.40, "start": 500.0, "stop": 1200.0, "lock": 1 },
-  "audio": { "devIdx": -1, "mastL": 0, "mastR": 1, "cueL": 2, "cueR": 3, "sr": 48000, "buf": 256, "bitdepth": 0 },
-  "beatfx": { "fx": 0, "pad": 4, "ch": 0, "depth": 0.50, "q": 1, "tab": 0 },
+  "wfmA": { "style": 1, "low": 0.40, "mid": 0.40, "high": 0.40, "start": 0.5, "stop": 1.0, "lock": 1, "rpm": 33.3, "touch": 1, "qres": 3 },
+  "wfmB": { "style": 1, "low": 0.40, "mid": 0.40, "high": 0.40, "start": 0.5, "stop": 1.0, "lock": 1, "rpm": 33.3, "touch": 1, "qres": 3 },
+  "audio": { "devIdx": 0, "mastL": 1, "mastR": 0, "cueL": -1, "cueR": 0, "sr": 48000, "buf": 1024, "bitdepth": 24, "xfader": 1 },
+  "beatfx": { "fx": 0, "pad": 4, "ch": 0, "depth": 0.50, "q": 1, "tab": 0, "on": 0 },
+  "colorfx": { "active": -1, "param": 0.50, "valA": 0.00, "valB": 0.00 },
+  "quantize": { "qA": 1, "qB": 1 },
+  "master": { "vol": 1.000 },
+  "jog": { "rpm": 33.333332, "tpr": 720.00, "eraw": 0.7500, "eprev": 0.2500, "vfric": 0.9650, "vcutoff": 0.005000, "pbfric": 0.9200, "pbscale": 1.0000, "nudge": 0.5000 },
   "controllers": { "path": "" }
 }

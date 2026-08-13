@@ -1,27 +1,27 @@
 {
-  "// Encoder Calibration": "Settings for physical jog encoder ticks and base RPM",
-  "DefaultRPM": 33.333333,
+  "// Encoder Calibration": "Settings for physical jog encoder",
+  "DefaultRPM": 33.333332,
   "TicksPerRev": 720.00,
 
-  "// Smoothing Filter": "Exponential Moving Average (EMA) weights for MIDI rate filtering",
+  "// Smoothing Filter": "Exponential Moving Average (EMA) weights",
   "EmaRawWeight": 0.7500,
   "EmaPrevWeight": 0.2500,
 
-  "// Vinyl Touch Release Inertia": "Momentum spin-down glide parameters when releasing top platter",
+  "// Vinyl Touch Release Inertia": "Momentum spin-down glide when releasing top platter",
   "VinylReleaseFriction": 0.9650,
   "VinylReleaseCutoff": 0.005000,
-  "VinylReleaseMinVelocity": 0.0100,
+  "VinylReleaseMinVelocity": 0.0000,
 
-  "// CDJ Mode Pitch Bend Nudge": "Side ring pitch bend nudge sensitivity and friction",
+  "// CDJ Pitch Bend Nudge": "Side ring pitch bend settings",
   "PitchBendFriction": 0.9200,
-  "PitchBendCutoff": 0.005000,
+  "PitchBendCutoff": 0.000000,
   "PitchBendScale": 1.0000,
 
-  "// Waveform Touch Drag": "Waveform UI touch drag nudge sensitivity scaling",
+  "// Waveform Touch Drag": "Waveform UI touch drag nudge scale",
   "WaveformNudgeScale": 0.5000,
 
-  "// Backspin FX": "Special Release FX initial speeds and decay rate",
-  "BackspinShortSpeed": -7.00,
-  "BackspinLongSpeed": -15.00,
-  "BackspinDecay": 0.9600
+  "// Backspin FX": "Special Release FX speeds",
+  "BackspinShortSpeed": 0.00,
+  "BackspinLongSpeed": 0.00,
+  "BackspinDecay": 0.0000
 }

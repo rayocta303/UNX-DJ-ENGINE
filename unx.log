@@ -1,0 +1,241 @@
+
+--- SESSION START: Fri Aug 14 06:01:38 2026
+[06:01:38] [INFO] Logger initialized at: unx.log
+[06:01:38] [INFO] Platform: Windows
+[06:01:38] [INFO] [DESKTOP] InitWindow SUCCESS. Size: 1280x720
+[06:01:38] [INFO] === DEVICE INFO ===
+[06:01:38] [INFO] OS          : Windows (x64)
+[06:01:38] [INFO] Processor   : AMD Ryzen 5 5600U with Radeon Graphics         
+[06:01:38] [INFO] Arch        : x64
+[06:01:38] [INFO] CPU Cores   : 12
+[06:01:38] [INFO] Total RAM   : 7489 MB (7.31 GB)
+[06:01:38] [INFO] Free RAM    : 461 MB (6.2%) 
+[06:01:38] [INFO] [WATCHDOG] Thread started.
+[06:01:38] [INFO] Display     : 1280x720 @ 60Hz
+[06:01:38] [INFO] GPU Model   : AMD Radeon(TM) Graphics
+[06:01:38] [INFO] === END DEVICE INFO ===
+[06:01:38] [INFO] [MAIN] Initializing Fonts...
+[06:01:38] [INFO] [FONTS] UIFonts_Init starting...
+[06:01:38] [INFO] [FONTS] Loading default (Nexa Heavy) from file: assets/fonts/nexa/Nexa-Heavy.ttf
+[06:01:38] [INFO] [FONTS] Loading bold from file: assets/fonts/nexa/Nexa-Heavy.ttf
+[06:01:38] [INFO] [FONTS] Loading time counter font from file: assets/fonts/Inter-Regular.ttf
+[06:01:38] [INFO] [FONTS] Result: Default ID=3, Bold ID=4, Time ID=5
+[06:01:38] [INFO] [FONTS] Preparing icon codepoints...
+[06:01:38] [INFO] [FONTS] Loading icon fonts from memory (optimized range)...
+[06:01:38] [INFO] [FONTS] UIFonts_Init completed.
+[06:01:38] [INFO] [MAIN] Fonts initialized.
+[06:01:38] [INFO] [MAIN] Initializing Audio Backend...
+[06:01:38] [INFO] [MAIN] Audio Backend initialized.
+[06:01:38] [INFO] [MAIN] Initializing App (Heap)...
+[06:01:38] [INFO] [MAIN] Structure Sizes - App: 1.09 MB, AudioEngine: 0.01 MB
+[06:01:38] [INFO] [APP] App_Init starting...
+[06:01:38] [INFO] [APP] Initializing Decks...
+[06:01:38] [INFO] [APP] Initializing Browser...
+[06:01:38] [INFO] [APP] App_Init completed.
+[06:01:38] [INFO] [MAIN] Audio config prepared. SR: 48000, Buf: 1229016411
+[06:01:38] [INFO] [MAIN] Retrieving active audio info...
+[06:01:38] [INFO] [MAIN] Initializing Audio Engine (Heap)...
+[06:01:38] [INFO] === AUDIO ENGINE SPECIFICS ===
+[06:01:38] [INFO] Sample Rate : 48000 Hz
+[06:01:38] [INFO] Channels    : 2
+[06:01:38] [INFO] API         : Raylib Audio (Internal)
+[06:01:38] [INFO] ASRC Engine : Active (Polyphase Bandlimited Sinc Interpolator)
+[06:01:38] [INFO] === END AUDIO ENGINE SPECIFICS ===
+[06:01:38] [INFO] [MAIN] Audio Engine initialized. Total RAM: 174.76 MB
+[06:01:38] [INFO] [JOG_CONFIG] Loaded jogwheel configuration from 'jog_config.json'.
+[06:01:38] [INFO] [MAIN] Starting audio backend...
+[06:01:39] [ERR ] [MAIN] Failed to start audio backend on first attempt! Retrying in 500ms...
+[06:01:39] [ERR ] [MAIN] Audio backend start failed again. Sound might not be available.
+[06:01:39] [INFO] [MAIN] Setting main loop (FPS: 60)...
+[06:01:39] [INFO] [MAIN] UpdateDrawFrame: First call (Window: 1280x720, Ready: 1, Hidden: 0, Min: 0)
+[06:01:39] [INFO] [MAIN] Screen changed to: 6
+[06:01:39] [WARN] [PERF] [GUI] CPU Stall Detected: Frame took 1174.86 ms (Throttling?)
+[06:01:40] [INFO] [MAIN] Screen changed to: 0
+[06:01:50] [INFO] [MAIN] Screen changed to: 1
+[06:01:51] [INFO] [RB) Metadata Loaded: Artists:2, Albums:1, Genres:1, Keys:2, Artworks:0, Labels:0
+[06:01:51] [INFO] [PERF] [DB] Database Loaded: 3 tracks in 2.60 ms
+[06:01:51] [INFO] [BROWSER] Selected storage: usb_test (DB Found: YES)
+[06:01:55] [INFO] [BROWSER] Loading RB track: I'll Be Yours (Dappsss Edit) to Deck A (Index 0)
+[06:01:55] [INFO] [RB] Loading Track Data: I'll Be Yours (Dappsss Edit) (ID: 1)
+[06:01:55] [INFO] [RB] Analysis File Size: 4.91 KB
+[06:01:55] [INFO] [ANLZ] Allocated BeatGrid: 313 entries (2.45 KB)
+[06:01:55] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:01:55] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:01:55] [INFO] [ANLZ] Allocated DynamicWaveform: 21606 bytes (0.02 MB)
+[06:01:55] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:01:55] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:01:55] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:01:55] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:01:55] [INFO] [ANLZ] Allocated DynamicWaveform: 43212 bytes (0.04 MB)
+[06:01:55] [INFO] [ANLZ] Allocated Phrases: 14 entries (0.55 KB)
+[06:01:55] [INFO] [AUDIO] [ASRC] Track Loaded: usb_test/Contents/UnknownArtist/UnknownAlbum/I'll Be Yours (Dappsss Edit).mp3 | File Rate: 44100 Hz -> Interface Rate: 48000 Hz (Ratio: 0.91875, ASRC Active: YES)
+[06:01:56] [INFO] [BROWSER] Loading RB track: PUSH (KRSN FLIP) to Deck B (Index 1)
+[06:01:56] [INFO] [RB] Loading Track Data: PUSH (KRSN FLIP) (ID: 2)
+[06:01:56] [INFO] [RB] Analysis File Size: 4.42 KB
+[06:01:56] [INFO] [ANLZ] Allocated BeatGrid: 260 entries (2.03 KB)
+[06:01:56] [INFO] [ANLZ] Allocated Cues: 1 entries (0.08 KB)
+[06:01:56] [INFO] [ANLZ] Allocated Cues: 1 entries (0.08 KB)
+[06:01:56] [INFO] [ANLZ] Allocated DynamicWaveform: 17954 bytes (0.02 MB)
+[06:01:56] [INFO] [ANLZ] Allocated Cues: 1 entries (0.08 KB)
+[06:01:56] [INFO] [ANLZ] Allocated Cues: 1 entries (0.08 KB)
+[06:01:56] [INFO] [ANLZ] Allocated Cues: 1 entries (0.08 KB)
+[06:01:56] [INFO] [ANLZ] Allocated Cues: 1 entries (0.08 KB)
+[06:01:56] [INFO] [ANLZ] Allocated DynamicWaveform: 35908 bytes (0.03 MB)
+[06:01:56] [INFO] [ANLZ] Allocated Phrases: 11 entries (0.43 KB)
+[06:01:56] [INFO] [AUDIO] [ASRC] Track Loaded: usb_test/Contents/Skrillex, KRSN/Becaklist/PUSH (KRSN FLIP).mp3 | File Rate: 44100 Hz -> Interface Rate: 48000 Hz (Ratio: 0.91875, ASRC Active: YES)
+[06:01:59] [INFO] [MAIN] Screen changed to: 0
+[06:02:03] [INFO] [MAIN] Screen changed to: 5
+[06:02:04] [INFO] [MAIN] Screen changed to: 8
+[06:02:06] [INFO] [MAIN] Screen changed to: 0
+[06:02:09] [INFO] [MAIN] Shutting down...
+[06:02:09] [INFO] [MAIN] Exit.
+
+--- SESSION START: Fri Aug 14 06:08:16 2026
+[06:08:16] [INFO] Logger initialized at: unx.log
+[06:08:16] [INFO] Platform: Windows
+[06:08:16] [INFO] [DESKTOP] InitWindow SUCCESS. Size: 1280x720
+[06:08:16] [INFO] === DEVICE INFO ===
+[06:08:16] [INFO] OS          : Windows (x64)
+[06:08:16] [INFO] Processor   : AMD Ryzen 5 5600U with Radeon Graphics         
+[06:08:16] [INFO] Arch        : x64
+[06:08:16] [INFO] CPU Cores   : 12
+[06:08:16] [INFO] Total RAM   : 7489 MB (7.31 GB)
+[06:08:16] [INFO] Free RAM    : 913 MB (12.2%) 
+[06:08:16] [INFO] [WATCHDOG] Thread started.
+[06:08:16] [INFO] Display     : 1280x720 @ 60Hz
+[06:08:16] [INFO] GPU Model   : AMD Radeon(TM) Graphics
+[06:08:16] [INFO] === END DEVICE INFO ===
+[06:08:16] [INFO] [MAIN] Initializing Fonts...
+[06:08:16] [INFO] [FONTS] UIFonts_Init starting...
+[06:08:16] [INFO] [FONTS] Loading default (Nexa Heavy) from file: assets/fonts/nexa/Nexa-Heavy.ttf
+[06:08:16] [INFO] [FONTS] Loading bold from file: assets/fonts/nexa/Nexa-Heavy.ttf
+[06:08:16] [INFO] [FONTS] Loading time counter font from file: assets/fonts/Inter-Regular.ttf
+[06:08:16] [INFO] [FONTS] Result: Default ID=3, Bold ID=4, Time ID=5
+[06:08:16] [INFO] [FONTS] Preparing icon codepoints...
+[06:08:16] [INFO] [FONTS] Loading icon fonts from memory (optimized range)...
+[06:08:16] [INFO] [FONTS] UIFonts_Init completed.
+[06:08:16] [INFO] [MAIN] Fonts initialized.
+[06:08:16] [INFO] [MAIN] Initializing Audio Backend...
+[06:08:16] [INFO] [MAIN] Audio Backend initialized.
+[06:08:16] [INFO] [MAIN] Initializing App (Heap)...
+[06:08:16] [INFO] [MAIN] Structure Sizes - App: 1.09 MB, AudioEngine: 0.01 MB
+[06:08:16] [INFO] [APP] App_Init starting...
+[06:08:16] [INFO] [APP] Initializing Decks...
+[06:08:16] [INFO] [APP] Initializing Browser...
+[06:08:16] [INFO] [APP] App_Init completed.
+[06:08:17] [INFO] [MAIN] Audio config prepared. SR: 48000, Buf: 1024
+[06:08:17] [INFO] [MAIN] Retrieving active audio info...
+[06:08:17] [INFO] [MAIN] Initializing Audio Engine (Heap)...
+[06:08:17] [INFO] === AUDIO ENGINE SPECIFICS ===
+[06:08:17] [INFO] Sample Rate : 48000 Hz
+[06:08:17] [INFO] Channels    : 2
+[06:08:17] [INFO] API         : Raylib Audio (Internal)
+[06:08:17] [INFO] ASRC Engine : Active (Polyphase Bandlimited Sinc Interpolator)
+[06:08:17] [INFO] === END AUDIO ENGINE SPECIFICS ===
+[06:08:17] [INFO] [MAIN] Audio Engine initialized. Total RAM: 172.75 MB
+[06:08:17] [INFO] [JOG_CONFIG] Loaded jogwheel configuration from 'jog_config.json'.
+[06:08:17] [INFO] [MAIN] Starting audio backend...
+[06:08:17] [INFO] [MAIN] Setting main loop (FPS: 60)...
+[06:08:17] [INFO] [MAIN] UpdateDrawFrame: First call (Window: 1280x720, Ready: 1, Hidden: 0, Min: 0)
+[06:08:17] [INFO] [MAIN] Screen changed to: 6
+[06:08:17] [WARN] [PERF] [GUI] CPU Stall Detected: Frame took 274.22 ms (Throttling?)
+[06:08:18] [INFO] [MAIN] Screen changed to: 0
+[06:08:38] [INFO] [PERF] [AUDIO] Budget: 21.33 ms/buf | 1024 frames @ 48000 Hz
+[06:08:59] [INFO] [PERF] [AUDIO] Budget: 21.33 ms/buf | 1024 frames @ 48000 Hz
+[06:09:20] [INFO] [PERF] [AUDIO] Budget: 21.33 ms/buf | 1024 frames @ 48000 Hz
+[06:09:42] [INFO] [PERF] [AUDIO] Budget: 21.33 ms/buf | 1024 frames @ 48000 Hz
+[06:09:46] [INFO] [MAIN] Shutting down...
+[06:09:46] [INFO] [MAIN] Exit.
+
+--- SESSION START: Fri Aug 14 06:10:01 2026
+[06:10:01] [INFO] Logger initialized at: unx.log
+[06:10:01] [INFO] Platform: Windows
+[06:10:01] [INFO] [DESKTOP] InitWindow SUCCESS. Size: 1280x720
+[06:10:01] [INFO] === DEVICE INFO ===
+[06:10:01] [INFO] OS          : Windows (x64)
+[06:10:01] [INFO] Processor   : AMD Ryzen 5 5600U with Radeon Graphics         
+[06:10:01] [INFO] Arch        : x64
+[06:10:01] [INFO] CPU Cores   : 12
+[06:10:01] [INFO] Total RAM   : 7489 MB (7.31 GB)
+[06:10:01] [INFO] Free RAM    : 535 MB (7.1%) 
+[06:10:01] [INFO] [WATCHDOG] Thread started.
+[06:10:01] [INFO] Display     : 1280x720 @ 60Hz
+[06:10:01] [INFO] GPU Model   : AMD Radeon(TM) Graphics
+[06:10:01] [INFO] === END DEVICE INFO ===
+[06:10:01] [INFO] [MAIN] Initializing Fonts...
+[06:10:01] [INFO] [FONTS] UIFonts_Init starting...
+[06:10:01] [INFO] [FONTS] Loading default (Nexa Heavy) from file: assets/fonts/nexa/Nexa-Heavy.ttf
+[06:10:01] [INFO] [FONTS] Loading bold from file: assets/fonts/nexa/Nexa-Heavy.ttf
+[06:10:01] [INFO] [FONTS] Loading time counter font from file: assets/fonts/Inter-Regular.ttf
+[06:10:01] [INFO] [FONTS] Result: Default ID=3, Bold ID=4, Time ID=5
+[06:10:01] [INFO] [FONTS] Preparing icon codepoints...
+[06:10:01] [INFO] [FONTS] Loading icon fonts from memory (optimized range)...
+[06:10:01] [INFO] [FONTS] UIFonts_Init completed.
+[06:10:01] [INFO] [MAIN] Fonts initialized.
+[06:10:01] [INFO] [MAIN] Initializing Audio Backend...
+[06:10:01] [INFO] [MAIN] Audio Backend initialized.
+[06:10:01] [INFO] [MAIN] Initializing App (Heap)...
+[06:10:01] [INFO] [MAIN] Structure Sizes - App: 1.09 MB, AudioEngine: 0.01 MB
+[06:10:01] [INFO] [APP] App_Init starting...
+[06:10:01] [INFO] [APP] Initializing Decks...
+[06:10:01] [INFO] [APP] Initializing Browser...
+[06:10:01] [INFO] [APP] App_Init completed.
+[06:10:01] [INFO] [MAIN] Audio config prepared. SR: 48000, Buf: 256
+[06:10:01] [INFO] [MAIN] Retrieving active audio info...
+[06:10:01] [INFO] [MAIN] Initializing Audio Engine (Heap)...
+[06:10:01] [INFO] === AUDIO ENGINE SPECIFICS ===
+[06:10:01] [INFO] Sample Rate : 48000 Hz
+[06:10:01] [INFO] Channels    : 2
+[06:10:01] [INFO] API         : Raylib Audio (Internal)
+[06:10:01] [INFO] ASRC Engine : Active (Polyphase Bandlimited Sinc Interpolator)
+[06:10:01] [INFO] === END AUDIO ENGINE SPECIFICS ===
+[06:10:01] [INFO] [MAIN] Audio Engine initialized. Total RAM: 174.89 MB
+[06:10:01] [INFO] [JOG_CONFIG] Loaded jogwheel configuration from 'jog_config.json'.
+[06:10:01] [INFO] [JOG_CONFIG] Saved jogwheel configuration to 'jog_config.json'.
+[06:10:01] [INFO] [SETTINGS] Applied Style: 1, Gains: L0.40 M0.40 H0.40, Start: 0, Stop: 1, Lock: 1, JogRPM: 33.3
+[06:10:01] [INFO] [SETTINGS] Audio changed: BufferSize 256 -> 1024
+[06:10:01] [INFO] [SETTINGS] Audio changed: MasterR 1 -> 0
+[06:10:01] [INFO] [SETTINGS] Audio changed: CueR -1 -> 0
+[06:10:01] [INFO] [SETTINGS] Audio Hardware config changed, restarting backend...
+[06:10:01] [INFO] [MAIN] Starting audio backend...
+[06:10:01] [ERR ] [AUDIO] Race Condition Warning: Audio Thread ID changed (Device Restarted?). Updating...
+[06:10:01] [INFO] [MAIN] Setting main loop (FPS: 60)...
+[06:10:01] [INFO] [MAIN] UpdateDrawFrame: First call (Window: 1280x720, Ready: 1, Hidden: 0, Min: 0)
+[06:10:01] [INFO] [MAIN] Screen changed to: 6
+[06:10:01] [WARN] [PERF] [GUI] CPU Stall Detected: Frame took 655.62 ms (Throttling?)
+[06:10:02] [INFO] [MAIN] Screen changed to: 0
+[06:10:03] [INFO] [MAIN] Screen changed to: 1
+[06:10:03] [INFO] [RB) Metadata Loaded: Artists:2, Albums:1, Genres:1, Keys:2, Artworks:0, Labels:0
+[06:10:03] [INFO] [PERF] [DB] Database Loaded: 3 tracks in 1.33 ms
+[06:10:03] [INFO] [BROWSER] Selected storage: usb_test (DB Found: YES)
+[06:10:07] [INFO] [PERF] [AUDIO] Budget: 5.33 ms/buf | 256 frames @ 48000 Hz
+[06:10:07] [INFO] [BROWSER] Loading RB track: I'll Be Yours (Dappsss Edit) to Deck A (Index 0)
+[06:10:07] [INFO] [RB] Loading Track Data: I'll Be Yours (Dappsss Edit) (ID: 1)
+[06:10:07] [INFO] [RB] Analysis File Size: 4.91 KB
+[06:10:07] [INFO] [ANLZ] Allocated BeatGrid: 313 entries (2.45 KB)
+[06:10:07] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:10:07] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:10:07] [INFO] [ANLZ] Allocated DynamicWaveform: 21606 bytes (0.02 MB)
+[06:10:07] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:10:07] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:10:07] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:10:07] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:10:07] [INFO] [ANLZ] Allocated DynamicWaveform: 43212 bytes (0.04 MB)
+[06:10:07] [INFO] [ANLZ] Allocated Phrases: 14 entries (0.55 KB)
+[06:10:07] [INFO] [AUDIO] [ASRC] Track Loaded: usb_test/Contents/UnknownArtist/UnknownAlbum/I'll Be Yours (Dappsss Edit).mp3 | File Rate: 44100 Hz -> Interface Rate: 48000 Hz (Ratio: 0.91875, ASRC Active: YES)
+[06:10:12] [INFO] [PERF] [AUDIO] Budget: 5.33 ms/buf | 256 frames @ 48000 Hz
+[06:10:14] [INFO] [BROWSER] Loading RB track: I'll Be Yours (Dappsss Edit) to Deck A (Index 0)
+[06:10:14] [INFO] [RB] Loading Track Data: I'll Be Yours (Dappsss Edit) (ID: 1)
+[06:10:14] [INFO] [RB] Analysis File Size: 4.91 KB
+[06:10:14] [INFO] [ANLZ] Allocated BeatGrid: 313 entries (2.45 KB)
+[06:10:14] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:10:14] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:10:14] [INFO] [ANLZ] Allocated DynamicWaveform: 21606 bytes (0.02 MB)
+[06:10:14] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:10:14] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:10:14] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:10:14] [INFO] [ANLZ] Allocated Cues: 2 entries (0.16 KB)
+[06:10:14] [INFO] [ANLZ] Allocated DynamicWaveform: 43212 bytes (0.04 MB)
+[06:10:14] [INFO] [AUDIO] [ASRC] Track Loaded: usb_test/Contents/UnknownArtist/UnknownAlbum/I'll Be Yours (Dappsss Edit).mp3 | File Rate: 44100 Hz -> Interface Rate: 48000 Hz (Ratio: 0.91875, ASRC Active: YES)
+[06:10:14] [INFO] [MAIN] Screen changed to: 0
+[06:10:15] [INFO] [MAIN] Screen changed to: 3

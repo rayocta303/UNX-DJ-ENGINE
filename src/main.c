@@ -321,15 +321,14 @@ void OnSettingsApply(void *ctx) {
     globalAudioEngine->CrossfaderCurve = aconf.CrossfaderCurve;
   }
 
-  // Auto-restart audio ONLY if hardware-critical config changed
-  bool audioChanged =
-      (aconf.DeviceIndex != a->activeAudioConfig.DeviceIndex) ||
-      (aconf.SampleRate != a->activeAudioConfig.SampleRate) ||
-      (aconf.BufferSizeFrames != a->activeAudioConfig.BufferSizeFrames) ||
-      (aconf.MasterOutL != a->activeAudioConfig.MasterOutL) ||
-      (aconf.MasterOutR != a->activeAudioConfig.MasterOutR) ||
-      (aconf.CueOutL != a->activeAudioConfig.CueOutL) ||
-      (aconf.CueOutR != a->activeAudioConfig.CueOutR);
+  bool audioChanged = false;
+  if (aconf.DeviceIndex != a->activeAudioConfig.DeviceIndex) { audioChanged = true; UNX_LOG_INFO("[SETTINGS] Audio changed: DeviceIndex %d -> %d", a->activeAudioConfig.DeviceIndex, aconf.DeviceIndex); }
+  if (aconf.SampleRate != a->activeAudioConfig.SampleRate) { audioChanged = true; UNX_LOG_INFO("[SETTINGS] Audio changed: SampleRate %d -> %d", a->activeAudioConfig.SampleRate, aconf.SampleRate); }
+  if (aconf.BufferSizeFrames != a->activeAudioConfig.BufferSizeFrames) { audioChanged = true; UNX_LOG_INFO("[SETTINGS] Audio changed: BufferSize %d -> %d", a->activeAudioConfig.BufferSizeFrames, aconf.BufferSizeFrames); }
+  if (aconf.MasterOutL != a->activeAudioConfig.MasterOutL) { audioChanged = true; UNX_LOG_INFO("[SETTINGS] Audio changed: MasterL %d -> %d", a->activeAudioConfig.MasterOutL, aconf.MasterOutL); }
+  if (aconf.MasterOutR != a->activeAudioConfig.MasterOutR) { audioChanged = true; UNX_LOG_INFO("[SETTINGS] Audio changed: MasterR %d -> %d", a->activeAudioConfig.MasterOutR, aconf.MasterOutR); }
+  if (aconf.CueOutL != a->activeAudioConfig.CueOutL) { audioChanged = true; UNX_LOG_INFO("[SETTINGS] Audio changed: CueL %d -> %d", a->activeAudioConfig.CueOutL, aconf.CueOutL); }
+  if (aconf.CueOutR != a->activeAudioConfig.CueOutR) { audioChanged = true; UNX_LOG_INFO("[SETTINGS] Audio changed: CueR %d -> %d", a->activeAudioConfig.CueOutR, aconf.CueOutR); }
 
   if (audioChanged) {
     UNX_LOG_INFO(
@@ -339,9 +338,26 @@ void OnSettingsApply(void *ctx) {
 
       // Sync actual hardware sample rate back to engine
       int actualSR = 0;
-      AudioBackend_GetActiveInfo(NULL, &actualSR, NULL, NULL, NULL);
+      int actualBuffer = 0;
+      AudioBackend_GetActiveInfo(NULL, &actualSR, &actualBuffer, NULL, NULL);
       if (globalAudioEngine)
         AudioEngine_SetOutputSampleRate(globalAudioEngine, actualSR);
+
+      a->activeAudioConfig.SampleRate = actualSR;
+      if (actualBuffer > 0) {
+        a->activeAudioConfig.BufferSizeFrames = actualBuffer;
+      }
+
+      // Sync back to UI to prevent infinite loop of restarts if hardware forced a different config
+      a->settingsState.Items[16].Current = (a->activeAudioConfig.SampleRate == 44100) ? 0 : 1;
+      
+      int bMap[] = {128, 256, 512, 1024};
+      a->settingsState.Items[15].Current = 1; // Default 256
+      for (int i = 0; i < 4; i++) {
+        if (a->activeAudioConfig.BufferSizeFrames == bMap[i]) {
+          a->settingsState.Items[15].Current = i;
+        }
+      }
 
       // Update bit depth in engine
       if (globalAudioEngine)
@@ -2304,10 +2320,25 @@ Log_LogDeviceInfo(gpuModel);
     }
   }
 
-  // Final sync of actual hardware sample rate
+  // Final sync of actual hardware sample rate and buffer size
   int actualSR = 0;
-  AudioBackend_GetActiveInfo(NULL, &actualSR, NULL, NULL, NULL);
+  int actualBuffer = 0;
+  AudioBackend_GetActiveInfo(NULL, &actualSR, &actualBuffer, NULL, NULL);
   AudioEngine_SetOutputSampleRate(audioEngine, actualSR);
+  app->activeAudioConfig.SampleRate = actualSR;
+  if (actualBuffer > 0) {
+      app->activeAudioConfig.BufferSizeFrames = actualBuffer;
+  }
+  
+  // Sync back to UI to prevent false restarts
+  app->settingsState.Items[16].Current = (app->activeAudioConfig.SampleRate == 44100) ? 0 : 1;
+  int bMap[] = {128, 256, 512, 1024};
+  app->settingsState.Items[15].Current = 1; // Default 256
+  for (int i = 0; i < 4; i++) {
+    if (app->activeAudioConfig.BufferSizeFrames == bMap[i]) {
+      app->settingsState.Items[15].Current = i;
+    }
+  }
 #endif
 
   UNX_LOG_INFO("[MAIN] Setting main loop (FPS: 60)...");
@@ -2636,7 +2667,7 @@ void UpdateDrawFrame(App *app) {
       ds->IsPlaying = false;
       ds->IsCueActive = false;
       audioEngine->Decks[i].IsPlaying = false;
-    } else if (ds->IsPlaying && !ds->IsPreviewing) {
+    } else if (ds->IsPlaying && !ds->IsPreviewing && !ds->IsLoading) {
       long long endMs = ds->TrackLengthMs;
       if (ds->LoadedTrack->Analysis.BeatGridCount > 0) {
         endMs = (long long)ds->LoadedTrack
@@ -3536,10 +3567,10 @@ void UpdateDrawFrame(App *app) {
     float startSec = ds->Waveform.VinylStartMs * barSec;
     float stopSec = ds->Waveform.VinylStopMs * barSec;
 
-    audioEngine->Decks[i].VinylStartAccel =
-        (startSec > 0.001f) ? (1.0f / (startSec * blocksPerSec + 1.0f)) : 1.0f;
-    audioEngine->Decks[i].VinylStopAccel =
-        (stopSec > 0.001f) ? (1.0f / (stopSec * blocksPerSec + 1.0f)) : 1.0f;
+    float newStartAccel = (startSec > 0.001f) ? (1.0f / (startSec * blocksPerSec + 1.0f)) : 1.0f;
+    float newStopAccel = (stopSec > 0.001f) ? (1.0f / (stopSec * blocksPerSec + 1.0f)) : 1.0f;
+
+    DeckAudio_SetVinylPhysics(&audioEngine->Decks[i], newStartAccel, newStopAccel);
   }
 
   bool browserSearchFocused = app->browserState.IsActive && app->browserState.IsSearching;
@@ -3620,6 +3651,11 @@ void UpdateDrawFrame(App *app) {
   for (int i = 0; i < 2; i++) {
     if (audioEngine->Decks[i].LoadFailed) {
       DeckState *target = (i == 0) ? &app->deckA : &app->deckB;
+      
+      // Stop the audio engine to prevent the old track from looping indefinitely
+      DeckAudio_InstantStop(&audioEngine->Decks[i]);
+      DeckAudio_LoadTrackAsync(&audioEngine->Decks[i], "", false); // Safely unload PCM buffer
+      
       if (target->LoadedTrack) {
         if (target->LoadedTrack->Analysis.BeatGrid != NULL) free(target->LoadedTrack->Analysis.BeatGrid);
         if (target->LoadedTrack->Analysis.Cues != NULL) free(target->LoadedTrack->Analysis.Cues);
@@ -3645,7 +3681,13 @@ void UpdateDrawFrame(App *app) {
       target->Year = 0;
       target->PositionMs = 0;
       target->Position = 0;
+      
       audioEngine->Decks[i].LoadFailed = false; // Reset
+
+      // If in CONTINUE mode, automatically try to load the next track
+      if (target->PlayMode == 0) {
+        Browser_LoadNextTrack(&app->browserState, i);
+      }
     }
   }
 
@@ -3768,11 +3810,7 @@ void UpdateDrawFrame(App *app) {
   rlPushMatrix();
   rlTranslatef(UI_OffsetX, UI_OffsetY, 0);
 
-  // Update UI touch state & memory state once per frame
-#if defined(PLATFORM_DRM) || (defined(__linux__) && !defined(__ANDROID__))
-  EvdevTouch_Update();
-#endif
-  UI_UpdateTouchState();
+  // MemoryGuard can be updated here or earlier, but we just do it once.
   MemoryGuard_Update();
 
   // High-level Screen Router

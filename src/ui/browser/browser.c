@@ -1989,7 +1989,9 @@ static int Browser_Update(Component *base) {
 
   if (s->BrowseLevel == 0 && loadToDeck != -1) {
     int idx = s->ScrollOffset + s->CursorPos;
-    return Browser_LoadTrackAtIndex(s, idx, loadToDeck, false);
+    struct DeckState *targetDeck = (loadToDeck == 0) ? s->DeckA : s->DeckB;
+    bool autoPlay = targetDeck ? (targetDeck->PlayMode == 0) : false;
+    return Browser_LoadTrackAtIndex(s, idx, loadToDeck, autoPlay);
   }
 
   s->MidiRequestBack = false;
@@ -2071,7 +2073,7 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck,
 
         if (s->AudioPlugin) {
           DeckAudio_LoadTrackAsync(&s->AudioPlugin->Decks[loadToDeck],
-                                   trackFullPath);
+                                   trackFullPath, autoPlay);
         }
 
         strncpy(targetDeck->TrackTitle, t->Title, 127);
@@ -2299,7 +2301,7 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck,
 
         if (s->AudioPlugin) {
           DeckAudio_LoadTrackAsync(&s->AudioPlugin->Decks[loadToDeck],
-                                   trackFullPath);
+                                   trackFullPath, autoPlay);
         }
 
         strncpy(targetDeck->TrackTitle, t->Title, 127);
@@ -2454,11 +2456,27 @@ int Browser_LoadNextTrack(BrowserState *s, int deckIdx) {
     return 0;
 
   int nextIdx = ds->LoadedTrackIndex + 1;
-  if (nextIdx >= s->ActiveTrackCount) {
-    nextIdx = 0; // Wrap around to first track
+  
+  for (int i = 0; i < s->ActiveTrackCount; i++) {
+    if (nextIdx >= s->ActiveTrackCount) {
+      nextIdx = 0; // Wrap around to first track
+    }
+
+    const char *filepath = NULL;
+    if (s->DatabaseType == 0) {
+      if (s->TrackPointers[nextIdx]) filepath = s->TrackPointers[nextIdx]->FilePath;
+    } else {
+      if (s->SeratoTrackPointers[nextIdx]) filepath = s->SeratoTrackPointers[nextIdx]->FilePath;
+    }
+
+    if (filepath && IsFormatSupported(filepath)) {
+      return Browser_LoadTrackAtIndex(s, nextIdx, deckIdx, true);
+    }
+    nextIdx++;
   }
 
-  return Browser_LoadTrackAtIndex(s, nextIdx, deckIdx, true);
+  Toast_Show("NO SUPPORTED TRACKS FOUND", 3.0f, (Color){240, 50, 50, 255});
+  return 0;
 }
 
 // On-Screen Keyboard (OSK) Touch Rendering & Interaction
