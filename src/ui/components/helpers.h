@@ -16,3 +16,5 @@ void UIDrawScrollingText(const char* str, Font font, Rectangle rect, float fontS
 void Toast_Show(const char *message, float durationSec, Color badgeColor);
 void Toast_ShowError(const char *message);
 void Toast_UpdateAndDraw(float dt);
+void GetDynamicKey(const char* originalKey, float tempoPercent, bool isMasterTempoOn, char* outKey);
+Color GetCamelotColor(const char* keyStr);

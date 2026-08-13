@@ -270,10 +270,87 @@ void Toast_UpdateAndDraw(float dt) {
 
     DrawRectangle(toastX, toastY, toastW, toastH, finalBg);
     DrawRectangleLinesEx((Rectangle){toastX, toastY, toastW, toastH}, 1.2f, borderColor);
-
     // Left indicator bar (pulses in intensity)
     DrawRectangle(toastX + S(2), toastY + S(2), S(4), toastH - S(4), borderColor);
 
     // Alert Message Text
     UIDrawText(g_toastMessage, fBold, toastX + S(12), toastY + S(4), S(9), textCol);
+}
+
+void GetDynamicKey(const char* originalKey, float tempoPercent, bool isMasterTempoOn, char* outKey) {
+    if (isMasterTempoOn || originalKey == NULL || originalKey[0] == '\0') {
+        if (originalKey) strcpy(outKey, originalKey);
+        else outKey[0] = '\0';
+        return;
+    }
+
+    float ratio = 1.0f + (tempoPercent / 100.0f);
+    if (ratio <= 0.01f) ratio = 0.01f; // safety
+    int semitoneShift = (int)round(12.0 * log2(ratio));
+
+    // Parse Camelot key (e.g., "8A", "12B")
+    int num = 0;
+    char letter = 0;
+    if (sscanf(originalKey, "%dA", &num) == 1) letter = 'A';
+    else if (sscanf(originalKey, "%dB", &num) == 1) letter = 'B';
+    
+    if (letter != 0 && num >= 1 && num <= 12) {
+        if (semitoneShift == 0) {
+            strcpy(outKey, originalKey);
+            return;
+        }
+
+        // Camelot +1 semitone = +7 on wheel
+        int shifts = (semitoneShift * 7) % 12;
+        int newNum = num + shifts;
+        
+        // Wrap around 1-12
+        while (newNum <= 0) newNum += 12;
+        while (newNum > 12) newNum -= 12;
+        
+        if (semitoneShift > 0) sprintf(outKey, "%d%c (+%d)", newNum, letter, semitoneShift);
+        else sprintf(outKey, "%d%c (%d)", newNum, letter, semitoneShift);
+    } else {
+        // Fallback for non-camelot (Musical) formats
+        if (semitoneShift > 0) sprintf(outKey, "%s (+%d)", originalKey, semitoneShift);
+        else if (semitoneShift < 0) sprintf(outKey, "%s (%d)", originalKey, semitoneShift);
+        else strcpy(outKey, originalKey);
+    }
+}
+
+Color GetCamelotColor(const char* keyStr) {
+    if (!keyStr || keyStr[0] == '\0') return ColorShadow;
+    
+    int num = 0;
+    char letter = 0;
+    if (sscanf(keyStr, "%dA", &num) == 1) letter = 'A';
+    else if (sscanf(keyStr, "%dB", &num) == 1) letter = 'B';
+    
+    if (num < 1 || num > 12) return ColorBlue; // Default fallback
+
+    // Colors derived from Camelot wheel palette
+    Color colors[12] = {
+        (Color){120, 240, 180, 255}, // 1: Green-Teal
+        (Color){160, 255, 140, 255}, // 2: Light Green
+        (Color){200, 255, 100, 255}, // 3: Lime Green
+        (Color){240, 230,  80, 255}, // 4: Yellow
+        (Color){255, 180,  90, 255}, // 5: Orange-Yellow
+        (Color){255, 120, 100, 255}, // 6: Coral Red
+        (Color){255, 100, 160, 255}, // 7: Pink
+        (Color){230, 100, 230, 255}, // 8: Light Purple
+        (Color){180, 100, 255, 255}, // 9: Purple
+        (Color){130, 150, 255, 255}, // 10: Lavender Blue
+        (Color){ 90, 220, 255, 255}, // 11: Light Blue
+        (Color){ 90, 250, 230, 255}  // 12: Cyan
+    };
+    
+    Color baseCol = colors[num - 1];
+    
+    // Minor 'A' is slightly desaturated/lighter than Major 'B' in the wheel
+    if (letter == 'A') {
+        baseCol.r = (unsigned char)(baseCol.r + (255 - baseCol.r) * 0.3f);
+        baseCol.g = (unsigned char)(baseCol.g + (255 - baseCol.g) * 0.3f);
+        baseCol.b = (unsigned char)(baseCol.b + (255 - baseCol.b) * 0.3f);
+    }
+    return baseCol;
 }

@@ -217,7 +217,9 @@ static void DeckStrip_Draw(Component *base) {
   drawLeftBadgeColumn(d, x, y, DECK_STR_H);
 
   Font faceXXS = UIFonts_GetFace(S(7));
+  Font faceXXSBold = UIFonts_GetBoldFace(S(7));
   Font faceMd = UIFonts_GetFace(S(11));
+  Font faceMdBold = UIFonts_GetBoldFace(S(11));
   Font faceBPM = UIFonts_GetFace(S(20));
 
   float lColW = S(40);
@@ -321,27 +323,32 @@ static void DeckStrip_Draw(Component *base) {
   UIDrawText("TEMPO", faceXXS, tempoX, midY, S(7), ColorShadow);
 
   const char *rangeStr = "10%";
-  if (d->State->TempoRange == 0)
+  Color rangeBgCol = (Color){180, 90, 0, 255}; // Dark Orange
+  if (d->State->TempoRange == 0) {
     rangeStr = " 6%";
-  else if (d->State->TempoRange == 2)
+    rangeBgCol = (Color){0, 150, 60, 255}; // Dark Green
+  } else if (d->State->TempoRange == 2) {
     rangeStr = "16%";
-  else if (d->State->TempoRange == 3)
+    rangeBgCol = (Color){0, 100, 180, 255}; // Dark Blue
+  } else if (d->State->TempoRange == 3) {
     rangeStr = "WIDE";
+    rangeBgCol = (Color){180, 30, 30, 255}; // Dark Red
+  }
 
   float tBadgeW = 24.0f;
   float tBadgeY = midY - S(0.5f);
-  DrawRectangle(tempoX + S(32), tBadgeY, S(tBadgeW), S(9), ColorOrange);
-  DrawCentredText(rangeStr, faceXXS, tempoX + S(32), S(tBadgeW),
-                  tBadgeY + S(0.5f), S(7), ColorBlack);
+  DrawRectangle(tempoX + S(32), tBadgeY, S(tBadgeW), S(9), rangeBgCol);
+  DrawCentredText(rangeStr, faceXXSBold, tempoX + S(32), S(tBadgeW),
+                  tBadgeY + S(0.5f), S(7), ColorWhite);
 
   char tempoStr[32];
   sprintf(tempoStr, "%+.2f%%", d->State->TempoPercent);
   if (d->State->TempoPercent == 0.0f)
     sprintf(tempoStr, " 0.00%%");
 
-  float wT = MeasureTextEx(faceMd, tempoStr, S(11), 1).x;
+  float wT = MeasureTextEx(faceMdBold, tempoStr, S(11), 1).x;
   float valX = (tempoX + S(32) + S(tBadgeW)) - wT;
-  UIDrawText(tempoStr, faceMd, valX, midY + S(11), S(11), ColorPaper);
+  UIDrawText(tempoStr, faceMdBold, valX, midY + S(11), S(11), ColorPaper);
 
   float bpmBoxH = S(28);
   float bpmBoxY = midY;

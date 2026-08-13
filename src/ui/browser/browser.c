@@ -3172,15 +3172,19 @@ static void Browser_Draw(Component *base) {
                                 rowH - S(8)};
 
       const char *masterKey = NULL;
+      char dynMasterKey[32] = "";
       if (s->DeckA && s->DeckA->IsPlaying && s->DeckA->TrackKey[0] != '\0') {
-        masterKey = s->DeckA->TrackKey;
-      } else if (s->DeckB && s->DeckB->IsPlaying &&
-                 s->DeckB->TrackKey[0] != '\0') {
-        masterKey = s->DeckB->TrackKey;
+        GetDynamicKey(s->DeckA->TrackKey, s->DeckA->TempoPercent, s->DeckA->MasterTempo, dynMasterKey);
+        masterKey = dynMasterKey;
+      } else if (s->DeckB && s->DeckB->IsPlaying && s->DeckB->TrackKey[0] != '\0') {
+        GetDynamicKey(s->DeckB->TrackKey, s->DeckB->TempoPercent, s->DeckB->MasterTempo, dynMasterKey);
+        masterKey = dynMasterKey;
       } else if (s->DeckA && s->DeckA->TrackKey[0] != '\0') {
-        masterKey = s->DeckA->TrackKey;
+        GetDynamicKey(s->DeckA->TrackKey, s->DeckA->TempoPercent, s->DeckA->MasterTempo, dynMasterKey);
+        masterKey = dynMasterKey;
       } else if (s->DeckB && s->DeckB->TrackKey[0] != '\0') {
-        masterKey = s->DeckB->TrackKey;
+        GetDynamicKey(s->DeckB->TrackKey, s->DeckB->TempoPercent, s->DeckB->MasterTempo, dynMasterKey);
+        masterKey = dynMasterKey;
       }
 
       int matchLevel = GetCamelotHarmonicMatchLevel(keyStr, masterKey);
@@ -3199,9 +3203,13 @@ static void Browser_Draw(Component *base) {
         // Incompatible key or no master key loaded
         DrawRectangleRec(keyBadgeRect, (Color){35, 35, 42, 255});
         DrawRectangleLinesEx(keyBadgeRect, 1.0f, ColorDark1);
+        Color keyCol = GetCamelotColor(keyStr);
+        if (!isCursor) {
+             // Dim it slightly if not focused
+             keyCol.a = 180;
+        }
         DrawCentredText(keyStr, faceXS, keyBadgeRect.x, keyBadgeRect.width,
-                        keyBadgeRect.y + S(5), S(10),
-                        isCursor ? ColorWhite : ColorShadow);
+                        keyBadgeRect.y + S(5), S(10), keyCol);
       }
     }
 

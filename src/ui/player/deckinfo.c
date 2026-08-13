@@ -275,9 +275,12 @@ static void DeckInfo_Draw(Component *base) {
     
     // Column 1: KEY
     UIDrawText("KEY", faceXXS, col1X + S(6), contentY + S(4), S(7), ColorShadow);
-    char keyStr[16] = "---";
-    if (d->State->LoadedTrack) strcpy(keyStr, d->State->TrackKey);
-    UIDrawText(keyStr, faceSm, col1X + S(6), contentY + S(11), S(10), ColorBlue);
+    char keyStr[32] = "---";
+    if (d->State->LoadedTrack) {
+        GetDynamicKey(d->State->TrackKey, d->State->TempoPercent, d->State->MasterTempo, keyStr);
+    }
+    Color keyCol = GetCamelotColor(keyStr);
+    UIDrawText(keyStr, faceSm, col1X + S(6), contentY + S(11), S(10), keyCol);
 
     // Column 2: BAR
     UIDrawText("BAR", faceXXS, col2X + S(2), contentY + S(4), S(7), ColorShadow);
