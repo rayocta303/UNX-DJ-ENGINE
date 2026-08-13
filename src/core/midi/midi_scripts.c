@@ -17,30 +17,51 @@ static uint8_t lastMasterVuR = 0;
 // =============================================================================
 // DYNAMIC REGISTER TABLE — resolved from MidiMapping at runtime
 // =============================================================================
-// Addresses (status + midino) for each LED output are NOT hardcoded anymore.
-// They are resolved from the loaded .midi.xml mapping file via MIDI_SetMappingRef().
-// Pioneer DDJ-FLX6 default values are used as fallback when a key is not found.
+// All MIDI output LED addresses (status + midino) are resolved from the loaded
+// .midi.xml mapping file via MIDI_SetMappingRef(). Pioneer DDJ-FLX6 defaults
+// are used as fallback when a key is not found in the mapping.
 
 typedef struct {
   uint8_t status; // MIDI status byte (e.g. 0x90..0x9F, 0xB0..0xBB)
   uint8_t midino; // MIDI note/CC number
 } MidiRegister;
 
-// Per-deck registers (indexed [0..3] = Channel1..Channel4)
+// --- Per-deck transport & loop LEDs ---
 static MidiRegister reg_play[4];
 static MidiRegister reg_cue[4];
 static MidiRegister reg_sync[4];
+static MidiRegister reg_sync_leader[4];
 static MidiRegister reg_master_tempo[4];
 static MidiRegister reg_loop_in[4];
 static MidiRegister reg_loop_out[4];
 static MidiRegister reg_reloop[4];
+
+// --- Per-deck toggle LEDs ---
+static MidiRegister reg_slip[4];
+static MidiRegister reg_keylock[4];
+static MidiRegister reg_quantize[4];
+static MidiRegister reg_pfl[4];
+
+// --- Per-deck pad mode button LEDs ---
+static MidiRegister reg_hotcue_mode[4];
+static MidiRegister reg_beatloop_mode[4];
+static MidiRegister reg_beatjump_mode[4];
+static MidiRegister reg_sampler_mode[4];
+static MidiRegister reg_padfx1_mode[4];
+static MidiRegister reg_padfx2_mode[4];
+static MidiRegister reg_keyboard_mode[4];
+static MidiRegister reg_keyshift_mode[4];
+
+// --- Per-deck pad LEDs ---
 static MidiRegister reg_pad[4];      // base status for hotcue pads (midino = pad index 0..7)
 static MidiRegister reg_beatloop[4]; // base status for beat loop pads (midino = 0x30 + index)
+
+// --- Per-deck jog LEDs ---
 static MidiRegister reg_jog_ring[4]; // 0x9F, deck index as midino
 static MidiRegister reg_jog_pos[4];  // 0xBB, deck index as midino
 static MidiRegister reg_jog_cc[4];   // 0xB0|deck, CC 0x2A / 0x2B
 
-// VU meter registers
+// --- VU meter registers ---
 static MidiRegister reg_vu_ch[4];      // per-channel VU (status=0xB0|ch, midino=0x02)
 static MidiRegister reg_vu_master_l;   // master VU left  (0xBA, 0x00)
 static MidiRegister reg_vu_master_r;   // master VU right (0xBA, 0x01)
@@ -48,22 +69,46 @@ static MidiRegister reg_vu_master_r;   // master VU right (0xBA, 0x01)
 static const char *kChannels[4] = {"[Channel1]", "[Channel2]", "[Channel3]", "[Channel4]"};
 
 static void MIDI_BuildRegisterDefaults(void) {
-  // Pioneer DDJ-FLX6 default register addresses (fallback values)
   for (int i = 0; i < 4; i++) {
     uint8_t ms = (uint8_t)(0x90 | i); // 0x90..0x93
     uint8_t ps = (uint8_t)(0x97 + i * 2); // 0x97, 0x99, 0x9B, 0x9D
+
+    // Transport & Loop
     reg_play[i]         = (MidiRegister){ms, 0x0B};
     reg_cue[i]          = (MidiRegister){ms, 0x0C};
     reg_sync[i]         = (MidiRegister){ms, 0x58};
+    reg_sync_leader[i]  = (MidiRegister){ms, 0x5C};
     reg_master_tempo[i] = (MidiRegister){ms, 0x1A};
     reg_loop_in[i]      = (MidiRegister){ms, 0x10};
     reg_loop_out[i]     = (MidiRegister){ms, 0x11};
     reg_reloop[i]       = (MidiRegister){ms, 0x12};
-    reg_pad[i]          = (MidiRegister){ps, 0x00}; // midino = pad index
+
+    // Toggle buttons
+    reg_slip[i]         = (MidiRegister){ms, 0x3D};
+    reg_keylock[i]      = (MidiRegister){ms, 0x3E};
+    reg_quantize[i]     = (MidiRegister){ms, 0x5D};
+    reg_pfl[i]          = (MidiRegister){ms, 0x54};
+
+    // Pad mode buttons
+    reg_hotcue_mode[i]    = (MidiRegister){ms, 0x1B};
+    reg_beatloop_mode[i]  = (MidiRegister){ms, 0x6D};
+    reg_beatjump_mode[i]  = (MidiRegister){ms, 0x20};
+    reg_sampler_mode[i]   = (MidiRegister){ms, 0x22};
+    reg_padfx1_mode[i]    = (MidiRegister){ms, 0x1E};
+    reg_padfx2_mode[i]    = (MidiRegister){ms, 0x6B};
+    reg_keyboard_mode[i]  = (MidiRegister){ms, 0x69};
+    reg_keyshift_mode[i]  = (MidiRegister){ms, 0x6F};
+
+    // Pad LEDs
+    reg_pad[i]          = (MidiRegister){ps, 0x00}; // midino = pad index 0..7
     reg_beatloop[i]     = (MidiRegister){ps, 0x30}; // midino = 0x30 + pad index
+
+    // Jog wheel LEDs
     reg_jog_ring[i]     = (MidiRegister){0x9F, (uint8_t)i};
     reg_jog_pos[i]      = (MidiRegister){0xBB, (uint8_t)i};
     reg_jog_cc[i]       = (MidiRegister){(uint8_t)(0xB0 | i), 0x2A};
+
+    // VU meters
     reg_vu_ch[i]        = (MidiRegister){(uint8_t)(0xB0 | i), 0x02};
   }
   reg_vu_master_l = (MidiRegister){0xBA, 0x00};
@@ -71,7 +116,6 @@ static void MIDI_BuildRegisterDefaults(void) {
 }
 
 void MIDI_SetMappingRef(const MidiMapping *map) {
-  // Always start from defaults so any missing key keeps the correct Pioneer value
   MIDI_BuildRegisterDefaults();
   if (!map) return;
 
@@ -82,20 +126,43 @@ void MIDI_SetMappingRef(const MidiMapping *map) {
 #define TRY_RESOLVE(reg, key) \
     if (MIDI_GetRegisterAddress(map, grp, key, &st, &no)) { (reg).status = st; (reg).midino = no; }
 
+    // Transport & Loop
     TRY_RESOLVE(reg_play[i],         "play")
     TRY_RESOLVE(reg_cue[i],          "cue_point")
-    TRY_RESOLVE(reg_sync[i],         "sync_mode")
+    TRY_RESOLVE(reg_sync[i],         "sync_enabled")
+    TRY_RESOLVE(reg_sync_leader[i],  "sync_leader")
     TRY_RESOLVE(reg_master_tempo[i], "master_tempo")
     TRY_RESOLVE(reg_loop_in[i],      "loop_in")
     TRY_RESOLVE(reg_loop_out[i],     "loop_out")
     TRY_RESOLVE(reg_reloop[i],       "reloop_exit")
-    TRY_RESOLVE(reg_pad[i],          "hotcue_1_activate")   // status only; midino = pad index
-    TRY_RESOLVE(reg_beatloop[i],     "beatloop_0.5_toggle") // status only; midino = 0x30 + idx
+
+    // Toggle buttons
+    TRY_RESOLVE(reg_slip[i],         "slip_enabled")
+    TRY_RESOLVE(reg_keylock[i],      "keylock")
+    TRY_RESOLVE(reg_quantize[i],     "quantize")
+    TRY_RESOLVE(reg_pfl[i],          "pfl")
+
+    // Pad mode buttons
+    TRY_RESOLVE(reg_hotcue_mode[i],   "hotcueMode")
+    TRY_RESOLVE(reg_beatloop_mode[i], "beatLoopMode")
+    TRY_RESOLVE(reg_beatjump_mode[i], "beatJumpMode")
+    TRY_RESOLVE(reg_sampler_mode[i],  "samplerMode")
+    TRY_RESOLVE(reg_padfx1_mode[i],   "padFX1Mode")
+    TRY_RESOLVE(reg_padfx2_mode[i],   "padFX2Mode")
+    TRY_RESOLVE(reg_keyboard_mode[i], "keyboardMode")
+    TRY_RESOLVE(reg_keyshift_mode[i], "keyShiftMode")
+
+    // Pad LEDs — only status byte resolved, midino = pad index at call site
+    TRY_RESOLVE(reg_pad[i],      "hotcue_1_activate")
+    TRY_RESOLVE(reg_beatloop[i], "beatloop_0.5_toggle")
+
 #undef TRY_RESOLVE
   }
 
-  printf("[MIDI] Register table resolved from mapping: '%s'\n", map->name);
+  printf("[MIDI] Register table resolved from mapping: '%s' (%d controls, %d outputs)\n",
+         map->name, map->count, map->outputCount);
 }
+
 
 // =============================================================================
 
