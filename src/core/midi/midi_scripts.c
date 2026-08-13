@@ -242,9 +242,23 @@ static uint8_t lastPlayVal[4] = {0, 0, 0, 0};
 static uint8_t lastCueVal[4] = {0, 0, 0, 0};
 static uint8_t lastSyncVal[4] = {0, 0, 0, 0};
 static uint8_t lastMasterTempoVal[4] = {0, 0, 0, 0};
+static uint8_t lastSlipVal[4] = {0, 0, 0, 0};
+static uint8_t lastKeylockVal[4] = {0, 0, 0, 0};
+static uint8_t lastQuantizeVal[4] = {0, 0, 0, 0};
+static uint8_t lastPflVal[4] = {0, 0, 0, 0};
+static uint8_t lastSyncLeaderVal[4] = {0, 0, 0, 0};
+static uint8_t lastHotcueModeVal[4] = {0, 0, 0, 0};
+static uint8_t lastBeatloopModeVal[4] = {0, 0, 0, 0};
+static uint8_t lastBeatjumpModeVal[4] = {0, 0, 0, 0};
+static uint8_t lastSamplerModeVal[4] = {0, 0, 0, 0};
+static uint8_t lastPadfx1ModeVal[4] = {0, 0, 0, 0};
+static uint8_t lastPadfx2ModeVal[4] = {0, 0, 0, 0};
+static uint8_t lastKeyboardModeVal[4] = {0, 0, 0, 0};
+static uint8_t lastKeyshiftModeVal[4] = {0, 0, 0, 0};
 static uint8_t lastPadVals[4][16] = {{0}};
 static uint8_t lastJogRingVal[4] = {0, 0, 0, 0};
 static uint8_t lastJogPosVal[4] = {0, 0, 0, 0};
+
 
 // Blink state: toggles every BLINK_INTERVAL calls (60fps -> ~4Hz blink)
 #define BLINK_INTERVAL 8
@@ -375,6 +389,21 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
     uint8_t syncVal = isSync ? 0x7F : 0x00;
     uint8_t mtVal = isMasterTempo ? 0x7F : 0x00;
 
+    // ---- SLIP / KEYLOCK / QUANTIZE / PFL / SYNC LEADER ----
+    bool isSlip = (audio && audio->SlipActive);
+    uint8_t slipVal = isSlip ? 0x7F : 0x00;
+
+    bool isQuantize = (ds && ds->QuantizeEnabled);
+    uint8_t quantizeVal = isQuantize ? 0x7F : 0x00;
+
+    COType coT;
+    float *pflPtr = (float *)CO_Find(kChannels[i], "pfl", &coT);
+    bool isPfl = pflPtr ? (*pflPtr > 0.0f) : false;
+    uint8_t pflVal = isPfl ? 0x7F : 0x00;
+
+    bool isMaster = (ds && ds->IsMaster);
+    uint8_t syncLeaderVal = isMaster ? 0x7F : 0x00;
+
     // Play/CUE: resend when value changes OR blink phase toggles (max 2 msgs / 8 frames)
     if (forceSend || blinkChanged || playVal != lastPlayVal[i]) {
       MIDI_SendShortMsg(reg_play[i].status, reg_play[i].midino, playVal);
@@ -390,7 +419,32 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
     }
     if (forceSend || mtVal != lastMasterTempoVal[i]) {
       MIDI_SendShortMsg(reg_master_tempo[i].status, reg_master_tempo[i].midino, mtVal);
+      MIDI_SendShortMsg(reg_keylock[i].status, reg_keylock[i].midino, mtVal);
       lastMasterTempoVal[i] = mtVal;
+      lastKeylockVal[i] = mtVal;
+    }
+    if (forceSend || slipVal != lastSlipVal[i]) {
+      MIDI_SendShortMsg(reg_slip[i].status, reg_slip[i].midino, slipVal);
+      lastSlipVal[i] = slipVal;
+    }
+    if (forceSend || quantizeVal != lastQuantizeVal[i]) {
+      MIDI_SendShortMsg(reg_quantize[i].status, reg_quantize[i].midino, quantizeVal);
+      lastQuantizeVal[i] = quantizeVal;
+    }
+    if (forceSend || pflVal != lastPflVal[i]) {
+      MIDI_SendShortMsg(reg_pfl[i].status, reg_pfl[i].midino, pflVal);
+      lastPflVal[i] = pflVal;
+    }
+    if (forceSend || syncLeaderVal != lastSyncLeaderVal[i]) {
+      MIDI_SendShortMsg(reg_sync_leader[i].status, reg_sync_leader[i].midino, syncLeaderVal);
+      lastSyncLeaderVal[i] = syncLeaderVal;
+    }
+
+    // Pad Mode Button LEDs — HotCue mode lit by default
+    uint8_t hotcueModeVal = 0x7F;
+    if (forceSend || hotcueModeVal != lastHotcueModeVal[i]) {
+      MIDI_SendShortMsg(reg_hotcue_mode[i].status, reg_hotcue_mode[i].midino, hotcueModeVal);
+      lastHotcueModeVal[i] = hotcueModeVal;
     }
 
     // -------------------------------------------------------------
@@ -470,17 +524,30 @@ void MIDI_ResetAllLEDs(void) {
   MIDI_ResetVuMeters();
 
   for (int i = 0; i < 4; i++) {
-    MIDI_SendShortMsg(reg_loop_in[i].status,      reg_loop_in[i].midino,      0);
-    MIDI_SendShortMsg(reg_loop_out[i].status,     reg_loop_out[i].midino,     0);
-    MIDI_SendShortMsg(reg_reloop[i].status,       reg_reloop[i].midino,       0);
-    MIDI_SendShortMsg(reg_play[i].status,         reg_play[i].midino,         0);
-    MIDI_SendShortMsg(reg_cue[i].status,          reg_cue[i].midino,          0);
-    MIDI_SendShortMsg(reg_sync[i].status,         reg_sync[i].midino,         0);
-    MIDI_SendShortMsg(reg_master_tempo[i].status, reg_master_tempo[i].midino, 0);
-    MIDI_SendShortMsg(reg_jog_ring[i].status,     reg_jog_ring[i].midino,     0);
-    MIDI_SendShortMsg(reg_jog_pos[i].status,      reg_jog_pos[i].midino,      0);
-    MIDI_SendShortMsg(reg_jog_cc[i].status,       0x2A,                       0);
-    MIDI_SendShortMsg(reg_jog_cc[i].status,       0x2B,                       0);
+    MIDI_SendShortMsg(reg_loop_in[i].status,         reg_loop_in[i].midino,         0);
+    MIDI_SendShortMsg(reg_loop_out[i].status,        reg_loop_out[i].midino,        0);
+    MIDI_SendShortMsg(reg_reloop[i].status,          reg_reloop[i].midino,          0);
+    MIDI_SendShortMsg(reg_play[i].status,            reg_play[i].midino,            0);
+    MIDI_SendShortMsg(reg_cue[i].status,             reg_cue[i].midino,             0);
+    MIDI_SendShortMsg(reg_sync[i].status,            reg_sync[i].midino,            0);
+    MIDI_SendShortMsg(reg_sync_leader[i].status,     reg_sync_leader[i].midino,     0);
+    MIDI_SendShortMsg(reg_master_tempo[i].status,    reg_master_tempo[i].midino,    0);
+    MIDI_SendShortMsg(reg_slip[i].status,            reg_slip[i].midino,            0);
+    MIDI_SendShortMsg(reg_keylock[i].status,         reg_keylock[i].midino,         0);
+    MIDI_SendShortMsg(reg_quantize[i].status,        reg_quantize[i].midino,        0);
+    MIDI_SendShortMsg(reg_pfl[i].status,             reg_pfl[i].midino,             0);
+    MIDI_SendShortMsg(reg_hotcue_mode[i].status,     reg_hotcue_mode[i].midino,     0);
+    MIDI_SendShortMsg(reg_beatloop[i].status,        reg_beatloop_mode[i].midino,   0);
+    MIDI_SendShortMsg(reg_beatjump_mode[i].status,   reg_beatjump_mode[i].midino,   0);
+    MIDI_SendShortMsg(reg_sampler_mode[i].status,    reg_sampler_mode[i].midino,    0);
+    MIDI_SendShortMsg(reg_padfx1_mode[i].status,     reg_padfx1_mode[i].midino,     0);
+    MIDI_SendShortMsg(reg_padfx2_mode[i].status,     reg_padfx2_mode[i].midino,     0);
+    MIDI_SendShortMsg(reg_keyboard_mode[i].status,   reg_keyboard_mode[i].midino,   0);
+    MIDI_SendShortMsg(reg_keyshift_mode[i].status,   reg_keyshift_mode[i].midino,   0);
+    MIDI_SendShortMsg(reg_jog_ring[i].status,        reg_jog_ring[i].midino,        0);
+    MIDI_SendShortMsg(reg_jog_pos[i].status,         reg_jog_pos[i].midino,         0);
+    MIDI_SendShortMsg(reg_jog_cc[i].status,          0x2A,                          0);
+    MIDI_SendShortMsg(reg_jog_cc[i].status,          0x2B,                          0);
 
     lastLoopInVal[i] = 0;
     lastLoopOutVal[i] = 0;
@@ -488,7 +555,20 @@ void MIDI_ResetAllLEDs(void) {
     lastPlayVal[i] = 0;
     lastCueVal[i] = 0;
     lastSyncVal[i] = 0;
+    lastSyncLeaderVal[i] = 0;
     lastMasterTempoVal[i] = 0;
+    lastSlipVal[i] = 0;
+    lastKeylockVal[i] = 0;
+    lastQuantizeVal[i] = 0;
+    lastPflVal[i] = 0;
+    lastHotcueModeVal[i] = 0;
+    lastBeatloopModeVal[i] = 0;
+    lastBeatjumpModeVal[i] = 0;
+    lastSamplerModeVal[i] = 0;
+    lastPadfx1ModeVal[i] = 0;
+    lastPadfx2ModeVal[i] = 0;
+    lastKeyboardModeVal[i] = 0;
+    lastKeyshiftModeVal[i] = 0;
     lastJogRingVal[i] = 0;
     lastJogPosVal[i] = 0;
 
@@ -500,6 +580,7 @@ void MIDI_ResetAllLEDs(void) {
     }
   }
 }
+
 
 void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
                         uint8_t midino, uint8_t value) {
