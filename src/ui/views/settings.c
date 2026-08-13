@@ -7,7 +7,24 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include "core/audio_backend.h"
+
+void Settings_RefreshAudioDevices(SettingsState *state) {
+  AudioDeviceInfo devs[MAX_AUDIO_DEVICES];
+  int devCount = AudioBackend_GetDevices(devs, MAX_AUDIO_DEVICES);
+  state->Items[10].OptionsCount = devCount + 1;
+  strcpy(state->Items[10].Options[0], "System Default");
+  for (int i = 0; i < devCount && i < MAX_SETTING_OPTIONS - 1; i++) {
+    snprintf(state->Items[10].Options[i + 1], 64, "%dCH %s",
+             devs[i].NativeChannels, devs[i].Name);
+  }
+  // Prevent out of bounds if a device was disconnected
+  if (state->Items[10].Current >= state->Items[10].OptionsCount) {
+    state->Items[10].Current = 0;
+  }
+}
 
 static double g_lastSettingsClickTime = 0.0;
 
@@ -545,9 +562,7 @@ static int Settings_Update(Component *base) {
       (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) ? S(38.0f) : S(32.0f);
   float bottomH = S(46.0f);
   float listY = TOP_BAR_H + tabH;
-  float systemCardH =
-      (r->State->SelectedTab == SETTING_CAT_SYSTEM) ? S(112.0f) : 0.0f;
-  float effectiveListY = listY + systemCardH;
+  float effectiveListY = listY;
   int visibleRows = (int)((viewH - effectiveListY - bottomH) / rowH);
   if (visibleRows <= 0)
     visibleRows = 1;
@@ -556,7 +571,25 @@ static int Settings_Update(Component *base) {
   // Level 0 = Tab/Category selection
   // Level 1 = Sub-menu/List item selection
   // Level 2 = Value editing mode
-  if (r->State->MidiBrowseDelta != 0) {
+  // Handle Modal Rotary Encoder Navigation
+  if (r->State->IsConfirmPopupOpen || r->State->IsSystemInfoOpen || r->State->IsSliderModalOpen || r->State->IsEditMappingOpen) {
+      if (r->State->MidiBrowseDelta != 0) {
+          int maxPos = 1; // 2 buttons: Cancel, OK (0, 1)
+          if (r->State->IsSystemInfoOpen) maxPos = 0; // Only Close button (0)
+          if (r->State->IsEditMappingOpen) maxPos = 3; // 4 buttons (0,1,2,3)
+          if (r->State->IsSliderModalOpen) maxPos = 1; // Slider (0), OK (1)
+
+          r->State->ModalCursorPos += r->State->MidiBrowseDelta;
+          if (r->State->ModalCursorPos < 0) r->State->ModalCursorPos = 0;
+          if (r->State->ModalCursorPos > maxPos) r->State->ModalCursorPos = maxPos;
+          r->State->MidiBrowseDelta = 0;
+      }
+      
+      if (r->State->IsSliderModalOpen && r->State->ModalCursorPos == 0 && r->State->MidiBrowseDelta != 0) {
+          // If on slider, let MidiBrowseDelta pass through?
+          // Actually MidiBrowseDelta is already consumed. 
+      }
+  } else if (r->State->MidiBrowseDelta != 0) {
     int delta = r->State->MidiBrowseDelta;
     r->State->MidiBrowseDelta = 0;
 
@@ -624,6 +657,9 @@ static int Settings_Update(Component *base) {
         int idx = filteredIndices[idx_f];
         SettingItem *item = &r->State->Items[idx];
         if (item->Type == SETTING_TYPE_LIST) {
+          if (strcmp(item->Label, "AUDIO DEVICE") == 0) {
+            Settings_RefreshAudioDevices(r->State);
+          }
           r->State->IsDropdownOpen = true;
           r->State->DropdownItemIdx = idx;
           r->State->DropdownScroll = 0;
@@ -886,6 +922,9 @@ static int Settings_Update(Component *base) {
                 r->State->SliderItemIdx = idx;
             }
           } else if (clickedItem->Type == SETTING_TYPE_LIST) {
+            if (strcmp(clickedItem->Label, "AUDIO DEVICE") == 0) {
+              Settings_RefreshAudioDevices(r->State);
+            }
             r->State->IsDropdownOpen = true;
             r->State->DropdownItemIdx = idx;
             r->State->DropdownScroll = 0;
@@ -962,6 +1001,9 @@ static int Settings_Update(Component *base) {
           r->OnApply(r->callbackCtx);
       }
       if (IsKeyPressed(KEY_ENTER)) {
+        if (strcmp(item->Label, "AUDIO DEVICE") == 0) {
+          Settings_RefreshAudioDevices(r->State);
+        }
         r->State->IsDropdownOpen = true;
         r->State->DropdownItemIdx = idx;
         r->State->DropdownScroll = 0;
@@ -1142,9 +1184,7 @@ static void Settings_Draw(Component *base) {
     }
   }
 
-  float systemCardH = 0.0f;
-
-  float effectiveListY = listY + systemCardH;
+  float effectiveListY = listY;
   int visibleRows = (int)((divY - effectiveListY) / rowH);
 
   // Layout params
@@ -1715,29 +1755,73 @@ static void Settings_Draw(Component *base) {
 
     // 2x2 Larger Sharp Buttons Grid
     float btnW = S(150.0f), btnH = S(28.0f);
+    
     Rectangle btn1 = {cardRect.x + S(15), cardRect.y + S(110), btnW, btnH};
-    DrawRectangleRec(btn1, ColorBlue);
-    DrawRectangleLinesEx(btn1, 1.0f, ColorWhite);
-    DrawCentredText("START MIDI LEARN", faceXS, btn1.x, btn1.width,
-                    btn1.y + S(9), S(9.5f), ColorWhite);
+    bool btn1Hover = CheckCollisionPointRec(Input_GetPointerPos(), btn1) || r->State->ModalCursorPos == 0;
+    DrawRectangleRec(btn1, btn1Hover ? ColorBlue : ColorDark2);
+    DrawRectangleLinesEx(btn1, 1.0f, btn1Hover ? ColorWhite : ColorShadow);
+    DrawCentredText("START MIDI LEARN", faceXS, btn1.x, btn1.width, btn1.y + S(9), S(9.5f), ColorWhite);
 
     Rectangle btn2 = {cardRect.x + S(175), cardRect.y + S(110), btnW, btnH};
-    DrawRectangleRec(btn2, ColorDark2);
-    DrawRectangleLinesEx(btn2, 1.0f, ColorOrange);
-    DrawCentredText("CYCLE TYPE", faceXS, btn2.x, btn2.width, btn2.y + S(9),
-                    S(9.5f), ColorOrange);
+    bool btn2Hover = CheckCollisionPointRec(Input_GetPointerPos(), btn2) || r->State->ModalCursorPos == 1;
+    DrawRectangleRec(btn2, btn2Hover ? ColorDark2 : ColorDark1);
+    DrawRectangleLinesEx(btn2, 1.0f, btn2Hover ? ColorOrange : ColorShadow);
+    DrawCentredText("CYCLE TYPE", faceXS, btn2.x, btn2.width, btn2.y + S(9), S(9.5f), ColorOrange);
 
     Rectangle btn3 = {cardRect.x + S(15), cardRect.y + S(150), btnW, btnH};
-    DrawRectangleRec(btn3, (Color){100, 30, 30, 255});
-    DrawRectangleLinesEx(btn3, 1.0f, ColorRed);
-    DrawCentredText("CLEAR / RESET", faceXS, btn3.x, btn3.width, btn3.y + S(9),
-                    S(9.5f), ColorWhite);
+    bool btn3Hover = CheckCollisionPointRec(Input_GetPointerPos(), btn3) || r->State->ModalCursorPos == 2;
+    DrawRectangleRec(btn3, btn3Hover ? (Color){100, 30, 30, 255} : (Color){50, 20, 20, 255});
+    DrawRectangleLinesEx(btn3, 1.0f, btn3Hover ? ColorRed : ColorShadow);
+    DrawCentredText("CLEAR / RESET", faceXS, btn3.x, btn3.width, btn3.y + S(9), S(9.5f), ColorWhite);
 
     Rectangle btn4 = {cardRect.x + S(175), cardRect.y + S(150), btnW, btnH};
-    DrawRectangleRec(btn4, ColorDGreen);
-    DrawRectangleLinesEx(btn4, 1.0f, ColorWhite);
-    DrawCentredText("SAVE & CLOSE", faceXS, btn4.x, btn4.width, btn4.y + S(9),
-                    S(9.5f), ColorWhite);
+    bool btn4Hover = CheckCollisionPointRec(Input_GetPointerPos(), btn4) || r->State->ModalCursorPos == 3;
+    DrawRectangleRec(btn4, btn4Hover ? ColorDGreen : (Color){20, 60, 20, 255});
+    DrawRectangleLinesEx(btn4, 1.0f, btn4Hover ? ColorWhite : ColorShadow);
+    DrawCentredText("SAVE & CLOSE", faceXS, btn4.x, btn4.width, btn4.y + S(9), S(9.5f), ColorWhite);
+    
+    bool enterPressed = r->State->MidiRequestEnter;
+    if (Input_CheckPress(btn1) || (enterPressed && r->State->ModalCursorPos == 0)) {
+        g_lastSettingsClickTime = GetTime();
+        r->State->IsLearningMidi = true;
+        r->State->LearningItemIdx = r->State->EditMappingItemIdx;
+        uint8_t s, m;
+        while (MIDI_GetLastMessage(&s, &m)); // Flush
+        r->State->MidiRequestEnter = false;
+    } else if (Input_CheckPress(btn2) || (enterPressed && r->State->ModalCursorPos == 1)) {
+        g_lastSettingsClickTime = GetTime();
+        MidiMapping *map = MIDI_GetGlobalMapping();
+        int mapIdx = r->State->EditMappingItemIdx - MIDI_MAPPING_START_IDX;
+        if (mapIdx >= 0 && mapIdx < map->count) {
+          if (strcmp(item->Options[0], "SCRIPT") == 0) {
+            strcpy(item->Options[0], "REL");
+            map->entries[mapIdx].options = 1; // RELATIVE
+          } else if (strcmp(item->Options[0], "REL") == 0) {
+            strcpy(item->Options[0], "14BIT");
+            map->entries[mapIdx].options = 8; // 14BIT
+          } else {
+            strcpy(item->Options[0], "SCRIPT");
+            map->entries[mapIdx].options = 4; // SCRIPT
+          }
+          if (r->OnApply) r->OnApply(r->callbackCtx);
+        }
+        r->State->MidiRequestEnter = false;
+    } else if (Input_CheckPress(btn3) || (enterPressed && r->State->ModalCursorPos == 2)) {
+        g_lastSettingsClickTime = GetTime();
+        MidiMapping *map = MIDI_GetGlobalMapping();
+        int mapIdx = r->State->EditMappingItemIdx - MIDI_MAPPING_START_IDX;
+        if (mapIdx >= 0 && mapIdx < map->count) {
+          map->entries[mapIdx].status = 0;
+          map->entries[mapIdx].midino = 0;
+          strcpy(item->Unit, "0x00:0x00");
+          if (r->OnApply) r->OnApply(r->callbackCtx);
+        }
+        r->State->MidiRequestEnter = false;
+    } else if (Input_CheckPress(btn4) || (enterPressed && r->State->ModalCursorPos == 3)) {
+        g_lastSettingsClickTime = GetTime();
+        r->State->IsEditMappingOpen = false;
+        r->State->MidiRequestEnter = false;
+    }
   }
 
   // Render System Info Modal Popup
@@ -1768,10 +1852,15 @@ static void Settings_Draw(Component *base) {
              ColorOrange);
 
     // Close Button 'X'
-    Rectangle closeBtn = {modalX + modalW - S(32.0f), modalY + S(3.0f),
-                          S(28.0f), S(24.0f)};
-    UIDrawText("\uf00d", faceIconSm, closeBtn.x + S(8.0f), closeBtn.y + S(5.0f),
-               S(14), ColorGray);
+    Rectangle closeBtn = {modalX + modalW - S(32.0f), modalY + S(3.0f), S(28.0f), S(24.0f)};
+    bool closeHover = CheckCollisionPointRec(Input_GetPointerPos(), closeBtn) || r->State->ModalCursorPos == 0;
+    DrawRectangleRec(closeBtn, closeHover ? ColorRed : BLANK);
+    UIDrawText("\uf00d", faceIconSm, closeBtn.x + S(8.0f), closeBtn.y + S(5.0f), S(14), closeHover ? ColorWhite : ColorGray);
+    
+    if (Input_CheckPress(closeBtn) || (r->State->MidiRequestEnter && r->State->ModalCursorPos == 0)) {
+        r->State->IsSystemInfoOpen = false;
+        r->State->MidiRequestEnter = false;
+    }
 
     // 1. CPU Load
     float cpuUsage = r->State->CPUUsage;
@@ -1947,9 +2036,15 @@ static void Settings_Draw(Component *base) {
 
     // OK Button
     Rectangle okBtn = {modalX + (modalW - S(120))/2.0f, modalY + modalH - S(44), S(120), S(32)};
-    DrawRectangleRec(okBtn, ColorDark2);
-    DrawRectangleLinesEx(okBtn, 1.5f, ColorOrange);
-    DrawCentredText("APPLY", faceSm, okBtn.x, okBtn.width, okBtn.y + S(10), S(11), ColorWhite);
+    bool okHover = CheckCollisionPointRec(Input_GetPointerPos(), okBtn) || r->State->ModalCursorPos == 1;
+    DrawRectangleRec(okBtn, okHover ? ColorDark2 : ColorDark1);
+    DrawRectangleLinesEx(okBtn, 1.5f, okHover ? ColorOrange : ColorShadow);
+    DrawCentredText("APPLY", faceSm, okBtn.x, okBtn.width, okBtn.y + S(10), S(11), okHover ? ColorWhite : ColorGray);
+    
+    if (Input_CheckPress(okBtn) || (r->State->MidiRequestEnter && r->State->ModalCursorPos == 1)) {
+        r->State->IsSliderModalOpen = false;
+        r->State->MidiRequestEnter = false;
+    }
   }
 
   // Render Confirmation Popup
@@ -1978,14 +2073,25 @@ static void Settings_Draw(Component *base) {
 
     // Cancel / OK Buttons
     Rectangle cancelBtn = {modalX + S(20), modalY + modalH - S(44), S(130), S(32)};
-    DrawRectangleRec(cancelBtn, ColorDark2);
+    bool cancelHover = CheckCollisionPointRec(Input_GetPointerPos(), cancelBtn) || r->State->ModalCursorPos == 0;
+    DrawRectangleRec(cancelBtn, cancelHover ? ColorDark2 : ColorDark1);
     DrawRectangleLinesEx(cancelBtn, 1.5f, ColorShadow);
     DrawCentredText("CANCEL", faceSm, cancelBtn.x, cancelBtn.width, cancelBtn.y + S(10), S(11), ColorWhite);
 
     Rectangle okBtn = {modalX + modalW - S(150), modalY + modalH - S(44), S(130), S(32)};
-    DrawRectangleRec(okBtn, ColorDark2);
-    DrawRectangleLinesEx(okBtn, 1.5f, ColorRed);
-    DrawCentredText("OK", faceSm, okBtn.x, okBtn.width, okBtn.y + S(10), S(11), ColorRed);
+    bool okHover = CheckCollisionPointRec(Input_GetPointerPos(), okBtn) || r->State->ModalCursorPos == 1;
+    DrawRectangleRec(okBtn, okHover ? (Color){100, 30, 30, 255} : (Color){50, 20, 20, 255});
+    DrawRectangleLinesEx(okBtn, 1.5f, okHover ? ColorRed : ColorShadow);
+    DrawCentredText("OK", faceSm, okBtn.x, okBtn.width, okBtn.y + S(10), S(11), ColorWhite);
+    
+    if (Input_CheckPress(cancelBtn) || (r->State->MidiRequestEnter && r->State->ModalCursorPos == 0)) {
+        r->State->IsConfirmPopupOpen = false;
+        r->State->MidiRequestEnter = false;
+    } else if (Input_CheckPress(okBtn) || (r->State->MidiRequestEnter && r->State->ModalCursorPos == 1)) {
+        r->State->IsConfirmPopupOpen = false;
+        if (r->OnAction) r->OnAction(r->callbackCtx, r->State->ConfirmActionIdx);
+        r->State->MidiRequestEnter = false;
+    }
   }
 }
 

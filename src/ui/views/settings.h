@@ -29,7 +29,7 @@ typedef struct {
   SettingCategory Category;
 
   // List part
-  char Options[MAX_SETTING_OPTIONS][32];
+  char Options[MAX_SETTING_OPTIONS][64]; // Increased from 32 to 64 to avoid ALSA name truncation
   int OptionsCount;
   int Current;
 
@@ -88,6 +88,9 @@ typedef struct {
   int ConfirmActionIdx;
   char ConfirmMessage[128];
 
+  // For modal rotary encoder navigation
+  int ModalCursorPos;
+
   // Live System Metrics & Specifications
   float CPUUsage;
   int CPUCores;
@@ -115,3 +118,4 @@ struct SettingsRenderer {
 };
 
 void SettingsRenderer_Init(SettingsRenderer *r, SettingsState *state);
+void Settings_RefreshAudioDevices(SettingsState *state);

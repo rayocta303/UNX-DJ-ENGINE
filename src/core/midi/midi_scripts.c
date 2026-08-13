@@ -668,12 +668,13 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
   // -------------------------------------------------------------
   // 5. BEAT FX & MASTER HEADPHONE CUE LEDs
   // -------------------------------------------------------------
-  bool isFxOn = engine ? engine->BeatFX.isFxOn : false;
-  bool blinkState = ((int)(GetTime() * 4) % 2 == 0); // 4Hz blinking (250ms toggle)
+  COType coT2;
+  float *isFxOnPtr = (float *)CO_Find("[Master]", "beatfx_on", &coT2);
+  bool isFxOn = isFxOnPtr ? (*isFxOnPtr > 0.0f) : (engine ? engine->BeatFX.isFxOn : false);
+  bool blinkState = (fmod(GetTime(), 0.5) < 0.25); // Exact UI blink rate matching
   uint8_t bfxButtonVal = isFxOn ? (blinkState ? 0x7F : 0x00) : 0x00;
   uint8_t bfxSelectVal = isFxOn ? (blinkState ? 0x7F : 0x20) : 0x20;
 
-  COType coT2;
   float *releasePtr =
       (float *)CO_Find("[EffectRack1_EffectUnit1]", "release_fx", &coT2);
   bool isReleaseFx = releasePtr ? (*releasePtr > 0.0f) : false;
@@ -706,11 +707,8 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
 
   // Beat FX CH Selector LEDs (Ch 1..4 & Master)
   int targetCh = engine ? engine->BeatFX.targetChannel : 0;
-  // targetCh: 0=Master, 1=Ch1, 2=Ch2, 3=Ch3, 4=Ch4
-  // reg_beatfx_ch: [0]=Ch1, [1]=Ch2, [2]=Ch3, [3]=Ch4, [4]=Master
-  int activeIndex = (targetCh == 0) ? 4 : (targetCh - 1);
   for (int c = 0; c < 5; c++) {
-    uint8_t chVal = (c == activeIndex) ? 0x7F : 0x00;
+    uint8_t chVal = (targetCh == c) ? 0x7F : 0x00;
     if (forceSend || chVal != lastBeatFxChVal[c]) {
       MIDI_SendShortMsg(reg_beatfx_ch[c].status, reg_beatfx_ch[c].midino,
                         chVal);
@@ -880,18 +878,6 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
     if (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2) {
       DeckAudio_SetJogTouch(&globalAudioEngine->Decks[targetDeckIdx], touching);
     }
-  } else if (strstr(function, "beatFxLeftPressed") ||
-             strstr(function, "beatFxBeatLeft") ||
-             strstr(function, "beatFxLeft") ||
-             ((status == 0x94 || status == 0x95) && midino == 0x06)) {
-    if (value > 0)
-      CO_SetValue("[Master]", "beatfx_beat_left", 1.0f);
-  } else if (strstr(function, "beatFxRightPressed") ||
-             strstr(function, "beatFxBeatRight") ||
-             strstr(function, "beatFxRight") ||
-             ((status == 0x94 || status == 0x95) && midino == 0x07)) {
-    if (value > 0)
-      CO_SetValue("[Master]", "beatfx_beat_right", 1.0f);
   } else if (strstr(function, "beatTap") || strstr(function, "beatFxTap")) {
     if (value > 0)
       CO_SetValue("[Master]", "beatfx_tap", 1.0f);
@@ -911,27 +897,6 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
               (midino == 0x02 || midino == 0x09 || midino == 0x0F))) {
     float depth = (float)value / 127.0f;
     CO_SetValue("[Master]", "beatfx_drywet", depth);
-  } else if (strstr(function, "setGroupKey") ||
-             strstr(function, "setGroupKeyValue") ||
-             strstr(function, "beatFxChannel") ||
-             strstr(function, "beatFxMaster")) {
-    if (value > 0) {
-      if (midino == 0x1C || midino == 0x10 || strstr(function, "Channel1") ||
-          strstr(function, "beatFxChannel1") || strstr(group, "[Channel1]"))
-        CO_SetValue("[Master]", "beatfx_ch1", 1.0f);
-      else if (midino == 0x1D || midino == 0x11 || strstr(function, "Channel2") ||
-               strstr(function, "beatFxChannel2") || strstr(group, "[Channel2]"))
-        CO_SetValue("[Master]", "beatfx_ch2", 1.0f);
-      else if (midino == 0x1E || midino == 0x12 || strstr(function, "Channel3") ||
-               strstr(function, "beatFxChannel3") || strstr(group, "[Channel3]"))
-        CO_SetValue("[Master]", "beatfx_ch3", 1.0f);
-      else if (midino == 0x1F || midino == 0x13 || strstr(function, "Channel4") ||
-               strstr(function, "beatFxChannel4") || strstr(group, "[Channel4]"))
-        CO_SetValue("[Master]", "beatfx_ch4", 1.0f);
-      else if (midino == 0x14 || strstr(function, "Master") ||
-               strstr(function, "beatFxMaster") || strstr(function, "beatFxChannelMaster") || strstr(group, "[Master]"))
-        CO_SetValue("[Master]", "beatfx_chmaster", 1.0f);
-    }
   } else if (strstr(function, "fxEnabled") ||
              strstr(function, "beatFxOnOffPressed") ||
              strstr(function, "beatFxOnOff") ||

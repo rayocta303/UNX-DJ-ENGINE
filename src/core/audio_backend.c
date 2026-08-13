@@ -127,18 +127,24 @@ bool AudioBackend_Init(void) {
     ma_device_info* pPlaybackInfos;
     ma_uint32 playbackCount;
     if (ma_context_get_devices(&g_maContext, &pPlaybackInfos, &playbackCount, NULL, NULL) == MA_SUCCESS) {
-        g_deviceCount = playbackCount > MAX_AUDIO_DEVICES ? MAX_AUDIO_DEVICES : playbackCount;
-        for (int i = 0; i < g_deviceCount; i++) {
-            g_deviceInfos[i] = pPlaybackInfos[i];
+        int validCount = 0;
+        for (int i = 0; i < (playbackCount > MAX_AUDIO_DEVICES ? MAX_AUDIO_DEVICES : playbackCount); i++) {
+            // Ignore ALSA null dummy devices
+            if (strstr(pPlaybackInfos[i].name, "Discard") || strstr(pPlaybackInfos[i].name, "null") || strlen(pPlaybackInfos[i].name) < 2) {
+                continue;
+            }
+            g_deviceInfos[validCount] = pPlaybackInfos[i];
             
             ma_device_info info;
-            if (ma_context_get_device_info(&g_maContext, ma_device_type_playback, &g_deviceInfos[i].id, &info) == MA_SUCCESS) {
+            if (ma_context_get_device_info(&g_maContext, ma_device_type_playback, &g_deviceInfos[validCount].id, &info) == MA_SUCCESS) {
                 printf("[AUDIO] Found Device: %s (Channels: %d, Native SR: %dHz)\n", 
-                        g_deviceInfos[i].name, info.nativeDataFormats[0].channels, info.nativeDataFormats[0].sampleRate);
+                        g_deviceInfos[validCount].name, info.nativeDataFormats[0].channels, info.nativeDataFormats[0].sampleRate);
             } else {
-                printf("[AUDIO] Found Device: %s\n", g_deviceInfos[i].name);
+                printf("[AUDIO] Found Device: %s\n", g_deviceInfos[validCount].name);
             }
+            validCount++;
         }
+        g_deviceCount = validCount;
     }
     
     return true;

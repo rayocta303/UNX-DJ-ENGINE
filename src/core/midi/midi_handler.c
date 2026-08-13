@@ -89,7 +89,7 @@ static void LinuxMIDI_AutoConnectPorts(char *outDetectedName) {
   snd_seq_client_info_alloca(&cinfo);
   snd_seq_port_info_alloca(&pinfo);
 
-  printf("[MIDI] Scanning ALSA ports... in_port=%d out_port=%d\n", in_port, out_port);
+  // printf("[MIDI] Scanning ALSA ports... in_port=%d out_port=%d\n", in_port, out_port);
 
   snd_seq_client_info_set_client(cinfo, -1);
   while (snd_seq_query_next_client(seq, cinfo) >= 0) {
@@ -101,14 +101,14 @@ static void LinuxMIDI_AutoConnectPorts(char *outDetectedName) {
     if (!cName || strstr(cName, "Midi Through"))
       continue;
 
-    printf("[MIDI] Found ALSA client [%d] '%s'\n", client, cName);
+    // printf("[MIDI] Found ALSA client [%d] '%s'\n", client, cName);
 
     snd_seq_port_info_set_client(pinfo, client);
     snd_seq_port_info_set_port(pinfo, -1);
     while (snd_seq_query_next_port(seq, pinfo) >= 0) {
       int port = snd_seq_port_info_get_port(pinfo);
       unsigned int caps = snd_seq_port_info_get_capability(pinfo);
-      printf("[MIDI]   Port [%d:%d] caps=0x%02x\n", client, port, caps);
+      // printf("[MIDI]   Port [%d:%d] caps=0x%02x\n", client, port, caps);
 
       // Connect FROM controller -> our in_port (receive MIDI input from controller)
       if ((caps & SND_SEQ_PORT_CAP_READ) || (caps & SND_SEQ_PORT_CAP_SUBS_READ)) {
