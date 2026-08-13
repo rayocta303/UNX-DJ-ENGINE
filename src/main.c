@@ -2752,38 +2752,36 @@ void UpdateDrawFrame(App *app) {
       app->fxState.MidiRequestToggleFX = false;
   }
   if (app->fxState.MidiRequestCh1) {
-      app->fxState.SelectedChannel = 0;
-      audioEngine->BeatFX.targetChannel = 0;
+      app->fxState.SelectedChannel = 1;
+      audioEngine->BeatFX.targetChannel = 1;
       app->fxState.MidiRequestCh1 = false;
   }
   if (app->fxState.MidiRequestCh2) {
-      app->fxState.SelectedChannel = 1;
-      audioEngine->BeatFX.targetChannel = 1;
+      app->fxState.SelectedChannel = 2;
+      audioEngine->BeatFX.targetChannel = 2;
       app->fxState.MidiRequestCh2 = false;
   }
   if (app->fxState.MidiRequestCh3) {
-      app->fxState.SelectedChannel = 2;
-      audioEngine->BeatFX.targetChannel = 2;
+      app->fxState.SelectedChannel = 3;
+      audioEngine->BeatFX.targetChannel = 3;
       app->fxState.MidiRequestCh3 = false;
   }
   if (app->fxState.MidiRequestCh4) {
-      app->fxState.SelectedChannel = 3;
-      audioEngine->BeatFX.targetChannel = 3;
+      app->fxState.SelectedChannel = 4;
+      audioEngine->BeatFX.targetChannel = 4;
       app->fxState.MidiRequestCh4 = false;
   }
   if (app->fxState.MidiRequestChMaster) {
-      app->fxState.SelectedChannel = 4;
-      audioEngine->BeatFX.targetChannel = 4;
+      app->fxState.SelectedChannel = 0;
+      audioEngine->BeatFX.targetChannel = 0;
       app->fxState.MidiRequestChMaster = false;
   }
   if (app->fxState.MidiRequestBeatLeft) {
       if (app->fxState.SelectedPad > 0) app->fxState.SelectedPad--;
-      BeatFXManager_AdjustTimeMultiplier(&audioEngine->BeatFX, 0.5f);
       app->fxState.MidiRequestBeatLeft = false;
   }
   if (app->fxState.MidiRequestBeatRight) {
       if (app->fxState.SelectedPad < 5) app->fxState.SelectedPad++;
-      BeatFXManager_AdjustTimeMultiplier(&audioEngine->BeatFX, 2.0f);
       app->fxState.MidiRequestBeatRight = false;
   }
   if (app->fxState.MidiRequestTap) {

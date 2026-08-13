@@ -88,7 +88,7 @@ static int BeatFX_Update(Component *base) {
         if (Input_IsReleased()) {
             bool insideModal = CheckCollisionPointRec(mouse, (Rectangle){modalX, modalY, modalW, modalH});
             if (insideModal) {
-                for (int i = 0; i < 3; i++) {
+                for (int i = 0; i < 5; i++) {
                     float bx = modalX + pad;
                     float by = modalY + S(45) + i * (btnH + pad);
                     if (CheckCollisionPointRec(mouse, (Rectangle){bx, by, btnW, btnH})) {
@@ -226,7 +226,9 @@ static void BeatFX_Draw(Component *base) {
     
     const char* chName = "MASTER";
     if (b->State->SelectedChannel == 1) chName = "DECK 1";
-    if (b->State->SelectedChannel == 2) chName = "DECK 2";
+    else if (b->State->SelectedChannel == 2) chName = "DECK 2";
+    else if (b->State->SelectedChannel == 3) chName = "DECK 3";
+    else if (b->State->SelectedChannel == 4) chName = "DECK 4";
     
     DrawRectangle(x + S(4), cy, w - S(8), S(22), ColorDark3);
     DrawRectangleLines(x + S(4), cy, w - S(8), S(22), ColorDark1);
@@ -424,7 +426,7 @@ void BeatFXPanel_DrawOverlays(BeatFXPanel *b) {
         DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, 200});
         
         float modalW = S(280);
-        float modalH = S(220);
+        float modalH = S(290);
         float modalX = (SCREEN_WIDTH - modalW) / 2.0f;
         float modalY = (SCREEN_HEIGHT - modalH) / 2.0f;
         
@@ -434,14 +436,14 @@ void BeatFXPanel_DrawOverlays(BeatFXPanel *b) {
         DrawCentredText("SELECT CHANNEL", faceLg, modalX, modalW, modalY + S(12), S(12), ColorWhite);
         DrawLine(modalX + S(10), modalY + S(36), modalX + modalW - S(10), modalY + S(36), ColorDark2);
         
-        const char* chNames[] = { "MASTER", "DECK 1", "DECK 2" };
-        float pad = S(12);
+        const char* chNames[] = { "MASTER", "DECK 1", "DECK 2", "DECK 3", "DECK 4" };
+        float pad = S(8);
         float btnW = modalW - pad * 2;
-        float btnH = S(44);
+        float btnH = S(40);
         
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 5; i++) {
             float bx = modalX + pad;
-            float by = modalY + S(45) + i * (btnH + pad);
+            float by = modalY + S(42) + i * (btnH + pad);
             Rectangle optRect = { bx, by, btnW, btnH };
             
             Color bg = (b->State->SelectedChannel == i) ? ColorBlue : ColorDark2;
