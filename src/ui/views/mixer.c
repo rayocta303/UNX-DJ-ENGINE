@@ -377,13 +377,13 @@ static void Mixer_Draw(Component *base) {
   }
 
   float targetY = bSelectorY + S(32);
-  const char *targetNames[] = {"MASTER", "CH 1", "CH 2"};
+  const char *targetNames[] = {"MASTER", "CH 1", "CH 2", "CH 3", "CH 4"};
   Rectangle chSelRect = {rightX + S(10), targetY, colRightW - S(20), S(26)};
   DrawRectangleRec(chSelRect, ColorBlack);
   DrawRectangleLinesEx(chSelRect, 1.0f, ColorWhite);
-  DrawCentredText(targetNames[fxs->SelectedChannel % 3], fSub, rightX, colRightW, targetY + S(8), S(9), ColorOrange);
+  DrawCentredText(targetNames[fxs->SelectedChannel % 5], fSub, rightX, colRightW, targetY + S(8), S(9), ColorOrange);
   if (Input_CheckPress(chSelRect)) {
-      fxs->SelectedChannel = (fxs->SelectedChannel + 1) % 3;
+      fxs->SelectedChannel = (fxs->SelectedChannel + 1) % 5;
   }
 
   float bDepthY = panelY + panelH - S(100);
