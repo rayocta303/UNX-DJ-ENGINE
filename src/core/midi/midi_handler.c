@@ -67,10 +67,14 @@ static void LinuxMIDI_AutoConnectPorts(char *outDetectedName) {
         if (in_port >= 0) {
           // Check not already connected
           int err1 = snd_seq_connect_from(seq, in_port, client, port);
-          if (err1 < 0 && err1 != -EEXIST)
+          if (err1 < 0 && err1 != -EEXIST && err1 != -EBUSY && err1 != -16)
             printf("[MIDI] connect_from [%d:%d] -> in_port %d FAIL: %s\n", client, port, in_port, snd_strerror(err1));
-          else {
+          else if (err1 >= 0) {
             printf("[MIDI] connect_from [%d:%d] '%s' -> in_port %d OK\n", client, port, cName, in_port);
+            if (outDetectedName && outDetectedName[0] == '\0')
+              strncpy(outDetectedName, cName, 127);
+          } else {
+            // Already connected (-EBUSY / -EEXIST), set detected name silently
             if (outDetectedName && outDetectedName[0] == '\0')
               strncpy(outDetectedName, cName, 127);
           }
@@ -81,10 +85,14 @@ static void LinuxMIDI_AutoConnectPorts(char *outDetectedName) {
       if ((caps & SND_SEQ_PORT_CAP_WRITE) || (caps & SND_SEQ_PORT_CAP_SUBS_WRITE)) {
         if (out_port >= 0) {
           int err2 = snd_seq_connect_to(seq, out_port, client, port);
-          if (err2 < 0 && err2 != -EEXIST)
+          if (err2 < 0 && err2 != -EEXIST && err2 != -EBUSY && err2 != -16)
             printf("[MIDI] connect_to out_port %d -> [%d:%d] FAIL: %s\n", out_port, client, port, snd_strerror(err2));
-          else {
+          else if (err2 >= 0) {
             printf("[MIDI] connect_to out_port %d -> [%d:%d] '%s' OK\n", out_port, client, port, cName);
+            dest_client = client;
+            dest_port = port;
+          } else {
+            // Already connected
             dest_client = client;
             dest_port = port;
           }
@@ -93,10 +101,14 @@ static void LinuxMIDI_AutoConnectPorts(char *outDetectedName) {
     }
   }
 
-  if (dest_client == -1)
-    printf("[MIDI] WARNING: No writable MIDI output target found! LED/feedback will not work.\n");
-  else
-    printf("[MIDI] Output wired: out_port %d -> dest [%d:%d]\n", out_port, dest_client, dest_port);
+  if (dest_client == -1) {
+    // Only print warning once
+    static bool warned = false;
+    if (!warned) {
+      printf("[MIDI] WARNING: No writable MIDI output target found! LED/feedback will not work.\n");
+      warned = true;
+    }
+  }
 #else
   (void)outDetectedName;
 #endif
@@ -119,28 +131,37 @@ static uint8_t lastStatus = 0;
 static uint8_t lastMidino = 0;
 static bool lastMsgSet = false;
 
-void MIDI_SendSysEx(const uint8_t *data, uint32_t length) {
-#if defined(_WIN32)
-  WinMIDI_SendSysEx(data, length);
-#elif defined(__linux__) && !defined(__ANDROID__)
+static void send_bytes(const unsigned char *b, int len) {
+#if defined(__linux__) && !defined(__ANDROID__)
 #ifdef HAS_ALSA
-  if (!seq_handle || out_port < 0 || !data || length == 0) return;
+  if (!seq_handle || out_port < 0 || !b || len <= 0)
+    return;
   if (!midi_coder) {
-    if (snd_midi_event_new(1024, &midi_coder) < 0) return;
+    if (snd_midi_event_new(1024, &midi_coder) < 0)
+      return;
   }
   snd_seq_event_t ev;
   snd_seq_ev_clear(&ev);
   snd_midi_event_init(midi_coder);
-  long encoded = snd_midi_event_encode(midi_coder, data, (long)length, &ev);
+  long encoded = snd_midi_event_encode(midi_coder, b, len, &ev);
   if (encoded > 0) {
     snd_seq_ev_set_source(&ev, out_port);
     snd_seq_ev_set_subs(&ev);
     snd_seq_ev_set_direct(&ev);
-    int err = snd_seq_event_output((snd_seq_t *)seq_handle, &ev);
-    // Removed blocking snd_seq_drain_output to prevent ALSA drops during fast bursts
-    // printf("[MIDI] SysEx sent (%u bytes): err=%d\n", length, err);
+    snd_seq_event_output((snd_seq_t *)seq_handle, &ev);
+    snd_seq_drain_output((snd_seq_t *)seq_handle);
   }
 #endif
+#else
+  (void)b; (void)len;
+#endif
+}
+
+void MIDI_SendSysEx(const uint8_t *data, uint32_t length) {
+#if defined(_WIN32)
+  WinMIDI_SendSysEx(data, length);
+#elif defined(__linux__) && !defined(__ANDROID__)
+  send_bytes(data, (int)length);
 #else
   (void)data; (void)length;
 #endif
@@ -150,43 +171,8 @@ void MIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
 #if defined(_WIN32)
   WinMIDI_SendShortMsg(status, data1, data2);
 #elif defined(__linux__) && !defined(__ANDROID__)
-#ifdef HAS_ALSA
-  if (!seq_handle || out_port < 0)
-    return;
-  if (!midi_coder) {
-    if (snd_midi_event_new(256, &midi_coder) < 0) return;
-  }
   uint8_t buf[3] = { status, data1, data2 };
-  snd_seq_event_t ev;
-  snd_seq_ev_clear(&ev);
-  snd_midi_event_init(midi_coder);
-  long encoded = snd_midi_event_encode(midi_coder, buf, 3, &ev);
-  if (encoded == 3) {
-    snd_seq_ev_set_source(&ev, out_port);
-    snd_seq_ev_set_subs(&ev);
-    snd_seq_ev_set_direct(&ev);
-    snd_seq_event_output((snd_seq_t *)seq_handle, &ev);
-    // Removed blocking snd_seq_drain_output
-  } else {
-    // Fallback direct event construction
-    snd_seq_ev_clear(&ev);
-    snd_seq_ev_set_source(&ev, out_port);
-    snd_seq_ev_set_subs(&ev);
-    snd_seq_ev_set_direct(&ev);
-    uint8_t type = status & 0xF0;
-    if (type == 0xB0) {
-      snd_seq_ev_set_controller(&ev, status & 0x0F, data1, data2);
-    } else if (type == 0x90) {
-      snd_seq_ev_set_noteon(&ev, status & 0x0F, data1, data2);
-    } else if (type == 0x80) {
-      snd_seq_ev_set_noteoff(&ev, status & 0x0F, data1, data2);
-    } else {
-      snd_seq_ev_set_controller(&ev, status & 0x0F, data1, data2);
-    }
-    snd_seq_event_output((snd_seq_t *)seq_handle, &ev);
-    // Removed blocking snd_seq_drain_output
-  }
-#endif
+  send_bytes(buf, 3);
 #else
   (void)status; (void)data1; (void)data2;
 #endif
@@ -202,6 +188,15 @@ void MIDI_UpdateLEDs(MidiContext *ctx, DeckState *d1, DeckState *d2,
     MIDI_UpdateVuMeters(engine, false);
   }
   MIDI_UpdateLoopAndPadLEDs(d1, d2, engine, false);
+
+  // Pioneer DDJ-FLX6 Keep-Alive SysEx (Required to keep LEDs updating)
+  static int keepAliveCounter = 0;
+  keepAliveCounter++;
+  if (keepAliveCounter >= 120) { // Approx every 2 seconds @ 60fps
+    static const uint8_t sysexKeepAlive[] = {0xF0, 0x00, 0x40, 0x05, 0x00, 0x00, 0x04, 0x05, 0x00, 0x50, 0x02, 0xF7};
+    MIDI_SendSysEx(sysexKeepAlive, sizeof(sysexKeepAlive));
+    keepAliveCounter = 0;
+  }
 
 #if defined(__linux__) && !defined(__ANDROID__)
 #ifdef HAS_ALSA
@@ -483,6 +478,29 @@ void MIDI_CheckHotplug(MidiContext *ctx) {
         }
       }
       ctx->initialized = true;
+
+      // Resend Pioneer DDJ Hardware Init / LED Enable Handshake on hotplug
+      MIDI_SendShortMsg(0x9F, 0x00, 0x7F);
+      MIDI_SendShortMsg(0x9F, 0x01, 0x7F);
+      MIDI_SendShortMsg(0x90, 0x7F, 0x7F);
+      MIDI_SendShortMsg(0x91, 0x7F, 0x7F);
+      MIDI_SendShortMsg(0x93, 0x7F, 0x7F);
+      MIDI_SendShortMsg(0x94, 0x7F, 0x7F);
+
+      static const uint8_t sysexInit1[] = {0xF0, 0x00, 0x20, 0x7F, 0x03, 0x01, 0xF7};
+      static const uint8_t sysexInit2[] = {0xF0, 0x00, 0x40, 0x05, 0x00, 0x00, 0x04, 0x05, 0x00, 0x50, 0x02, 0xF7};
+      static const uint8_t sysexInit3[] = {0xF0, 0x00, 0x20, 0x2B, 0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0xF7};
+      MIDI_SendSysEx(sysexInit1, sizeof(sysexInit1));
+      MIDI_SendSysEx(sysexInit2, sizeof(sysexInit2));
+      MIDI_SendSysEx(sysexInit3, sizeof(sysexInit3));
+
+#if defined(__linux__) && !defined(__ANDROID__)
+#ifdef HAS_ALSA
+      if (seq_handle) {
+        snd_seq_drain_output((snd_seq_t *)seq_handle);
+      }
+#endif
+#endif
 
       char toastMsg[160];
       snprintf(toastMsg, sizeof(toastMsg), "MIDI RECONNECTED: %s", deviceName);
