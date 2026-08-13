@@ -131,6 +131,7 @@ typedef struct {
   bool showExitConfirm;
   bool showPowerPopup;
   bool showRestartAppConfirm;
+  int modalCursorPos;
   bool showPowerActionConfirm;
   int pendingPowerAction; // 1 = Reboot OS, 2 = Hibernate OS, 3 = Shutdown OS
   float masterVolume; // Persisted master output level (0.0 - 1.0)
@@ -374,44 +375,44 @@ void UpdateChannelOptions(App *a, int deviceIdx) {
     channels = devs[deviceIdx].NativeChannels;
   }
 
-  // Common init for channel items (Items 10..13)
-  strcpy(a->settingsState.Items[10].Label, "MASTER LEFT");
-  a->settingsState.Items[10].Type = SETTING_TYPE_LIST;
-  strcpy(a->settingsState.Items[11].Label, "MASTER RIGHT");
+  // Common init for channel items (Items 11..14)
+  strcpy(a->settingsState.Items[11].Label, "MASTER LEFT");
   a->settingsState.Items[11].Type = SETTING_TYPE_LIST;
-  strcpy(a->settingsState.Items[12].Label, "CUE LEFT");
+  strcpy(a->settingsState.Items[12].Label, "MASTER RIGHT");
   a->settingsState.Items[12].Type = SETTING_TYPE_LIST;
-  strcpy(a->settingsState.Items[13].Label, "CUE RIGHT");
+  strcpy(a->settingsState.Items[13].Label, "CUE LEFT");
   a->settingsState.Items[13].Type = SETTING_TYPE_LIST;
+  strcpy(a->settingsState.Items[14].Label, "CUE RIGHT");
+  a->settingsState.Items[14].Type = SETTING_TYPE_LIST;
 
-  a->settingsState.Items[10].Category = SETTING_CAT_AUDIO;
   a->settingsState.Items[11].Category = SETTING_CAT_AUDIO;
   a->settingsState.Items[12].Category = SETTING_CAT_AUDIO;
   a->settingsState.Items[13].Category = SETTING_CAT_AUDIO;
+  a->settingsState.Items[14].Category = SETTING_CAT_AUDIO;
 
   // Master L/R: CH 1..N
-  a->settingsState.Items[10].OptionsCount = channels;
   a->settingsState.Items[11].OptionsCount = channels;
+  a->settingsState.Items[12].OptionsCount = channels;
   for (int i = 0; i < channels && i < MAX_SETTING_OPTIONS; i++) {
-    sprintf(a->settingsState.Items[10].Options[i], "CH %d", i + 1);
     sprintf(a->settingsState.Items[11].Options[i], "CH %d", i + 1);
+    sprintf(a->settingsState.Items[12].Options[i], "CH %d", i + 1);
   }
 
   // Cue L/R: Blank, CH 1..N
-  a->settingsState.Items[12].OptionsCount = channels + 1;
   a->settingsState.Items[13].OptionsCount = channels + 1;
-  strcpy(a->settingsState.Items[12].Options[0], "Blank");
+  a->settingsState.Items[14].OptionsCount = channels + 1;
   strcpy(a->settingsState.Items[13].Options[0], "Blank");
+  strcpy(a->settingsState.Items[14].Options[0], "Blank");
   for (int i = 0; i < channels && (i + 1) < MAX_SETTING_OPTIONS; i++) {
-    sprintf(a->settingsState.Items[12].Options[i + 1], "CH %d", i + 1);
     sprintf(a->settingsState.Items[13].Options[i + 1], "CH %d", i + 1);
+    sprintf(a->settingsState.Items[14].Options[i + 1], "CH %d", i + 1);
   }
 
   // Auto-Select defaults
-  a->settingsState.Items[10].Current = 0; // Master L -> CH1
-  a->settingsState.Items[11].Current = (channels > 1) ? 1 : 0; // Master R -> CH2
-  a->settingsState.Items[12].Current = 1; // Cue L -> CH 1 (Index 0 is Blank)
-  a->settingsState.Items[13].Current = (channels > 1) ? 2 : 1; // Cue R -> CH 2
+  a->settingsState.Items[11].Current = 0; // Master L -> CH1
+  a->settingsState.Items[12].Current = (channels > 1) ? 1 : 0; // Master R -> CH2
+  a->settingsState.Items[13].Current = 1; // Cue L -> CH 1 (Index 0 is Blank)
+  a->settingsState.Items[14].Current = (channels > 1) ? 2 : 1; // Cue R -> CH 2
 }
 
 void PopulateJogSettings(App *a);
@@ -2214,15 +2215,15 @@ Log_LogDeviceInfo(gpuModel);
 
   // --- Beat FX ---
   CO_Register("[Master]", "beatfx_select", CO_TYPE_INT,
-              &audioEngine->BeatFX.activeFX, 0, 13);
+              &app->fxState.SelectedFX, 0, 13);
   CO_Register("[Master]", "beatfx_drywet", CO_TYPE_FLOAT,
-              &audioEngine->BeatFX.levelDepth, 0, 1.0f);
+              &app->fxState.LevelDepth, 0, 1.0f);
   CO_Register("[Master]", "beatfx_time", CO_TYPE_FLOAT,
               &audioEngine->BeatFX.beatMs, 0, 2000.0f);
   CO_Register("[Master]", "beatfx_on", CO_TYPE_BOOL,
               &app->fxState.IsFXOn, 0, 1);
   CO_Register("[Master]", "beatfx_channel", CO_TYPE_INT,
-              &audioEngine->BeatFX.targetChannel, 0, 4);
+              &app->fxState.SelectedChannel, 0, 4);
   CO_Register("[Master]", "beatfx_prev", CO_TYPE_BOOL,
               &app->fxState.MidiRequestPrevFX, 0, 1);
   CO_Register("[Master]", "beatfx_next", CO_TYPE_BOOL,
@@ -2751,34 +2752,42 @@ void UpdateDrawFrame(App *app) {
       app->fxState.MidiRequestToggleFX = false;
   }
   if (app->fxState.MidiRequestCh1) {
+      app->fxState.SelectedChannel = 0;
       audioEngine->BeatFX.targetChannel = 0;
       app->fxState.MidiRequestCh1 = false;
   }
   if (app->fxState.MidiRequestCh2) {
+      app->fxState.SelectedChannel = 1;
       audioEngine->BeatFX.targetChannel = 1;
       app->fxState.MidiRequestCh2 = false;
   }
   if (app->fxState.MidiRequestCh3) {
-      audioEngine->BeatFX.targetChannel = 0;
+      app->fxState.SelectedChannel = 2;
+      audioEngine->BeatFX.targetChannel = 2;
       app->fxState.MidiRequestCh3 = false;
   }
   if (app->fxState.MidiRequestCh4) {
-      audioEngine->BeatFX.targetChannel = 1;
+      app->fxState.SelectedChannel = 3;
+      audioEngine->BeatFX.targetChannel = 3;
       app->fxState.MidiRequestCh4 = false;
   }
   if (app->fxState.MidiRequestChMaster) {
-      audioEngine->BeatFX.targetChannel = 2;
+      app->fxState.SelectedChannel = 4;
+      audioEngine->BeatFX.targetChannel = 4;
       app->fxState.MidiRequestChMaster = false;
   }
   if (app->fxState.MidiRequestBeatLeft) {
+      if (app->fxState.SelectedPad > 0) app->fxState.SelectedPad--;
       BeatFXManager_AdjustTimeMultiplier(&audioEngine->BeatFX, 0.5f);
       app->fxState.MidiRequestBeatLeft = false;
   }
   if (app->fxState.MidiRequestBeatRight) {
+      if (app->fxState.SelectedPad < 5) app->fxState.SelectedPad++;
       BeatFXManager_AdjustTimeMultiplier(&audioEngine->BeatFX, 2.0f);
       app->fxState.MidiRequestBeatRight = false;
   }
   if (app->fxState.MidiRequestTap) {
+      app->fxState.SelectedPad = 4;
       BeatFXManager_AdjustTimeMultiplier(&audioEngine->BeatFX, 1.0f);
       app->fxState.MidiRequestTap = false;
   }
@@ -2839,6 +2848,19 @@ void UpdateDrawFrame(App *app) {
 
   // Route Encoder & MIDI signals to Settings FIRST when Settings screen is active
   if (app->screen == ScreenSettings || app->settingsState.IsActive) {
+    if (app->showPowerPopup || app->showPowerActionConfirm || app->showRestartAppConfirm) {
+        if (app->browserState.MidiBrowseDelta != 0) {
+            int maxItems = 1; // Default for 2 buttons (CANCEL, OK)
+            if (app->showPowerPopup) maxItems = 3; // 4 buttons (REBOOT, HIBERNATE, SHUTDOWN, CANCEL)
+            
+            app->modalCursorPos += app->browserState.MidiBrowseDelta;
+            if (app->modalCursorPos < 0) app->modalCursorPos = 0;
+            if (app->modalCursorPos > maxItems) app->modalCursorPos = maxItems;
+            
+            app->browserState.MidiBrowseDelta = 0;
+        }
+    }
+
     if (app->browserState.MidiBrowseDelta != 0) {
       app->settingsState.MidiBrowseDelta += app->browserState.MidiBrowseDelta;
       app->browserState.MidiBrowseDelta = 0;
@@ -3876,45 +3898,64 @@ void UpdateDrawFrame(App *app) {
     DrawCentredText("OS POWER OPTIONS", fMd, px, pw, py + S(12), S(12), ColorWhite);
     DrawCentredText("Select system power action", fSm, px, pw, py + S(28), S(9), ColorShadow);
 
-    float btnW = S(240);
+    float gap = S(6);
     float btnH = S(28);
-    float btnX = px + (pw - btnW) / 2.0f;
     Vector2 mPos = Input_GetPointerPos();
 
-    // 1. REBOOT OS
-    Rectangle r1 = {btnX, py + S(46), btnW, btnH};
-    bool h1 = CheckCollisionPointRec(mPos, r1);
-    DrawRectangleRec(r1, h1 ? (Color){0, 140, 220, 255} : (Color){20, 30, 45, 255});
-    DrawRectangleLinesEx(r1, 1.0f, (Color){0, 160, 255, 255});
-    DrawCentredText("REBOOT SYSTEM", fMd, btnX, btnW, py + S(54), S(11), ColorWhite);
+    // Option 1: Reboot
+    Rectangle rReboot = {px + S(20), py + S(50), pw - S(40), btnH};
+    bool rebHover = CheckCollisionPointRec(mPos, rReboot) || (app->modalCursorPos == 0);
+    DrawRectangleRec(rReboot, rebHover ? ColorDark2 : ColorDark1);
+    DrawRectangleLinesEx(rReboot, 1.0f, rebHover ? ColorOrange : ColorShadow);
+    DrawCentredText("REBOOT SYSTEM", fMd, px + S(20), pw - S(40), py + S(56), S(10), ColorWhite);
 
-    // 2. HIBERNATE OS
-    Rectangle r2 = {btnX, py + S(80), btnW, btnH};
-    bool h2 = CheckCollisionPointRec(mPos, r2);
-    DrawRectangleRec(r2, h2 ? (Color){140, 60, 220, 255} : (Color){35, 20, 45, 255});
-    DrawRectangleLinesEx(r2, 1.0f, (Color){160, 80, 255, 255});
-    DrawCentredText("HIBERNATE / DEEP SLEEP", fMd, btnX, btnW, py + S(88), S(11), ColorWhite);
+    // Option 2: Hibernate
+    Rectangle rHib = {px + S(20), py + S(50) + btnH + gap, pw - S(40), btnH};
+    bool hibHover = CheckCollisionPointRec(mPos, rHib) || (app->modalCursorPos == 1);
+    DrawRectangleRec(rHib, hibHover ? ColorDark2 : ColorDark1);
+    DrawRectangleLinesEx(rHib, 1.0f, hibHover ? ColorOrange : ColorShadow);
+    DrawCentredText("HIBERNATE (SLEEP)", fMd, px + S(20), pw - S(40), py + S(56) + btnH + gap, S(10), ColorWhite);
 
-    // 3. SHUTDOWN OS
-    Rectangle r3 = {btnX, py + S(114), btnW, btnH};
-    bool h3 = CheckCollisionPointRec(mPos, r3);
-    DrawRectangleRec(r3, h3 ? (Color){220, 50, 50, 255} : (Color){45, 20, 20, 255});
-    DrawRectangleLinesEx(r3, 1.0f, (Color){255, 60, 60, 255});
-    DrawCentredText("SHUTDOWN SYSTEM", fMd, btnX, btnW, py + S(122), S(11), ColorWhite);
+    // Option 3: Shutdown
+    Rectangle rShut = {px + S(20), py + S(50) + (btnH + gap)*2, pw - S(40), btnH};
+    bool shutHover = CheckCollisionPointRec(mPos, rShut) || (app->modalCursorPos == 2);
+    DrawRectangleRec(rShut, shutHover ? (Color){100, 30, 30, 255} : (Color){50, 20, 20, 255});
+    DrawRectangleLinesEx(rShut, 1.0f, shutHover ? ColorRed : ColorShadow);
+    DrawCentredText("SHUTDOWN SYSTEM", fMd, px + S(20), pw - S(40), py + S(56) + (btnH + gap)*2, S(10), ColorRed);
 
-    // 4. CANCEL
-    Rectangle r4 = {btnX, py + S(154), btnW, S(24)};
-    bool h4 = CheckCollisionPointRec(mPos, r4);
-    DrawRectangleRec(r4, h4 ? ColorGray : ColorDark1);
-    DrawRectangleLinesEx(r4, 1.0f, ColorShadow);
-    DrawCentredText("CANCEL", fSm, btnX, btnW, py + S(160), S(10), ColorWhite);
+    // Cancel
+    Rectangle rCancel = {px + S(20), py + S(50) + (btnH + gap)*3 + S(10), pw - S(40), btnH};
+    bool cancelHover = CheckCollisionPointRec(mPos, rCancel) || (app->modalCursorPos == 3);
+    DrawRectangleRec(rCancel, cancelHover ? ColorGray : ColorDark1);
+    DrawRectangleLinesEx(rCancel, 1.0f, ColorShadow);
+    DrawCentredText("CANCEL", fMd, px + S(20), pw - S(40), py + S(56) + (btnH + gap)*3 + S(10), S(10), ColorWhite);
 
-    if (Input_IsReleased()) {
-      if (h1) { app->showPowerPopup = false; app->pendingPowerAction = 1; app->showPowerActionConfirm = true; }
-      else if (h2) { app->showPowerPopup = false; app->pendingPowerAction = 2; app->showPowerActionConfirm = true; }
-      else if (h3) { app->showPowerPopup = false; app->pendingPowerAction = 3; app->showPowerActionConfirm = true; }
-      else if (h4) { app->showPowerPopup = false; }
-      Input_Consume();
+    bool enterPressed = app->settingsState.MidiRequestEnter || app->browserState.MidiRequestEnter;
+    if (Input_CheckPress(rReboot) || (enterPressed && app->modalCursorPos == 0)) {
+        app->showPowerPopup = false;
+        app->showPowerActionConfirm = true;
+        app->pendingPowerAction = 1;
+        app->modalCursorPos = 0;
+        app->settingsState.MidiRequestEnter = false;
+        app->browserState.MidiRequestEnter = false;
+    } else if (Input_CheckPress(rHib) || (enterPressed && app->modalCursorPos == 1)) {
+        app->showPowerPopup = false;
+        app->showPowerActionConfirm = true;
+        app->pendingPowerAction = 2;
+        app->modalCursorPos = 0;
+        app->settingsState.MidiRequestEnter = false;
+        app->browserState.MidiRequestEnter = false;
+    } else if (Input_CheckPress(rShut) || (enterPressed && app->modalCursorPos == 2)) {
+        app->showPowerPopup = false;
+        app->showPowerActionConfirm = true;
+        app->pendingPowerAction = 3;
+        app->modalCursorPos = 0;
+        app->settingsState.MidiRequestEnter = false;
+        app->browserState.MidiRequestEnter = false;
+    } else if (Input_CheckPress(rCancel) || (enterPressed && app->modalCursorPos == 3)) {
+        app->showPowerPopup = false;
+        app->settingsState.MidiRequestEnter = false;
+        app->browserState.MidiRequestEnter = false;
     }
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) app->showPowerPopup = false;
   }
@@ -3947,27 +3988,30 @@ void UpdateDrawFrame(App *app) {
 
     // CANCEL / NO
     Rectangle rNo = {px + S(25), py + S(68), btnW, btnH};
-    bool noHover = CheckCollisionPointRec(mPos, rNo);
+    bool noHover = CheckCollisionPointRec(mPos, rNo) || (app->modalCursorPos == 0);
     DrawRectangleRec(rNo, noHover ? ColorGray : ColorDark1);
     DrawRectangleLinesEx(rNo, 1.0f, ColorShadow);
     DrawCentredText("CANCEL", fMd, px + S(25), btnW, py + S(74), S(10), ColorWhite);
 
     // YES
     Rectangle rYes = {px + pw - S(100), py + S(68), btnW, btnH};
-    bool yesHover = CheckCollisionPointRec(mPos, rYes);
-    DrawRectangleRec(rYes, yesHover ? ColorRed : (Color){60, 20, 20, 255});
-    DrawRectangleLinesEx(rYes, 1.0f, ColorRed);
+    bool yesHover = CheckCollisionPointRec(mPos, rYes) || (app->modalCursorPos == 1);
+    DrawRectangleRec(rYes, yesHover ? (Color){100, 30, 30, 255} : (Color){50, 20, 20, 255});
+    DrawRectangleLinesEx(rYes, 1.0f, yesHover ? ColorRed : ColorShadow);
     DrawCentredText("CONFIRM", fMd, px + pw - S(100), btnW, py + S(74), S(10), ColorWhite);
 
-    if (Input_IsReleased()) {
-      if (noHover) app->showPowerActionConfirm = false;
-      if (yesHover) {
+    bool enterPressed = app->settingsState.MidiRequestEnter || app->browserState.MidiRequestEnter;
+    if (Input_CheckPress(rNo) || (enterPressed && app->modalCursorPos == 0)) {
+        app->showPowerActionConfirm = false;
+        app->settingsState.MidiRequestEnter = false;
+        app->browserState.MidiRequestEnter = false;
+    } else if (Input_CheckPress(rYes) || (enterPressed && app->modalCursorPos == 1)) {
         app->showPowerActionConfirm = false;
         if (app->pendingPowerAction == 1) System_RebootOS();
         else if (app->pendingPowerAction == 2) System_HibernateOS();
         else if (app->pendingPowerAction == 3) System_ShutdownOS();
-      }
-      Input_Consume();
+        app->settingsState.MidiRequestEnter = false;
+        app->browserState.MidiRequestEnter = false;
     }
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) app->showPowerActionConfirm = false;
   }
@@ -3995,25 +4039,28 @@ void UpdateDrawFrame(App *app) {
 
     // CANCEL / NO
     Rectangle rNo = {px + S(25), py + S(68), btnW, btnH};
-    bool noHover = CheckCollisionPointRec(mPos, rNo);
+    bool noHover = CheckCollisionPointRec(mPos, rNo) || (app->modalCursorPos == 0);
     DrawRectangleRec(rNo, noHover ? ColorGray : ColorDark1);
     DrawRectangleLinesEx(rNo, 1.0f, ColorShadow);
     DrawCentredText("CANCEL", fMd, px + S(25), btnW, py + S(74), S(10), ColorWhite);
 
     // YES
     Rectangle rYes = {px + pw - S(100), py + S(68), btnW, btnH};
-    bool yesHover = CheckCollisionPointRec(mPos, rYes);
+    bool yesHover = CheckCollisionPointRec(mPos, rYes) || (app->modalCursorPos == 1);
     DrawRectangleRec(rYes, yesHover ? (Color){255, 140, 0, 255} : (Color){50, 30, 0, 255});
-    DrawRectangleLinesEx(rYes, 1.0f, (Color){255, 140, 0, 255});
+    DrawRectangleLinesEx(rYes, 1.0f, yesHover ? (Color){255, 140, 0, 255} : (Color){255, 140, 0, 255});
     DrawCentredText("RESTART", fMd, px + pw - S(100), btnW, py + S(74), S(10), ColorWhite);
 
-    if (Input_IsReleased()) {
-      if (noHover) app->showRestartAppConfirm = false;
-      if (yesHover) {
+    bool enterPressed = app->settingsState.MidiRequestEnter || app->browserState.MidiRequestEnter;
+    if (Input_CheckPress(rNo) || (enterPressed && app->modalCursorPos == 0)) {
+        app->showRestartAppConfirm = false;
+        app->settingsState.MidiRequestEnter = false;
+        app->browserState.MidiRequestEnter = false;
+    } else if (Input_CheckPress(rYes) || (enterPressed && app->modalCursorPos == 1)) {
         app->showRestartAppConfirm = false;
         System_RestartApp();
-      }
-      Input_Consume();
+        app->settingsState.MidiRequestEnter = false;
+        app->browserState.MidiRequestEnter = false;
     }
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) app->showRestartAppConfirm = false;
   }
