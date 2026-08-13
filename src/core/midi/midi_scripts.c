@@ -66,7 +66,19 @@ static MidiRegister reg_vu_ch[4];      // per-channel VU (status=0xB0|ch, midino
 static MidiRegister reg_vu_master_l;   // master VU left  (0xBA, 0x00)
 static MidiRegister reg_vu_master_r;   // master VU right (0xBA, 0x01)
 
+// --- Global / Beat FX & Master LEDs ---
+static MidiRegister reg_beatfx_button; // 0x94, 0x47
+static MidiRegister reg_beatfx_select; // 0x94, 0x63
+static MidiRegister reg_release_fx;    // 0x94, 0x43
+static MidiRegister reg_master_pfl;    // 0x94, 0x54
+static MidiRegister reg_beatfx_ch[5];  // Ch 1, 2, 3, 4, Master
+static MidiRegister reg_beat_left;     // BEAT LEFT (0x94, 0x06)
+static MidiRegister reg_beat_right;    // BEAT RIGHT (0x94, 0x07)
+
 static const char *kChannels[4] = {"[Channel1]", "[Channel2]", "[Channel3]", "[Channel4]"};
+
+
+
 
 static void MIDI_BuildRegisterDefaults(void) {
   for (int i = 0; i < 4; i++) {
@@ -111,8 +123,23 @@ static void MIDI_BuildRegisterDefaults(void) {
     // VU meters
     reg_vu_ch[i]        = (MidiRegister){(uint8_t)(0xB0 | i), 0x02};
   }
-  reg_vu_master_l = (MidiRegister){0xBA, 0x00};
-  reg_vu_master_r = (MidiRegister){0xBA, 0x01};
+  reg_vu_master_l   = (MidiRegister){0xBA, 0x00};
+  reg_vu_master_r   = (MidiRegister){0xBA, 0x01};
+  reg_beatfx_button = (MidiRegister){0x94, 0x47};
+  reg_beatfx_select = (MidiRegister){0x94, 0x63};
+  reg_release_fx    = (MidiRegister){0x94, 0x43};
+  reg_master_pfl    = (MidiRegister){0x94, 0x54};
+
+  // Beat FX CH Selector (Ch1..Ch4, Master)
+  reg_beatfx_ch[0]  = (MidiRegister){0x94, 0x10};
+  reg_beatfx_ch[1]  = (MidiRegister){0x95, 0x11};
+  reg_beatfx_ch[2]  = (MidiRegister){0x96, 0x12};
+  reg_beatfx_ch[3]  = (MidiRegister){0x97, 0x13};
+  reg_beatfx_ch[4]  = (MidiRegister){0x94, 0x14};
+
+  // Beat FX Beat Select
+  reg_beat_left     = (MidiRegister){0x94, 0x06};
+  reg_beat_right    = (MidiRegister){0x94, 0x07};
 }
 
 void MIDI_SetMappingRef(const MidiMapping *map) {
@@ -159,9 +186,56 @@ void MIDI_SetMappingRef(const MidiMapping *map) {
 #undef TRY_RESOLVE
   }
 
+  // Global & Master / Beat FX registers
+  uint8_t st = 0, no = 0;
+  if (MIDI_GetRegisterAddress(map, "[EffectRack1_EffectUnit1]", "PioneerDDJFLX6.beatFxEnable", &st, &no) ||
+      MIDI_GetRegisterAddress(map, "[EffectRack1_EffectUnit1_Effect1]", "PioneerDDJFLX6.fxEnabled", &st, &no) ||
+      MIDI_GetRegisterAddress(map, "[EffectRack1_EffectUnit1]", "beatfx_enable", &st, &no)) {
+    reg_beatfx_button = (MidiRegister){st, no};
+  }
+
+  if (MIDI_GetRegisterAddress(map, "[EffectRack1_EffectUnit1]", "PioneerDDJFLX6.beatFxSelectPressed", &st, &no) ||
+      MIDI_GetRegisterAddress(map, "[EffectRack1_EffectUnit1]", "beatfx_select", &st, &no)) {
+    reg_beatfx_select = (MidiRegister){st, no};
+  }
+
+  if (MIDI_GetRegisterAddress(map, "[EffectRack1_EffectUnit1]", "release_fx", &st, &no) ||
+      MIDI_GetRegisterAddress(map, "[EffectRack1_EffectUnit1]", "PioneerDDJFLX6.releaseFxPressed", &st, &no)) {
+    reg_release_fx = (MidiRegister){st, no};
+  }
+
+  if (MIDI_GetRegisterAddress(map, "[Master]", "pfl", &st, &no) ||
+      MIDI_GetRegisterAddress(map, "[Master]", "headphone_cue", &st, &no)) {
+    reg_master_pfl = (MidiRegister){st, no};
+  }
+
+  if (MIDI_GetRegisterAddress(map, "[EffectRack1_EffectUnit1]", "PioneerDDJFLX6.beatFxLeftPressed", &st, &no) ||
+      MIDI_GetRegisterAddress(map, "[EffectRack1_EffectUnit1]", "beat_left", &st, &no)) {
+    reg_beat_left = (MidiRegister){st, no};
+  }
+
+  if (MIDI_GetRegisterAddress(map, "[EffectRack1_EffectUnit1]", "PioneerDDJFLX6.beatFxRightPressed", &st, &no) ||
+      MIDI_GetRegisterAddress(map, "[EffectRack1_EffectUnit1]", "beat_right", &st, &no)) {
+    reg_beat_right = (MidiRegister){st, no};
+  }
+
+  // Resolving Beat FX CH Selector (Ch1..Ch4 & Master)
+  char chKey[64];
+  for (int c = 0; c < 4; c++) {
+    snprintf(chKey, sizeof(chKey), "PioneerDDJFLX6.beatFxChannel%d", c + 1);
+    if (MIDI_GetRegisterAddress(map, "[EffectRack1_EffectUnit1]", chKey, &st, &no)) {
+      reg_beatfx_ch[c] = (MidiRegister){st, no};
+    }
+  }
+  if (MIDI_GetRegisterAddress(map, "[EffectRack1_EffectUnit1]", "PioneerDDJFLX6.beatFxChannelMaster", &st, &no)) {
+    reg_beatfx_ch[4] = (MidiRegister){st, no};
+  }
+
+
   printf("[MIDI] Register table resolved from mapping: '%s' (%d controls, %d outputs)\n",
          map->name, map->count, map->outputCount);
 }
+
 
 
 // =============================================================================
@@ -258,6 +332,17 @@ static uint8_t lastKeyshiftModeVal[4] = {0, 0, 0, 0};
 static uint8_t lastPadVals[4][16] = {{0}};
 static uint8_t lastJogRingVal[4] = {0, 0, 0, 0};
 static uint8_t lastJogPosVal[4] = {0, 0, 0, 0};
+
+// Global / Beat FX & Master LED last-state tracking
+static uint8_t lastBeatFxButtonVal = 0;
+static uint8_t lastBeatFxSelectVal = 0;
+static uint8_t lastReleaseFxVal = 0;
+static uint8_t lastMasterPflVal = 0;
+static uint8_t lastBeatFxChVal[5] = {0, 0, 0, 0, 0};
+static uint8_t lastBeatLeftVal = 0;
+static uint8_t lastBeatRightVal = 0;
+
+
 
 
 // Blink state: toggles every BLINK_INTERVAL calls (60fps -> ~4Hz blink)
@@ -518,10 +603,86 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
       lastJogPosVal[i] = jogPos72;
     }
   }
+
+  // -------------------------------------------------------------
+  // 5. BEAT FX & MASTER HEADPHONE CUE LEDs
+  // -------------------------------------------------------------
+  bool isFxOn = engine ? engine->BeatFX.isFxOn : false;
+  uint8_t bfxButtonVal = isFxOn ? 0x7F : 0x00;
+
+  uint8_t bfxSelectVal = isFxOn ? 0x7F : 0x20;
+
+  COType coT2;
+  float *releasePtr = (float *)CO_Find("[EffectRack1_EffectUnit1]", "release_fx", &coT2);
+  bool isReleaseFx = releasePtr ? (*releasePtr > 0.0f) : false;
+  uint8_t releaseFxVal = isReleaseFx ? 0x7F : 0x00;
+
+  float *masterPflPtr = (float *)CO_Find("[Master]", "pfl", &coT2);
+  bool isMasterPfl = masterPflPtr ? (*masterPflPtr > 0.0f) : false;
+  uint8_t masterPflVal = isMasterPfl ? 0x7F : 0x00;
+
+  if (forceSend || bfxButtonVal != lastBeatFxButtonVal) {
+    MIDI_SendShortMsg(reg_beatfx_button.status, reg_beatfx_button.midino, bfxButtonVal);
+    lastBeatFxButtonVal = bfxButtonVal;
+  }
+  if (forceSend || bfxSelectVal != lastBeatFxSelectVal) {
+    MIDI_SendShortMsg(reg_beatfx_select.status, reg_beatfx_select.midino, bfxSelectVal);
+    lastBeatFxSelectVal = bfxSelectVal;
+  }
+  if (forceSend || releaseFxVal != lastReleaseFxVal) {
+    MIDI_SendShortMsg(reg_release_fx.status, reg_release_fx.midino, releaseFxVal);
+    lastReleaseFxVal = releaseFxVal;
+  }
+  if (forceSend || masterPflVal != lastMasterPflVal) {
+    MIDI_SendShortMsg(reg_master_pfl.status, reg_master_pfl.midino, masterPflVal);
+    lastMasterPflVal = masterPflVal;
+  }
+
+  // Beat FX CH Selector LEDs (Ch 1..4 & Master)
+  int targetCh = engine ? engine->BeatFX.targetChannel : 0;
+  for (int c = 0; c < 5; c++) {
+    uint8_t chVal = (targetCh == c) ? 0x7F : 0x00;
+    if (forceSend || chVal != lastBeatFxChVal[c]) {
+      MIDI_SendShortMsg(reg_beatfx_ch[c].status, reg_beatfx_ch[c].midino, chVal);
+      lastBeatFxChVal[c] = chVal;
+    }
+  }
+
+  // Beat FX Beat Select LEDs (Beat Left / Right)
+  uint8_t beatLeftVal = 0x20;
+  uint8_t beatRightVal = 0x20;
+  if (forceSend || beatLeftVal != lastBeatLeftVal) {
+    MIDI_SendShortMsg(reg_beat_left.status, reg_beat_left.midino, beatLeftVal);
+    lastBeatLeftVal = beatLeftVal;
+  }
+  if (forceSend || beatRightVal != lastBeatRightVal) {
+    MIDI_SendShortMsg(reg_beat_right.status, reg_beat_right.midino, beatRightVal);
+    lastBeatRightVal = beatRightVal;
+  }
 }
 
 void MIDI_ResetAllLEDs(void) {
   MIDI_ResetVuMeters();
+
+  MIDI_SendShortMsg(reg_beatfx_button.status, reg_beatfx_button.midino, 0);
+  MIDI_SendShortMsg(reg_beatfx_select.status, reg_beatfx_select.midino, 0);
+  MIDI_SendShortMsg(reg_release_fx.status,    reg_release_fx.midino,    0);
+  MIDI_SendShortMsg(reg_master_pfl.status,    reg_master_pfl.midino,    0);
+  MIDI_SendShortMsg(reg_beat_left.status,     reg_beat_left.midino,     0);
+  MIDI_SendShortMsg(reg_beat_right.status,    reg_beat_right.midino,    0);
+
+  for (int c = 0; c < 5; c++) {
+    MIDI_SendShortMsg(reg_beatfx_ch[c].status, reg_beatfx_ch[c].midino, 0);
+    lastBeatFxChVal[c] = 0;
+  }
+
+  lastBeatFxButtonVal = 0;
+  lastBeatFxSelectVal = 0;
+  lastReleaseFxVal = 0;
+  lastMasterPflVal = 0;
+  lastBeatLeftVal = 0;
+  lastBeatRightVal = 0;
+
 
   for (int i = 0; i < 4; i++) {
     MIDI_SendShortMsg(reg_loop_in[i].status,         reg_loop_in[i].midino,         0);
@@ -580,6 +741,7 @@ void MIDI_ResetAllLEDs(void) {
     }
   }
 }
+
 
 
 void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
