@@ -29,6 +29,7 @@ int ParseScriptAction(const char* function) {
     if (strstr(function, "jogTurn")) return SCRIPT_ACTION_JOG_TURN;
     if (strstr(function, "jogTouch") || strstr(function, "JogTouch")) return SCRIPT_ACTION_JOG_TOUCH;
     if (strstr(function, "beatTap") || strstr(function, "beatFxTap")) return SCRIPT_ACTION_BEAT_TAP;
+    if (strstr(function, "beatFxSelectShiftPressed")) return SCRIPT_ACTION_BEATFX_PREV;
     if (strstr(function, "beatFxSelect") || strstr(function, "beatFxNext")) return SCRIPT_ACTION_BEATFX_NEXT;
     if (strstr(function, "beatFxPrev")) return SCRIPT_ACTION_BEATFX_PREV;
     if (strstr(function, "beatFxLevelDepth") || strstr(function, "beatFxDepth") || strstr(function, "drywet") || strstr(function, "meta") || strstr(function, "super1")) return SCRIPT_ACTION_BEATFX_DEPTH;
@@ -46,7 +47,7 @@ int ParseScriptAction(const char* function) {
     if (strstr(function, "quantizeToggle")) return SCRIPT_ACTION_QUANTIZE;
     if (strstr(function, "slipToggle")) return SCRIPT_ACTION_SLIP;
     if (strstr(function, "mergeFxTurn")) return SCRIPT_ACTION_MERGE_FX_TURN;
-    if (strstr(function, "mergeFxPressed")) return SCRIPT_ACTION_MERGE_FX_PRESS;
+    if (strstr(function, "mergeFxPressed") || strstr(function, "mergeEffectButtonPressed")) return SCRIPT_ACTION_MERGE_FX_PRESS;
     if (strstr(function, "loadSelectedTrack") || strstr(function, "LoadSelectedTrack")) return SCRIPT_ACTION_LOAD_TRACK;
     if (strstr(function, "browseClick") || strstr(function, "browsePush") || strstr(function, "SelectTrack") || strstr(function, "DirectoryPush") || strstr(function, "LibraryPush") || strstr(function, "knobClick")) return SCRIPT_ACTION_BROWSE_CLICK;
     if (strstr(function, "browseToggle")) return SCRIPT_ACTION_BROWSE_TOGGLE;
@@ -58,6 +59,13 @@ int ParseScriptAction(const char* function) {
     if (strstr(function, "deckControlRPressed")) return SCRIPT_ACTION_DECK_CONTROL_R;
     if (strstr(function, "setGroupKeyValue") || strstr(function, "keyboardButtonPressed")) return SCRIPT_ACTION_KEYBOARD_BTN;
     if (strstr(function, "MoveVertical") || strstr(function, "scrollTrack")) return SCRIPT_ACTION_BROWSE_SCROLL;
+    if (strstr(function, "beatFxLeftPressed")) return SCRIPT_ACTION_BEATFX_LEFT;
+    if (strstr(function, "beatFxRightPressed")) return SCRIPT_ACTION_BEATFX_RIGHT;
+    if (strstr(function, "padFxPressed")) return SCRIPT_ACTION_PAD_FX;
+    if (strstr(function, "quickJumpBack")) return SCRIPT_ACTION_QUICK_JUMP;
+    if (strstr(function, "waveformZoom")) return SCRIPT_ACTION_WAVEFORM_ZOOM;
+    if (strstr(function, "mergeEffectSelectorPressed")) return SCRIPT_ACTION_MERGE_FX_SEL;
+    if (strstr(function, "samplerPadShiftPressed")) return SCRIPT_ACTION_SAMPLER_SHIFT;
     return SCRIPT_ACTION_UNKNOWN;
 }
 

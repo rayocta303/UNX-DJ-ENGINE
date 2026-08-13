@@ -3335,17 +3335,21 @@ void UpdateDrawFrame(App *app) {
     double dt = GetFrameTime();
     if (dt < 0.001) dt = 0.016;
 
+    double calibRPM = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckA.Waveform.JogCalibRPM : (double)g_JogConfig.DefaultRPM;
+    double ticksPerSecAtNormalSpeed = (double)g_JogConfig.TicksPerRev * (calibRPM / 60.0);
+    double rawRate = 0.0;
+
     if (app->deckA.JogDelta != 0) {
-      double calibRPM = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckA.Waveform.JogCalibRPM : (double)g_JogConfig.DefaultRPM;
-      double ticksPerSecAtNormalSpeed = (double)g_JogConfig.TicksPerRev * (calibRPM / 60.0);
-      double rawRate = app->deckA.JogDelta / (ticksPerSecAtNormalSpeed * dt);
+      rawRate = app->deckA.JogDelta / (ticksPerSecAtNormalSpeed * dt);
       app->deckA.JogDelta = 0;
-      audioEngine->Decks[0].JogRate = rawRate;
       app->deckA.LastJogActiveTime = GetTime();
-    } else {
-      if (GetTime() - app->deckA.LastJogActiveTime > 0.05) {
-          audioEngine->Decks[0].JogRate = 0.0;
-      }
+    }
+
+    // Apply EMA filter to smooth out USB MIDI jitter, removing the need for a 50ms hard hold
+    audioEngine->Decks[0].JogRate = (audioEngine->Decks[0].JogRate * (double)g_JogConfig.EmaPrevWeight) + (rawRate * (double)g_JogConfig.EmaRawWeight);
+
+    if (rawRate == 0.0 && fabs(audioEngine->Decks[0].JogRate) < 0.01) {
+       audioEngine->Decks[0].JogRate = 0.0;
     }
   } else if (audioEngine->Decks[0].VinylReleaseActive) {
     // Vinyl touch release inertia in progress: consume leftover physical wheel ticks
@@ -3424,17 +3428,21 @@ void UpdateDrawFrame(App *app) {
     double dt = GetFrameTime();
     if (dt < 0.001) dt = 0.016;
 
+    double calibRPM = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckB.Waveform.JogCalibRPM : (double)g_JogConfig.DefaultRPM;
+    double ticksPerSecAtNormalSpeed = (double)g_JogConfig.TicksPerRev * (calibRPM / 60.0);
+    double rawRate = 0.0;
+
     if (app->deckB.JogDelta != 0) {
-      double calibRPM = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckB.Waveform.JogCalibRPM : (double)g_JogConfig.DefaultRPM;
-      double ticksPerSecAtNormalSpeed = (double)g_JogConfig.TicksPerRev * (calibRPM / 60.0);
-      double rawRate = app->deckB.JogDelta / (ticksPerSecAtNormalSpeed * dt);
+      rawRate = app->deckB.JogDelta / (ticksPerSecAtNormalSpeed * dt);
       app->deckB.JogDelta = 0;
-      audioEngine->Decks[1].JogRate = rawRate;
       app->deckB.LastJogActiveTime = GetTime();
-    } else {
-      if (GetTime() - app->deckB.LastJogActiveTime > 0.05) {
-          audioEngine->Decks[1].JogRate = 0.0;
-      }
+    }
+
+    // Apply EMA filter to smooth out USB MIDI jitter, removing the need for a 50ms hard hold
+    audioEngine->Decks[1].JogRate = (audioEngine->Decks[1].JogRate * (double)g_JogConfig.EmaPrevWeight) + (rawRate * (double)g_JogConfig.EmaRawWeight);
+
+    if (rawRate == 0.0 && fabs(audioEngine->Decks[1].JogRate) < 0.01) {
+       audioEngine->Decks[1].JogRate = 0.0;
     }
   } else if (audioEngine->Decks[1].VinylReleaseActive) {
     // Vinyl touch release inertia in progress: consume leftover physical wheel ticks

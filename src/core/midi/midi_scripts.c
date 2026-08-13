@@ -29,13 +29,20 @@ typedef struct {
 
 // --- Per-deck transport & loop LEDs ---
 static MidiRegister reg_play[4];
+static MidiRegister reg_play_indicator[4];
+static MidiRegister reg_start_stop[4];
 static MidiRegister reg_cue[4];
+static MidiRegister reg_cue_default[4];
+static MidiRegister reg_cue_indicator[4];
 static MidiRegister reg_sync[4];
 static MidiRegister reg_sync_leader[4];
 static MidiRegister reg_master_tempo[4];
 static MidiRegister reg_loop_in[4];
 static MidiRegister reg_loop_out[4];
 static MidiRegister reg_reloop[4];
+static MidiRegister reg_reloop_toggle[4];
+static MidiRegister reg_reloop_andstop[4];
+static MidiRegister reg_track_loaded[4];
 
 // --- Per-deck toggle LEDs ---
 static MidiRegister reg_slip[4];
@@ -54,10 +61,8 @@ static MidiRegister reg_keyboard_mode[4];
 static MidiRegister reg_keyshift_mode[4];
 
 // --- Per-deck pad LEDs ---
-static MidiRegister
-    reg_pad[4]; // base status for hotcue pads (midino = pad index 0..7)
-static MidiRegister
-    reg_beatloop[4]; // base status for beat loop pads (midino = 0x30 + index)
+static MidiRegister reg_hotcue[4][8];
+static MidiRegister reg_beatloop[4][8];
 
 // --- Per-deck jog LEDs ---
 static MidiRegister reg_jog_ring[4]; // 0x9F, deck index as midino
@@ -89,13 +94,24 @@ static void MIDI_BuildRegisterDefaults(void) {
 
     // Transport & Loop
     reg_play[i] = (MidiRegister){ms, 0x0B};
+    reg_play_indicator[i] = reg_play[i];
+    reg_start_stop[i] = reg_play[i];
+
     reg_cue[i] = (MidiRegister){ms, 0x0C};
+    reg_cue_default[i] = reg_cue[i];
+    reg_cue_indicator[i] = reg_cue[i];
+
     reg_sync[i] = (MidiRegister){ms, 0x58};
     reg_sync_leader[i] = (MidiRegister){ms, 0x5C};
     reg_master_tempo[i] = (MidiRegister){ms, 0x1A};
     reg_loop_in[i] = (MidiRegister){ms, 0x10};
     reg_loop_out[i] = (MidiRegister){ms, 0x11};
+    
     reg_reloop[i] = (MidiRegister){ms, 0x12};
+    reg_reloop_toggle[i] = reg_reloop[i];
+    reg_reloop_andstop[i] = reg_reloop[i];
+    
+    reg_track_loaded[i] = (MidiRegister){ms, 0x00}; // Fallback default
 
     // Toggle buttons
     reg_slip[i] = (MidiRegister){ms, 0x3D};
@@ -114,8 +130,10 @@ static void MIDI_BuildRegisterDefaults(void) {
     reg_keyshift_mode[i] = (MidiRegister){ms, 0x6F};
 
     // Pad LEDs
-    reg_pad[i] = (MidiRegister){ps, 0x00};      // midino = pad index 0..7
-    reg_beatloop[i] = (MidiRegister){ps, 0x30}; // midino = 0x30 + pad index
+    for (int p = 0; p < 8; p++) {
+        reg_hotcue[i][p] = (MidiRegister){ps, (uint8_t)p};
+        reg_beatloop[i][p] = (MidiRegister){ps, (uint8_t)(0x30 + p)};
+    }
 
     // Jog wheel LEDs
     reg_jog_ring[i] = (MidiRegister){0x9F, (uint8_t)i};
@@ -161,13 +179,22 @@ void MIDI_SetMappingRef(const MidiMapping *map) {
 
     // Transport & Loop
     TRY_RESOLVE(reg_play[i], "play")
+    TRY_RESOLVE(reg_play_indicator[i], "play_indicator")
+    TRY_RESOLVE(reg_start_stop[i], "start_stop")
+    
     TRY_RESOLVE(reg_cue[i], "cue_point")
+    TRY_RESOLVE(reg_cue_default[i], "cue_default")
+    TRY_RESOLVE(reg_cue_indicator[i], "cue_indicator")
+    
     TRY_RESOLVE(reg_sync[i], "sync_enabled")
     TRY_RESOLVE(reg_sync_leader[i], "sync_leader")
     TRY_RESOLVE(reg_master_tempo[i], "master_tempo")
     TRY_RESOLVE(reg_loop_in[i], "loop_in")
     TRY_RESOLVE(reg_loop_out[i], "loop_out")
     TRY_RESOLVE(reg_reloop[i], "reloop_exit")
+    TRY_RESOLVE(reg_reloop_toggle[i], "reloop_toggle")
+    TRY_RESOLVE(reg_reloop_andstop[i], "reloop_andstop")
+    TRY_RESOLVE(reg_track_loaded[i], "track_loaded")
 
     // Toggle buttons
     TRY_RESOLVE(reg_slip[i], "slip_enabled")
@@ -185,9 +212,24 @@ void MIDI_SetMappingRef(const MidiMapping *map) {
     TRY_RESOLVE(reg_keyboard_mode[i], "keyboardMode")
     TRY_RESOLVE(reg_keyshift_mode[i], "keyShiftMode")
 
-    // Pad LEDs — only status byte resolved, midino = pad index at call site
-    TRY_RESOLVE(reg_pad[i], "hotcue_1_activate")
-    TRY_RESOLVE(reg_beatloop[i], "beatloop_0.5_toggle")
+    // Pad LEDs — Individual resolution
+    for (int p = 0; p < 8; p++) {
+        char keyBuf[64];
+        snprintf(keyBuf, sizeof(keyBuf), "hotcue_%d_enabled", p + 1);
+        TRY_RESOLVE(reg_hotcue[i][p], keyBuf)
+        // Fallback for activate if enabled not found and nothing resolved yet
+        snprintf(keyBuf, sizeof(keyBuf), "hotcue_%d_activate", p + 1);
+        TRY_RESOLVE(reg_hotcue[i][p], keyBuf)
+    }
+
+    const char *blKeys[8] = {"0.125", "0.25", "0.5", "1", "2", "4", "8", "16"};
+    for (int p = 0; p < 8; p++) {
+        char keyBuf[64];
+        snprintf(keyBuf, sizeof(keyBuf), "beatloop_%s_enabled", blKeys[p]);
+        TRY_RESOLVE(reg_beatloop[i][p], keyBuf)
+        snprintf(keyBuf, sizeof(keyBuf), "beatloop_%s_toggle", blKeys[p]);
+        TRY_RESOLVE(reg_beatloop[i][p], keyBuf)
+    }
 
 #undef TRY_RESOLVE
   }
@@ -389,10 +431,6 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
     DeckAudioState *audio =
         (engine && i < MAX_DECKS) ? &engine->Decks[i] : NULL;
 
-    uint8_t mainStatus = reg_play[i].status; // resolved from mapping
-    (void)mainStatus; // used via reg_* table directly below
-    uint8_t padStatus = reg_pad[i].status; // resolved from mapping
-    (void)padStatus; // used via reg_* table directly below
 
     // -------------------------------------------------------------
     // 1. LOOP BUTTON LEDs (Loop In, Loop Out, Reloop/Exit)
@@ -513,14 +551,17 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
     bool isMaster = (ds && ds->IsMaster);
     uint8_t syncLeaderVal = isMaster ? 0x7F : 0x00;
 
-    // Play/CUE: resend when value changes OR blink phase toggles (max 2 msgs /
-    // 8 frames)
+    // Play/CUE: resend when value changes OR blink phase toggles (max 2 msgs / 8 frames)
     if (forceSend || blinkChanged || playVal != lastPlayVal[i]) {
       MIDI_SendShortMsg(reg_play[i].status, reg_play[i].midino, playVal);
+      MIDI_SendShortMsg(reg_play_indicator[i].status, reg_play_indicator[i].midino, playVal);
+      MIDI_SendShortMsg(reg_start_stop[i].status, reg_start_stop[i].midino, playVal);
       lastPlayVal[i] = playVal;
     }
     if (forceSend || blinkChanged || cueVal != lastCueVal[i]) {
       MIDI_SendShortMsg(reg_cue[i].status, reg_cue[i].midino, cueVal);
+      MIDI_SendShortMsg(reg_cue_default[i].status, reg_cue_default[i].midino, cueVal);
+      MIDI_SendShortMsg(reg_cue_indicator[i].status, reg_cue_indicator[i].midino, cueVal);
       lastCueVal[i] = cueVal;
     }
     if (forceSend || syncVal != lastSyncVal[i]) {
@@ -599,20 +640,28 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
         }
       }
 
-      // HotCue Mode Pad LED — midino = pad index 0..7
+      // HotCue Mode Pad LED
       if (forceSend || padVal != lastPadVals[i][p]) {
-        MIDI_SendShortMsg(reg_pad[i].status, (uint8_t)p, padVal);
+        MIDI_SendShortMsg(reg_hotcue[i][p].status, reg_hotcue[i][p].midino, padVal);
         lastPadVals[i][p] = padVal;
       }
 
-      // Beat Loop Mode Pad LED — midino = beatloop base + pad index
+      // Beat Loop Mode Pad LED
       uint8_t beatLoopPadVal =
           (isLooping && p == 2) ? 0x7F : (padVal > 0 ? 0x20 : 0x00);
       if (forceSend || beatLoopPadVal != lastPadVals[i][p + 8]) {
-        MIDI_SendShortMsg(reg_beatloop[i].status,
-                          reg_beatloop[i].midino + (uint8_t)p, beatLoopPadVal);
+        MIDI_SendShortMsg(reg_beatloop[i][p].status,
+                          reg_beatloop[i][p].midino, beatLoopPadVal);
         lastPadVals[i][p + 8] = beatLoopPadVal;
       }
+    }
+    
+    // Track Loaded Indicator
+    uint8_t trackLoadedVal = hasTrackLoaded ? 0x7F : 0x00;
+    static uint8_t lastTrackLoadedVal[4] = {0, 0, 0, 0};
+    if (forceSend || trackLoadedVal != lastTrackLoadedVal[i]) {
+        MIDI_SendShortMsg(reg_track_loaded[i].status, reg_track_loaded[i].midino, trackLoadedVal);
+        lastTrackLoadedVal[i] = trackLoadedVal;
     }
 
     // -------------------------------------------------------------
@@ -756,8 +805,15 @@ void MIDI_ResetAllLEDs(void) {
     MIDI_SendShortMsg(reg_loop_in[i].status, reg_loop_in[i].midino, 0);
     MIDI_SendShortMsg(reg_loop_out[i].status, reg_loop_out[i].midino, 0);
     MIDI_SendShortMsg(reg_reloop[i].status, reg_reloop[i].midino, 0);
+    MIDI_SendShortMsg(reg_reloop_toggle[i].status, reg_reloop_toggle[i].midino, 0);
+    MIDI_SendShortMsg(reg_reloop_andstop[i].status, reg_reloop_andstop[i].midino, 0);
+    MIDI_SendShortMsg(reg_track_loaded[i].status, reg_track_loaded[i].midino, 0);
     MIDI_SendShortMsg(reg_play[i].status, reg_play[i].midino, 0);
+    MIDI_SendShortMsg(reg_play_indicator[i].status, reg_play_indicator[i].midino, 0);
+    MIDI_SendShortMsg(reg_start_stop[i].status, reg_start_stop[i].midino, 0);
     MIDI_SendShortMsg(reg_cue[i].status, reg_cue[i].midino, 0);
+    MIDI_SendShortMsg(reg_cue_default[i].status, reg_cue_default[i].midino, 0);
+    MIDI_SendShortMsg(reg_cue_indicator[i].status, reg_cue_indicator[i].midino, 0);
     MIDI_SendShortMsg(reg_sync[i].status, reg_sync[i].midino, 0);
     MIDI_SendShortMsg(reg_sync_leader[i].status, reg_sync_leader[i].midino, 0);
     MIDI_SendShortMsg(reg_master_tempo[i].status, reg_master_tempo[i].midino,
@@ -767,7 +823,7 @@ void MIDI_ResetAllLEDs(void) {
     MIDI_SendShortMsg(reg_quantize[i].status, reg_quantize[i].midino, 0);
     MIDI_SendShortMsg(reg_pfl[i].status, reg_pfl[i].midino, 0);
     MIDI_SendShortMsg(reg_hotcue_mode[i].status, reg_hotcue_mode[i].midino, 0);
-    MIDI_SendShortMsg(reg_beatloop[i].status, reg_beatloop_mode[i].midino, 0);
+    MIDI_SendShortMsg(reg_beatloop_mode[i].status, reg_beatloop_mode[i].midino, 0);
     MIDI_SendShortMsg(reg_beatjump_mode[i].status, reg_beatjump_mode[i].midino,
                       0);
     MIDI_SendShortMsg(reg_sampler_mode[i].status, reg_sampler_mode[i].midino,
@@ -807,9 +863,8 @@ void MIDI_ResetAllLEDs(void) {
     lastJogPosVal[i] = 0;
 
     for (int p = 0; p < 8; p++) {
-      MIDI_SendShortMsg(reg_pad[i].status, (uint8_t)p, 0);
-      MIDI_SendShortMsg(reg_beatloop[i].status,
-                        reg_beatloop[i].midino + (uint8_t)p, 0);
+      MIDI_SendShortMsg(reg_hotcue[i][p].status, reg_hotcue[i][p].midino, 0);
+      MIDI_SendShortMsg(reg_beatloop[i][p].status, reg_beatloop[i][p].midino, 0);
       lastPadVals[i][p] = 0;
       lastPadVals[i][p + 8] = 0;
     }
@@ -1140,6 +1195,33 @@ void MIDI_ExecuteScript(MidiMapping *map, int actionId, uint8_t status,
   case SCRIPT_ACTION_BROWSE_SCROLL: {
     float diff = (value >= 64) ? (float)(value - 128) : (float)value;
     CO_AddValue("[Library]", "scroll", diff);
+  } break;
+  case SCRIPT_ACTION_BEATFX_LEFT: {
+    if (value > 0) CO_SetValue("[Master]", "beatfx_prev", 1.0f);
+  } break;
+  case SCRIPT_ACTION_BEATFX_RIGHT: {
+    if (value > 0) CO_SetValue("[Master]", "beatfx_next", 1.0f);
+  } break;
+  case SCRIPT_ACTION_PAD_FX: {
+    if (value > 0) CO_SetValue(group, "padmode", 2.0f); // Default to Slip Loop or Pad FX mode
+  } break;
+  case SCRIPT_ACTION_QUICK_JUMP: {
+    if (value > 0) {
+      if (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2) {
+        globalAudioEngine->Decks[targetDeckIdx].Position = 0.0;
+      }
+    }
+  } break;
+  case SCRIPT_ACTION_WAVEFORM_ZOOM: {
+    float diff = (value >= 64) ? (float)(value - 128) : (float)value;
+    CO_AddValue(group, "waveform_zoom", diff * 0.1f);
+  } break;
+  case SCRIPT_ACTION_MERGE_FX_SEL: {
+    if (value > 0) CO_ToggleValue("[Master]", "beatfx_next");
+  } break;
+  case SCRIPT_ACTION_SAMPLER_SHIFT: {
+    // Usually mapped to stop sampler or clear sampler
+    if (value > 0) CO_SetValue("[Library]", "loadA", -1.0f); // Dummy action
   } break;
   default: break;
   }
