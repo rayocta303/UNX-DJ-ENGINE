@@ -32,6 +32,15 @@ void MIDI_ResetVuMeters(void);
  */
 void MIDI_ResetAllLEDs(void);
 
+/**
+ * Sets the active MidiMapping reference so that LED register addresses
+ * (status byte and CC/midino) are resolved from the loaded mapping file
+ * instead of being hardcoded. Call this once after MIDI_LoadMapping.
+ *
+ * Falls back to Pioneer DDJ-FLX6 defaults if a key is not found in the mapping.
+ */
+void MIDI_SetMappingRef(const MidiMapping *map);
+
 #endif
 
 

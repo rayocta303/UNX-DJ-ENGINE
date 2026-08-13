@@ -417,6 +417,9 @@ bool MIDI_Init(MidiContext *ctx) {
     }
   }
 
+  // Resolve LED register addresses from the loaded mapping (not hardcoded)
+  MIDI_SetMappingRef(&global_mapping);
+
   ctx->initialized = true;
 
   // Pioneer DDJ Hardware Init / LED Enable Handshake

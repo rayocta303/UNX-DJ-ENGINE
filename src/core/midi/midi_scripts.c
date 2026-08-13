@@ -14,9 +14,98 @@ static uint8_t lastVuVal[4] = {0, 0, 0, 0};
 static uint8_t lastMasterVuL = 0;
 static uint8_t lastMasterVuR = 0;
 
+// =============================================================================
+// DYNAMIC REGISTER TABLE — resolved from MidiMapping at runtime
+// =============================================================================
+// Addresses (status + midino) for each LED output are NOT hardcoded anymore.
+// They are resolved from the loaded .midi.xml mapping file via MIDI_SetMappingRef().
+// Pioneer DDJ-FLX6 default values are used as fallback when a key is not found.
+
+typedef struct {
+  uint8_t status; // MIDI status byte (e.g. 0x90..0x9F, 0xB0..0xBB)
+  uint8_t midino; // MIDI note/CC number
+} MidiRegister;
+
+// Per-deck registers (indexed [0..3] = Channel1..Channel4)
+static MidiRegister reg_play[4];
+static MidiRegister reg_cue[4];
+static MidiRegister reg_sync[4];
+static MidiRegister reg_master_tempo[4];
+static MidiRegister reg_loop_in[4];
+static MidiRegister reg_loop_out[4];
+static MidiRegister reg_reloop[4];
+static MidiRegister reg_pad[4];      // base status for hotcue pads (midino = pad index 0..7)
+static MidiRegister reg_beatloop[4]; // base status for beat loop pads (midino = 0x30 + index)
+static MidiRegister reg_jog_ring[4]; // 0x9F, deck index as midino
+static MidiRegister reg_jog_pos[4];  // 0xBB, deck index as midino
+static MidiRegister reg_jog_cc[4];   // 0xB0|deck, CC 0x2A / 0x2B
+
+// VU meter registers
+static MidiRegister reg_vu_ch[4];      // per-channel VU (status=0xB0|ch, midino=0x02)
+static MidiRegister reg_vu_master_l;   // master VU left  (0xBA, 0x00)
+static MidiRegister reg_vu_master_r;   // master VU right (0xBA, 0x01)
+
+static const char *kChannels[4] = {"[Channel1]", "[Channel2]", "[Channel3]", "[Channel4]"};
+
+static void MIDI_BuildRegisterDefaults(void) {
+  // Pioneer DDJ-FLX6 default register addresses (fallback values)
+  for (int i = 0; i < 4; i++) {
+    uint8_t ms = (uint8_t)(0x90 | i); // 0x90..0x93
+    uint8_t ps = (uint8_t)(0x97 + i * 2); // 0x97, 0x99, 0x9B, 0x9D
+    reg_play[i]         = (MidiRegister){ms, 0x0B};
+    reg_cue[i]          = (MidiRegister){ms, 0x0C};
+    reg_sync[i]         = (MidiRegister){ms, 0x58};
+    reg_master_tempo[i] = (MidiRegister){ms, 0x1A};
+    reg_loop_in[i]      = (MidiRegister){ms, 0x10};
+    reg_loop_out[i]     = (MidiRegister){ms, 0x11};
+    reg_reloop[i]       = (MidiRegister){ms, 0x12};
+    reg_pad[i]          = (MidiRegister){ps, 0x00}; // midino = pad index
+    reg_beatloop[i]     = (MidiRegister){ps, 0x30}; // midino = 0x30 + pad index
+    reg_jog_ring[i]     = (MidiRegister){0x9F, (uint8_t)i};
+    reg_jog_pos[i]      = (MidiRegister){0xBB, (uint8_t)i};
+    reg_jog_cc[i]       = (MidiRegister){(uint8_t)(0xB0 | i), 0x2A};
+    reg_vu_ch[i]        = (MidiRegister){(uint8_t)(0xB0 | i), 0x02};
+  }
+  reg_vu_master_l = (MidiRegister){0xBA, 0x00};
+  reg_vu_master_r = (MidiRegister){0xBA, 0x01};
+}
+
+void MIDI_SetMappingRef(const MidiMapping *map) {
+  // Always start from defaults so any missing key keeps the correct Pioneer value
+  MIDI_BuildRegisterDefaults();
+  if (!map) return;
+
+  for (int i = 0; i < 4; i++) {
+    const char *grp = kChannels[i];
+    uint8_t st = 0, no = 0;
+
+#define TRY_RESOLVE(reg, key) \
+    if (MIDI_GetRegisterAddress(map, grp, key, &st, &no)) { (reg).status = st; (reg).midino = no; }
+
+    TRY_RESOLVE(reg_play[i],         "play")
+    TRY_RESOLVE(reg_cue[i],          "cue_point")
+    TRY_RESOLVE(reg_sync[i],         "sync_mode")
+    TRY_RESOLVE(reg_master_tempo[i], "master_tempo")
+    TRY_RESOLVE(reg_loop_in[i],      "loop_in")
+    TRY_RESOLVE(reg_loop_out[i],     "loop_out")
+    TRY_RESOLVE(reg_reloop[i],       "reloop_exit")
+    TRY_RESOLVE(reg_pad[i],          "hotcue_1_activate")   // status only; midino = pad index
+    TRY_RESOLVE(reg_beatloop[i],     "beatloop_0.5_toggle") // status only; midino = 0x30 + idx
+#undef TRY_RESOLVE
+  }
+
+  printf("[MIDI] Register table resolved from mapping: '%s'\n", map->name);
+}
+
+// =============================================================================
+
+
 void MIDI_UpdateVuMeters(AudioEngine *engine, bool forceSend) {
   if (!engine)
     return;
+
+  static bool vuInitialized = false;
+  if (!vuInitialized) { MIDI_BuildRegisterDefaults(); vuInitialized = true; }
 
   // Gain multiplier to map linear engine audio peaks to Pioneer DDJ hardware
   // LED calibration
@@ -31,20 +120,13 @@ void MIDI_UpdateVuMeters(AudioEngine *engine, bool forceSend) {
       float rawPeak = fmaxf(audio->VuMeterL, audio->VuMeterR);
       float trimVal = (audio->Trim > 0.0f) ? audio->Trim : 1.0f;
       peak = rawPeak * trimVal * VU_GAIN;
-      if (peak > 1.0f)
-        peak = 1.0f;
-      if (peak < 0.0f)
-        peak = 0.0f;
+      if (peak > 1.0f) peak = 1.0f;
+      if (peak < 0.0f) peak = 0.0f;
     }
 
-    // Pioneer VU meters: 0x00 to 0x7F (0 to 127)
     uint8_t midiVal = (uint8_t)(peak * 127.0f);
-
     if (forceSend || (midiVal != lastVuVal[i])) {
-      // 0xB0 = Ch 1, 0xB1 = Ch 2, 0xB2 = Ch 3, 0xB3 = Ch 4
-      uint8_t status = 0xB0 | (i & 0x0F);
-      uint8_t cc = 0x02; // Pioneer Channel Level Meter CC
-      MIDI_SendShortMsg(status, cc, midiVal);
+      MIDI_SendShortMsg(reg_vu_ch[i].status, reg_vu_ch[i].midino, midiVal);
       lastVuVal[i] = midiVal;
     }
   }
@@ -53,41 +135,39 @@ void MIDI_UpdateVuMeters(AudioEngine *engine, bool forceSend) {
   float masterVol = (engine->MasterVolume > 0.0f) ? engine->MasterVolume : 1.0f;
   float masterL = engine->MasterVuL * masterVol * VU_GAIN;
   float masterR = engine->MasterVuR * masterVol * VU_GAIN;
-  if (masterL > 1.0f)
-    masterL = 1.0f;
-  if (masterL < 0.0f)
-    masterL = 0.0f;
-  if (masterR > 1.0f)
-    masterR = 1.0f;
-  if (masterR < 0.0f)
-    masterR = 0.0f;
+  if (masterL > 1.0f) masterL = 1.0f;
+  if (masterL < 0.0f) masterL = 0.0f;
+  if (masterR > 1.0f) masterR = 1.0f;
+  if (masterR < 0.0f) masterR = 0.0f;
 
   uint8_t mValL = (uint8_t)(masterL * 127.0f);
   uint8_t mValR = (uint8_t)(masterR * 127.0f);
 
   if (forceSend || (mValL != lastMasterVuL)) {
-    MIDI_SendShortMsg(0xBA, 0x00, mValL);
+    MIDI_SendShortMsg(reg_vu_master_l.status, reg_vu_master_l.midino, mValL);
     lastMasterVuL = mValL;
   }
   if (forceSend || (mValR != lastMasterVuR)) {
-    MIDI_SendShortMsg(0xBA, 0x01, mValR);
+    MIDI_SendShortMsg(reg_vu_master_r.status, reg_vu_master_r.midino, mValR);
     lastMasterVuR = mValR;
   }
 }
 
 void MIDI_ResetVuMeters(void) {
   for (int i = 0; i < 4; i++) {
-    uint8_t status = 0xB0 | (i & 0x0F);
-    uint8_t cc = 0x02;
-    MIDI_SendShortMsg(status, cc, 0);
+    MIDI_SendShortMsg(reg_vu_ch[i].status, reg_vu_ch[i].midino, 0);
     lastVuVal[i] = 0;
   }
-  MIDI_SendShortMsg(0xBA, 0x00, 0);
-  MIDI_SendShortMsg(0xBA, 0x01, 0);
+  MIDI_SendShortMsg(reg_vu_master_l.status, reg_vu_master_l.midino, 0);
+  MIDI_SendShortMsg(reg_vu_master_r.status, reg_vu_master_r.midino, 0);
   lastMasterVuL = 0;
   lastMasterVuR = 0;
 }
 
+
+
+// Last-state tracking arrays (change-detection to avoid MIDI flooding)
+// =============================================================================
 static uint8_t lastLoopInVal[4] = {0, 0, 0, 0};
 static uint8_t lastLoopOutVal[4] = {0, 0, 0, 0};
 static uint8_t lastReloopVal[4] = {0, 0, 0, 0};
@@ -105,11 +185,15 @@ static int blinkCounter = 0;
 static bool blinkPhase = false;     // current blink LED state
 static bool lastBlinkPhase = false; // previous phase — detect transition
 
+// =============================================================================
+
 void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
                                AudioEngine *engine, bool forceSend) {
+  // Ensure register defaults exist (no-op if already initialized)
+  static bool regInitialized = false;
+  if (!regInitialized) { MIDI_BuildRegisterDefaults(); regInitialized = true; }
+
   DeckState *decks[4] = {d1, d2, NULL, NULL};
-  uint8_t mainStatuses[4] = {0x90, 0x91, 0x92, 0x93};
-  uint8_t padStatuses[4] = {0x97, 0x99, 0x98, 0x9A};
 
   // Advance blink timer — only Play/CUE LEDs are force-sent on phase change.
   // All other LEDs use normal change-detection to avoid MIDI flooding.
@@ -126,8 +210,10 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
     DeckAudioState *audio =
         (engine && i < MAX_DECKS) ? &engine->Decks[i] : NULL;
 
-    uint8_t mainStatus = mainStatuses[i];
-    uint8_t padStatus = padStatuses[i];
+    uint8_t mainStatus = reg_play[i].status;   // resolved from mapping
+    (void)mainStatus; // used via reg_* table directly below
+    uint8_t padStatus  = reg_pad[i].status;    // resolved from mapping
+    (void)padStatus;  // used via reg_* table directly below
 
     // -------------------------------------------------------------
     // 1. LOOP BUTTON LEDs (Loop In, Loop Out, Reloop/Exit)
@@ -155,15 +241,15 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
     uint8_t reloopVal = isLooping ? 0x7F : 0x00;
 
     if (forceSend || loopInVal != lastLoopInVal[i]) {
-      MIDI_SendShortMsg(mainStatus, 0x10, loopInVal); // LOOP IN / 4 BEAT
+      MIDI_SendShortMsg(reg_loop_in[i].status, reg_loop_in[i].midino, loopInVal);
       lastLoopInVal[i] = loopInVal;
     }
     if (forceSend || loopOutVal != lastLoopOutVal[i]) {
-      MIDI_SendShortMsg(mainStatus, 0x11, loopOutVal); // LOOP OUT
+      MIDI_SendShortMsg(reg_loop_out[i].status, reg_loop_out[i].midino, loopOutVal);
       lastLoopOutVal[i] = loopOutVal;
     }
     if (forceSend || reloopVal != lastReloopVal[i]) {
-      MIDI_SendShortMsg(mainStatus, 0x12, reloopVal); // RELOOP / EXIT
+      MIDI_SendShortMsg(reg_reloop[i].status, reg_reloop[i].midino, reloopVal);
       lastReloopVal[i] = reloopVal;
     }
 
@@ -224,20 +310,19 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
 
     // Play/CUE: resend when value changes OR blink phase toggles (max 2 msgs / 8 frames)
     if (forceSend || blinkChanged || playVal != lastPlayVal[i]) {
-      MIDI_SendShortMsg(mainStatus, 0x0B, playVal); // PLAY / PAUSE
+      MIDI_SendShortMsg(reg_play[i].status, reg_play[i].midino, playVal);
       lastPlayVal[i] = playVal;
     }
     if (forceSend || blinkChanged || cueVal != lastCueVal[i]) {
-      MIDI_SendShortMsg(mainStatus, 0x0C, cueVal); // CUE
+      MIDI_SendShortMsg(reg_cue[i].status, reg_cue[i].midino, cueVal);
       lastCueVal[i] = cueVal;
     }
-    // Sync & Master Tempo: pure change-detection, no blink needed
     if (forceSend || syncVal != lastSyncVal[i]) {
-      MIDI_SendShortMsg(mainStatus, 0x58, syncVal); // SYNC
+      MIDI_SendShortMsg(reg_sync[i].status, reg_sync[i].midino, syncVal);
       lastSyncVal[i] = syncVal;
     }
     if (forceSend || mtVal != lastMasterTempoVal[i]) {
-      MIDI_SendShortMsg(mainStatus, 0x1A, mtVal); // MASTER TEMPO
+      MIDI_SendShortMsg(reg_master_tempo[i].status, reg_master_tempo[i].midino, mtVal);
       lastMasterTempoVal[i] = mtVal;
     }
 
@@ -257,17 +342,17 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
         }
       }
 
-      // HotCue Mode Pad LED (0x00 .. 0x07)
+      // HotCue Mode Pad LED — midino = pad index 0..7
       if (forceSend || padVal != lastPadVals[i][p]) {
-        MIDI_SendShortMsg(padStatus, (uint8_t)p, padVal);
+        MIDI_SendShortMsg(reg_pad[i].status, (uint8_t)p, padVal);
         lastPadVals[i][p] = padVal;
       }
 
-      // Beat Loop Mode Pad LED (0x30 .. 0x37)
+      // Beat Loop Mode Pad LED — midino = beatloop base + pad index
       uint8_t beatLoopPadVal =
           (isLooping && p == 2) ? 0x7F : (padVal > 0 ? 0x20 : 0x00);
       if (forceSend || beatLoopPadVal != lastPadVals[i][p + 8]) {
-        MIDI_SendShortMsg(padStatus, (uint8_t)(0x30 + p), beatLoopPadVal);
+        MIDI_SendShortMsg(reg_beatloop[i].status, reg_beatloop[i].midino + (uint8_t)p, beatLoopPadVal);
         lastPadVals[i][p + 8] = beatLoopPadVal;
       }
     }
@@ -288,11 +373,11 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
       else             jogRingVal = 0x28; // Loaded/idle: dim
     }
     if (forceSend || jogRingVal != lastJogRingVal[i]) {
-      MIDI_SendShortMsg(0x9F, (uint8_t)i, jogRingVal);
+      MIDI_SendShortMsg(reg_jog_ring[i].status, reg_jog_ring[i].midino, jogRingVal);
       lastJogRingVal[i] = jogRingVal;
     }
 
-    // Jog Ring Position Rotation LED (0xBB, data1 = deck index 0..3, data2 = 1..72)
+    // Jog Ring Position Rotation LED
     uint8_t jogPos72 = 1;
     uint8_t jogPos127 = 0;
 
@@ -306,14 +391,9 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
     }
 
     if (forceSend || jogPos72 != lastJogPosVal[i]) {
-      // Send 0xBB (Pioneer DDJ-FLX6 / DDJ-1000 Hardware Jog Ring Status)
-      MIDI_SendShortMsg(0xBB, (uint8_t)i, jogPos72);
-      
-      // Also send CC 0x2A & 0x2B (Pioneer DDJ-400 / FLX4 CC Ring Status)
-      uint8_t ccStatus = 0xB0 | (i & 0x0F);
-      MIDI_SendShortMsg(ccStatus, 0x2A, jogPos127);
-      MIDI_SendShortMsg(ccStatus, 0x2B, jogRingVal);
-
+      MIDI_SendShortMsg(reg_jog_pos[i].status, reg_jog_pos[i].midino, jogPos72);
+      MIDI_SendShortMsg(reg_jog_cc[i].status, 0x2A, jogPos127);
+      MIDI_SendShortMsg(reg_jog_cc[i].status, 0x2B, jogRingVal);
       lastJogPosVal[i] = jogPos72;
     }
   }
@@ -322,25 +402,18 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
 void MIDI_ResetAllLEDs(void) {
   MIDI_ResetVuMeters();
 
-  uint8_t mainStatuses[4] = {0x90, 0x91, 0x92, 0x93};
-  uint8_t padStatuses[4] = {0x97, 0x99, 0x98, 0x9A};
-
   for (int i = 0; i < 4; i++) {
-    uint8_t ms = mainStatuses[i];
-    uint8_t ps = padStatuses[i];
-
-    MIDI_SendShortMsg(ms, 0x10, 0); // Loop In
-    MIDI_SendShortMsg(ms, 0x11, 0); // Loop Out
-    MIDI_SendShortMsg(ms, 0x12, 0); // Reloop/Exit
-    MIDI_SendShortMsg(ms, 0x0B, 0); // Play
-    MIDI_SendShortMsg(ms, 0x0C, 0); // Cue
-    MIDI_SendShortMsg(ms, 0x58, 0); // Sync
-    MIDI_SendShortMsg(ms, 0x1A, 0); // Master Tempo
-
-    MIDI_SendShortMsg(0x9F, (uint8_t)i, 0); // Jog Ring OFF
-    MIDI_SendShortMsg(0xBB, (uint8_t)i, 0); // Jog Pos 0xBB OFF
-    MIDI_SendShortMsg(0xB0 | (i & 0x0F), 0x2A, 0); // Jog Pos CC OFF
-    MIDI_SendShortMsg(0xB0 | (i & 0x0F), 0x2B, 0);
+    MIDI_SendShortMsg(reg_loop_in[i].status,      reg_loop_in[i].midino,      0);
+    MIDI_SendShortMsg(reg_loop_out[i].status,     reg_loop_out[i].midino,     0);
+    MIDI_SendShortMsg(reg_reloop[i].status,       reg_reloop[i].midino,       0);
+    MIDI_SendShortMsg(reg_play[i].status,         reg_play[i].midino,         0);
+    MIDI_SendShortMsg(reg_cue[i].status,          reg_cue[i].midino,          0);
+    MIDI_SendShortMsg(reg_sync[i].status,         reg_sync[i].midino,         0);
+    MIDI_SendShortMsg(reg_master_tempo[i].status, reg_master_tempo[i].midino, 0);
+    MIDI_SendShortMsg(reg_jog_ring[i].status,     reg_jog_ring[i].midino,     0);
+    MIDI_SendShortMsg(reg_jog_pos[i].status,      reg_jog_pos[i].midino,      0);
+    MIDI_SendShortMsg(reg_jog_cc[i].status,       0x2A,                       0);
+    MIDI_SendShortMsg(reg_jog_cc[i].status,       0x2B,                       0);
 
     lastLoopInVal[i] = 0;
     lastLoopOutVal[i] = 0;
@@ -353,8 +426,8 @@ void MIDI_ResetAllLEDs(void) {
     lastJogPosVal[i] = 0;
 
     for (int p = 0; p < 8; p++) {
-      MIDI_SendShortMsg(ps, (uint8_t)p, 0);
-      MIDI_SendShortMsg(ps, (uint8_t)(0x30 + p), 0);
+      MIDI_SendShortMsg(reg_pad[i].status,      (uint8_t)p,       0);
+      MIDI_SendShortMsg(reg_beatloop[i].status, reg_beatloop[i].midino + (uint8_t)p, 0);
       lastPadVals[i][p] = 0;
       lastPadVals[i][p + 8] = 0;
     }
