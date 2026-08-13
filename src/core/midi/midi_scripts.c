@@ -133,10 +133,10 @@ static void MIDI_BuildRegisterDefaults(void) {
   reg_master_pfl = (MidiRegister){0x94, 0x54};
 
   // Beat FX CH Selector (Ch1..Ch4, Master)
-  reg_beatfx_ch[0] = (MidiRegister){0x94, 0x10};
-  reg_beatfx_ch[1] = (MidiRegister){0x95, 0x11};
-  reg_beatfx_ch[2] = (MidiRegister){0x96, 0x12};
-  reg_beatfx_ch[3] = (MidiRegister){0x97, 0x13};
+  reg_beatfx_ch[0] = (MidiRegister){0x94, 0x1C};
+  reg_beatfx_ch[1] = (MidiRegister){0x94, 0x1D};
+  reg_beatfx_ch[2] = (MidiRegister){0x94, 0x1E};
+  reg_beatfx_ch[3] = (MidiRegister){0x94, 0x1F};
   reg_beatfx_ch[4] = (MidiRegister){0x94, 0x14};
 
   // Beat FX Beat Select
@@ -669,9 +669,9 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
   // 5. BEAT FX & MASTER HEADPHONE CUE LEDs
   // -------------------------------------------------------------
   bool isFxOn = engine ? engine->BeatFX.isFxOn : false;
-  uint8_t bfxButtonVal = isFxOn ? 0x7F : 0x00;
-
-  uint8_t bfxSelectVal = isFxOn ? 0x7F : 0x20;
+  bool blinkState = ((int)(GetTime() * 4) % 2 == 0); // 4Hz blinking (250ms toggle)
+  uint8_t bfxButtonVal = isFxOn ? (blinkState ? 0x7F : 0x00) : 0x00;
+  uint8_t bfxSelectVal = isFxOn ? (blinkState ? 0x7F : 0x20) : 0x20;
 
   COType coT2;
   float *releasePtr =

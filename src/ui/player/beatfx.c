@@ -35,12 +35,6 @@ static int BeatFX_Update(Component *base) {
     
     Rectangle chRect = { x + S(4), cy, w - S(8), S(20) };
     
-    // Sync UI State with Engine State (if engine exists)
-    if (b->AudioPlugin) {
-        b->State->IsFXOn = b->AudioPlugin->BeatFX.isFxOn;
-        b->State->SelectedFX = b->AudioPlugin->BeatFX.activeFX;
-        b->State->SelectedChannel = b->AudioPlugin->BeatFX.targetChannel;
-    }
 
     if (b->State->FXDropdownOpen) {
         float modalW = S(420);

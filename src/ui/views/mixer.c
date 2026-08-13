@@ -10,16 +10,7 @@
 
 static int Mixer_Update(Component *base) {
   MixerRenderer *r = (MixerRenderer *)base;
-  if (r->State->AudioPlugin && r->State->FXState) {
-    AudioEngine *eng = r->State->AudioPlugin;
-    BeatFXState *fx = r->State->FXState;
-    // Pull any changes from engine (e.g. MIDI) or push UI changes
-    // Here we ensure the UI state matches the engine
-    fx->LevelDepth = eng->BeatFX.levelDepth;
-    fx->SelectedChannel = eng->BeatFX.targetChannel;
-    fx->SelectedFX = eng->BeatFX.activeFX;
-    fx->IsFXOn = eng->BeatFX.isFxOn;
-  }
+  (void)r;
   return 0;
 }
 
@@ -94,7 +85,7 @@ static bool DrawFXButton(const char *label, float x, float y, float w, float h,
                          bool active) {
   bool hovered =
       CheckCollisionPointRec(Input_GetPointerPos(), (Rectangle){x, y, w, h});
-  bool pressed = Input_CheckClick((Rectangle){x, y, w, h});
+  bool pressed = Input_CheckPress((Rectangle){x, y, w, h});
   bool isFxBlinking = (fmod(GetTime(), 0.5) < 0.25);
   Color bg = active ? (isFxBlinking ? (Color){0, 140, 255, 255} : (Color){0, 40, 110, 255}) : (hovered ? ColorDark1 : ColorBlack);
   Color fg = active ? ColorWhite : ColorOrange;
@@ -287,7 +278,7 @@ static void Mixer_Draw(Component *base) {
 
     Font iconFont = UIFonts_GetIcon(S(12));
     UIDrawText("\xef\x80\xa5", iconFont, fcx - S(6), cueBtnY + S(4), S(12), d->IsCueActive ? ColorOrange : ColorShadow);
-    if (Input_CheckClick((Rectangle){cueBtnX, cueBtnY, cueBtnSize, cueBtnSize})) {
+    if (Input_CheckPress((Rectangle){cueBtnX, cueBtnY, cueBtnSize, cueBtnSize})) {
         d->IsCueActive = !d->IsCueActive;
     }
 
@@ -380,7 +371,7 @@ static void Mixer_Draw(Component *base) {
   DrawRectangleRec(fxSelRect, ColorBlack);
   DrawRectangleLinesEx(fxSelRect, 1.0f, ColorWhite);
   DrawCentredText(bfxNames[fxs->SelectedFX % 14], fSub, rightX, colRightW, bSelectorY + S(8), S(9), ColorWhite);
-  if (Input_CheckClick(fxSelRect)) {
+  if (Input_CheckPress(fxSelRect)) {
       fxs->SelectedFX = (fxs->SelectedFX + 1) % 14;
       BeatFXManager_SetFX(&eng->BeatFX, fxs->SelectedFX);
   }
@@ -391,7 +382,7 @@ static void Mixer_Draw(Component *base) {
   DrawRectangleRec(chSelRect, ColorBlack);
   DrawRectangleLinesEx(chSelRect, 1.0f, ColorWhite);
   DrawCentredText(targetNames[fxs->SelectedChannel % 3], fSub, rightX, colRightW, targetY + S(8), S(9), ColorOrange);
-  if (Input_CheckClick(chSelRect)) {
+  if (Input_CheckPress(chSelRect)) {
       fxs->SelectedChannel = (fxs->SelectedChannel + 1) % 3;
   }
 
