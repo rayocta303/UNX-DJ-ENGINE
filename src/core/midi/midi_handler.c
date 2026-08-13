@@ -11,6 +11,8 @@
 #if defined(__linux__) && !defined(__ANDROID__)
 #include <alsa/asoundlib.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
 #ifndef HAS_ALSA
 #define HAS_ALSA 1
 #endif
@@ -29,6 +31,25 @@ static int in_port = -1;
 static int out_port = -1;
 static int dest_client = -1;
 static int dest_port = -1;
+static int raw_midi_fd = -1;
+
+static void LinuxMIDI_OpenRawMIDI(void) {
+  if (raw_midi_fd >= 0) return;
+  const char *paths[] = {
+      "/dev/snd/midiC1D0",
+      "/dev/snd/midiC0D0",
+      "/dev/snd/midiC2D0",
+      "/dev/snd/midiC3D0"
+  };
+  for (size_t i = 0; i < sizeof(paths) / sizeof(paths[0]); i++) {
+    int fd = open(paths[i], O_WRONLY | O_NONBLOCK);
+    if (fd >= 0) {
+      raw_midi_fd = fd;
+      printf("[MIDI] Opened RawMIDI direct device: %s (fd=%d)\n", paths[i], fd);
+      break;
+    }
+  }
+}
 
 static void LinuxMIDI_AutoConnectPorts(char *outDetectedName) {
 #ifdef HAS_ALSA
@@ -133,23 +154,29 @@ static bool lastMsgSet = false;
 
 static void send_bytes(const unsigned char *b, int len) {
 #if defined(__linux__) && !defined(__ANDROID__)
-#ifdef HAS_ALSA
-  if (!seq_handle || out_port < 0 || !b || len <= 0)
-    return;
-  if (!midi_coder) {
-    if (snd_midi_event_new(1024, &midi_coder) < 0)
-      return;
+  // 1. Direct RawMIDI Write (Bypasses ALSA Sequencer queue issues on S905X kernel)
+  if (raw_midi_fd >= 0 && b && len > 0) {
+    write(raw_midi_fd, b, len);
   }
-  snd_seq_event_t ev;
-  snd_seq_ev_clear(&ev);
-  snd_midi_event_init(midi_coder);
-  long encoded = snd_midi_event_encode(midi_coder, b, len, &ev);
-  if (encoded > 0) {
-    snd_seq_ev_set_source(&ev, out_port);
-    snd_seq_ev_set_subs(&ev);
-    snd_seq_ev_set_direct(&ev);
-    snd_seq_event_output((snd_seq_t *)seq_handle, &ev);
-    snd_seq_drain_output((snd_seq_t *)seq_handle);
+
+  // 2. ALSA Sequencer Write
+#ifdef HAS_ALSA
+  if (seq_handle && out_port >= 0 && b && len > 0) {
+    if (!midi_coder) {
+      if (snd_midi_event_new(1024, &midi_coder) < 0)
+        return;
+    }
+    snd_seq_event_t ev;
+    snd_seq_ev_clear(&ev);
+    snd_midi_event_init(midi_coder);
+    long encoded = snd_midi_event_encode(midi_coder, b, len, &ev);
+    if (encoded > 0) {
+      snd_seq_ev_set_source(&ev, out_port);
+      snd_seq_ev_set_subs(&ev);
+      snd_seq_ev_set_direct(&ev);
+      snd_seq_event_output((snd_seq_t *)seq_handle, &ev);
+      snd_seq_drain_output((snd_seq_t *)seq_handle);
+    }
   }
 #endif
 #else
@@ -311,6 +338,7 @@ bool MIDI_Init(MidiContext *ctx) {
   char deviceName[256] = "";
 
 #if defined(__linux__) && !defined(__ANDROID__)
+  LinuxMIDI_OpenRawMIDI();
 #ifdef HAS_ALSA
   if (!seq_handle) {
     snd_seq_t *seq = NULL;
