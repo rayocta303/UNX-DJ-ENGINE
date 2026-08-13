@@ -27,8 +27,8 @@ static int DeckInfo_Update(Component *base) {
     float statusH = S(22);
 
     // 1. Eject Button (Touch Utility)
-    float ejectW = S(20);
-    float ejectH = S(9);
+    float ejectW = S(12);
+    float ejectH = S(12);
     float ejectX = deckInfoW - ejectW - S(3);
     float ejectY = y + (headerH - ejectH) / 2.0f;
     Rectangle ejectRect = { ejectX, ejectY, ejectW, ejectH };
@@ -76,7 +76,8 @@ static int DeckInfo_Update(Component *base) {
         }
     }
 
-    // 2. Utility Buttons (2 Rows x 2 Columns Grid) - ENLARGED
+    // 2. Utility Buttons (2 Rows x 2 Columns Grid) - COMMENTED OUT
+    /*
     float utilY = contentY + statusH + S(5);
     float utilGap = S(4.0f);
     float utilW = (deckInfoW - margin * 2 - utilGap) / 2.0f;
@@ -104,6 +105,7 @@ static int DeckInfo_Update(Component *base) {
     if (Touch_CheckClick(viRect, S(2.0f))) {
         d->State->VinylModeEnabled = !d->State->VinylModeEnabled;
     }
+    */
 
     // --- 3. Main Controls (CUE / PLAY) COMMENTED OUT ---
     /*
@@ -212,11 +214,11 @@ static void DeckInfo_Draw(Component *base) {
 
     char deckLabel[32];
     sprintf(deckLabel, "DECK %d", d->ID + 1);
-    UIDrawText(deckLabel, faceXXS, margin, y + S(3.5f), S(7), ColorWhite);
+    UIDrawText(deckLabel, faceSm, margin, y + S(2.5f), S(10), ColorWhite);
 
     // Eject Button
-    float ejectW = S(20);
-    float ejectH = S(9);
+    float ejectW = S(12);
+    float ejectH = S(12);
     float ejectX = deckInfoW - ejectW - S(3);
     float ejectY = y + (headerH - ejectH) / 2.0f;
     Rectangle ejectRect = { ejectX, ejectY, ejectW, ejectH };
@@ -257,9 +259,9 @@ static void DeckInfo_Draw(Component *base) {
         
         // Icon (Eject)
         if (isConfirming) {
-            UIDrawText("SURE?", faceXXS, ejectRect.x + S(2), ejectRect.y + S(1.5f), S(7), ColorWhite);
+            UIDrawText("SURE?", faceXXS, ejectRect.x + S(1), ejectRect.y + S(2.5f), S(7), ColorWhite);
         } else {
-            UIDrawText("\uf052", faceIcon, ejectRect.x + (ejectW - S(7))/2.0f, ejectRect.y + S(1.0f), S(7), ColorWhite);
+            UIDrawText("\uf052", faceIcon, ejectRect.x + (ejectW - S(7))/2.0f, ejectRect.y + S(2.5f), S(7), ColorWhite);
         }
     }
 
@@ -296,7 +298,8 @@ static void DeckInfo_Draw(Component *base) {
     }
     UIDrawText(barsVal, faceSm, col2X + S(2), contentY + S(11), S(10), d->ID == 0 ? ColorOrange : ColorWhite);
 
-    // --- Row 2: Utility Buttons (2 Rows x 2 Columns Grid) - ENLARGED ---
+    // --- Row 2: Utility Buttons (2 Rows x 2 Columns Grid) - COMMENTED OUT ---
+    /*
     float utilY = contentY + statusH + S(5);
     float utilGap = S(4.0f);
     float utilW = (deckInfoW - margin * 2 - utilGap) / 2.0f;
@@ -343,6 +346,7 @@ static void DeckInfo_Draw(Component *base) {
     const char *viLbl = vinylOn ? "VINYL" : "CDJ";
     Vector2 viSz = MeasureTextEx(faceSm, viLbl, S(9), 1);
     UIDrawText(viLbl, faceSm, viRect.x + (utilW - viSz.x)/2.0f, viRect.y + (utilH - S(9))/2.0f, S(9), ColorWhite);
+    */
 
     // --- Row 3: Main Controls (Cue, Play) COMMENTED OUT ---
     /*

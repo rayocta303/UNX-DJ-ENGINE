@@ -22,6 +22,45 @@ static void trim_xml_tag(char *str) {
     memmove(str, start, strlen(start) + 1);
 }
 
+int ParseScriptAction(const char* function) {
+    if (!function || function[0] == '\0') return SCRIPT_ACTION_UNKNOWN;
+    if (strstr(function, "shiftButton") || strstr(function, "shiftPressed")) return SCRIPT_ACTION_SHIFT;
+    if (strstr(function, "jogSearch")) return SCRIPT_ACTION_JOG_SEARCH;
+    if (strstr(function, "jogTurn")) return SCRIPT_ACTION_JOG_TURN;
+    if (strstr(function, "jogTouch") || strstr(function, "JogTouch")) return SCRIPT_ACTION_JOG_TOUCH;
+    if (strstr(function, "beatTap") || strstr(function, "beatFxTap")) return SCRIPT_ACTION_BEAT_TAP;
+    if (strstr(function, "beatFxSelect") || strstr(function, "beatFxNext")) return SCRIPT_ACTION_BEATFX_NEXT;
+    if (strstr(function, "beatFxPrev")) return SCRIPT_ACTION_BEATFX_PREV;
+    if (strstr(function, "beatFxLevelDepth") || strstr(function, "beatFxDepth") || strstr(function, "drywet") || strstr(function, "meta") || strstr(function, "super1")) return SCRIPT_ACTION_BEATFX_DEPTH;
+    if (strstr(function, "fxEnabled") || strstr(function, "beatFxOnOffPressed") || strstr(function, "beatFxOnOff") || strstr(function, "super1_toggle")) return SCRIPT_ACTION_BEATFX_TOGGLE;
+    if (strstr(function, "padMode") || strstr(function, "PadMode")) return SCRIPT_ACTION_PAD_MODE;
+    if (strstr(function, "samplerPadPressed")) return SCRIPT_ACTION_SAMPLER_PAD;
+    if (strstr(function, "toggleLoopAdjustIn")) return SCRIPT_ACTION_LOOP_IN_ADJUST;
+    if (strstr(function, "toggleLoopAdjustOut")) return SCRIPT_ACTION_LOOP_OUT_ADJUST;
+    if (strstr(function, "cueLoopCallLeft")) return SCRIPT_ACTION_CUE_LOOP_LEFT;
+    if (strstr(function, "cueLoopCallRight")) return SCRIPT_ACTION_CUE_LOOP_RIGHT;
+    if (strstr(function, "tempoSliderMSB")) return SCRIPT_ACTION_TEMPO_MSB;
+    if (strstr(function, "tempoSliderLSB")) return SCRIPT_ACTION_TEMPO_LSB;
+    if (strstr(function, "cycleTempoRange")) return SCRIPT_ACTION_TEMPO_RANGE;
+    if (strstr(function, "syncPressed") || strstr(function, "syncLongPressed")) return SCRIPT_ACTION_SYNC;
+    if (strstr(function, "quantizeToggle")) return SCRIPT_ACTION_QUANTIZE;
+    if (strstr(function, "slipToggle")) return SCRIPT_ACTION_SLIP;
+    if (strstr(function, "mergeFxTurn")) return SCRIPT_ACTION_MERGE_FX_TURN;
+    if (strstr(function, "mergeFxPressed")) return SCRIPT_ACTION_MERGE_FX_PRESS;
+    if (strstr(function, "loadSelectedTrack") || strstr(function, "LoadSelectedTrack")) return SCRIPT_ACTION_LOAD_TRACK;
+    if (strstr(function, "browseClick") || strstr(function, "browsePush") || strstr(function, "SelectTrack") || strstr(function, "DirectoryPush") || strstr(function, "LibraryPush") || strstr(function, "knobClick")) return SCRIPT_ACTION_BROWSE_CLICK;
+    if (strstr(function, "browseToggle")) return SCRIPT_ACTION_BROWSE_TOGGLE;
+    if (strstr(function, "headMix") || strstr(function, "headphone_mix") || strstr(function, "headMixRotate")) return SCRIPT_ACTION_HEAD_MIX;
+    if (strstr(function, "beatjumpPadPressed")) return SCRIPT_ACTION_BEATJUMP_PAD;
+    if (strstr(function, "decreaseBeatjumpSizes")) return SCRIPT_ACTION_BEATJUMP_DEC;
+    if (strstr(function, "increaseBeatjumpSizes")) return SCRIPT_ACTION_BEATJUMP_INC;
+    if (strstr(function, "deckControlLPressed")) return SCRIPT_ACTION_DECK_CONTROL_L;
+    if (strstr(function, "deckControlRPressed")) return SCRIPT_ACTION_DECK_CONTROL_R;
+    if (strstr(function, "setGroupKeyValue") || strstr(function, "keyboardButtonPressed")) return SCRIPT_ACTION_KEYBOARD_BTN;
+    if (strstr(function, "MoveVertical") || strstr(function, "scrollTrack")) return SCRIPT_ACTION_BROWSE_SCROLL;
+    return SCRIPT_ACTION_UNKNOWN;
+}
+
 bool MIDI_LoadMapping(MidiMapping *map, const char *path) {
     map->count = 0;
     map->scriptCount = 0;
@@ -92,6 +131,13 @@ bool MIDI_LoadMapping(MidiMapping *map, const char *path) {
 
                 // Bind ControlObject pointer if exists
                 cur.cachedCO = CO_Find(cur.group, cur.key, NULL);
+                
+                if (cur.options & MIDI_OPT_SCRIPT) {
+                    if (cur.scriptFunction[0] == '\0') {
+                        strncpy(cur.scriptFunction, cur.key, 127);
+                    }
+                    cur.scriptActionId = ParseScriptAction(cur.scriptFunction);
+                }
 
                 int idx = map->count;
                 map->entries[idx] = cur;
@@ -370,7 +416,7 @@ void MIDI_HandleMapping(MidiMapping *map, uint8_t status, uint8_t midino, float 
             }
         }
     } else if (e->options & MIDI_OPT_SCRIPT) {
-        MIDI_ExecuteScript(map, e->scriptFunction, status, midino, currentRawVal);
+        MIDI_ExecuteScript(map, e->scriptActionId, status, midino, currentRawVal);
     } else if ((e->options & MIDI_OPT_SWITCH) ||
                strcmp(e->key, "pfl") == 0 ||
                strcmp(e->key, "master_tempo") == 0 ||

@@ -816,7 +816,7 @@ void MIDI_ResetAllLEDs(void) {
   }
 }
 
-void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
+void MIDI_ExecuteScript(MidiMapping *map, int actionId, uint8_t status,
                         uint8_t midino, uint8_t value) {
   (void)midino;
   int deck = (status & 0x0F) % 4;
@@ -825,10 +825,13 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
   const char *group = groupNames[deck];
   int targetDeckIdx = deck % 2; // 0 for Deck A (Ch 1/3), 1 for Deck B (Ch 2/4)
 
-  if (strstr(function, "shiftButton") || strstr(function, "shiftPressed")) {
+  switch(actionId) {
+  case SCRIPT_ACTION_SHIFT: {
     map->modifiers[0] = (value > 0); // Modifier 0 is Shift
     CO_SetValue(group, "shift", (value > 0) ? 1.0f : 0.0f);
-  } else if (strstr(function, "jogTurn") || strstr(function, "jogSearch")) {
+    } break;
+  case SCRIPT_ACTION_JOG_TURN:
+  case SCRIPT_ACTION_JOG_SEARCH: {
     float delta = (float)value - 64.0f;
     bool adjusting = false;
 
@@ -868,70 +871,62 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
                  globalAudioEngine->Decks[targetDeckIdx].VinylModeEnabled)
               : false;
       bool isSearch =
-          (strstr(function, "jogSearch") != NULL) || map->modifiers[0];
+          (actionId == SCRIPT_ACTION_JOG_SEARCH) || map->modifiers[0];
       float scale = isSearch ? 2.0f : (touching ? 0.1f : 0.005f);
       CO_AddValue(group, "jog", delta * scale);
     }
-  } else if (strstr(function, "jogTouch") || strstr(function, "JogTouch")) {
+    } break;
+  case SCRIPT_ACTION_JOG_TOUCH: {
     bool touching = (value > 0);
     CO_SetValue(group, "touch", touching ? 1.0f : 0.001f);
     if (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2) {
       DeckAudio_SetJogTouch(&globalAudioEngine->Decks[targetDeckIdx], touching);
     }
-  } else if (strstr(function, "beatTap") || strstr(function, "beatFxTap")) {
+    } break;
+  case SCRIPT_ACTION_BEAT_TAP: {
     if (value > 0)
       CO_SetValue("[Master]", "beatfx_tap", 1.0f);
-  } else if (strstr(function, "beatFxSelect") ||
-             strstr(function, "beatFxNext")) {
+    } break;
+  case SCRIPT_ACTION_BEATFX_NEXT: {
     if (value > 0)
       CO_SetValue("[Master]", "beatfx_next", 1.0f);
-  } else if (strstr(function, "beatFxPrev")) {
+    } break;
+  case SCRIPT_ACTION_BEATFX_PREV: {
     if (value > 0)
       CO_SetValue("[Master]", "beatfx_prev", 1.0f);
-  } else if (strstr(function, "beatFxLevelDepth") ||
-             strstr(function, "beatFxDepth") ||
-             strstr(function, "drywet") ||
-             strstr(function, "meta") ||
-             strstr(function, "super1") ||
-             ((status == 0xB4 || status == 0xB5 || status == 0xB6) &&
-              (midino == 0x02 || midino == 0x09 || midino == 0x0F))) {
+    } break;
+  case SCRIPT_ACTION_BEATFX_DEPTH: {
     float depth = (float)value / 127.0f;
     CO_SetValue("[Master]", "beatfx_drywet", depth);
-  } else if (strstr(function, "fxEnabled") ||
-             strstr(function, "beatFxOnOffPressed") ||
-             strstr(function, "beatFxOnOff") ||
-             strstr(function, "super1_toggle") ||
-             ((status == 0x94 || status == 0x95) && midino == 0x47)) {
+  } break;
+  case SCRIPT_ACTION_BEATFX_TOGGLE: {
     if (value > 0)
       CO_SetValue("[Master]", "beatfx_toggle", 1.0f);
-  } else if (strstr(function, "padMode") || strstr(function, "PadMode")) {
+    } break;
+  case SCRIPT_ACTION_PAD_MODE: {
     if (value > 0) {
-      if (strstr(function, "HotCue") || strstr(function, "hotcueMode") ||
+      if (1 /*hotcue*/ ||
           midino == 0x1B)
         CO_SetValue(group, "padmode", 0.0f); // PAD_MODE_HOT_CUE (0)
-      else if (strstr(function, "BeatLoop") ||
-               strstr(function, "beatLoopMode") || midino == 0x6D)
+      else if (1 /*beatloop*/ || midino == 0x6D)
         CO_SetValue(group, "padmode", 1.0f); // PAD_MODE_BEAT_LOOP (1)
-      else if (strstr(function, "PadFX") || strstr(function, "padFX") ||
-               strstr(function, "SlipLoop") || midino == 0x1E || midino == 0x6B)
+      else if (1 /*padfx*/ || midino == 0x1E || midino == 0x6B)
         CO_SetValue(group, "padmode", 2.0f); // PAD_MODE_SLIP_LOOP (2)
-      else if (strstr(function, "BeatJump") ||
-               strstr(function, "beatJumpMode") || midino == 0x20)
+      else if (1 /*beatjump*/ || midino == 0x20)
         CO_SetValue(group, "padmode", 3.0f); // PAD_MODE_BEAT_JUMP (3)
-      else if (strstr(function, "Sampler") || strstr(function, "samplerMode") ||
-               strstr(function, "GateCue") || midino == 0x22)
+      else if (1 /*sampler*/ || midino == 0x22)
         CO_SetValue(group, "padmode", 4.0f); // PAD_MODE_GATE_CUE (4)
-      else if (strstr(function, "ReleaseFX") ||
-               strstr(function, "keyShiftMode") ||
-               strstr(function, "keyboardMode") || midino == 0x69 ||
+      else if (1 /*releasefx*/ || midino == 0x69 ||
                midino == 0x6F)
         CO_SetValue(group, "padmode", 5.0f); // PAD_MODE_RELEASE_FX (5)
     }
-  } else if (strstr(function, "samplerPadPressed")) {
+    } break;
+  case SCRIPT_ACTION_SAMPLER_PAD: {
     if (value > 0) {
       CO_SetValue("[Library]", (targetDeckIdx == 0) ? "loadA" : "loadB", 1.0f);
     }
-  } else if (strstr(function, "toggleLoopAdjustIn")) {
+    } break;
+  case SCRIPT_ACTION_LOOP_IN_ADJUST: {
     if (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2) {
       if (globalAudioEngine->Decks[targetDeckIdx].IsLooping) {
         COType t;
@@ -943,7 +938,8 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
         }
       }
     }
-  } else if (strstr(function, "toggleLoopAdjustOut")) {
+    } break;
+  case SCRIPT_ACTION_LOOP_OUT_ADJUST: {
     if (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2) {
       if (globalAudioEngine->Decks[targetDeckIdx].IsLooping) {
         COType t;
@@ -955,7 +951,8 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
         }
       }
     }
-  } else if (strstr(function, "cueLoopCallLeft")) {
+    } break;
+  case SCRIPT_ACTION_CUE_LOOP_LEFT: {
     static bool callLeftPressed[2] = {false, false};
     if (targetDeckIdx >= 0 && targetDeckIdx < 2) {
       if (value > 0) {
@@ -968,7 +965,8 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
           *req = true;
       }
     }
-  } else if (strstr(function, "cueLoopCallRight")) {
+    } break;
+  case SCRIPT_ACTION_CUE_LOOP_RIGHT: {
     static bool callRightPressed[2] = {false, false};
     if (targetDeckIdx >= 0 && targetDeckIdx < 2) {
       if (value > 0) {
@@ -981,11 +979,13 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
           *req = true;
       }
     }
-  } else if (strstr(function, "tempoSliderMSB")) {
+    } break;
+  case SCRIPT_ACTION_TEMPO_MSB: {
     if (deck >= 0 && deck < 4) {
       highResMSB[deck] = value;
     }
-  } else if (strstr(function, "tempoSliderLSB")) {
+    } break;
+  case SCRIPT_ACTION_TEMPO_LSB: {
     if (deck >= 0 && deck < 4) {
       uint16_t fullValue = (highResMSB[deck] << 7) | value;
       float rateVal = 1.0f - ((float)fullValue / 8192.0f);
@@ -1009,47 +1009,51 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
         *tempoPtr = rateVal * maxPercent;
       }
     }
-  } else if (strstr(function, "cycleTempoRange")) {
+    } break;
+  case SCRIPT_ACTION_TEMPO_RANGE: {
     COType t;
     int *rangePtr = (int *)CO_Find(group, "tempo_range", &t);
     if (rangePtr) {
       *rangePtr = (*rangePtr + 1) % 4;
     }
-  } else if (strstr(function, "syncPressed") ||
-             strstr(function, "syncLongPressed")) {
+    } break;
+  case SCRIPT_ACTION_SYNC: {
     if (value > 0)
       CO_SetValue(group, "sync", 1.0f);
-  } else if (strstr(function, "quantizeToggle")) {
+    } break;
+  case SCRIPT_ACTION_QUANTIZE: {
     if (value > 0)
       CO_ToggleValue(group, "quantize");
-  } else if (strstr(function, "slipToggle")) {
+    } break;
+  case SCRIPT_ACTION_SLIP: {
     if (value > 0)
       CO_ToggleValue(group, "slip");
-  } else if (strstr(function, "mergeFxTurn")) {
+    } break;
+  case SCRIPT_ACTION_MERGE_FX_TURN: {
     float delta = (value >= 64) ? (float)(value - 128) : (float)value;
     CO_AddValue("[Master]", "beatfx_drywet", delta * 0.02f);
-  } else if (strstr(function, "mergeFxPressed")) {
+    } break;
+  case SCRIPT_ACTION_MERGE_FX_PRESS: {
     if (value > 0)
       CO_ToggleValue("[Master]", "beatfx_on");
-  } else if (strstr(function, "loadSelectedTrack") ||
-             strstr(function, "LoadSelectedTrack")) {
+    } break;
+  case SCRIPT_ACTION_LOAD_TRACK: {
     CO_SetValue("[Library]", (targetDeckIdx == 0) ? "loadA" : "loadB", 1.0f);
-  } else if (strstr(function, "browseClick") ||
-             strstr(function, "browsePush") ||
-             strstr(function, "SelectTrack") ||
-             strstr(function, "DirectoryPush") ||
-             strstr(function, "LibraryPush") || strstr(function, "knobClick")) {
+    } break;
+  case SCRIPT_ACTION_BROWSE_CLICK: {
     if (value > 0)
       CO_SetValue("[Library]", "enter", 1.0f);
-  } else if (strstr(function, "browseToggle")) {
+    } break;
+  case SCRIPT_ACTION_BROWSE_TOGGLE: {
     if (value > 0)
       CO_SetValue("[Library]", "browser_toggle", 1.0f);
-  } else if (strstr(function, "headMix") || strstr(function, "headphone_mix") ||
-             strstr(function, "headMixRotate")) {
+    } break;
+  case SCRIPT_ACTION_HEAD_MIX: {
     float normVal = (float)value / 127.0f;
     CO_SetValue("[Master]", "headphone_mix", normVal);
     CO_SetValue("[Master]", "headMix", normVal);
-  } else if (strstr(function, "beatjumpPadPressed")) {
+    } break;
+  case SCRIPT_ACTION_BEATJUMP_PAD: {
     if (value > 0) {
       static const double beatSizes[8] = {-1.0, 1.0, -2.0, 2.0,
                                           -4.0, 4.0, -8.0, 8.0};
@@ -1079,7 +1083,8 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
         }
       }
     }
-  } else if (strstr(function, "decreaseBeatjumpSizes")) {
+    } break;
+  case SCRIPT_ACTION_BEATJUMP_DEC: {
     if (value > 0) {
       CO_SetValue(group, "beatjump_backward", 1.0f);
       if (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2) {
@@ -1093,7 +1098,8 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
           audio->Position = 0.0;
       }
     }
-  } else if (strstr(function, "increaseBeatjumpSizes")) {
+    } break;
+  case SCRIPT_ACTION_BEATJUMP_INC: {
     if (value > 0) {
       CO_SetValue(group, "beatjump_forward", 1.0f);
       if (globalAudioEngine && targetDeckIdx >= 0 && targetDeckIdx < 2) {
@@ -1109,16 +1115,18 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
         }
       }
     }
-  } else if (strstr(function, "deckControlLPressed")) {
+    } break;
+  case SCRIPT_ACTION_DECK_CONTROL_L: {
     if (value > 0) {
       CO_ToggleValue("[Channel1]", "deck_layer");
     }
-  } else if (strstr(function, "deckControlRPressed")) {
+    } break;
+  case SCRIPT_ACTION_DECK_CONTROL_R: {
     if (value > 0) {
       CO_ToggleValue("[Channel2]", "deck_layer");
     }
-  } else if (strstr(function, "setGroupKeyValue") ||
-             strstr(function, "keyboardButtonPressed")) {
+    } break;
+  case SCRIPT_ACTION_KEYBOARD_BTN: {
     if (value > 0) {
       int semitone = 0;
       if (midino >= 0x70 && midino <= 0x77) {
@@ -1128,9 +1136,11 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
       }
       CO_SetValue(group, "key_shift", (float)semitone);
     }
-  } else if (strstr(function, "MoveVertical") ||
-             strstr(function, "scrollTrack")) {
+    } break;
+  case SCRIPT_ACTION_BROWSE_SCROLL: {
     float diff = (value >= 64) ? (float)(value - 128) : (float)value;
     CO_AddValue("[Library]", "scroll", diff);
+  } break;
+  default: break;
   }
 }

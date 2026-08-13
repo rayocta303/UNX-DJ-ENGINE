@@ -9,7 +9,7 @@
 
 typedef struct DeckState DeckState;
 
-void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status, uint8_t midino, uint8_t value);
+void MIDI_ExecuteScript(MidiMapping *map, int actionId, uint8_t status, uint8_t midino, uint8_t value);
 
 /**
  * Updates MIDI OUT VU meters for hardware controllers (Pioneer DDJ-FLX4 / FLX6 style).

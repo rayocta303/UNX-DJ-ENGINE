@@ -112,6 +112,12 @@ static int DeckStrip_Update(Component *base) {
   if (Touch_CheckClick((Rectangle){ x, y + S(68), lColW, S(20) }, S(2.0f))) {
     d->State->QuantizeEnabled = !d->State->QuantizeEnabled;
   }
+  
+  float jogY = midY + S(1);
+  if (Touch_CheckClick((Rectangle){ mx, jogY, S(48), S(12) }, S(2.0f))) {
+    d->State->VinylModeEnabled = !d->State->VinylModeEnabled;
+  }
+
   if (Touch_CheckClick((Rectangle){ mtX, mtY, mtW, mtH }, S(2.0f))) {
     d->State->MasterTempo = !d->State->MasterTempo;
   }
@@ -251,9 +257,11 @@ static void DeckStrip_Draw(Component *base) {
   float badgeW = S(48);
   float badgeH = S(12);
 
-  DrawRectangleLines(badgeX, midY + S(1), badgeW, badgeH, ColorOrange);
-  DrawCentredText("A.HOT CUE", faceXXS, badgeX, badgeW, midY + S(3.0f), S(7),
-                  ColorOrange);
+  bool vinylOn = d->State->VinylModeEnabled;
+  Color jogClr = vinylOn ? ColorBlue : ColorRed;
+  const char *jogStr = vinylOn ? "VINYL" : "CDJ";
+  DrawRectangleLines(badgeX, midY + S(1), badgeW, badgeH, jogClr);
+  DrawCentredText(jogStr, faceXXS, badgeX, badgeW, midY + S(3.0f), S(7), jogClr);
 
   DrawRectangleLines(badgeX, midY + S(15), badgeW, badgeH, ColorShadow);
   DrawCentredText("AUTO CUE", faceXXS, badgeX, badgeW, midY + S(17.0f), S(7),

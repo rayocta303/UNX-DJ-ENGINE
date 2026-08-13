@@ -520,7 +520,13 @@ static void Waveform_Draw(Component *base) {
   int64_t preRollStart = startFrame - (int64_t)(32.0 * framesPerPixel);
   if (preRollStart < 0) preRollStart = 0;
   
-  for (int64_t k = preRollStart; k < startFrame; k++) {
+  int64_t step = 1;
+  if (framesPerPixel > 4.0) {
+      step = (int64_t)(framesPerPixel / 2.0);
+      if (step < 1) step = 1;
+  }
+
+  for (int64_t k = preRollStart; k < startFrame; k += step) {
     float rL = 0, rM = 0, rH = 0;
     Color colRaw = {0, 0, 0, 255};
 
@@ -580,7 +586,15 @@ static void Waveform_Draw(Component *base) {
       pixCol[b] = (Color){0, 0, 0, 0};
   }
 
-  for (int64_t i = startFrame; i < endFrame; i++) {
+  // LOD (Level of Detail) Sub-sampling: 
+  // If framesPerPixel is high (zoomed out), skip redundant samples that fall into the same pixel.
+  step = 1;
+  if (framesPerPixel > 4.0) {
+      step = (int64_t)(framesPerPixel / 2.0);
+      if (step < 1) step = 1;
+  }
+
+  for (int64_t i = startFrame; i < endFrame; i += step) {
     float rL = 0, rM = 0, rH = 0;
     Color colRaw = {0, 0, 0, 255};
 

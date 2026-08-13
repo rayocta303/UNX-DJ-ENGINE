@@ -18,6 +18,7 @@ struct WaveformRenderer {
   double lastInteractionTime;
 };
 
+#define MAX_WAVE_BINS 3000
 static const float ZOOM_LEVELS[] = {0.25f, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f,
                                     2.0f,  3.0f, 4.0f,  6.0f, 8.0f};
 static const int NUM_ZOOM_LEVELS = sizeof(ZOOM_LEVELS) / sizeof(ZOOM_LEVELS[0]);
