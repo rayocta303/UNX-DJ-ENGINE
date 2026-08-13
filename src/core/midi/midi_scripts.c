@@ -878,11 +878,15 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
       DeckAudio_SetJogTouch(&globalAudioEngine->Decks[targetDeckIdx], touching);
     }
   } else if (strstr(function, "beatFxLeftPressed") ||
-             strstr(function, "beatFxBeatLeft")) {
+             strstr(function, "beatFxBeatLeft") ||
+             strstr(function, "beatFxLeft") ||
+             ((status == 0x94 || status == 0x95) && midino == 0x06)) {
     if (value > 0)
       CO_SetValue("[Master]", "beatfx_beat_left", 1.0f);
   } else if (strstr(function, "beatFxRightPressed") ||
-             strstr(function, "beatFxBeatRight")) {
+             strstr(function, "beatFxBeatRight") ||
+             strstr(function, "beatFxRight") ||
+             ((status == 0x94 || status == 0x95) && midino == 0x07)) {
     if (value > 0)
       CO_SetValue("[Master]", "beatfx_beat_right", 1.0f);
   } else if (strstr(function, "beatTap") || strstr(function, "beatFxTap")) {
@@ -896,28 +900,40 @@ void MIDI_ExecuteScript(MidiMapping *map, const char *function, uint8_t status,
     if (value > 0)
       CO_SetValue("[Master]", "beatfx_prev", 1.0f);
   } else if (strstr(function, "beatFxLevelDepth") ||
-             strstr(function, "beatFxDepth")) {
+             strstr(function, "beatFxDepth") ||
+             strstr(function, "drywet") ||
+             strstr(function, "meta") ||
+             strstr(function, "super1") ||
+             ((status == 0xB4 || status == 0xB5 || status == 0xB6) &&
+              (midino == 0x02 || midino == 0x09 || midino == 0x0F))) {
     float depth = (float)value / 127.0f;
     CO_SetValue("[Master]", "beatfx_drywet", depth);
-  } else if (strstr(function, "beatFxChannel1")) {
-    if (value > 0)
-      CO_SetValue("[Master]", "beatfx_ch1", 1.0f);
-  } else if (strstr(function, "beatFxChannel2")) {
-    if (value > 0)
-      CO_SetValue("[Master]", "beatfx_ch2", 1.0f);
-  } else if (strstr(function, "beatFxChannel3")) {
-    if (value > 0)
-      CO_SetValue("[Master]", "beatfx_ch3", 1.0f);
-  } else if (strstr(function, "beatFxChannel4")) {
-    if (value > 0)
-      CO_SetValue("[Master]", "beatfx_ch4", 1.0f);
-  } else if (strstr(function, "beatFxMaster") ||
-             strstr(function, "beatFxChannelMaster")) {
-    if (value > 0)
-      CO_SetValue("[Master]", "beatfx_chmaster", 1.0f);
+  } else if (strstr(function, "setGroupKey") ||
+             strstr(function, "setGroupKeyValue") ||
+             strstr(function, "beatFxChannel") ||
+             strstr(function, "beatFxMaster")) {
+    if (value > 0) {
+      if (midino == 0x1C || midino == 0x10 || strstr(function, "Channel1") ||
+          strstr(function, "beatFxChannel1"))
+        CO_SetValue("[Master]", "beatfx_ch1", 1.0f);
+      else if (midino == 0x1D || midino == 0x11 || strstr(function, "Channel2") ||
+               strstr(function, "beatFxChannel2"))
+        CO_SetValue("[Master]", "beatfx_ch2", 1.0f);
+      else if (midino == 0x1E || midino == 0x12 || strstr(function, "Channel3") ||
+               strstr(function, "beatFxChannel3"))
+        CO_SetValue("[Master]", "beatfx_ch3", 1.0f);
+      else if (midino == 0x1F || midino == 0x13 || strstr(function, "Channel4") ||
+               strstr(function, "beatFxChannel4"))
+        CO_SetValue("[Master]", "beatfx_ch4", 1.0f);
+      else if (midino == 0x14 || strstr(function, "Master") ||
+               strstr(function, "beatFxMaster") || strstr(function, "beatFxChannelMaster"))
+        CO_SetValue("[Master]", "beatfx_chmaster", 1.0f);
+    }
   } else if (strstr(function, "fxEnabled") ||
              strstr(function, "beatFxOnOffPressed") ||
-             strstr(function, "beatFxOnOff")) {
+             strstr(function, "beatFxOnOff") ||
+             strstr(function, "super1_toggle") ||
+             ((status == 0x94 || status == 0x95) && midino == 0x47)) {
     if (value > 0)
       CO_SetValue("[Master]", "beatfx_toggle", 1.0f);
   } else if (strstr(function, "padMode") || strstr(function, "PadMode")) {

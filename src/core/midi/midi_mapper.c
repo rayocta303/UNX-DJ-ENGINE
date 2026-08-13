@@ -352,14 +352,22 @@ void MIDI_HandleMapping(MidiMapping *map, uint8_t status, uint8_t midino, float 
         int lsbIndex = midino + 0x20;
         if (lsbIndex < 128) {
             uint16_t combined = (currentRawVal << 7) | lsbStore[ch][lsbIndex];
-            CO_SetValue(e->group, e->key, (float)combined / 16383.0f);
+            float normVal = (float)combined / 16383.0f;
+            CO_SetValue(e->group, e->key, normVal);
+            if ((status == 0xB4 || status == 0xB5) && (midino == 0x02 || midino == 0x09)) {
+                CO_SetValue("[Master]", "beatfx_drywet", normVal);
+            }
         }
     } else if (e->options & MIDI_OPT_14BIT_LSB) {
         lsbStore[ch][midino] = currentRawVal;
         int msbIndex = midino - 0x20;
         if (msbIndex >= 0 && msbIndex < 128) {
             uint16_t combined = (msbStore[ch][msbIndex] << 7) | currentRawVal;
-            CO_SetValue(e->group, e->key, (float)combined / 16383.0f);
+            float normVal = (float)combined / 16383.0f;
+            CO_SetValue(e->group, e->key, normVal);
+            if ((status == 0xB4 || status == 0xB5) && (midino == 0x22 || midino == 0x29)) {
+                CO_SetValue("[Master]", "beatfx_drywet", normVal);
+            }
         }
     } else if (e->options & MIDI_OPT_SCRIPT) {
         MIDI_ExecuteScript(map, e->scriptFunction, status, midino, currentRawVal);
