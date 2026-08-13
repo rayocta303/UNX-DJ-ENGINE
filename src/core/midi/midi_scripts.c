@@ -3,6 +3,7 @@
 #include "core/logic/control_object.h"
 #include "core/midi/midi_handler.h"
 #include "ui/player/player_state.h"
+#include "raylib.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -569,8 +570,30 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
       if (ds && ds->LoadedTrack) {
         // Check HotCue presence for Pad p (ID = p + 1)
         for (int h = 0; h < ds->LoadedTrack->HotCuesCount; h++) {
-          if (ds->LoadedTrack->HotCues[h].ID == (unsigned int)(p + 1)) {
+          HotCue hc = ds->LoadedTrack->HotCues[h];
+          if (hc.ID == (unsigned int)(p + 1)) {
             padVal = 0x7F; // Lit up HotCue Pad
+
+            bool isApproaching = false;
+            if (ds->CurrentBPM > 0) {
+              uint32_t currentPosMs = ds->PositionMs;
+              if (ds->IsPreviewing && globalAudioEngine && ds->ID >= 0 && ds->ID < 2) {
+                DeckAudioState *audioState = &globalAudioEngine->Decks[ds->ID];
+                if (audioState->SampleRate > 0) {
+                  currentPosMs = (uint32_t)((audioState->Position / (double)audioState->SampleRate) * 1000.0);
+                }
+              }
+
+              double distanceMs = (double)hc.Start - (double)currentPosMs;
+              if (distanceMs > 0 && distanceMs <= (60000.0 / ds->CurrentBPM) * 16.0) {
+                isApproaching = true;
+              }
+            }
+
+            // Active Loop or Approaching blinking (matches bottomstrip.c 4 Hz flash rate)
+            if ((hc.Status == 4 || isApproaching) && (int)(GetTime() * 4) % 2 == 0) {
+              padVal = 0x00;
+            }
             break;
           }
         }
