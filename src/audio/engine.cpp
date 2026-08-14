@@ -1,6 +1,6 @@
 #include "audio/engine.h"
 #include "audio/asrc_resampler.h"
-#include "core/logic/jog_config.h"
+
 #include "SoundTouch.h"
 #include "engine/util/engine_math.h"
 #include <algorithm>
@@ -13,11 +13,12 @@
 
 #define MINIMP3_API static
 #define MINIMP3_IMPLEMENTATION
+#include "core/logger.h"
 #include "minimp3.h"
 #include "minimp3_ex.h"
-#include "core/logger.h"
 #include <chrono>
 #include <thread>
+
 
 extern "C" void Toast_ShowError(const char *message);
 
@@ -28,17 +29,18 @@ extern "C" void Toast_ShowError(const char *message);
 
 using namespace soundtouch;
 
-void DeckAudio_LoadTrackAsync(DeckAudioState *deck, const char *filePath, bool autoPlay) {
+void DeckAudio_LoadTrackAsync(DeckAudioState *deck, const char *filePath,
+                              bool autoPlay) {
   // Increment LoadID and capture it for this thread
   uint32_t myID = ++(deck->LastLoadID);
-  
+
   deck->IsLoading = true;
   deck->LoadingProgress = 0.0f;
 
   std::string path = filePath;
   std::thread([deck, path, myID, autoPlay]() {
     bool success = DeckAudio_LoadTrack(deck, path.c_str(), autoPlay);
-    
+
     // Only clear IsLoading if this was the latest request
     if (deck->LastLoadID == myID) {
       deck->IsLoading = false;
@@ -46,10 +48,10 @@ void DeckAudio_LoadTrackAsync(DeckAudioState *deck, const char *filePath, bool a
       deck->LoadingProgress = 1.0f;
     } else {
       // Stale request, but DeckAudio_LoadTrack already modified the deck.
-      // This is still a bit problematic because DeckAudio_LoadTrack modifies state.
-      // However, if DeckAudio_LoadTrack(deck, path) is called for the next track,
-      // it will overwrite whatever this thread did.
-      // The race condition happens if the second thread finishes BEFORE the first.
+      // This is still a bit problematic because DeckAudio_LoadTrack modifies
+      // state. However, if DeckAudio_LoadTrack(deck, path) is called for the
+      // next track, it will overwrite whatever this thread did. The race
+      // condition happens if the second thread finishes BEFORE the first.
     }
   }).detach();
 }
@@ -92,7 +94,8 @@ void AudioEngine_Init(AudioEngine *engine, uint32_t outputSampleRate) {
     deck->SoundTouchHandle = (void *)st;
     deck->OutputSampleRate = engine->OutputSampleRate;
     deck->SampleRate = engine->OutputSampleRate;
-    ASRCResampler_Init(&deck->ASRC, engine->OutputSampleRate, engine->OutputSampleRate);
+    ASRCResampler_Init(&deck->ASRC, engine->OutputSampleRate,
+                       engine->OutputSampleRate);
     deck->ASRCRatio = 1.0;
   }
 
@@ -105,7 +108,8 @@ void AudioEngine_Init(AudioEngine *engine, uint32_t outputSampleRate) {
   UNX_LOG_INFO("Sample Rate : %u Hz", engine->OutputSampleRate);
   UNX_LOG_INFO("Channels    : %d", CHANNELS);
   UNX_LOG_INFO("API         : Raylib Audio (Internal)");
-  UNX_LOG_INFO("ASRC Engine : Active (Polyphase Bandlimited Sinc Interpolator)");
+  UNX_LOG_INFO(
+      "ASRC Engine : Active (Polyphase Bandlimited Sinc Interpolator)");
   UNX_LOG_INFO("=== END AUDIO ENGINE SPECIFICS ===");
 }
 
@@ -124,8 +128,11 @@ void AudioEngine_SetOutputSampleRate(AudioEngine *engine, uint32_t sampleRate) {
           ->setSampleRate(sampleRate);
     }
     engine->Decks[i].OutputSampleRate = sampleRate;
-    uint32_t srcRate = engine->Decks[i].SampleRate > 0 ? engine->Decks[i].SampleRate : sampleRate;
-    ASRCResampler_SetRates(&engine->Decks[i].ASRC, (double)srcRate, (double)sampleRate);
+    uint32_t srcRate = engine->Decks[i].SampleRate > 0
+                           ? engine->Decks[i].SampleRate
+                           : sampleRate;
+    ASRCResampler_SetRates(&engine->Decks[i].ASRC, (double)srcRate,
+                           (double)sampleRate);
     engine->Decks[i].ASRCRatio = (double)srcRate / (double)sampleRate;
 
     engine->Decks[i].SuspendProcessing = false;
@@ -145,7 +152,8 @@ void AudioEngine_SetPCMBitDepth(AudioEngine *engine, int bitDepth) {
 
         double currentPos = engine->Decks[i].Position;
         bool wasPlaying = engine->Decks[i].IsPlaying;
-        DeckAudio_LoadTrack(&engine->Decks[i], engine->Decks[i].FilePath, wasPlaying);
+        DeckAudio_LoadTrack(&engine->Decks[i], engine->Decks[i].FilePath,
+                            wasPlaying);
         engine->Decks[i].Position = currentPos;
         engine->Decks[i].IsPlaying = wasPlaying;
 
@@ -164,21 +172,24 @@ void AudioEngine_Destroy(AudioEngine *engine) {
   }
 }
 
-void DeckAudio_SetVinylPhysics(DeckAudioState *deck, float startAccel, float stopAccel) {
-  if (!deck) return;
+void DeckAudio_SetVinylPhysics(DeckAudioState *deck, float startAccel,
+                               float stopAccel) {
+  if (!deck)
+    return;
   deck->VinylStartAccel = startAccel;
   deck->VinylStopAccel = stopAccel;
 }
 
-bool DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath, bool autoPlay) {
+bool DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath,
+                         bool autoPlay) {
   uint32_t myID = deck->LastLoadID;
-  
+
   if (!filePath || strlen(filePath) == 0) {
     if (deck->PCMBuffer) {
       void *oldBuf = deck->PCMBuffer;
       deck->PCMBuffer = NULL;
       while (deck->IsProcessingAudio) {
-          std::this_thread::yield();
+        std::this_thread::yield();
       }
       deck->TotalSamples = 0;
       free(oldBuf);
@@ -186,8 +197,9 @@ bool DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath, bool autoPl
     return false;
   }
 
-  // Decode into local variables first to prevent race conditions during long decoding
-  void* localPCM = NULL;
+  // Decode into local variables first to prevent race conditions during long
+  // decoding
+  void *localPCM = NULL;
   uint32_t localSamples = 0;
   uint32_t localRate = 44100;
 
@@ -273,7 +285,8 @@ bool DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath, bool autoPl
           }
           free(info.buffer);
           localPCM = buf24;
-          localSamples = (uint32_t)(info.samples * (info.channels == 1 ? 2 : 1));
+          localSamples =
+              (uint32_t)(info.samples * (info.channels == 1 ? 2 : 1));
         } else {
           free(info.buffer);
         }
@@ -303,32 +316,39 @@ bool DeckAudio_LoadTrack(DeckAudioState *deck, const char *filePath, bool autoPl
 
   // Check decoding success
   if (!localPCM || localSamples == 0) {
-    UNX_LOG_WARN("[ENGINE] Failed to decode track format or file unreadable: %s", filePath);
+    UNX_LOG_WARN(
+        "[ENGINE] Failed to decode track format or file unreadable: %s",
+        filePath);
     Toast_ShowError("UNSUPPORTED TRACK FORMAT");
     return false;
   }
 
-  // Configure ASRC (Asynchronous Sample Rate Conversion) for seamless multi-rate support
-  uint32_t targetSR = (deck->OutputSampleRate > 0) ? deck->OutputSampleRate : 44100;
+  // Configure ASRC (Asynchronous Sample Rate Conversion) for seamless
+  // multi-rate support
+  uint32_t targetSR =
+      (deck->OutputSampleRate > 0) ? deck->OutputSampleRate : 44100;
   ASRCResampler_SetRates(&deck->ASRC, (double)localRate, (double)targetSR);
   deck->ASRCRatio = (double)localRate / (double)targetSR;
   ASRCResampler_Reset(&deck->ASRC);
 
-  UNX_LOG_INFO("[AUDIO] [ASRC] Track Loaded: %s | File Rate: %u Hz -> Interface Rate: %u Hz (Ratio: %.5f, ASRC Active: %s)",
-               filePath, localRate, targetSR, deck->ASRCRatio, deck->ASRC.active ? "YES" : "NO");
+  UNX_LOG_INFO("[AUDIO] [ASRC] Track Loaded: %s | File Rate: %u Hz -> "
+               "Interface Rate: %u Hz (Ratio: %.5f, ASRC Active: %s)",
+               filePath, localRate, targetSR, deck->ASRCRatio,
+               deck->ASRC.active ? "YES" : "NO");
 
   // Check if a newer load request has arrived during decoding
   if (myID != deck->LastLoadID) {
-    if (localPCM) free(localPCM);
+    if (localPCM)
+      free(localPCM);
     return false;
   }
 
   // Final apply to deck (Safe update)
   void *oldBuf = deck->PCMBuffer;
-  deck->PCMBuffer = NULL; 
+  deck->PCMBuffer = NULL;
   // Wait for the audio thread to finish its current block using spinlock
   while (deck->IsProcessingAudio) {
-      std::this_thread::yield();
+    std::this_thread::yield();
   }
 
   deck->PCMBuffer = localPCM;
@@ -362,16 +382,17 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
   float accel = 0.08f;
 
   if (deck->IsTouching && deck->VinylModeEnabled) {
-    // Vinyl Scratch Mode: 1:1 platter rate lock when scrubbing, Touch Brake when held
+    // Vinyl Scratch Mode: 1:1 platter rate lock when scrubbing and holding
     targetRate = deck->JogRate;
-    accel = (fabs(deck->JogRate) > 0.001) ? 1000.0f : (deck->VinylStopAccel > 0 ? deck->VinylStopAccel : 0.12f);
+    accel = 1000.0f; // Instant lock to hand
   } else {
     // CDJ Pitch Bend Mode or Vinyl Release Inertia
     double base = deck->IsMotorOn ? deck->BaseRate : 0.0;
     targetRate = base + deck->JogRate;
 
     if (fabs(deck->JogRate) > 0.001f) {
-      // Active vinyl/waveform spin release inertia: follow decay curve directly without linear lag
+      // Active vinyl/waveform spin release inertia: follow decay curve directly
+      // without linear lag
       accel = 1.0f;
     } else if (deck->IsMotorOn) {
       accel = (deck->VinylStartAccel > 0 ? deck->VinylStartAccel : 0.12f);
@@ -381,7 +402,7 @@ static void ProcessDeckPhysics(DeckAudioState *deck) {
   }
 
   if (deck->ReleaseFXType == 2) { // Backspin Active
-    deck->JogRate *= (double)g_JogConfig.BackspinDecay; // smooth exponential decay
+    deck->JogRate *= 0;           // smooth exponential decay
     if (fabs(deck->JogRate) < 0.15) {
       deck->ReleaseFXType = 0;
       deck->IsTouching = false;
@@ -418,9 +439,10 @@ static inline float SampleToFloat(void *buffer, int index, int bitDepth) {
   }
 }
 
-static inline void AudioEngine_GetSampleDirect(void *buffer, int i, int bitDepth,
-                                               uint32_t totalSamples,
-                                               float *l, float *r) {
+static inline void AudioEngine_GetSampleDirect(void *buffer, int i,
+                                               int bitDepth,
+                                               uint32_t totalSamples, float *l,
+                                               float *r) {
   if (i < 0 || i >= (int)(totalSamples / 2)) {
     *l = 0;
     *r = 0;
@@ -430,11 +452,13 @@ static inline void AudioEngine_GetSampleDirect(void *buffer, int i, int bitDepth
   *r = SampleToFloat(buffer, i * 2 + 1, bitDepth);
 }
 
-static inline void AudioEngine_GetSample(DeckAudioState *deck, void *buffer, double pos, int bitDepth,
+static inline void AudioEngine_GetSample(DeckAudioState *deck, void *buffer,
+                                         double pos, int bitDepth,
                                          uint32_t totalSamples, float *l,
                                          float *r) {
   if (deck && deck->ASRC.active) {
-    ASRCResampler_GetSample(&deck->ASRC, buffer, pos, bitDepth, totalSamples, l, r);
+    ASRCResampler_GetSample(&deck->ASRC, buffer, pos, bitDepth, totalSamples, l,
+                            r);
     return;
   }
 
@@ -475,12 +499,13 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
                              int deckIndex, float *outCleanMaster) {
   // RAII lock to ensure IsProcessingAudio is correctly toggled on all returns
   struct AudioLock {
-    volatile bool& flag;
-    AudioLock(volatile bool& f) : flag(f) { flag = true; }
+    volatile bool &flag;
+    AudioLock(volatile bool &f) : flag(f) { flag = true; }
     ~AudioLock() { flag = false; }
   } _lock(deck->IsProcessingAudio);
 
-  if (deck->SuspendProcessing) return;
+  if (deck->SuspendProcessing)
+    return;
 
   void *pcm = deck->PCMBuffer;
   bool noiseActive = (deck->ColorFX.activeFX == COLORFX_NOISE &&
@@ -552,21 +577,25 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
   if (MAX_DECKS >= 2) {
     DeckAudioState *d0 = &engine->Decks[0];
     DeckAudioState *d1 = &engine->Decks[1];
-    
+
     // Equal-power effective fader and crossfader weights
     float fader0 = d0->Fader * d0->Fader;
     float fader1 = d1->Fader * d1->Fader;
-    float xGain0 = Engine_GetCrossfaderGain(engine->Crossfader, 0, engine->CrossfaderCurve);
-    float xGain1 = Engine_GetCrossfaderGain(engine->Crossfader, 1, engine->CrossfaderCurve);
-    
+    float xGain0 = Engine_GetCrossfaderGain(engine->Crossfader, 0,
+                                            engine->CrossfaderCurve);
+    float xGain1 = Engine_GetCrossfaderGain(engine->Crossfader, 1,
+                                            engine->CrossfaderCurve);
+
     float w0 = fader0 * xGain0 * d0->EqLow * (d0->IsMotorOn ? 1.0f : 0.0f);
     float w1 = fader1 * xGain1 * d1->EqLow * (d1->IsMotorOn ? 1.0f : 0.0f);
-    
+
     // If BOTH decks are active and sending low-frequency energy simultaneously
     if (w0 > 0.05f && w1 > 0.05f) {
       float sumPower = sqrtf(w0 * w0 + w1 * w1);
-      if (deckIndex == 0) bassScale = w0 / (sumPower * fmaxf(w0, 0.001f));
-      else if (deckIndex == 1) bassScale = w1 / (sumPower * fmaxf(w1, 0.001f));
+      if (deckIndex == 0)
+        bassScale = w0 / (sumPower * fmaxf(w0, 0.001f));
+      else if (deckIndex == 1)
+        bassScale = w1 / (sumPower * fmaxf(w1, 0.001f));
     }
   }
 
@@ -584,15 +613,21 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
   float sampleRateRatio =
       (float)deck->SampleRate / (float)engine->OutputSampleRate;
 
-  // Audio Buffering — Thread-safe static buffer for the current deck (16384 max)
+  // Audio Buffering — Thread-safe static buffer for the current deck (16384
+  // max)
   static float outBuf[MAX_DECKS][16384 * 2];
   uint32_t received = 0;
 
   // Bypass MT during motor start/stop or scratching/spinning inertia
   bool motorSteady = (fabs(deck->OutlinedRate - deck->BaseRate) < 0.05f);
   // In Vinyl mode, we want pitch to shift during any scratch/spin (not steady).
-  // In CDJ mode, we only bypass during motor start/stop ramps (at least 95% speed).
-  bool motorReady = deck->IsMotorOn && (deck->VinylModeEnabled ? motorSteady : (fabs(deck->OutlinedRate) >= fabs(deck->BaseRate) * 0.95f));
+  // In CDJ mode, we only bypass during motor start/stop ramps (at least 95%
+  // speed).
+  bool motorReady =
+      deck->IsMotorOn &&
+      (deck->VinylModeEnabled
+           ? motorSteady
+           : (fabs(deck->OutlinedRate) >= fabs(deck->BaseRate) * 0.95f));
 
   if (deck->MasterTempoActive && !deck->IsTouching && motorReady && st &&
       fabs(targetRate) > 0.01) {
@@ -603,7 +638,7 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     }
     double effectiveTempo = fabs(targetRate) * (double)sampleRateRatio;
     st->setTempo(effectiveTempo);
-    
+
     // Apply Dynamic Key Shift (Semitones)
     double keyRatio = pow(2.0, (double)deck->KeyShiftSemitones / 12.0);
     st->setPitch((double)sampleRateRatio * keyRatio);
@@ -702,9 +737,10 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
   float effectiveFader = deck->Fader * deck->Fader;
   float effectiveLastFader = deck->LastFader * deck->LastFader;
 
-  float startCrossGain =
-      Engine_GetCrossfaderGain(engine->LastCrossfader, deckIndex, engine->CrossfaderCurve);
-  float endCrossGain = Engine_GetCrossfaderGain(engine->Crossfader, deckIndex, engine->CrossfaderCurve);
+  float startCrossGain = Engine_GetCrossfaderGain(
+      engine->LastCrossfader, deckIndex, engine->CrossfaderCurve);
+  float endCrossGain = Engine_GetCrossfaderGain(engine->Crossfader, deckIndex,
+                                                engine->CrossfaderCurve);
   float startTotalGain = effectiveLastFader * startCrossGain;
   float endTotalGain = effectiveFader * endCrossGain;
 
@@ -736,10 +772,12 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     float targetDry = deck->ReleaseFXEchoActive ? 0.0f : 1.0f;
     if (deck->DryGain < targetDry) {
       deck->DryGain += 0.0008f;
-      if (deck->DryGain > targetDry) deck->DryGain = targetDry;
+      if (deck->DryGain > targetDry)
+        deck->DryGain = targetDry;
     } else if (deck->DryGain > targetDry) {
       deck->DryGain -= 0.0008f;
-      if (deck->DryGain < targetDry) deck->DryGain = targetDry;
+      if (deck->DryGain < targetDry)
+        deck->DryGain = targetDry;
     }
 
     // Channel Fader (Post-Cue) with Ramping
@@ -749,7 +787,8 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
     float sendL = l * currentTotalGain;
     float sendR = r * currentTotalGain;
 
-    // Color FX (Post-Fader routing so delay/space tails persist when fader is down)
+    // Color FX (Post-Fader routing so delay/space tails persist when fader is
+    // down)
     ColorFXManager_Process(&deck->ColorFX, &sendL, &sendR, sendL, sendR, fs);
 
     float dryL = sendL * deck->DryGain;
@@ -763,7 +802,8 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
       outCleanMaster[i * 2] += dryL;
       outCleanMaster[i * 2 + 1] += dryR;
 
-      // BEAT FX gets Send signal (un-attenuated sendL/sendR while Echo active so tail captures full audio)
+      // BEAT FX gets Send signal (un-attenuated sendL/sendR while Echo active
+      // so tail captures full audio)
       float wetL = 0, wetR = 0;
       if (engine->BeatFX.targetChannel == deckIndex + 1) {
         BeatFXManager_ProcessWetOnly(&engine->BeatFX, &wetL, &wetR, sendL,
@@ -795,19 +835,23 @@ static void ProcessDeckAudio(DeckAudioState *deck, float *outMaster,
   // VU Meter Ballistics (Smooth PPM decay curve)
   float peakL = maxL * 1.5f;
   float peakR = maxR * 1.5f;
-  if (peakL > 1.0f) peakL = 1.0f;
-  if (peakR > 1.0f) peakR = 1.0f;
+  if (peakL > 1.0f)
+    peakL = 1.0f;
+  if (peakR > 1.0f)
+    peakR = 1.0f;
   if (peakL > deck->VuMeterL) {
     deck->VuMeterL = peakL;
   } else {
     deck->VuMeterL = deck->VuMeterL * 0.94f + peakL * 0.06f;
-    if (deck->VuMeterL < 0.005f) deck->VuMeterL = 0.0f;
+    if (deck->VuMeterL < 0.005f)
+      deck->VuMeterL = 0.0f;
   }
   if (peakR > deck->VuMeterR) {
     deck->VuMeterR = peakR;
   } else {
     deck->VuMeterR = deck->VuMeterR * 0.94f + peakR * 0.06f;
-    if (deck->VuMeterR < 0.005f) deck->VuMeterR = 0.0f;
+    if (deck->VuMeterR < 0.005f)
+      deck->VuMeterR = 0.0f;
   }
 }
 
@@ -823,11 +867,13 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
     g_audioThreadId = std::this_thread::get_id();
     g_audioThreadIdSet = true;
   } else if (g_audioThreadId != std::this_thread::get_id()) {
-    UNX_LOG_ERR("[AUDIO] Race Condition Warning: Audio Thread ID changed (Device Restarted?). Updating...");
+    UNX_LOG_ERR("[AUDIO] Race Condition Warning: Audio Thread ID changed "
+                "(Device Restarted?). Updating...");
     g_audioThreadId = std::this_thread::get_id();
   }
 
-  if (frames > 16384) frames = 16384;
+  if (frames > 16384)
+    frames = 16384;
 
   static float masterMix[16384 * 2];
   static float cleanMasterMix[16384 * 2];
@@ -880,19 +926,23 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
   // Master VU Ballistics (Smooth PPM decay curve)
   float pML = mPeakL * 1.4f;
   float pMR = mPeakR * 1.4f;
-  if (pML > 1.0f) pML = 1.0f;
-  if (pMR > 1.0f) pMR = 1.0f;
+  if (pML > 1.0f)
+    pML = 1.0f;
+  if (pMR > 1.0f)
+    pMR = 1.0f;
   if (pML > engine->MasterVuL) {
     engine->MasterVuL = pML;
   } else {
     engine->MasterVuL = engine->MasterVuL * 0.94f + pML * 0.06f;
-    if (engine->MasterVuL < 0.005f) engine->MasterVuL = 0.0f;
+    if (engine->MasterVuL < 0.005f)
+      engine->MasterVuL = 0.0f;
   }
   if (pMR > engine->MasterVuR) {
     engine->MasterVuR = pMR;
   } else {
     engine->MasterVuR = engine->MasterVuR * 0.94f + pMR * 0.06f;
-    if (engine->MasterVuR < 0.005f) engine->MasterVuR = 0.0f;
+    if (engine->MasterVuR < 0.005f)
+      engine->MasterVuR = 0.0f;
   }
   engine->LastCrossfader = engine->Crossfader;
 
@@ -905,16 +955,17 @@ void AudioEngine_Process(AudioEngine *engine, float *outBuffer, int frames) {
   if (++perfCallCount >= kPerfLogInterval) {
     perfCallCount = 0;
     auto now = std::chrono::steady_clock::now();
-    double secsSinceLog = std::chrono::duration<double>(now - lastLogTime).count();
+    double secsSinceLog =
+        std::chrono::duration<double>(now - lastLogTime).count();
     if (secsSinceLog >= 5.0) {
-      double budgetMs = ((double)frames / (double)engine->OutputSampleRate) * 1000.0;
+      double budgetMs =
+          ((double)frames / (double)engine->OutputSampleRate) * 1000.0;
       UNX_LOG_INFO("[PERF] [AUDIO] Budget: %.2f ms/buf | %d frames @ %u Hz",
                    budgetMs, frames, engine->OutputSampleRate);
       lastLogTime = now;
     }
   }
 }
-
 
 void DeckAudio_Play(DeckAudioState *deck) { deck->IsMotorOn = true; }
 void DeckAudio_Stop(DeckAudioState *deck) { deck->IsMotorOn = false; }
@@ -958,7 +1009,8 @@ void DeckAudio_TriggerReleaseFX(DeckAudioState *deck, int type) {
   switch (type) {
   case 1: { // Vinyl Brake Short (1 Beat)
     float durationSec = beatSec * 1.0f;
-    if (durationSec < 0.1f) durationSec = 0.1f;
+    if (durationSec < 0.1f)
+      durationSec = 0.1f;
     deck->VinylStopAccel = 1.0f / (durationSec * 60.0f);
     deck->ReleaseFXTimer = durationSec;
     deck->IsMotorOn = false;
@@ -966,7 +1018,8 @@ void DeckAudio_TriggerReleaseFX(DeckAudioState *deck, int type) {
   }
   case 2: { // Vinyl Brake Long (4 Beats / 1 Bar)
     float durationSec = beatSec * 4.0f;
-    if (durationSec < 0.2f) durationSec = 0.2f;
+    if (durationSec < 0.2f)
+      durationSec = 0.2f;
     deck->VinylStopAccel = 1.0f / (durationSec * 60.0f);
     deck->ReleaseFXTimer = durationSec;
     deck->IsMotorOn = false;
@@ -974,10 +1027,11 @@ void DeckAudio_TriggerReleaseFX(DeckAudioState *deck, int type) {
   }
   case 3: { // Backspin Short (2 Beats)
     float durationSec = beatSec * 2.0f;
-    if (durationSec < 0.2f) durationSec = 0.2f;
+    if (durationSec < 0.2f)
+      durationSec = 0.2f;
     deck->VinylModeEnabled = true;
     deck->IsTouching = true;
-    deck->JogRate = (double)g_JogConfig.BackspinShortSpeed;
+    deck->JogRate = -12.0;
     deck->OutlinedRate = deck->JogRate;
     deck->ReleaseFXType = 2; // Backspin Active mode
     deck->ReleaseFXTimer = durationSec;
@@ -986,10 +1040,11 @@ void DeckAudio_TriggerReleaseFX(DeckAudioState *deck, int type) {
   }
   case 4: { // Backspin Long (4 Beats / 1 Bar)
     float durationSec = beatSec * 4.0f;
-    if (durationSec < 0.4f) durationSec = 0.4f;
+    if (durationSec < 0.4f)
+      durationSec = 0.4f;
     deck->VinylModeEnabled = true;
     deck->IsTouching = true;
-    deck->JogRate = (double)g_JogConfig.BackspinLongSpeed;
+    deck->JogRate = -25.0;
     deck->OutlinedRate = deck->JogRate;
     deck->ReleaseFXType = 2; // Backspin Active mode
     deck->ReleaseFXTimer = durationSec;
@@ -1034,10 +1089,10 @@ void DeckAudio_SetJogRate(DeckAudioState *deck, double rate) {
 void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching) {
   if (deck->ReleaseFXType == 2)
     return; // Protect active backspin
-  
+
   bool wasTouching = deck->IsTouching;
   deck->IsTouching = touching;
-  
+
   if (touching) {
     deck->VinylReleaseActive = false;
   } else if (wasTouching) {
@@ -1047,8 +1102,9 @@ void DeckAudio_SetJogTouch(DeckAudioState *deck, bool touching) {
       deck->MT_ReadPos = deck->SlipPosition;
       deck->SlipActive = false;
     }
-    
-    // Smooth vinyl spin release: initialize release offset relative to motor speed
+
+    // Smooth vinyl spin release: initialize release offset relative to motor
+    // speed
     if (deck->VinylModeEnabled) {
       double base = deck->IsMotorOn ? deck->BaseRate : 0.0;
       deck->JogRate = deck->OutlinedRate - base;

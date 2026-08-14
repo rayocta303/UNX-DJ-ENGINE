@@ -52,6 +52,11 @@ typedef struct DeckAudioState {
   uint16_t Pitch;        // 10000 = 100% pitch
   uint16_t TargetPitch;  // Where the fader is currently set
   double JogRate;        // Inertia value for vinyl mode
+  
+  // Alpha-Beta Filter state (Mixxx ported)
+  double ScratchFilter_x;
+  double ScratchFilter_v;
+  
   bool IsTouching;       // User is actively touching jog (renamed)
   bool VinylModeEnabled; // Vinyl vs CDJ mode
   bool VinylReleaseActive; // True when smooth touch-release spin inertia is active

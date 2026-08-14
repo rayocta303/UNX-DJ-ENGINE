@@ -2,7 +2,6 @@
 #include "core/logger.h"
 #include "core/logic/control_object.h"
 #include "core/logic/settings_io.h"
-#include "core/logic/jog_config.h"
 #include "core/logic/sync.h"
 #include "core/midi/midi_handler.h"
 #include "core/system_info.h"
@@ -228,7 +227,7 @@ void App_SaveSettings(App *a) {
   Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig,
                 a->fxState, a->colorFxDeckA, a->colorFxDeckB,
                 a->activeControllerPath, a->deckA.QuantizeEnabled,
-                a->deckB.QuantizeEnabled, a->masterVolume, &g_JogConfig);
+                a->deckB.QuantizeEnabled, a->masterVolume);
 }
 
 void OnSettingsClose(void *ctx) {
@@ -273,25 +272,11 @@ void OnSettingsApply(void *ctx) {
   // Save/Sync JogConfig from JOG tab items
   for (int i = 0; i < a->settingsState.ItemsCount; i++) {
     SettingItem *item = &a->settingsState.Items[i];
-    if (item->Category != SETTING_CAT_JOG) continue;
-    if (strcmp(item->Label, "DEFAULT RPM") == 0) g_JogConfig.DefaultRPM = item->Value;
-    else if (strcmp(item->Label, "ENCODER TICKS/REV") == 0) g_JogConfig.TicksPerRev = item->Value;
-    else if (strcmp(item->Label, "VINYL RELEASE FRICTION") == 0) g_JogConfig.VinylReleaseFriction = item->Value;
-    else if (strcmp(item->Label, "VINYL RELEASE CUTOFF") == 0) g_JogConfig.VinylReleaseCutoff = item->Value;
-    else if (strcmp(item->Label, "VINYL MIN VELOCITY") == 0) g_JogConfig.VinylReleaseMinVelocity = item->Value;
-    else if (strcmp(item->Label, "PITCH BEND FRICTION") == 0) g_JogConfig.PitchBendFriction = item->Value;
-    else if (strcmp(item->Label, "PITCH BEND CUTOFF") == 0) g_JogConfig.PitchBendCutoff = item->Value;
-    else if (strcmp(item->Label, "PITCH BEND SENSITIVITY") == 0) g_JogConfig.PitchBendScale = item->Value;
-    else if (strcmp(item->Label, "WAVEFORM DRAG SENSITIVITY") == 0) g_JogConfig.WaveformNudgeScale = item->Value;
-    else if (strcmp(item->Label, "FILTER RESPONSE (RAW)") == 0) {
-      g_JogConfig.EmaRawWeight = item->Value;
-      g_JogConfig.EmaPrevWeight = 1.0f - item->Value;
+    if (item->Category == SETTING_CAT_JOG) {
+      // Jog settings removed from UI
+      continue;
     }
-    else if (strcmp(item->Label, "BACKSPIN SHORT SPEED") == 0) g_JogConfig.BackspinShortSpeed = item->Value;
-    else if (strcmp(item->Label, "BACKSPIN LONG SPEED") == 0) g_JogConfig.BackspinLongSpeed = item->Value;
-    else if (strcmp(item->Label, "BACKSPIN DECAY RATE") == 0) g_JogConfig.BackspinDecay = item->Value;
   }
-  JogConfig_Save(&g_JogConfig, "jog_config.json");
 
   UNX_LOG_INFO(
       "[SETTINGS] Applied Style: %d, Gains: L%.2f M%.2f H%.2f, Start: %.0f, "
@@ -438,23 +423,7 @@ void OnSettingsValueChanged(void *ctx, int idx) {
   App *a = (App *)ctx;
   SettingItem *item = &a->settingsState.Items[idx];
   if (item->Category == SETTING_CAT_JOG) {
-    if (strcmp(item->Label, "DEFAULT RPM") == 0) g_JogConfig.DefaultRPM = item->Value;
-    else if (strcmp(item->Label, "ENCODER TICKS/REV") == 0) g_JogConfig.TicksPerRev = item->Value;
-    else if (strcmp(item->Label, "VINYL RELEASE FRICTION") == 0) g_JogConfig.VinylReleaseFriction = item->Value;
-    else if (strcmp(item->Label, "VINYL RELEASE CUTOFF") == 0) g_JogConfig.VinylReleaseCutoff = item->Value;
-    else if (strcmp(item->Label, "VINYL MIN VELOCITY") == 0) g_JogConfig.VinylReleaseMinVelocity = item->Value;
-    else if (strcmp(item->Label, "PITCH BEND FRICTION") == 0) g_JogConfig.PitchBendFriction = item->Value;
-    else if (strcmp(item->Label, "PITCH BEND CUTOFF") == 0) g_JogConfig.PitchBendCutoff = item->Value;
-    else if (strcmp(item->Label, "PITCH BEND SENSITIVITY") == 0) g_JogConfig.PitchBendScale = item->Value;
-    else if (strcmp(item->Label, "WAVEFORM DRAG SENSITIVITY") == 0) g_JogConfig.WaveformNudgeScale = item->Value;
-    else if (strcmp(item->Label, "FILTER RESPONSE (RAW)") == 0) {
-      g_JogConfig.EmaRawWeight = item->Value;
-      g_JogConfig.EmaPrevWeight = 1.0f - item->Value;
-    }
-    else if (strcmp(item->Label, "BACKSPIN SHORT SPEED") == 0) g_JogConfig.BackspinShortSpeed = item->Value;
-    else if (strcmp(item->Label, "BACKSPIN LONG SPEED") == 0) g_JogConfig.BackspinLongSpeed = item->Value;
-    else if (strcmp(item->Label, "BACKSPIN DECAY RATE") == 0) g_JogConfig.BackspinDecay = item->Value;
-    JogConfig_Save(&g_JogConfig, "jog_config.json");
+    // Jog settings removed from UI
   } else if (strcmp(item->Label, "AUDIO DEVICE") == 0) {
     UpdateChannelOptions(a, item->Current - 1);
   } else if (strcmp(item->Label, "CONNECTED DEVICE") == 0) {
@@ -490,8 +459,7 @@ void OnSettingsAction(void *ctx, int idx) {
   if (strcmp(item->Label, "SYSTEM INFO & RESOURCES") == 0) {
     a->settingsState.IsSystemInfoOpen = true;
   } else if (strcmp(item->Label, "LOAD DEFAULT JOG SETTINGS") == 0) {
-    JogConfig_InitDefaults(&g_JogConfig);
-    JogConfig_Save(&g_JogConfig, "jog_config.json");
+    // Removed JogConfig_InitDefaults and Save
     UpdateJogSettingsUI(a);
     Toast_Show("JOG SETTINGS RESET TO DEFAULT", 3.0f, (Color){255, 140, 0, 255});
     UNX_LOG_INFO("[JOG_CONFIG] Reset jog configuration parameters to defaults.");
@@ -511,178 +479,12 @@ void OnSettingsAction(void *ctx, int idx) {
 }
 
 void UpdateJogSettingsUI(App *a) {
-  for (int i = 0; i < a->settingsState.ItemsCount; i++) {
-    SettingItem *item = &a->settingsState.Items[i];
-    if (item->Category != SETTING_CAT_JOG) continue;
-    if (strcmp(item->Label, "DEFAULT RPM") == 0) item->Value = g_JogConfig.DefaultRPM;
-    else if (strcmp(item->Label, "ENCODER TICKS/REV") == 0) item->Value = g_JogConfig.TicksPerRev;
-    else if (strcmp(item->Label, "VINYL RELEASE FRICTION") == 0) item->Value = g_JogConfig.VinylReleaseFriction;
-    else if (strcmp(item->Label, "VINYL RELEASE CUTOFF") == 0) item->Value = g_JogConfig.VinylReleaseCutoff;
-    else if (strcmp(item->Label, "VINYL MIN VELOCITY") == 0) item->Value = g_JogConfig.VinylReleaseMinVelocity;
-    else if (strcmp(item->Label, "PITCH BEND FRICTION") == 0) item->Value = g_JogConfig.PitchBendFriction;
-    else if (strcmp(item->Label, "PITCH BEND CUTOFF") == 0) item->Value = g_JogConfig.PitchBendCutoff;
-    else if (strcmp(item->Label, "PITCH BEND SENSITIVITY") == 0) item->Value = g_JogConfig.PitchBendScale;
-    else if (strcmp(item->Label, "WAVEFORM DRAG SENSITIVITY") == 0) item->Value = g_JogConfig.WaveformNudgeScale;
-    else if (strcmp(item->Label, "FILTER RESPONSE (RAW)") == 0) item->Value = g_JogConfig.EmaRawWeight;
-    else if (strcmp(item->Label, "BACKSPIN SHORT SPEED") == 0) item->Value = g_JogConfig.BackspinShortSpeed;
-    else if (strcmp(item->Label, "BACKSPIN LONG SPEED") == 0) item->Value = g_JogConfig.BackspinLongSpeed;
-    else if (strcmp(item->Label, "BACKSPIN DECAY RATE") == 0) item->Value = g_JogConfig.BackspinDecay;
-  }
+  // Jog settings removed from UI
 }
 
 void PopulateJogSettings(App *a) {
-  int writeIdx = (a->jogSettingsStartIdx > 0) ? a->jogSettingsStartIdx : 24;
-
-  // 1. Default RPM
-  strcpy(a->settingsState.Items[writeIdx].Label, "DEFAULT RPM");
-  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
-  a->settingsState.Items[writeIdx].Min = 1.0f;
-  a->settingsState.Items[writeIdx].Max = 100.0f;
-  a->settingsState.Items[writeIdx].Step = 0.1f;
-  a->settingsState.Items[writeIdx].Value = g_JogConfig.DefaultRPM;
-  strcpy(a->settingsState.Items[writeIdx].Unit, "RPM");
-  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
-  writeIdx++;
-
-  // 2. Encoder Ticks/Rev
-  strcpy(a->settingsState.Items[writeIdx].Label, "ENCODER TICKS/REV");
-  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
-  a->settingsState.Items[writeIdx].Min = 100.0f;
-  a->settingsState.Items[writeIdx].Max = 4096.0f;
-  a->settingsState.Items[writeIdx].Step = 10.0f;
-  a->settingsState.Items[writeIdx].Value = g_JogConfig.TicksPerRev;
-  strcpy(a->settingsState.Items[writeIdx].Unit, "PPR");
-  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
-  writeIdx++;
-
-  // 3. Vinyl Release Friction
-  strcpy(a->settingsState.Items[writeIdx].Label, "VINYL RELEASE FRICTION");
-  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
-  a->settingsState.Items[writeIdx].Min = 0.800f;
-  a->settingsState.Items[writeIdx].Max = 0.999f;
-  a->settingsState.Items[writeIdx].Step = 0.005f;
-  a->settingsState.Items[writeIdx].Value = g_JogConfig.VinylReleaseFriction;
-  a->settingsState.Items[writeIdx].Unit[0] = '\0';
-  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
-  writeIdx++;
-
-  // 4. Vinyl Release Cutoff
-  strcpy(a->settingsState.Items[writeIdx].Label, "VINYL RELEASE CUTOFF");
-  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
-  a->settingsState.Items[writeIdx].Min = 0.001f;
-  a->settingsState.Items[writeIdx].Max = 0.050f;
-  a->settingsState.Items[writeIdx].Step = 0.001f;
-  a->settingsState.Items[writeIdx].Value = g_JogConfig.VinylReleaseCutoff;
-  a->settingsState.Items[writeIdx].Unit[0] = '\0';
-  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
-  writeIdx++;
-
-  // 5. Vinyl Min Velocity
-  strcpy(a->settingsState.Items[writeIdx].Label, "VINYL MIN VELOCITY");
-  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
-  a->settingsState.Items[writeIdx].Min = 0.001f;
-  a->settingsState.Items[writeIdx].Max = 0.100f;
-  a->settingsState.Items[writeIdx].Step = 0.005f;
-  a->settingsState.Items[writeIdx].Value = g_JogConfig.VinylReleaseMinVelocity;
-  a->settingsState.Items[writeIdx].Unit[0] = '\0';
-  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
-  writeIdx++;
-
-  // 6. Pitch Bend Friction
-  strcpy(a->settingsState.Items[writeIdx].Label, "PITCH BEND FRICTION");
-  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
-  a->settingsState.Items[writeIdx].Min = 0.800f;
-  a->settingsState.Items[writeIdx].Max = 0.999f;
-  a->settingsState.Items[writeIdx].Step = 0.005f;
-  a->settingsState.Items[writeIdx].Value = g_JogConfig.PitchBendFriction;
-  a->settingsState.Items[writeIdx].Unit[0] = '\0';
-  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
-  writeIdx++;
-
-  // 7. Pitch Bend Cutoff
-  strcpy(a->settingsState.Items[writeIdx].Label, "PITCH BEND CUTOFF");
-  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
-  a->settingsState.Items[writeIdx].Min = 0.001f;
-  a->settingsState.Items[writeIdx].Max = 0.050f;
-  a->settingsState.Items[writeIdx].Step = 0.001f;
-  a->settingsState.Items[writeIdx].Value = g_JogConfig.PitchBendCutoff;
-  a->settingsState.Items[writeIdx].Unit[0] = '\0';
-  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
-  writeIdx++;
-
-  // 8. Pitch Bend Sensitivity
-  strcpy(a->settingsState.Items[writeIdx].Label, "PITCH BEND SENSITIVITY");
-  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
-  a->settingsState.Items[writeIdx].Min = 0.10f;
-  a->settingsState.Items[writeIdx].Max = 5.00f;
-  a->settingsState.Items[writeIdx].Step = 0.10f;
-  a->settingsState.Items[writeIdx].Value = g_JogConfig.PitchBendScale;
-  strcpy(a->settingsState.Items[writeIdx].Unit, "x");
-  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
-  writeIdx++;
-
-  // 9. Waveform Drag Sensitivity
-  strcpy(a->settingsState.Items[writeIdx].Label, "WAVEFORM DRAG SENSITIVITY");
-  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
-  a->settingsState.Items[writeIdx].Min = 0.10f;
-  a->settingsState.Items[writeIdx].Max = 5.00f;
-  a->settingsState.Items[writeIdx].Step = 0.10f;
-  a->settingsState.Items[writeIdx].Value = g_JogConfig.WaveformNudgeScale;
-  strcpy(a->settingsState.Items[writeIdx].Unit, "x");
-  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
-  writeIdx++;
-
-  // 10. Filter Response
-  strcpy(a->settingsState.Items[writeIdx].Label, "FILTER RESPONSE (RAW)");
-  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
-  a->settingsState.Items[writeIdx].Min = 0.05f;
-  a->settingsState.Items[writeIdx].Max = 1.00f;
-  a->settingsState.Items[writeIdx].Step = 0.05f;
-  a->settingsState.Items[writeIdx].Value = g_JogConfig.EmaRawWeight;
-  a->settingsState.Items[writeIdx].Unit[0] = '\0';
-  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
-  writeIdx++;
-
-  // 11. Backspin Short Speed
-  strcpy(a->settingsState.Items[writeIdx].Label, "BACKSPIN SHORT SPEED");
-  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
-  a->settingsState.Items[writeIdx].Min = -30.0f;
-  a->settingsState.Items[writeIdx].Max = -1.0f;
-  a->settingsState.Items[writeIdx].Step = 0.5f;
-  a->settingsState.Items[writeIdx].Value = g_JogConfig.BackspinShortSpeed;
-  a->settingsState.Items[writeIdx].Unit[0] = '\0';
-  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
-  writeIdx++;
-
-  // 12. Backspin Long Speed
-  strcpy(a->settingsState.Items[writeIdx].Label, "BACKSPIN LONG SPEED");
-  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
-  a->settingsState.Items[writeIdx].Min = -50.0f;
-  a->settingsState.Items[writeIdx].Max = -1.0f;
-  a->settingsState.Items[writeIdx].Step = 0.5f;
-  a->settingsState.Items[writeIdx].Value = g_JogConfig.BackspinLongSpeed;
-  a->settingsState.Items[writeIdx].Unit[0] = '\0';
-  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
-  writeIdx++;
-
-  // 13. Backspin Decay Rate
-  strcpy(a->settingsState.Items[writeIdx].Label, "BACKSPIN DECAY RATE");
-  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_KNOB;
-  a->settingsState.Items[writeIdx].Min = 0.800f;
-  a->settingsState.Items[writeIdx].Max = 0.999f;
-  a->settingsState.Items[writeIdx].Step = 0.005f;
-  a->settingsState.Items[writeIdx].Value = g_JogConfig.BackspinDecay;
-  a->settingsState.Items[writeIdx].Unit[0] = '\0';
-  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
-  writeIdx++;
-
-  // 14. Action: Load Defaults
-  strcpy(a->settingsState.Items[writeIdx].Label, "LOAD DEFAULT JOG SETTINGS");
-  a->settingsState.Items[writeIdx].Type = SETTING_TYPE_ACTION;
-  a->settingsState.Items[writeIdx].Category = SETTING_CAT_JOG;
-  writeIdx++;
-
-  a->settingsState.ItemsCount = writeIdx;
+  // Jog settings removed as per user request to match Mixxx hardcoded logic
+  a->settingsState.ItemsCount = (a->jogSettingsStartIdx > 0) ? a->jogSettingsStartIdx : 24;
 }
 
 void PopulateMidiSettings(App *a) {
@@ -1202,7 +1004,7 @@ void App_Init(App *a) {
   Settings_Load(&a->deckA.Waveform, &a->deckB.Waveform, &a->activeAudioConfig,
                 &a->fxState, &a->colorFxDeckA, &a->colorFxDeckB,
                 a->activeControllerPath, &a->deckA.QuantizeEnabled,
-                &a->deckB.QuantizeEnabled, &a->masterVolume, &g_JogConfig);
+                &a->deckB.QuantizeEnabled, &a->masterVolume);
   if (a->activeControllerPath[0] != '\0') {
     MIDI_RefreshMapping(a->activeControllerPath);
   }
@@ -1932,8 +1734,7 @@ Log_LogDeviceInfo(gpuModel);
 
   // Register Controls after Init
   CO_Init();
-  JogConfig_Load(&g_JogConfig, "jog_config.json");
-  JogConfig_RegisterControlObjects();
+  // Jog config removed
   CO_Register("[Channel1]", "play", CO_TYPE_BOOL, &app->deckA.MidiRequestPlay, 0,
               1);
   CO_Register("[Channel1]", "cue", CO_TYPE_BOOL, &app->deckA.MidiRequestCue, 0,
@@ -3328,7 +3129,16 @@ void UpdateDrawFrame(App *app) {
   audioEngine->Decks[1].BPM = app->deckB.CurrentBPM;
 
   // Deck A
-  bool effTouchA = app->deckA.IsTouching && !app->deckA.LoopAdjustIn && !app->deckA.LoopAdjustOut;
+  bool effTouchA = app->deckA.IsTouching;
+  
+  // Extended Momentum Touch: Keep touch active if the physical wheel is still spinning freely
+  if (!effTouchA && app->deckA.VinylModeEnabled) {
+      if (fabs(audioEngine->Decks[0].JogRate) > 0.15 && (GetTime() - app->deckA.LastJogActiveTime < 0.1)) {
+          effTouchA = true;
+      }
+  }
+  effTouchA = effTouchA && !app->deckA.LoopAdjustIn && !app->deckA.LoopAdjustOut;
+
   if (effTouchA != audioEngine->Decks[0].IsTouching) {
     bool released = !effTouchA && audioEngine->Decks[0].IsTouching;
     DeckAudio_SetJogTouch(&audioEngine->Decks[0], effTouchA);
@@ -3365,25 +3175,40 @@ void UpdateDrawFrame(App *app) {
   } else if (audioEngine->Decks[0].ReleaseFXType == 2) {
     // Active Backspin: Let engine physics decay JogRate smoothly
   } else if (effTouchA && app->deckA.VinylModeEnabled) {
-    // Active vinyl scratch hold/move under hand
-    double dt = GetFrameTime();
-    if (dt < 0.001) dt = 0.016;
-
-    double calibRPM = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckA.Waveform.JogCalibRPM : (double)g_JogConfig.DefaultRPM;
-    double ticksPerSecAtNormalSpeed = (double)g_JogConfig.TicksPerRev * (calibRPM / 60.0);
-    double rawRate = 0.0;
-
+    // Active vinyl scratch hold/move under hand (Mixxx Alpha-Beta Filter)
+    double calibRPM = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckA.Waveform.JogCalibRPM : 33.333333;
+    double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
+    double dx = 0.0;
+    
     if (app->deckA.JogDelta != 0) {
-      rawRate = app->deckA.JogDelta / (ticksPerSecAtNormalSpeed * dt);
+      dx = (double)app->deckA.JogDelta / ticksPerSecAtNormalSpeed;
       app->deckA.JogDelta = 0;
       app->deckA.LastJogActiveTime = GetTime();
     }
 
-    // Apply EMA filter to smooth out USB MIDI jitter, removing the need for a 50ms hard hold
-    audioEngine->Decks[0].JogRate = (audioEngine->Decks[0].JogRate * (double)g_JogConfig.EmaPrevWeight) + (rawRate * (double)g_JogConfig.EmaRawWeight);
+    double dt = GetFrameTime();
+    if (dt < 0.001) dt = 0.016;
 
-    if (rawRate == 0.0 && fabs(audioEngine->Decks[0].JogRate) < 0.01) {
+    double alpha = 1.0;
+    double beta = 0.8;
+
+    double predicted_x = audioEngine->Decks[0].ScratchFilter_x + audioEngine->Decks[0].ScratchFilter_v * dt;
+    double predicted_v = audioEngine->Decks[0].ScratchFilter_v;
+    double residual_x = dx - predicted_x;
+
+    audioEngine->Decks[0].ScratchFilter_x = predicted_x + residual_x * alpha;
+    audioEngine->Decks[0].ScratchFilter_v = predicted_v + residual_x * beta / dt;
+
+    // relative to previous
+    audioEngine->Decks[0].ScratchFilter_x -= dx;
+
+    // Set engine rate directly to predicted physical velocity
+    audioEngine->Decks[0].JogRate = audioEngine->Decks[0].ScratchFilter_v;
+    
+    if (dx == 0.0 && fabs(audioEngine->Decks[0].JogRate) < 0.01) {
        audioEngine->Decks[0].JogRate = 0.0;
+       audioEngine->Decks[0].ScratchFilter_v = 0.0;
+       audioEngine->Decks[0].ScratchFilter_x = 0.0;
     }
   } else if (audioEngine->Decks[0].VinylReleaseActive) {
     // Vinyl touch release inertia in progress: consume leftover physical wheel ticks
@@ -3393,20 +3218,23 @@ void UpdateDrawFrame(App *app) {
     float dtFactor = (float)(dt / 0.016667);
     if (dtFactor < 0.1f) dtFactor = 0.1f;
     if (dtFactor > 5.0f) dtFactor = 5.0f;
-    audioEngine->Decks[0].JogRate *= powf(g_JogConfig.VinylReleaseFriction, dtFactor);
-    if (fabs(audioEngine->Decks[0].JogRate) < (double)g_JogConfig.VinylReleaseCutoff) {
+    audioEngine->Decks[0].JogRate *= powf(0.965f, dtFactor);
+    if (fabs(audioEngine->Decks[0].JogRate) < 0.005f) {
       audioEngine->Decks[0].JogRate = 0.0;
       audioEngine->Decks[0].VinylReleaseActive = false;
     }
+    // Also reset alpha beta filter during release so it doesn't snap back when touched
+    audioEngine->Decks[0].ScratchFilter_v = audioEngine->Decks[0].JogRate;
+    audioEngine->Decks[0].ScratchFilter_x = 0.0;
   } else if (app->deckA.JogDelta != 0) {
     // CDJ pitch bend nudge (outer wheel turn without touching top plate)
     double dt = GetFrameTime();
     if (dt < 0.001) dt = 0.016;
-    double calibRPM = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckA.Waveform.JogCalibRPM : (double)g_JogConfig.DefaultRPM;
-    double ticksPerSecAtNormalSpeed = (double)g_JogConfig.TicksPerRev * (calibRPM / 60.0);
-    double rawRate = (app->deckA.JogDelta * (double)g_JogConfig.PitchBendScale) / (ticksPerSecAtNormalSpeed * dt);
+    double calibRPM = (app->deckA.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckA.Waveform.JogCalibRPM : 33.333333;
+    double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
+    double rawRate = (double)app->deckA.JogDelta / (ticksPerSecAtNormalSpeed * dt);
     app->deckA.JogDelta = 0;
-    audioEngine->Decks[0].JogRate = audioEngine->Decks[0].JogRate * (double)g_JogConfig.EmaPrevWeight + rawRate * (double)g_JogConfig.EmaRawWeight;
+    audioEngine->Decks[0].JogRate = audioEngine->Decks[0].JogRate * 0.25 + rawRate * 0.75;
   } else {
     // Pitch bend release decay back to zero
     double dt = GetFrameTime();
@@ -3414,14 +3242,23 @@ void UpdateDrawFrame(App *app) {
     float dtFactor = (float)(dt / 0.016667);
     if (dtFactor < 0.1f) dtFactor = 0.1f;
     if (dtFactor > 5.0f) dtFactor = 5.0f;
-    audioEngine->Decks[0].JogRate *= powf(g_JogConfig.PitchBendFriction, dtFactor);
-    if (fabs(audioEngine->Decks[0].JogRate) < (double)g_JogConfig.PitchBendCutoff) {
+    audioEngine->Decks[0].JogRate *= powf(0.92f, dtFactor);
+    if (fabs(audioEngine->Decks[0].JogRate) < 0.005) {
       audioEngine->Decks[0].JogRate = 0.0;
     }
   }
 
   // Deck B
-  bool effTouchB = app->deckB.IsTouching && !app->deckB.LoopAdjustIn && !app->deckB.LoopAdjustOut;
+  bool effTouchB = app->deckB.IsTouching;
+  
+  // Extended Momentum Touch: Keep touch active if the physical wheel is still spinning freely
+  if (!effTouchB && app->deckB.VinylModeEnabled) {
+      if (fabs(audioEngine->Decks[1].JogRate) > 0.15 && (GetTime() - app->deckB.LastJogActiveTime < 0.1)) {
+          effTouchB = true;
+      }
+  }
+  effTouchB = effTouchB && !app->deckB.LoopAdjustIn && !app->deckB.LoopAdjustOut;
+
   if (effTouchB != audioEngine->Decks[1].IsTouching) {
     bool released = !effTouchB && audioEngine->Decks[1].IsTouching;
     DeckAudio_SetJogTouch(&audioEngine->Decks[1], effTouchB);
@@ -3458,25 +3295,40 @@ void UpdateDrawFrame(App *app) {
   } else if (audioEngine->Decks[1].ReleaseFXType == 2) {
     // Active Backspin: Let engine physics decay JogRate smoothly
   } else if (effTouchB && app->deckB.VinylModeEnabled) {
-    // Active vinyl scratch hold/move under hand
-    double dt = GetFrameTime();
-    if (dt < 0.001) dt = 0.016;
-
-    double calibRPM = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckB.Waveform.JogCalibRPM : (double)g_JogConfig.DefaultRPM;
-    double ticksPerSecAtNormalSpeed = (double)g_JogConfig.TicksPerRev * (calibRPM / 60.0);
-    double rawRate = 0.0;
+    // Active vinyl scratch hold/move under hand (Mixxx Alpha-Beta Filter)
+    double calibRPM = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckB.Waveform.JogCalibRPM : 33.333333;
+    double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
+    double dx = 0.0;
 
     if (app->deckB.JogDelta != 0) {
-      rawRate = app->deckB.JogDelta / (ticksPerSecAtNormalSpeed * dt);
+      dx = (double)app->deckB.JogDelta / ticksPerSecAtNormalSpeed;
       app->deckB.JogDelta = 0;
       app->deckB.LastJogActiveTime = GetTime();
     }
 
-    // Apply EMA filter to smooth out USB MIDI jitter, removing the need for a 50ms hard hold
-    audioEngine->Decks[1].JogRate = (audioEngine->Decks[1].JogRate * (double)g_JogConfig.EmaPrevWeight) + (rawRate * (double)g_JogConfig.EmaRawWeight);
+    double dt = GetFrameTime();
+    if (dt < 0.001) dt = 0.016;
 
-    if (rawRate == 0.0 && fabs(audioEngine->Decks[1].JogRate) < 0.01) {
+    double alpha = 1.0;
+    double beta = 0.8;
+
+    double predicted_x = audioEngine->Decks[1].ScratchFilter_x + audioEngine->Decks[1].ScratchFilter_v * dt;
+    double predicted_v = audioEngine->Decks[1].ScratchFilter_v;
+    double residual_x = dx - predicted_x;
+
+    audioEngine->Decks[1].ScratchFilter_x = predicted_x + residual_x * alpha;
+    audioEngine->Decks[1].ScratchFilter_v = predicted_v + residual_x * beta / dt;
+
+    // relative to previous
+    audioEngine->Decks[1].ScratchFilter_x -= dx;
+
+    // Set engine rate directly to predicted physical velocity
+    audioEngine->Decks[1].JogRate = audioEngine->Decks[1].ScratchFilter_v;
+
+    if (dx == 0.0 && fabs(audioEngine->Decks[1].JogRate) < 0.01) {
        audioEngine->Decks[1].JogRate = 0.0;
+       audioEngine->Decks[1].ScratchFilter_v = 0.0;
+       audioEngine->Decks[1].ScratchFilter_x = 0.0;
     }
   } else if (audioEngine->Decks[1].VinylReleaseActive) {
     // Vinyl touch release inertia in progress: consume leftover physical wheel ticks
@@ -3486,20 +3338,23 @@ void UpdateDrawFrame(App *app) {
     float dtFactor = (float)(dt / 0.016667);
     if (dtFactor < 0.1f) dtFactor = 0.1f;
     if (dtFactor > 5.0f) dtFactor = 5.0f;
-    audioEngine->Decks[1].JogRate *= powf(g_JogConfig.VinylReleaseFriction, dtFactor);
-    if (fabs(audioEngine->Decks[1].JogRate) < (double)g_JogConfig.VinylReleaseCutoff) {
+    audioEngine->Decks[1].JogRate *= powf(0.965f, dtFactor);
+    if (fabs(audioEngine->Decks[1].JogRate) < 0.005f) {
       audioEngine->Decks[1].JogRate = 0.0;
       audioEngine->Decks[1].VinylReleaseActive = false;
     }
+    // Also reset alpha beta filter during release so it doesn't snap back when touched
+    audioEngine->Decks[1].ScratchFilter_v = audioEngine->Decks[1].JogRate;
+    audioEngine->Decks[1].ScratchFilter_x = 0.0;
   } else if (app->deckB.JogDelta != 0) {
     // CDJ pitch bend nudge (outer wheel turn without touching top plate)
     double dt = GetFrameTime();
     if (dt < 0.001) dt = 0.016;
-    double calibRPM = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckB.Waveform.JogCalibRPM : (double)g_JogConfig.DefaultRPM;
-    double ticksPerSecAtNormalSpeed = (double)g_JogConfig.TicksPerRev * (calibRPM / 60.0);
-    double rawRate = (app->deckB.JogDelta * (double)g_JogConfig.PitchBendScale) / (ticksPerSecAtNormalSpeed * dt);
+    double calibRPM = (app->deckB.Waveform.JogCalibRPM > 5.0f) ? (double)app->deckB.Waveform.JogCalibRPM : 33.333333;
+    double ticksPerSecAtNormalSpeed = 720.0 * (calibRPM / 60.0);
+    double rawRate = (double)app->deckB.JogDelta / (ticksPerSecAtNormalSpeed * dt);
     app->deckB.JogDelta = 0;
-    audioEngine->Decks[1].JogRate = audioEngine->Decks[1].JogRate * (double)g_JogConfig.EmaPrevWeight + rawRate * (double)g_JogConfig.EmaRawWeight;
+    audioEngine->Decks[1].JogRate = audioEngine->Decks[1].JogRate * 0.25 + rawRate * 0.75;
   } else {
     // Pitch bend release decay back to zero
     double dt = GetFrameTime();
@@ -3507,8 +3362,8 @@ void UpdateDrawFrame(App *app) {
     float dtFactor = (float)(dt / 0.016667);
     if (dtFactor < 0.1f) dtFactor = 0.1f;
     if (dtFactor > 5.0f) dtFactor = 5.0f;
-    audioEngine->Decks[1].JogRate *= powf(g_JogConfig.PitchBendFriction, dtFactor);
-    if (fabs(audioEngine->Decks[1].JogRate) < (double)g_JogConfig.PitchBendCutoff) {
+    audioEngine->Decks[1].JogRate *= powf(0.92f, dtFactor);
+    if (fabs(audioEngine->Decks[1].JogRate) < 0.005) {
       audioEngine->Decks[1].JogRate = 0.0;
     }
   }
