@@ -153,21 +153,50 @@ bool WinMIDI_SendShortMsg(uint8_t status, uint8_t data1, uint8_t data2) {
     return false;
 }
 
-bool WinMIDI_SendSysEx(const uint8_t *data, uint32_t length) {
-    if (hMidiOut && data && length > 0) {
+typedef struct {
+    HMIDIOUT hOut;
+    uint32_t length;
+    uint8_t data[]; // Flexible array member
+} SysExThreadData;
+
+static DWORD WINAPI SysExWorkerThread(LPVOID lpParam) {
+    SysExThreadData *args = (SysExThreadData *)lpParam;
+    if (args && args->hOut) {
         MIDIHDR midiHdr;
         memset(&midiHdr, 0, sizeof(MIDIHDR));
-        midiHdr.lpData = (LPSTR)data;
-        midiHdr.dwBufferLength = length;
-        midiHdr.dwBytesRecorded = length;
+        midiHdr.lpData = (LPSTR)args->data;
+        midiHdr.dwBufferLength = args->length;
+        midiHdr.dwBytesRecorded = args->length;
 
-        if (midiOutPrepareHeader(hMidiOut, &midiHdr, sizeof(MIDIHDR)) == MMSYSERR_NOERROR) {
-            midiOutLongMsg(hMidiOut, &midiHdr, sizeof(MIDIHDR));
+        if (midiOutPrepareHeader(args->hOut, &midiHdr, sizeof(MIDIHDR)) == MMSYSERR_NOERROR) {
+            midiOutLongMsg(args->hOut, &midiHdr, sizeof(MIDIHDR));
+            // Wait for transmission to finish in this background thread
             while ((midiHdr.dwFlags & MHDR_DONE) == 0) {
                 Sleep(1);
             }
-            midiOutUnprepareHeader(hMidiOut, &midiHdr, sizeof(MIDIHDR));
-            return true;
+            midiOutUnprepareHeader(args->hOut, &midiHdr, sizeof(MIDIHDR));
+        }
+    }
+    free(args);
+    return 0;
+}
+
+bool WinMIDI_SendSysEx(const uint8_t *data, uint32_t length) {
+    if (hMidiOut && data && length > 0) {
+        // Allocate structure + payload buffer
+        SysExThreadData *args = (SysExThreadData *)malloc(sizeof(SysExThreadData) + length);
+        if (args) {
+            args->hOut = hMidiOut;
+            args->length = length;
+            memcpy(args->data, data, length);
+            
+            HANDLE hThread = CreateThread(NULL, 0, SysExWorkerThread, args, 0, NULL);
+            if (hThread) {
+                CloseHandle(hThread); // Detach thread
+                return true;
+            } else {
+                free(args); // Thread creation failed
+            }
         }
     }
     return false;

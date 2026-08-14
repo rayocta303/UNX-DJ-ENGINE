@@ -202,7 +202,8 @@ static void send_bytes(const unsigned char *b, int len) {
       snd_seq_ev_set_subs(&ev);
       snd_seq_ev_set_direct(&ev);
       snd_seq_event_output((snd_seq_t *)seq_handle, &ev);
-      snd_seq_drain_output((snd_seq_t *)seq_handle);
+      // Removed snd_seq_drain_output here to prevent severe CPU stalls.
+      // Draining is handled at the end of the frame in MIDI_UpdateLEDs.
     }
   }
 #endif
@@ -480,9 +481,16 @@ void MIDI_CheckHotplug(MidiContext *ctx) {
 
   static double lastCheckTime = 0;
   double now = GetTime();
-  if (now - lastCheckTime < 0.4)
-    return; // Rate-limit hotplug checks to every 400ms
+  if (now - lastCheckTime < 2.0)
+    return; // Rate-limit hotplug checks to every 2 seconds
   lastCheckTime = now;
+
+  if (ctx->initialized) {
+      // Do not poll USB MIDI devices while connected!
+      // On Windows and embedded Linux, polling midiInGetNumDevs / ALSA 
+      // blocks the main UI thread and causes severe stuttering every 0.4s.
+      return;
+  }
 
   char devNames[16][64];
   int count = MIDI_GetDeviceList(devNames);

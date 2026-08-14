@@ -2823,9 +2823,12 @@ void UpdateDrawFrame(App *app) {
       app->fxState.MidiRequestTap = false;
   }
 
-  // Send hardware LED and VU Meter updates via MIDI
-  MIDI_UpdateLEDs(&app->midiCtx, &app->deckA, &app->deckB, audioEngine, app);
-
+  // Send hardware LED and VU Meter updates via MIDI (rate-limited to 30Hz to prevent driver congestion)
+  static double lastMidiUpdate = 0;
+  if (GetTime() - lastMidiUpdate > 0.033) {
+      MIDI_UpdateLEDs(&app->midiCtx, &app->deckA, &app->deckB, audioEngine, app);
+      lastMidiUpdate = GetTime();
+  }
 
   // --- Global Beat FX Sync ---
   float masterBpm = 120.0f;

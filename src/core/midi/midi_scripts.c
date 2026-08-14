@@ -551,14 +551,14 @@ void MIDI_UpdateLoopAndPadLEDs(DeckState *d1, DeckState *d2,
     bool isMaster = (ds && ds->IsMaster);
     uint8_t syncLeaderVal = isMaster ? 0x7F : 0x00;
 
-    // Play/CUE: resend when value changes OR blink phase toggles (max 2 msgs / 8 frames)
-    if (forceSend || blinkChanged || playVal != lastPlayVal[i]) {
+    // Play/CUE: resend when value changes (max 2 msgs / 8 frames if paused, 0 if playing)
+    if (forceSend || playVal != lastPlayVal[i]) {
       MIDI_SendShortMsg(reg_play[i].status, reg_play[i].midino, playVal);
       MIDI_SendShortMsg(reg_play_indicator[i].status, reg_play_indicator[i].midino, playVal);
       MIDI_SendShortMsg(reg_start_stop[i].status, reg_start_stop[i].midino, playVal);
       lastPlayVal[i] = playVal;
     }
-    if (forceSend || blinkChanged || cueVal != lastCueVal[i]) {
+    if (forceSend || cueVal != lastCueVal[i]) {
       MIDI_SendShortMsg(reg_cue[i].status, reg_cue[i].midino, cueVal);
       MIDI_SendShortMsg(reg_cue_default[i].status, reg_cue_default[i].midino, cueVal);
       MIDI_SendShortMsg(reg_cue_indicator[i].status, reg_cue_indicator[i].midino, cueVal);
