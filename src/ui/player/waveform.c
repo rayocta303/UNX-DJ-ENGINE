@@ -482,8 +482,9 @@ static void Waveform_Draw(Component *base) {
         }
 
         // Current position marker on deckstrip
-        float playPos = (float)((double)r->State->PositionMs / (double)r->State->TrackLengthMs) * wfW;
-        DrawRectangle(wfLeft + playPos - 1, dsY, 2, dsH, ColorWhite);
+        float playPos = (float)((double)r->State->PositionMs /
+    (double)r->State->TrackLengthMs) * wfW; DrawRectangle(wfLeft + playPos - 1,
+    dsY, 2, dsH, ColorWhite);
     }
   */
 
@@ -492,29 +493,33 @@ static void Waveform_Draw(Component *base) {
   float yy = wfY + waveCenter;
 
   double framesPerPixel = zoomDelta;
-  if (framesPerPixel < 0.05) framesPerPixel = 0.05;
+  if (framesPerPixel < 0.05)
+    framesPerPixel = 0.05;
 
   // Re-sync effectiveZoom in case framesPerPixel was clamped at max zoom
   effectiveZoom = (float)framesPerPixel / r->dataDensity;
 
   double centerFrame = elapsedHalfFrames * r->dataDensity;
   double centerBinExact = centerFrame / framesPerPixel;
-  
+
   // Calculate rendering bounds in terms of absolute bins
   int binsLeft = (int)ceilf(playheadX - wfLeft) + 2;
   int binsRight = (int)ceilf(wfRight - playheadX) + 2;
-  
+
   int startBinIndex = (int)floor(centerBinExact) - binsLeft;
   int endBinIndex = (int)floor(centerBinExact) + binsRight;
-  if (startBinIndex < 0) startBinIndex = 0;
-  
+  if (startBinIndex < 0)
+    startBinIndex = 0;
+
   int numBins = endBinIndex - startBinIndex + 1;
-  #define MAX_WAVE_BINS 3000
-  if (numBins > MAX_WAVE_BINS) numBins = MAX_WAVE_BINS;
+#define MAX_WAVE_BINS 3000
+  if (numBins > MAX_WAVE_BINS)
+    numBins = MAX_WAVE_BINS;
 
   int64_t startFrame = (int64_t)(startBinIndex * framesPerPixel);
   int64_t endFrame = (int64_t)((endBinIndex + 1) * framesPerPixel);
-  if (endFrame > wfFrames) endFrame = wfFrames;
+  if (endFrame > wfFrames)
+    endFrame = wfFrames;
 
   // Fast Extraction (Zero-Latency Binning) - No temporal IIR!
   static float pixLo[MAX_WAVE_BINS];
@@ -522,169 +527,321 @@ static void Waveform_Draw(Component *base) {
   static float pixHi[MAX_WAVE_BINS];
   static Color pixCol[MAX_WAVE_BINS];
 
+  // 1. Clear Bins
   for (int b = 0; b < numBins; b++) {
-      pixLo[b] = 0.0f; pixMi[b] = 0.0f; pixHi[b] = 0.0f;
-      pixCol[b] = (Color){0, 0, 0, 0};
+    pixLo[b] = 0.0f;
+    pixMi[b] = 0.0f;
+    pixHi[b] = 0.0f;
+    pixCol[b] = (Color){0, 0, 0, 0};
   }
 
-  int64_t step = 1;
-  if (framesPerPixel > 4.0) {
-      step = (int64_t)(framesPerPixel / 2.0);
-      if (step < 1) step = 1;
-  }
+  // 2. Extract Data
+  if (framesPerPixel < 1.0) {
+    // ZOOMED IN: Linear Interpolation for mathematically continuous curves
+    for (int b = 0; b < numBins; b++) {
+      double exactFrame = (startBinIndex + b) * framesPerPixel;
+      int64_t f0 = (int64_t)floor(exactFrame);
+      int64_t f1 = f0 + 1;
+      float t = (float)(exactFrame - f0);
 
-  for (int64_t i = startFrame; i < endFrame; i += step) {
-    float rL = 0, rM = 0, rH = 0;
-    Color colRaw = {0, 0, 0, 255};
+      if (f0 < 0)
+        f0 = 0;
+      if (f0 >= wfFrames)
+        f0 = wfFrames - 1;
+      if (f1 < 0)
+        f1 = 0;
+      if (f1 >= wfFrames)
+        f1 = wfFrames - 1;
 
-    if (wfType == 3) {
-      rM = (float)wfData[i * 3] * MID_SCALE * NORM * waveCenter * gMid;
-      rH = (float)wfData[i * 3 + 1] * HIGH_SCALE * NORM * waveCenter * gHigh;
-      rL = (float)wfData[i * 3 + 2] * LOW_SCALE * NORM * waveCenter * gLow;
-    } else {
-      int h;
-      if (wfType == 2)
-        h = PWV4_Decode(wfData, i, wfFrames, &colRaw);
-      else
-        h = PWV2_Decode(wfData[i], &colRaw);
+      float rL0 = 0, rM0 = 0, rH0 = 0;
+      float rL1 = 0, rM1 = 0, rH1 = 0;
 
-      float baseH = h * PWV2_HSCALE;
-      if (wfType == 2) {
-        rL = baseH * ((float)colRaw.r / 255.0f) * gLow;
-        rM = baseH * ((float)colRaw.g / 255.0f) * gMid;
-        rH = baseH * ((float)colRaw.b / 255.0f) * gHigh;
+      if (wfType == 3) {
+        rM0 = (float)wfData[f0 * 3] * MID_SCALE * NORM * waveCenter * gMid;
+        rH0 =
+            (float)wfData[f0 * 3 + 1] * HIGH_SCALE * NORM * waveCenter * gHigh;
+        rL0 = (float)wfData[f0 * 3 + 2] * LOW_SCALE * NORM * waveCenter * gLow;
+
+        rM1 = (float)wfData[f1 * 3] * MID_SCALE * NORM * waveCenter * gMid;
+        rH1 =
+            (float)wfData[f1 * 3 + 1] * HIGH_SCALE * NORM * waveCenter * gHigh;
+        rL1 = (float)wfData[f1 * 3 + 2] * LOW_SCALE * NORM * waveCenter * gLow;
       } else {
-        if (colRaw.r > colRaw.b && colRaw.r > colRaw.g) {
-          rL = baseH * 0.4f * gLow; rM = baseH * 0.9f * gMid; rH = baseH * 0.2f * gHigh;
-        } else if (colRaw.b > colRaw.r && colRaw.b > colRaw.g) {
-          rL = baseH * 0.95f * gLow; rM = baseH * 0.6f * gMid; rH = baseH * 0.1f * gHigh;
+        Color colRaw0, colRaw1;
+        int h0 = (wfType == 2) ? PWV4_Decode(wfData, f0, wfFrames, &colRaw0)
+                               : PWV2_Decode(wfData[f0], &colRaw0);
+        int h1 = (wfType == 2) ? PWV4_Decode(wfData, f1, wfFrames, &colRaw1)
+                               : PWV2_Decode(wfData[f1], &colRaw1);
+
+        float baseH0 = h0 * PWV2_HSCALE;
+        float baseH1 = h1 * PWV2_HSCALE;
+        if (wfType == 2) {
+          rL0 = baseH0 * ((float)colRaw0.r / 255.0f) * gLow;
+          rM0 = baseH0 * ((float)colRaw0.g / 255.0f) * gMid;
+          rH0 = baseH0 * ((float)colRaw0.b / 255.0f) * gHigh;
+          rL1 = baseH1 * ((float)colRaw1.r / 255.0f) * gLow;
+          rM1 = baseH1 * ((float)colRaw1.g / 255.0f) * gMid;
+          rH1 = baseH1 * ((float)colRaw1.b / 255.0f) * gHigh;
         } else {
-          rL = baseH * 0.8f * gLow; rM = baseH * 0.8f * gMid; rH = baseH * 0.6f * gHigh;
+          if (colRaw0.r > colRaw0.b && colRaw0.r > colRaw0.g) {
+            rL0 = baseH0 * 0.4f * gLow;
+            rM0 = baseH0 * 0.9f * gMid;
+            rH0 = baseH0 * 0.2f * gHigh;
+          } else if (colRaw0.b > colRaw0.r && colRaw0.b > colRaw0.g) {
+            rL0 = baseH0 * 0.95f * gLow;
+            rM0 = baseH0 * 0.6f * gMid;
+            rH0 = baseH0 * 0.1f * gHigh;
+          } else {
+            rL0 = baseH0 * 0.8f * gLow;
+            rM0 = baseH0 * 0.8f * gMid;
+            rH0 = baseH0 * 0.6f * gHigh;
+          }
+
+          if (colRaw1.r > colRaw1.b && colRaw1.r > colRaw1.g) {
+            rL1 = baseH1 * 0.4f * gLow;
+            rM1 = baseH1 * 0.9f * gMid;
+            rH1 = baseH1 * 0.2f * gHigh;
+          } else if (colRaw1.b > colRaw1.r && colRaw1.b > colRaw1.g) {
+            rL1 = baseH1 * 0.95f * gLow;
+            rM1 = baseH1 * 0.6f * gMid;
+            rH1 = baseH1 * 0.1f * gHigh;
+          } else {
+            rL1 = baseH1 * 0.8f * gLow;
+            rM1 = baseH1 * 0.8f * gMid;
+            rH1 = baseH1 * 0.6f * gHigh;
+          }
+        }
+        pixCol[b].r = (unsigned char)(((float)colRaw0.r * (1.0f - t)) +
+                                      ((float)colRaw1.r * t));
+        pixCol[b].g = (unsigned char)(((float)colRaw0.g * (1.0f - t)) +
+                                      ((float)colRaw1.g * t));
+        pixCol[b].b = (unsigned char)(((float)colRaw0.b * (1.0f - t)) +
+                                      ((float)colRaw1.b * t));
+        pixCol[b].a = 255;
+      }
+
+      pixLo[b] = rL0 * (1.0f - t) + rL1 * t;
+      pixMi[b] = rM0 * (1.0f - t) + rM1 * t;
+      pixHi[b] = rH0 * (1.0f - t) + rH1 * t;
+    }
+  } else {
+    // ZOOMED OUT: Max-Binning
+    int64_t step = 1;
+    if (framesPerPixel > 4.0) {
+      step = (int64_t)(framesPerPixel / 2.0);
+      if (step < 1)
+        step = 1;
+    }
+
+    for (int64_t i = startFrame; i < endFrame; i += step) {
+      float rL = 0, rM = 0, rH = 0;
+      Color colRaw = {0, 0, 0, 255};
+
+      if (wfType == 3) {
+        rM = (float)wfData[i * 3] * MID_SCALE * NORM * waveCenter * gMid;
+        rH = (float)wfData[i * 3 + 1] * HIGH_SCALE * NORM * waveCenter * gHigh;
+        rL = (float)wfData[i * 3 + 2] * LOW_SCALE * NORM * waveCenter * gLow;
+      } else {
+        int h;
+        if (wfType == 2)
+          h = PWV4_Decode(wfData, i, wfFrames, &colRaw);
+        else
+          h = PWV2_Decode(wfData[i], &colRaw);
+
+        float baseH = h * PWV2_HSCALE;
+        if (wfType == 2) {
+          rL = baseH * ((float)colRaw.r / 255.0f) * gLow;
+          rM = baseH * ((float)colRaw.g / 255.0f) * gMid;
+          rH = baseH * ((float)colRaw.b / 255.0f) * gHigh;
+        } else {
+          if (colRaw.r > colRaw.b && colRaw.r > colRaw.g) {
+            rL = baseH * 0.4f * gLow;
+            rM = baseH * 0.9f * gMid;
+            rH = baseH * 0.2f * gHigh;
+          } else if (colRaw.b > colRaw.r && colRaw.b > colRaw.g) {
+            rL = baseH * 0.95f * gLow;
+            rM = baseH * 0.6f * gMid;
+            rH = baseH * 0.1f * gHigh;
+          } else {
+            rL = baseH * 0.8f * gLow;
+            rM = baseH * 0.8f * gMid;
+            rH = baseH * 0.6f * gHigh;
+          }
+        }
+      }
+
+      if (rL > waveCenter)
+        rL = waveCenter;
+      if (rM > waveCenter)
+        rM = waveCenter;
+      if (rH > waveCenter)
+        rH = waveCenter;
+
+      int binStart = (int)(i / framesPerPixel) - startBinIndex;
+      int binEnd = (int)((i + 0.999) / framesPerPixel) - startBinIndex;
+
+      for (int k = binStart; k <= binEnd; k++) {
+        if (k >= 0 && k < numBins) {
+          if (rL > pixLo[k])
+            pixLo[k] = rL;
+          if (rM > pixMi[k])
+            pixMi[k] = rM;
+          if (rH > pixHi[k])
+            pixHi[k] = rH;
+          if (wfType != 3 && (rL >= pixLo[k] || rM >= pixMi[k])) {
+            pixCol[k] = colRaw;
+          }
         }
       }
     }
-
-    if (rL > waveCenter) rL = waveCenter;
-    if (rM > waveCenter) rM = waveCenter;
-    if (rH > waveCenter) rH = waveCenter;
-
-    int trackBinStart = (int)(i / framesPerPixel);
-    int trackBinEnd = (int)((i + 0.999) / framesPerPixel);
-    
-    for (int k = trackBinStart; k <= trackBinEnd; k++) {
-        int b = k - startBinIndex;
-        if (b >= 0 && b < numBins) {
-            if (rL > pixLo[b]) pixLo[b] = rL;
-            if (rM > pixMi[b]) pixMi[b] = rM;
-            if (rH > pixHi[b]) pixHi[b] = rH;
-            if (wfType != 3 && (rL >= pixLo[b] || rM >= pixMi[b])) {
-                pixCol[b] = colRaw;
-            }
-        }
-    }
   }
 
-  // Fast 1D Spatial Blur (Anti-Pixelation / Anti-Aliasing)
-  static float tempLo[MAX_WAVE_BINS], tempMi[MAX_WAVE_BINS], tempHi[MAX_WAVE_BINS];
+  // 3. APPLY CDJ Peak-Hold / Exponential Decay Envelope
+  float pixelDecay = powf(0.85f, (float)framesPerPixel);
+  if (pixelDecay < 0.1f)
+    pixelDecay = 0.1f;
+  if (pixelDecay > 0.99f)
+    pixelDecay = 0.99f;
+
+  float envLo = pixLo[0], envMi = pixMi[0], envHi = pixHi[0];
+
   for (int b = 0; b < numBins; b++) {
-      int p2 = (b > 1) ? b - 2 : ((b > 0) ? b - 1 : b);
-      int p1 = (b > 0) ? b - 1 : b;
-      int n1 = (b < numBins - 1) ? b + 1 : b;
-      int n2 = (b < numBins - 2) ? b + 2 : ((b < numBins - 1) ? b + 1 : b);
-      
-      // 5-tap Gaussian-like kernel for beautiful smooth curves
-      tempLo[b] = pixLo[p2]*0.06f + pixLo[p1]*0.24f + pixLo[b]*0.4f + pixLo[n1]*0.24f + pixLo[n2]*0.06f;
-      tempMi[b] = pixMi[p2]*0.06f + pixMi[p1]*0.24f + pixMi[b]*0.4f + pixMi[n1]*0.24f + pixMi[n2]*0.06f;
-      tempHi[b] = pixHi[p2]*0.06f + pixHi[p1]*0.24f + pixHi[b]*0.4f + pixHi[n1]*0.24f + pixHi[n2]*0.06f;
+    if (pixLo[b] > envLo)
+      envLo = pixLo[b]; // Instant attack
+    else
+      envLo = pixLo[b] * (1.0f - pixelDecay) +
+              envLo * pixelDecay; // Exponential decay curve
+
+    if (pixMi[b] > envMi)
+      envMi = pixMi[b];
+    else
+      envMi = pixMi[b] * (1.0f - pixelDecay) + envMi * pixelDecay;
+
+    if (pixHi[b] > envHi)
+      envHi = pixHi[b];
+    else
+      envHi = pixHi[b] * (1.0f - pixelDecay) + envHi * pixelDecay;
+
+    pixLo[b] = envLo;
+    pixMi[b] = envMi;
+    pixHi[b] = envHi;
   }
+
+  // Force strict nesting (Blue > Orange > White) to recreate the 3-Band
+  // layering
   for (int b = 0; b < numBins; b++) {
-      pixLo[b] = tempLo[b];
-      pixMi[b] = tempMi[b];
-      pixHi[b] = tempHi[b];
+    float h = pixHi[b];
+    float m = fmaxf(pixMi[b], h);
+    float l = fmaxf(pixLo[b], m);
+
+    pixLo[b] = l;
+    pixMi[b] = m;
+    pixHi[b] = h;
   }
 
   // Draw smooth continuous polygon (RL_QUADS)
   // This is highly optimal for GPU and naturally creates a seamless curve.
   if (userStyle == WAVEFORM_STYLE_BLUE || userStyle == WAVEFORM_STYLE_RGB) {
-      rlBegin(RL_QUADS);
-      for (int b = 0; b < numBins - 1; b++) {
-          int binIdx = startBinIndex + b;
-          float px0 = playheadX + (float)((double)binIdx - centerBinExact);
-          float px1 = px0 + 1.0f;
-          
-          if (px1 < wfLeft - 2.0f || px0 > wfRight + 2.0f) continue;
-          
-          float h0 = fmaxf(pixLo[b], fmaxf(pixMi[b], pixHi[b]));
-          float h1 = fmaxf(pixLo[b+1], fmaxf(pixMi[b+1], pixHi[b+1]));
-          if (h0 < 0.5f) h0 = 0.5f; // minimum thickness
-          if (h1 < 0.5f) h1 = 0.5f;
-          
-          Color c = pixCol[b];
-          if (userStyle == WAVEFORM_STYLE_RGB) {
-              c.r = (unsigned char)fminf(255.0f, (float)c.r * eqLowMult);
-              c.g = (unsigned char)fminf(255.0f, (float)c.g * eqMidMult);
-              c.b = (unsigned char)fminf(255.0f, (float)c.b * eqHighMult);
-          }
-          
-          rlColor4ub(c.r, c.g, c.b, 255);
-          rlVertex2f(px0, yy - h0);
-          rlColor4ub(c.r, c.g, c.b, 255);
-          rlVertex2f(px0, yy + h0);
-          rlColor4ub(c.r, c.g, c.b, 255);
-          rlVertex2f(px1, yy + h1);
-          rlColor4ub(c.r, c.g, c.b, 255);
-          rlVertex2f(px1, yy - h1);
+    rlBegin(RL_QUADS);
+    for (int b = 0; b < numBins - 1; b++) {
+      int binIdx = startBinIndex + b;
+      float px0 = playheadX + (float)((double)binIdx - centerBinExact);
+      float px1 = px0 + 1.0f;
+
+      if (px1 < wfLeft - 2.0f || px0 > wfRight + 2.0f)
+        continue;
+
+      float h0 = fmaxf(pixLo[b], fmaxf(pixMi[b], pixHi[b]));
+      float h1 = fmaxf(pixLo[b + 1], fmaxf(pixMi[b + 1], pixHi[b + 1]));
+      if (h0 < 0.5f)
+        h0 = 0.5f; // minimum thickness
+      if (h1 < 0.5f)
+        h1 = 0.5f;
+
+      Color c = pixCol[b];
+      if (userStyle == WAVEFORM_STYLE_RGB) {
+        c.r = (unsigned char)fminf(255.0f, (float)c.r * eqLowMult);
+        c.g = (unsigned char)fminf(255.0f, (float)c.g * eqMidMult);
+        c.b = (unsigned char)fminf(255.0f, (float)c.b * eqHighMult);
       }
-      rlEnd();
+
+      rlColor4ub(c.r, c.g, c.b, 255);
+      rlVertex2f(px0, yy - h0);
+      rlColor4ub(c.r, c.g, c.b, 255);
+      rlVertex2f(px0, yy + h0);
+      rlColor4ub(c.r, c.g, c.b, 255);
+      rlVertex2f(px1, yy + h1);
+      rlColor4ub(c.r, c.g, c.b, 255);
+      rlVertex2f(px1, yy - h1);
+    }
+    rlEnd();
   } else {
-      // 3-band style: Draw Low, Mid, High as separate quads
-      // Low (Back)
-      rlBegin(RL_QUADS);
-      rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 255);
-      for (int b = 0; b < numBins - 1; b++) {
-          float px0 = playheadX + (float)((double)(startBinIndex + b) - centerBinExact);
-          float px1 = px0 + 1.0f;
-          if (px1 < wfLeft - 2.0f || px0 > wfRight + 2.0f) continue;
-          float h0 = pixLo[b]; if (h0 < 0.5f) h0 = 0.5f;
-          float h1 = pixLo[b+1]; if (h1 < 0.5f) h1 = 0.5f;
-          rlVertex2f(px0, yy - h0);
-          rlVertex2f(px0, yy + h0);
-          rlVertex2f(px1, yy + h1);
-          rlVertex2f(px1, yy - h1);
-      }
-      rlEnd();
-      
-      // Mid (Middle)
-      rlBegin(RL_QUADS);
-      rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 255);
-      for (int b = 0; b < numBins - 1; b++) {
-          float px0 = playheadX + (float)((double)(startBinIndex + b) - centerBinExact);
-          float px1 = px0 + 1.0f;
-          if (px1 < wfLeft - 2.0f || px0 > wfRight + 2.0f) continue;
-          float h0 = pixMi[b]; if (h0 < 0.5f) h0 = 0.5f;
-          float h1 = pixMi[b+1]; if (h1 < 0.5f) h1 = 0.5f;
-          rlVertex2f(px0, yy - h0);
-          rlVertex2f(px0, yy + h0);
-          rlVertex2f(px1, yy + h1);
-          rlVertex2f(px1, yy - h1);
-      }
-      rlEnd();
-      
-      // High (Front)
-      rlBegin(RL_QUADS);
-      rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 255);
-      for (int b = 0; b < numBins - 1; b++) {
-          float px0 = playheadX + (float)((double)(startBinIndex + b) - centerBinExact);
-          float px1 = px0 + 1.0f;
-          if (px1 < wfLeft - 2.0f || px0 > wfRight + 2.0f) continue;
-          float h0 = pixHi[b]; if (h0 < 0.5f) h0 = 0.5f;
-          float h1 = pixHi[b+1]; if (h1 < 0.5f) h1 = 0.5f;
-          rlVertex2f(px0, yy - h0);
-          rlVertex2f(px0, yy + h0);
-          rlVertex2f(px1, yy + h1);
-          rlVertex2f(px1, yy - h1);
-      }
-      rlEnd();
+    // 3-band style: Draw Low, Mid, High as separate quads
+    // Low (Back)
+    rlBegin(RL_QUADS);
+    rlColor4ub(BL_LOW.r, BL_LOW.g, BL_LOW.b, 255);
+    for (int b = 0; b < numBins - 1; b++) {
+      float px0 =
+          playheadX + (float)((double)(startBinIndex + b) - centerBinExact);
+      float px1 = px0 + 1.0f;
+      if (px1 < wfLeft - 2.0f || px0 > wfRight + 2.0f)
+        continue;
+      float h0 = pixLo[b];
+      if (h0 < 0.5f)
+        h0 = 0.5f;
+      float h1 = pixLo[b + 1];
+      if (h1 < 0.5f)
+        h1 = 0.5f;
+      rlVertex2f(px0, yy - h0);
+      rlVertex2f(px0, yy + h0);
+      rlVertex2f(px1, yy + h1);
+      rlVertex2f(px1, yy - h1);
+    }
+    rlEnd();
+
+    // Mid (Middle)
+    rlBegin(RL_QUADS);
+    rlColor4ub(BL_MID.r, BL_MID.g, BL_MID.b, 255);
+    for (int b = 0; b < numBins - 1; b++) {
+      float px0 =
+          playheadX + (float)((double)(startBinIndex + b) - centerBinExact);
+      float px1 = px0 + 1.0f;
+      if (px1 < wfLeft - 2.0f || px0 > wfRight + 2.0f)
+        continue;
+      float h0 = pixMi[b];
+      if (h0 < 0.5f)
+        h0 = 0.5f;
+      float h1 = pixMi[b + 1];
+      if (h1 < 0.5f)
+        h1 = 0.5f;
+      rlVertex2f(px0, yy - h0);
+      rlVertex2f(px0, yy + h0);
+      rlVertex2f(px1, yy + h1);
+      rlVertex2f(px1, yy - h1);
+    }
+    rlEnd();
+
+    // High (Front)
+    rlBegin(RL_QUADS);
+    rlColor4ub(BL_HIGH.r, BL_HIGH.g, BL_HIGH.b, 255);
+    for (int b = 0; b < numBins - 1; b++) {
+      float px0 =
+          playheadX + (float)((double)(startBinIndex + b) - centerBinExact);
+      float px1 = px0 + 1.0f;
+      if (px1 < wfLeft - 2.0f || px0 > wfRight + 2.0f)
+        continue;
+      float h0 = pixHi[b];
+      if (h0 < 0.5f)
+        h0 = 0.5f;
+      float h1 = pixHi[b + 1];
+      if (h1 < 0.5f)
+        h1 = 0.5f;
+      rlVertex2f(px0, yy - h0);
+      rlVertex2f(px0, yy + h0);
+      rlVertex2f(px1, yy + h1);
+      rlVertex2f(px1, yy - h1);
+    }
+    rlEnd();
   }
 
   // Beat Grid — ticks use semi-transparent overlay to preserve waveform pixels
@@ -951,13 +1108,15 @@ static void Waveform_Draw(Component *base) {
     // Get current beat (1-4) and map it to a 0-3 index for the blocks
     uint32_t myPosMs = r->State->PositionMs;
     extern AudioEngine *globalAudioEngine;
-    if (r->State->IsPreviewing && globalAudioEngine && r->ID >= 0 && r->ID < 2) {
-        DeckAudioState *audio = &globalAudioEngine->Decks[r->ID];
-        if (audio->SampleRate > 0) {
-            myPosMs = (uint32_t)((audio->Position / (double)audio->SampleRate) * 1000.0);
-        }
+    if (r->State->IsPreviewing && globalAudioEngine && r->ID >= 0 &&
+        r->ID < 2) {
+      DeckAudioState *audio = &globalAudioEngine->Decks[r->ID];
+      if (audio->SampleRate > 0) {
+        myPosMs =
+            (uint32_t)((audio->Position / (double)audio->SampleRate) * 1000.0);
+      }
     }
-    
+
     int myBeat = Quantize_GetCurrentBeat(r->State->LoadedTrack, myPosMs);
     int myDisplayBeat = ((myBeat - 1) % 4);
 
@@ -981,14 +1140,19 @@ static void Waveform_Draw(Component *base) {
     // Draw Other Deck - Small blocks underneath (for visual beat matching)
     if (r->OtherDeck && r->OtherDeck->LoadedTrack) {
       uint32_t otherPosMs = r->OtherDeck->PositionMs;
-      if (r->OtherDeck->IsPreviewing && globalAudioEngine && r->OtherDeck->ID >= 0 && r->OtherDeck->ID < 2) {
-          DeckAudioState *otherAudio = &globalAudioEngine->Decks[r->OtherDeck->ID];
-          if (otherAudio->SampleRate > 0) {
-              otherPosMs = (uint32_t)((otherAudio->Position / (double)otherAudio->SampleRate) * 1000.0);
-          }
+      if (r->OtherDeck->IsPreviewing && globalAudioEngine &&
+          r->OtherDeck->ID >= 0 && r->OtherDeck->ID < 2) {
+        DeckAudioState *otherAudio =
+            &globalAudioEngine->Decks[r->OtherDeck->ID];
+        if (otherAudio->SampleRate > 0) {
+          otherPosMs = (uint32_t)((otherAudio->Position /
+                                   (double)otherAudio->SampleRate) *
+                                  1000.0);
+        }
       }
 
-      int otherBeat = Quantize_GetCurrentBeat(r->OtherDeck->LoadedTrack, otherPosMs);
+      int otherBeat =
+          Quantize_GetCurrentBeat(r->OtherDeck->LoadedTrack, otherPosMs);
       int otherDisplayBeat = ((otherBeat - 1) % 4);
 
       float otherY = pmY + pmH + S(2);

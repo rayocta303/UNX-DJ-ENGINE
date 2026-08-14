@@ -1,14 +1,14 @@
 #include "ui/player/deckstrip.h"
 #include "audio/engine.h"
+#include "input/input.h"
 #include "ui/components/fonts.h"
 #include "ui/components/helpers.h"
 #include "ui/components/theme.h"
 #include "ui/player/waveform.h"
-#include "input/input.h"
 #include <math.h>
+#include <rlgl.h>
 #include <stdio.h>
 #include <string.h>
-#include <rlgl.h>
 
 static void drawLeftBadgeColumn(DeckStrip *d, float x, float y, float h) {
   float lColW = S(40);
@@ -23,9 +23,9 @@ static void drawLeftBadgeColumn(DeckStrip *d, float x, float y, float h) {
   float headH = 21;
   Color headColor = ColorBGUtil;
   if (d->State->IsLoading && ((int)(GetTime() * 4.0f) % 2 == 0)) {
-      headColor = ColorOrange;
+    headColor = ColorOrange;
   }
-  
+
   DrawRectangle(lColX, y, lColW, h, ColorDark3);
 
   DrawRectangle(lColX, y, lColW, S(headH), headColor);
@@ -106,28 +106,28 @@ static int DeckStrip_Update(Component *base) {
   // Time Mode Toggle
   float tx = mtX + mtW + S(6);
 
-  if (Touch_CheckClick((Rectangle){ x, y + S(50), lColW, S(16) }, S(2.0f))) {
+  if (Touch_CheckClick((Rectangle){x, y + S(50), lColW, S(16)}, S(2.0f))) {
     d->State->PlayMode = (d->State->PlayMode == 0) ? 1 : 0;
   }
-  if (Touch_CheckClick((Rectangle){ x, y + S(68), lColW, S(20) }, S(2.0f))) {
+  if (Touch_CheckClick((Rectangle){x, y + S(68), lColW, S(20)}, S(2.0f))) {
     d->State->QuantizeEnabled = !d->State->QuantizeEnabled;
   }
-  
+
   float jogY = midY + S(1);
-  if (Touch_CheckClick((Rectangle){ mx, jogY, S(48), S(12) }, S(2.0f))) {
+  if (Touch_CheckClick((Rectangle){mx, jogY, S(48), S(12)}, S(2.0f))) {
     d->State->VinylModeEnabled = !d->State->VinylModeEnabled;
   }
 
-  if (Touch_CheckClick((Rectangle){ mtX, mtY, mtW, mtH }, S(2.0f))) {
+  if (Touch_CheckClick((Rectangle){mtX, mtY, mtW, mtH}, S(2.0f))) {
     d->State->MasterTempo = !d->State->MasterTempo;
   }
-  if (Touch_CheckClick((Rectangle){ bpmX, syncY, bpmBoxW, syncH }, S(2.0f))) {
+  if (Touch_CheckClick((Rectangle){bpmX, syncY, bpmBoxW, syncH}, S(2.0f))) {
     d->State->SyncMode = (d->State->SyncMode + 1) % 3;
   }
-  if (Touch_CheckClick((Rectangle){ tx, midY, S(80), S(28) }, S(2.0f))) {
+  if (Touch_CheckClick((Rectangle){tx, midY, S(80), S(28)}, S(2.0f))) {
     d->State->TimeMode = (d->State->TimeMode + 1) % 2;
   }
-  if (Touch_CheckClick((Rectangle){ tempoX, midY, S(64), S(28) }, S(2.0f))) {
+  if (Touch_CheckClick((Rectangle){tempoX, midY, S(64), S(28)}, S(2.0f))) {
     d->State->TempoRange = (d->State->TempoRange + 1) % 4;
   }
 
@@ -136,19 +136,27 @@ static int DeckStrip_Update(Component *base) {
     float wheel = Mouse_GetWheel();
     if (wheel != 0.0f) {
       float step = 0.02f;
-      if (d->State->TempoRange == 1) step = 0.05f;
-      else if (d->State->TempoRange == 2) step = 0.05f;
-      else if (d->State->TempoRange == 3) step = 0.5f;
-      
+      if (d->State->TempoRange == 1)
+        step = 0.05f;
+      else if (d->State->TempoRange == 2)
+        step = 0.05f;
+      else if (d->State->TempoRange == 3)
+        step = 0.5f;
+
       d->State->TempoPercent += (step * wheel);
-      
+
       float maxRange = 6.0f;
-      if (d->State->TempoRange == 1) maxRange = 10.0f;
-      else if (d->State->TempoRange == 2) maxRange = 16.0f;
-      else if (d->State->TempoRange == 3) maxRange = 100.0f;
-      
-      if (d->State->TempoPercent > maxRange) d->State->TempoPercent = maxRange;
-      if (d->State->TempoPercent < -maxRange) d->State->TempoPercent = -maxRange;
+      if (d->State->TempoRange == 1)
+        maxRange = 10.0f;
+      else if (d->State->TempoRange == 2)
+        maxRange = 16.0f;
+      else if (d->State->TempoRange == 3)
+        maxRange = 100.0f;
+
+      if (d->State->TempoPercent > maxRange)
+        d->State->TempoPercent = maxRange;
+      if (d->State->TempoPercent < -maxRange)
+        d->State->TempoPercent = -maxRange;
     }
   }
 
@@ -167,7 +175,7 @@ static int DeckStrip_Update(Component *base) {
         uiTouching[d->ID] = true;
         wasPlayingBeforeSeek[d->ID] = d->State->IsPlaying;
         if (d->State->IsPlaying) {
-            d->State->IsPreviewing = true; // Start preview mode
+          d->State->IsPreviewing = true; // Start preview mode
         }
       }
     }
@@ -175,25 +183,29 @@ static int DeckStrip_Update(Component *base) {
     if (uiTouching[d->ID]) {
       if (Input_IsDown()) {
         float ratio = (mouse.x - wx) / ww;
-        if (ratio < 0.0f) ratio = 0.0f;
-        if (ratio > 1.0f) ratio = 1.0f;
-        long long targetMs = (long long)(ratio * (double)d->State->TrackLengthMs);
-        
+        if (ratio < 0.0f)
+          ratio = 0.0f;
+        if (ratio > 1.0f)
+          ratio = 1.0f;
+        long long targetMs =
+            (long long)(ratio * (double)d->State->TrackLengthMs);
+
         if (wasPlayingBeforeSeek[d->ID]) {
-            // Just previewing, do not seek audio engine
-            d->State->PositionMs = targetMs;
-            d->State->Position = (targetMs / 1000.0) * 150.0;
+          // Just previewing, do not seek audio engine
+          d->State->PositionMs = targetMs;
+          d->State->Position = (targetMs / 1000.0) * 150.0;
         } else {
-            // Paused, so we actually seek
-            d->State->SeekMs = targetMs;
-            d->State->PositionMs = targetMs;
-            d->State->Position = (targetMs / 1000.0) * 150.0;
-            d->State->HasSeekRequest = true;
+          // Paused, so we actually seek
+          d->State->SeekMs = targetMs;
+          d->State->PositionMs = targetMs;
+          d->State->Position = (targetMs / 1000.0) * 150.0;
+          d->State->HasSeekRequest = true;
         }
       } else {
         uiTouching[d->ID] = false;
         if (wasPlayingBeforeSeek[d->ID]) {
-          d->State->IsPreviewing = false; // Stop preview mode, snap back to playing pos
+          d->State->IsPreviewing =
+              false; // Stop preview mode, snap back to playing pos
         }
       }
     }
@@ -240,7 +252,7 @@ static void DeckStrip_Draw(Component *base) {
     UIDrawText("\xef\x80\x81", iconFace, mx, y + S(2.5f), S(11),
                ColorWhite); // f001 music note
     float maxW = stripW - (mx - x) - S(20);
-    Rectangle titleRect = { mx + S(15), y + S(1.5f), maxW, S(16) };
+    Rectangle titleRect = {mx + S(15), y + S(1.5f), maxW, S(16)};
     static float autoTimer[2] = {0, 0};
     static const TrackState *lastTrack[2] = {NULL, NULL};
     if (d->State->LoadedTrack != lastTrack[d->ID]) {
@@ -249,7 +261,8 @@ static void DeckStrip_Draw(Component *base) {
     }
     autoTimer[d->ID] += GetFrameTime();
 
-    UIDrawScrollingText(title, titleFont, titleRect, S(12.0f), ColorWhite, autoTimer[d->ID]);
+    UIDrawScrollingText(title, titleFont, titleRect, S(12.0f), ColorWhite,
+                        autoTimer[d->ID]);
   } else {
     UIDrawText(title, titleFont, mx, y + S(1.5f), S(12.0f), ColorWhite);
   }
@@ -263,7 +276,8 @@ static void DeckStrip_Draw(Component *base) {
   Color jogClr = vinylOn ? ColorBlue : ColorRed;
   const char *jogStr = vinylOn ? "VINYL" : "CDJ";
   DrawRectangleLines(badgeX, midY + S(1), badgeW, badgeH, jogClr);
-  DrawCentredText(jogStr, faceXXS, badgeX, badgeW, midY + S(3.0f), S(7), jogClr);
+  DrawCentredText(jogStr, faceXXS, badgeX, badgeW, midY + S(3.0f), S(7),
+                  jogClr);
 
   DrawRectangleLines(badgeX, midY + S(15), badgeW, badgeH, ColorShadow);
   DrawCentredText("AUTO CUE", faceXXS, badgeX, badgeW, midY + S(17.0f), S(7),
@@ -274,13 +288,13 @@ static void DeckStrip_Draw(Component *base) {
   DrawCentredText("MT", faceXXS, badgeX, badgeW, midY + S(31.0f), S(7), mtClr);
 
   float timeX = mx + badgeW + S(6);
-  
+
   // REMAIN / TIME Indicators
   Font elFace = (d->State->TimeMode == 0) ? UIFonts_GetBoldFace(S(7)) : faceXXS;
   Font rmFace = (d->State->TimeMode == 1) ? UIFonts_GetBoldFace(S(7)) : faceXXS;
   Color elClr = (d->State->TimeMode == 0) ? ColorWhite : ColorShadow;
   Color rmClr = (d->State->TimeMode == 1) ? ColorWhite : ColorShadow;
-  
+
   UIDrawText("TIME", elFace, timeX + S(50), midY, S(7), elClr);
   UIDrawText("/", faceXXS, timeX + S(43), midY, S(7), ColorShadow);
   UIDrawText("REMAIN", rmFace, timeX + S(7), midY, S(7), rmClr);
@@ -359,8 +373,8 @@ static void DeckStrip_Draw(Component *base) {
     float masterW = S(36);
     float masterX = bpmX + bpmBoxW - masterW - S(1);
     DrawRectangle(masterX, bpmBoxY + S(1), masterW, S(8), ColorOrange);
-    DrawCentredText("MASTER", faceXXS, masterX, masterW, bpmBoxY + S(0.5f), S(7),
-                    ColorBlack);
+    DrawCentredText("MASTER", faceXXS, masterX, masterW, bpmBoxY + S(0.5f),
+                    S(7), ColorBlack);
   }
 
   char bpmMain[16] = "--";
@@ -413,15 +427,17 @@ static void DeckStrip_Draw(Component *base) {
     // Background box
     DrawRectangle(wx, wy, ww, wh, (Color){5, 5, 5, 255});
     DrawRectangleLinesEx((Rectangle){wx, wy, ww, wh}, 1.0f, ColorDark1);
-    
+
     // Center guide line
-    DrawLine(wx, wy + wh * 0.5f, wx + ww, wy + wh * 0.5f, (Color){40, 40, 40, 255});
+    DrawLine(wx, wy + wh * 0.5f, wx + ww, wy + wh * 0.5f,
+             (Color){40, 40, 40, 255});
 
     int type = d->State->LoadedTrack->Analysis.StaticWaveformType;
     unsigned char *data = d->State->LoadedTrack->Analysis.StaticWaveform;
     int dataLen = d->State->LoadedTrack->Analysis.StaticWaveformLen;
     float totalMs = (float)d->State->TrackLengthMs;
-    float playedRatio = (totalMs > 0) ? (float)d->State->PositionMs / totalMs : 0;
+    float playedRatio =
+        (totalMs > 0) ? (float)d->State->PositionMs / totalMs : 0;
 
     if (dataLen > 0 && ww > 0) {
       rlDrawRenderBatchActive();
@@ -430,9 +446,9 @@ static void DeckStrip_Draw(Component *base) {
       extern AudioEngine *globalAudioEngine;
       float eqLowMult = 1.0f, eqMidMult = 1.0f, eqHighMult = 1.0f;
       if (globalAudioEngine != NULL && d->ID >= 0 && d->ID < 2) {
-          eqLowMult = globalAudioEngine->Decks[d->ID].EqLow * 2.0f;
-          eqMidMult = globalAudioEngine->Decks[d->ID].EqMid * 2.0f;
-          eqHighMult = globalAudioEngine->Decks[d->ID].EqHigh * 2.0f;
+        eqLowMult = globalAudioEngine->Decks[d->ID].EqLow * 2.0f;
+        eqMidMult = globalAudioEngine->Decks[d->ID].EqMid * 2.0f;
+        eqHighMult = globalAudioEngine->Decks[d->ID].EqHigh * 2.0f;
       }
 
       WaveformStyle style = d->State->Waveform.Style;
@@ -443,21 +459,29 @@ static void DeckStrip_Draw(Component *base) {
       // Decide which data source to use (High-res Dynamic or Low-res Static)
       // We prefer dynamic for 3-Band because it looks much better
       bool useDyn = (d->State->LoadedTrack->Analysis.DynamicWaveformLen > 0);
-      unsigned char *renderData = useDyn ? d->State->LoadedTrack->Analysis.DynamicWaveform : data;
-      int renderType = useDyn ? d->State->LoadedTrack->Analysis.WaveformType : type;
-      
+      unsigned char *renderData =
+          useDyn ? d->State->LoadedTrack->Analysis.DynamicWaveform : data;
+      int renderType =
+          useDyn ? d->State->LoadedTrack->Analysis.WaveformType : type;
+
       int bpf = 1;
-      if (renderType == 3) bpf = 3;      // PWV7
-      else if (renderType == 2) bpf = 2; // PWV4
-      else bpf = 1;                     // PWV2
-      
-      int totalFrames = (useDyn ? d->State->LoadedTrack->Analysis.DynamicWaveformLen : dataLen) / bpf;
+      if (renderType == 3)
+        bpf = 3; // PWV7
+      else if (renderType == 2)
+        bpf = 2; // PWV4
+      else
+        bpf = 1; // PWV2
+
+      int totalFrames =
+          (useDyn ? d->State->LoadedTrack->Analysis.DynamicWaveformLen
+                  : dataLen) /
+          bpf;
       float yy = wy + wh * 0.5f;
 
-      // hardware-accurate 3-band palette (Blue/Green/White)
-      Color BL_LOW = {16, 105, 238, 255};
-      Color BL_MID = {16, 190, 82, 255};
-      Color BL_HIGH = {246, 251, 246, 255};
+      // hardware-accurate 3-band palette
+      Color BL_LOW = {16, 105, 238, 255};   // col_blue
+      Color BL_MID = {16, 190, 82, 255};    // col_green
+      Color BL_HIGH = {246, 251, 246, 255}; // col_white
 
       float smLo = 0, smMi = 0, smHi = 0;
       const float ATK = 0.9f;
@@ -478,71 +502,91 @@ static void DeckStrip_Draw(Component *base) {
         Color col = ColorBlue;
         float halfH = wh * 0.5f;
 
-        // 1. DATA EXTRACTION & NORMALIZATION based on renderType (PWV2, PWV4, PWV7)
+        // 1. DATA EXTRACTION & NORMALIZATION based on renderType (PWV2, PWV4,
+        // PWV7)
         if (renderType == 3) {
-           // PWV7: 3-Band data [Mid, High, Low] (values 0..255)
-           Get3BandPeak(renderData, totalFrames, p0, p1, &rL, &rM, &rH);
-           rL = (rL / 255.0f) * halfH * gLow * 1.8f;
-           rM = (rM / 255.0f) * halfH * gMid * 1.8f;
-           rH = (rH / 255.0f) * halfH * gHigh * 1.8f;
+          // PWV7: 3-Band data [Mid, High, Low] (values 0..255)
+          Get3BandPeak(renderData, totalFrames, p0, p1, &rL, &rM, &rH);
+          rL = (rL / 255.0f) * halfH * gLow * 1.8f;
+          rM = (rM / 255.0f) * halfH * gMid * 1.8f;
+          rH = (rH / 255.0f) * halfH * gHigh * 1.8f;
         } else if (renderType == 2) {
-           // PWV4: RGB data (2 bytes per frame)
-           int maxH = 0;
-           Color maxCol = {0, 0, 0, 255};
-           int startF = (int)floor(p0);
-           int endF = (int)ceil(p1);
-           if (startF < 0) startF = 0;
-           if (endF >= totalFrames) endF = totalFrames - 1;
-           if (endF < startF) endF = startF;
+          // PWV4: RGB data (2 bytes per frame)
+          int maxH = 0;
+          Color maxCol = {0, 0, 0, 255};
+          int startF = (int)floor(p0);
+          int endF = (int)ceil(p1);
+          if (startF < 0)
+            startF = 0;
+          if (endF >= totalFrames)
+            endF = totalFrames - 1;
+          if (endF < startF)
+            endF = startF;
 
-           for (int f = startF; f <= endF; f++) {
-             Color tmpCol;
-             int h = PWV4_Decode(renderData, f, totalFrames, &tmpCol);
-             if (h > maxH) {
-               maxH = h;
-               maxCol = tmpCol;
-             }
-           }
-           col = maxCol;
-           float baseH = (maxH / 31.0f) * halfH;
-           rL = baseH * ((float)col.r / 255.0f) * gLow * 1.8f;
-           rM = baseH * ((float)col.g / 255.0f) * gMid * 1.8f;
-           rH = baseH * ((float)col.b / 255.0f) * gHigh * 1.8f;
+          for (int f = startF; f <= endF; f++) {
+            Color tmpCol;
+            int h = PWV4_Decode(renderData, f, totalFrames, &tmpCol);
+            if (h > maxH) {
+              maxH = h;
+              maxCol = tmpCol;
+            }
+          }
+          col = maxCol;
+          float baseH = (maxH / 31.0f) * halfH;
+          rL = baseH * ((float)col.r / 255.0f) * gLow * 1.8f;
+          rM = baseH * ((float)col.g / 255.0f) * gMid * 1.8f;
+          rH = baseH * ((float)col.b / 255.0f) * gHigh * 1.8f;
         } else {
-           // PWV2: Blue data (1 byte per frame)
-           int maxH = 0;
-           Color maxCol = {0, 0, 0, 255};
-           int startF = (int)floor(p0);
-           int endF = (int)ceil(p1);
-           if (startF < 0) startF = 0;
-           if (endF >= totalFrames) endF = totalFrames - 1;
-           if (endF < startF) endF = startF;
+          // PWV2: Blue data (1 byte per frame)
+          int maxH = 0;
+          Color maxCol = {0, 0, 0, 255};
+          int startF = (int)floor(p0);
+          int endF = (int)ceil(p1);
+          if (startF < 0)
+            startF = 0;
+          if (endF >= totalFrames)
+            endF = totalFrames - 1;
+          if (endF < startF)
+            endF = startF;
 
-           for (int f = startF; f <= endF; f++) {
-             Color tmpCol;
-             int h = PWV2_Decode(renderData[f], &tmpCol);
-             if (h > maxH) {
-               maxH = h;
-               maxCol = tmpCol;
-             }
-           }
-           col = maxCol;
-           float baseH = (maxH / 31.0f) * halfH;
-           if (col.r > col.b && col.r > col.g) {
-             rL = baseH * 0.4f * gLow * 1.8f; rM = baseH * 0.9f * gMid * 1.8f; rH = baseH * 0.2f * gHigh * 1.8f;
-           } else if (col.b > col.r && col.b > col.g) {
-             rL = baseH * 0.95f * gLow * 1.8f; rM = baseH * 0.6f * gMid * 1.8f; rH = baseH * 0.1f * gHigh * 1.8f;
-           } else {
-             rL = baseH * 0.8f * gLow * 1.8f; rM = baseH * 0.8f * gMid * 1.8f; rH = baseH * 0.6f * gHigh * 1.8f;
-           }
+          for (int f = startF; f <= endF; f++) {
+            Color tmpCol;
+            int h = PWV2_Decode(renderData[f], &tmpCol);
+            if (h > maxH) {
+              maxH = h;
+              maxCol = tmpCol;
+            }
+          }
+          col = maxCol;
+          float baseH = (maxH / 31.0f) * halfH;
+          if (col.r > col.b && col.r > col.g) {
+            rL = baseH * 0.4f * gLow * 1.8f;
+            rM = baseH * 0.9f * gMid * 1.8f;
+            rH = baseH * 0.2f * gHigh * 1.8f;
+          } else if (col.b > col.r && col.b > col.g) {
+            rL = baseH * 0.95f * gLow * 1.8f;
+            rM = baseH * 0.6f * gMid * 1.8f;
+            rH = baseH * 0.1f * gHigh * 1.8f;
+          } else {
+            rL = baseH * 0.8f * gLow * 1.8f;
+            rM = baseH * 0.8f * gMid * 1.8f;
+            rH = baseH * 0.6f * gHigh * 1.8f;
+          }
         }
 
         // 2. STYLE APPLICATION (Apply Gains & Final Colors)
         if (style == WAVEFORM_STYLE_3BAND) {
           // Render as 3 discrete layers
-          if (rL > halfH) rL = halfH;
-          if (rM > halfH) rM = halfH;
-          if (rH > halfH) rH = halfH;
+          if (rL > halfH)
+            rL = halfH;
+          if (rM > halfH)
+            rM = halfH;
+          if (rH > halfH)
+            rH = halfH;
+
+          // Force strict nesting (Blue > Orange > White)
+          rM = fmaxf(rM, rH);
+          rL = fmaxf(rL, rM);
 
           float pLo = smLo;
           float pMi = smMi;
@@ -553,13 +597,19 @@ static void DeckStrip_Draw(Component *base) {
           smHi = rH;
 
           // Boost and Clamp for visibility
-          if (smLo > halfH) smLo = halfH;
-          if (smMi > halfH) smMi = halfH;
-          if (smHi > halfH) smHi = halfH;
-          
-          if (smLo < 0.5f && rL > 0) smLo = 0.5f;
-          if (smMi < 0.5f && rM > 0) smMi = 0.5f;
-          if (smHi < 0.5f && rH > 0) smHi = 0.5f;
+          if (smLo > halfH)
+            smLo = halfH;
+          if (smMi > halfH)
+            smMi = halfH;
+          if (smHi > halfH)
+            smHi = halfH;
+
+          if (smLo < 0.5f && rL > 0)
+            smLo = 0.5f;
+          if (smMi < 0.5f && rM > 0)
+            smMi = 0.5f;
+          if (smHi < 0.5f && rH > 0)
+            smHi = 0.5f;
 
           Color clL = played ? Fade(BL_LOW, 0.4f) : BL_LOW;
           Color clM = played ? Fade(BL_MID, 0.4f) : BL_MID;
@@ -584,24 +634,34 @@ static void DeckStrip_Draw(Component *base) {
           // Render as single symmetric layer (RGB or BLUE)
           float hVal = fmaxf(rL, fmaxf(rM, rH));
           Color finalCol = col;
-          
+
           if (renderType == 3) {
-             if (style == WAVEFORM_STYLE_RGB) {
-                if (rL >= rM && rL >= rH) finalCol = BL_LOW;
-                else if (rM >= rH) finalCol = BL_MID;
-                else finalCol = BL_HIGH;
-             } else finalCol = ColorBlue;
+            if (style == WAVEFORM_STYLE_RGB) {
+              if (rL >= rM && rL >= rH)
+                finalCol = BL_LOW;
+              else if (rM >= rH)
+                finalCol = BL_MID;
+              else
+                finalCol = BL_HIGH;
+            } else
+              finalCol = ColorBlue;
           } else {
-             if (style == WAVEFORM_STYLE_RGB) {
-                finalCol.r = (unsigned char)fminf(255.0f, (float)col.r * eqLowMult);
-                finalCol.g = (unsigned char)fminf(255.0f, (float)col.g * eqMidMult);
-                finalCol.b = (unsigned char)fminf(255.0f, (float)col.b * eqHighMult);
-             } else finalCol = ColorBlue;
+            if (style == WAVEFORM_STYLE_RGB) {
+              finalCol.r =
+                  (unsigned char)fminf(255.0f, (float)col.r * eqLowMult);
+              finalCol.g =
+                  (unsigned char)fminf(255.0f, (float)col.g * eqMidMult);
+              finalCol.b =
+                  (unsigned char)fminf(255.0f, (float)col.b * eqHighMult);
+            } else
+              finalCol = ColorBlue;
           }
-          
-          if (hVal > halfH) hVal = halfH;
-          float pVal = smLo; smLo = pVal + (hVal - pVal) * ((hVal > pVal) ? ATK : REL);
-          
+
+          if (hVal > halfH)
+            hVal = halfH;
+          float pVal = smLo;
+          smLo = pVal + (hVal - pVal) * ((hVal > pVal) ? ATK : REL);
+
           Color finalC = played ? Fade(finalCol, 0.4f) : finalCol;
           rlColor4ub(finalC.r, finalC.g, finalC.b, finalC.a);
           rlVertex2f(cx0, yy - pVal);
@@ -626,36 +686,42 @@ static void DeckStrip_Draw(Component *base) {
         if (ratio >= 0.0f && ratio <= 1.0f) {
           float rx = wx + ratio * ww;
           static const Color hcPalette[8] = {
-              {0, 255, 0, 255},   {255, 0, 0, 255},   {255, 128, 0, 255},
-              {255, 255, 0, 255}, {0, 0, 255, 255},   {255, 0, 255, 255},
+              {0, 255, 0, 255},   {255, 0, 0, 255},  {255, 128, 0, 255},
+              {255, 255, 0, 255}, {0, 0, 255, 255},  {255, 0, 255, 255},
               {0, 255, 255, 255}, {128, 0, 255, 255}};
-          
+
           int idx = d->State->LoadedTrack->HotCues[h].ID - 1;
-          if (idx < 0) idx = 0; if (idx > 7) idx = 7;
-          
-          Color hcClr = GetCueColor(d->State->LoadedTrack->HotCues[h], hcPalette[idx]);
-          
+          if (idx < 0)
+            idx = 0;
+          if (idx > 7)
+            idx = 7;
+
+          Color hcClr =
+              GetCueColor(d->State->LoadedTrack->HotCues[h], hcPalette[idx]);
+
           // Thick line for pointer
           DrawLineEx((Vector2){rx, wy}, (Vector2){rx, wy + wh}, 2.0f, hcClr);
 
           // Downward triangle at top
           DrawTriangle((Vector2){rx - S(4), wy}, (Vector2){rx + S(4), wy},
                        (Vector2){rx, wy + S(6)}, hcClr);
-          
+
           // Letter label with background
-          char hcChar[2] = { (char)('A' + idx), 0 };
+          char hcChar[2] = {(char)('A' + idx), 0};
           float txtW = MeasureTextEx(faceXXS, hcChar, S(7), 1).x;
-          DrawRectangleRec((Rectangle){rx + S(2), wy, txtW + S(4), S(9)}, (Color){0, 0, 0, 200});
+          DrawRectangleRec((Rectangle){rx + S(2), wy, txtW + S(4), S(9)},
+                           (Color){0, 0, 0, 200});
           UIDrawText(hcChar, faceXXS, rx + S(4), wy + S(1), S(7), hcClr);
         }
       }
-      
+
       // Memory Cues
       for (int c = 0; c < d->State->LoadedTrack->CuesCount; c++) {
         float ratio = (float)d->State->LoadedTrack->Cues[c].Start / totalMs;
         if (ratio >= 0.0f && ratio <= 1.0f) {
           float rx = wx + ratio * ww;
-          DrawLineEx((Vector2){rx, wy}, (Vector2){rx, wy + wh}, 1.0f, ColorOrange);
+          DrawLineEx((Vector2){rx, wy}, (Vector2){rx, wy + wh}, 1.0f,
+                     ColorOrange);
         }
       }
 
@@ -664,30 +730,36 @@ static void DeckStrip_Draw(Component *base) {
         float ratio = (float)d->State->MainCueMs / totalMs;
         if (ratio >= 0.0f && ratio <= 1.0f) {
           float rx = wx + ratio * ww;
-          DrawLineEx((Vector2){rx, wy}, (Vector2){rx, wy + wh}, 1.5f, ColorWhite);
-          DrawTriangle((Vector2){rx - S(4), wy + wh}, (Vector2){rx + S(4), wy + wh},
+          DrawLineEx((Vector2){rx, wy}, (Vector2){rx, wy + wh}, 1.5f,
+                     ColorWhite);
+          DrawTriangle((Vector2){rx - S(4), wy + wh},
+                       (Vector2){rx + S(4), wy + wh},
                        (Vector2){rx, wy + wh - S(6)}, ColorOrange);
         }
       }
 
       // Playhead Position
       float ratio = (float)d->State->PositionMs / totalMs;
-      if (ratio < 0) ratio = 0; if (ratio > 1) ratio = 1;
+      if (ratio < 0)
+        ratio = 0;
+      if (ratio > 1)
+        ratio = 1;
       float px = wx + ratio * ww;
       DrawRectangle(px - 1, wy, 2, wh, ColorRed);
     }
-    
+
     // --- LOADING OVERLAY ---
     if (d->State->IsLoading) {
-        float pulse = (sinf(GetTime() * 10.0f) * 0.5f + 0.5f);
-        DrawRectangle(wx, wy, ww, wh, Fade(ColorOrange, 0.1f + pulse * 0.3f));
+      float pulse = (sinf(GetTime() * 10.0f) * 0.5f + 0.5f);
+      DrawRectangle(wx, wy, ww, wh, Fade(ColorOrange, 0.1f + pulse * 0.3f));
     }
   }
 
   // --- ENTIRE STRIP LOADING OVERLAY ---
   if (d->State->IsLoading) {
-      float pulse = (sinf(GetTime() * 10.0f) * 0.5f + 0.5f);
-      DrawRectangle(x, y, stripW, DECK_STR_H, Fade(ColorOrange, 0.1f + pulse * 0.2f));
+    float pulse = (sinf(GetTime() * 10.0f) * 0.5f + 0.5f);
+    DrawRectangle(x, y, stripW, DECK_STR_H,
+                  Fade(ColorOrange, 0.1f + pulse * 0.2f));
   }
 
   // Draw Bottom Borders
