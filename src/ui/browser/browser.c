@@ -2802,7 +2802,7 @@ static void Browser_Draw(Component *base) {
     }
 
     if (!isBank) {
-      const char *sidIcons[] = {"\uf03a", "\uf07b", "\uf5c0",
+      const char *sidIcons[] = {"\uf03a", "\uf07b", "\uf022",
                                 "\uf287"}; // Tracks, Folders, Playlist, USB
       DrawCentredText(sidIcons[i], (i == 3) ? faceBrand : faceIcon, 0, sidebarW,
                       boxY + S(12), S(16),

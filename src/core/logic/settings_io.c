@@ -95,15 +95,14 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         if ((sub = strstr(p, "\"bitdepth\"")) && sscanf(sub, "\"bitdepth\": %d", &ival) == 1) audio->PCMBitDepth = ival;
         if ((sub = strstr(p, "\"xfader\"")) && sscanf(sub, "\"xfader\": %d", &ival) == 1) audio->CrossfaderCurve = ival;
     }
-    // Beat FX
     if ((p = strstr(json, "\"beatfx\""))) {
-        if ((sub = strstr(p, "\"fx\"")) && sscanf(sub, "\"fx\": %d", &ival) == 1) fx->SelectedFX = ival;
+        if ((sub = strstr(p, "\"fx\"")) && sscanf(sub, "\"fx\": %d", &ival) == 1) fx->Slots[0].FXType = ival;
         if ((sub = strstr(p, "\"pad\"")) && sscanf(sub, "\"pad\": %d", &ival) == 1) fx->SelectedPad = ival;
         if ((sub = strstr(p, "\"ch\"")) && sscanf(sub, "\"ch\": %d", &ival) == 1) fx->SelectedChannel = ival;
         if ((sub = strstr(p, "\"depth\"")) && sscanf(sub, "\"depth\": %f", &val) == 1) fx->LevelDepth = val;
         if ((sub = strstr(p, "\"q\"")) && sscanf(sub, "\"q\": %d", &ival) == 1) fx->Quantize = (bool)ival;
         if ((sub = strstr(p, "\"tab\"")) && sscanf(sub, "\"tab\": %d", &ival) == 1) fx->ShowBeatFXTab = (bool)ival;
-        if ((sub = strstr(p, "\"on\"")) && sscanf(sub, "\"on\": %d", &ival) == 1) fx->IsFXOn = (bool)ival;
+        if ((sub = strstr(p, "\"on\"")) && sscanf(sub, "\"on\": %d", &ival) == 1) fx->Slots[0].IsOn = (bool)ival;
     }
 
     // Color FX
@@ -153,12 +152,16 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     audio->SampleRate = 48000; audio->BufferSizeFrames = 256; audio->PCMBitDepth = 16;
     audio->CrossfaderCurve = 0; // Smooth (Default)
     
-    fx->SelectedFX = 0;
+    for (int i = 0; i < 6; i++) {
+        fx->Slots[i].FXType = 0;
+        fx->Slots[i].IsOn = false;
+    }
     fx->SelectedPad = 4; // 1 Beat
     fx->SelectedChannel = 0; // Master
     fx->LevelDepth = 0.5f;
     fx->Quantize = true;
-    fx->IsFXOn = false;
+    fx->FocusedSlot = 0;
+    fx->ActiveSlotDropdown = -1;
 
     if (quantizeA) *quantizeA = true;
     if (quantizeB) *quantizeB = true;
@@ -278,7 +281,7 @@ void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendCon
     fprintf(f, "  \"audio\": { \"devIdx\": %d, \"mastL\": %d, \"mastR\": %d, \"cueL\": %d, \"cueR\": %d, \"sr\": %d, \"buf\": %d, \"bitdepth\": %d, \"xfader\": %d },\n",
             audio.DeviceIndex, audio.MasterOutL, audio.MasterOutR, audio.CueOutL, audio.CueOutR, audio.SampleRate, audio.BufferSizeFrames, audio.PCMBitDepth, audio.CrossfaderCurve);
     fprintf(f, "  \"beatfx\": { \"fx\": %d, \"pad\": %d, \"ch\": %d, \"depth\": %.2f, \"q\": %d, \"tab\": %d, \"on\": %d },\n",
-            fx.SelectedFX, fx.SelectedPad, fx.SelectedChannel, fx.LevelDepth, fx.Quantize ? 1 : 0, fx.ShowBeatFXTab ? 1 : 0, fx.IsFXOn ? 1 : 0);
+            fx.Slots[fx.FocusedSlot].FXType, fx.SelectedPad, fx.SelectedChannel, fx.LevelDepth, fx.Quantize ? 1 : 0, fx.ShowBeatFXTab ? 1 : 0, fx.Slots[fx.FocusedSlot].IsOn ? 1 : 0);
     fprintf(f, "  \"colorfx\": { \"active\": %d, \"param\": %.2f, \"valA\": %.2f, \"valB\": %.2f },\n",
             (int)cfxA.activeFX, cfxA.parameter, cfxA.colorValue, cfxB.colorValue);
     fprintf(f, "  \"quantize\": { \"qA\": %d, \"qB\": %d },\n", quantizeA ? 1 : 0, quantizeB ? 1 : 0);

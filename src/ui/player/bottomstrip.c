@@ -34,7 +34,9 @@ static int BottomStrip_Update(Component *base) {
             Rectangle r = { cx, btnY, fxBtnW, btnH };
             if (Touch_CheckClick(r, S(2))) {
                 static const int FXEnumMap[] = { 0, 1, 2 }; // DELAY, ECHO, REVERB
-                b->State->SelectedFX = FXEnumMap[i];
+                int focus = b->State->FocusedSlot;
+                b->State->Slots[focus].FXType = FXEnumMap[i];
+                if (b->AudioPlugin) BeatFXManager_SetFX(&b->AudioPlugin->BeatFX, b->State->Slots[focus].FXType);
                 return 1;
             }
             cx += fxBtnW + gap;
@@ -43,14 +45,17 @@ static int BottomStrip_Update(Component *base) {
         // Clear/Toggle FX
         Rectangle trashRect = { cx, btnY, trashW - S(2), btnH };
         if (Touch_CheckClick(trashRect, S(2))) {
-            b->State->IsFXOn = !b->State->IsFXOn;
+            int focus = b->State->FocusedSlot;
+            b->State->Slots[focus].IsOn = !b->State->Slots[focus].IsOn;
+            if (b->AudioPlugin) BeatFXManager_SetFXOn(&b->AudioPlugin->BeatFX, b->State->Slots[focus].IsOn);
             return 1;
         }
 
         // X-Pad Interaction
         cx = halfW + S(2);
         float padAreaW = halfW - S(4);
-        bool isScrubMode = (b->State->SelectedFX == 3 || b->State->SelectedFX == 5);
+        int selFX = b->State->Slots[b->State->FocusedSlot].FXType;
+        bool isScrubMode = (selFX == 3 || selFX == 5);
         if (!isScrubMode) {
             static const int XPadLabelsCount = 6;
             float padBtnW = padAreaW / XPadLabelsCount;
@@ -197,8 +202,9 @@ static void BottomStrip_Draw(Component *base) {
         float fxBtnW = (halfW - trashW - S(4) - (FXNamesCount - 1) * gap) / FXNamesCount;
         float cx = S(2);
 
+        int focus = b->State->FocusedSlot;
         for (int i = 0; i < FXNamesCount; i++) {
-            bool active = (FXEnumMap[i] == b->State->SelectedFX);
+            bool active = (FXEnumMap[i] == b->State->Slots[focus].FXType);
             Color bg = active ? (Color){0x44, 0x44, 0x44, 0xFF} : (Color){0x22, 0x22, 0x22, 0xFF};
             Color border = active ? ColorPaper : ColorDark1;
             Color txtClr = active ? ColorWhite : ColorPaper;
@@ -212,14 +218,15 @@ static void BottomStrip_Draw(Component *base) {
         // Trash/Clear
         bool isFxBlinking = (fmod(GetTime(), 0.5) < 0.25);
         Color onBgColor = isFxBlinking ? (Color){0, 140, 255, 255} : (Color){0, 40, 110, 255};
-        DrawRectangle(cx, btnY, trashW - S(2), btnH, b->State->IsFXOn ? onBgColor : (Color){0x22, 0x22, 0x22, 0xFF});
-        DrawRectangleLines(cx, btnY, trashW - S(2), btnH, b->State->IsFXOn ? ColorWhite : ColorDark1);
-        DrawCentredText(b->State->IsFXOn ? "ON" : "OFF", faceXXS, cx, trashW - S(2), btnY + S(6.5f), S(7), ColorWhite);
+        DrawRectangle(cx, btnY, trashW - S(2), btnH, b->State->Slots[focus].IsOn ? onBgColor : (Color){0x22, 0x22, 0x22, 0xFF});
+        DrawRectangleLines(cx, btnY, trashW - S(2), btnH, b->State->Slots[focus].IsOn ? ColorWhite : ColorDark1);
+        DrawCentredText(b->State->Slots[focus].IsOn ? "ON" : "OFF", faceXXS, cx, trashW - S(2), btnY + S(6.5f), S(7), ColorWhite);
 
         // X-PAD
         cx = halfW + S(2);
         float padAreaW = halfW - S(4);
-        bool isScrubMode = (b->State->SelectedFX == 3 || b->State->SelectedFX == 5);
+        int selFX2 = b->State->Slots[focus].FXType;
+        bool isScrubMode = (selFX2 == 3 || selFX2 == 5);
 
         if (isScrubMode) {
             DrawRectangle(cx, btnY, padAreaW, btnH, (Color){0x1A, 0x1A, 0x1A, 0xFF});

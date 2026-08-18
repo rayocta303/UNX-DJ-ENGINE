@@ -39,35 +39,95 @@ static int BeatFX_Update(Component *base) {
     if (b->State->FXDropdownOpen) {
         float modalW = S(420);
         float modalH = S(270);
+        if (b->State->ActiveSlotDropdown == -1) {
+            modalW = S(380);
+            modalH = S(200);
+        }
         float modalX = (SCREEN_WIDTH - modalW) / 2.0f;
         float modalY = (SCREEN_HEIGHT - modalH) / 2.0f;
         Rectangle modalRect = { modalX, modalY, modalW, modalH };
 
         if (UI_UpdateModal(modalRect)) {
-            b->State->FXDropdownOpen = false;
+            if (b->State->ActiveSlotDropdown >= 0) {
+                b->State->ActiveSlotDropdown = -1; // Go back to slots view
+            } else {
+                b->State->FXDropdownOpen = false;
+            }
         } else if (Input_IsReleased()) {
-            float cols = 3;
-            float pad = S(10);
-            float btnW = (modalW - pad * 4) / cols;
-            float btnH = (modalH - S(45) - pad * 6) / 5;
+            if (b->State->ActiveSlotDropdown >= 0) {
+                // 14-grid selection
+                float cols = 3;
+                float pad = S(10);
+                float btnW = (modalW - pad * 4) / cols;
+                float btnH = (modalH - S(45) - pad * 6) / 5;
 
-            for (int i = 0; i < ALL_FX_COUNT; i++) {
-                int row = i / (int)cols;
-                int col = i % (int)cols;
-                float bx = modalX + pad + col * (btnW + pad);
-                float by = modalY + S(45) + row * (btnH + pad);
-                if (CheckCollisionPointRec(mouse, (Rectangle){bx, by, btnW, btnH})) {
-                    b->State->SelectedFX = i;
-                    if (b->AudioPlugin) BeatFXManager_SetFX(&b->AudioPlugin->BeatFX, i);
-                    b->State->FXDropdownOpen = false;
-                    Input_Consume();
-                    break;
+                for (int i = 0; i < ALL_FX_COUNT; i++) {
+                    int row = i / (int)cols;
+                    int col = i % (int)cols;
+                    float bx = modalX + pad + col * (btnW + pad);
+                    float by = modalY + S(45) + row * (btnH + pad);
+                    if (CheckCollisionPointRec(mouse, (Rectangle){bx, by, btnW, btnH})) {
+                        b->State->Slots[b->State->ActiveSlotDropdown].FXType = i;
+                        if (b->State->FocusedSlot == b->State->ActiveSlotDropdown && b->AudioPlugin) {
+                            BeatFXManager_SetFX(&b->AudioPlugin->BeatFX, i);
+                        }
+                        b->State->ActiveSlotDropdown = -1;
+                        Input_Consume();
+                        break;
+                    }
+                }
+            } else {
+                // 6-slot selection
+                float cols = 2; // FX1, FX2
+                float rows = 3;
+                float pad = S(8);
+                float btnW = (modalW - pad * 3) / cols;
+                float btnH = (modalH - S(45) - pad * 4) / rows;
+
+                for (int i = 0; i < 6; i++) {
+                    int col = i / 3;
+                    int row = i % 3;
+                    float bx = modalX + pad + col * (btnW + pad);
+                    float by = modalY + S(45) + row * (btnH + pad);
+                    if (CheckCollisionPointRec(mouse, (Rectangle){bx, by, btnW, btnH})) {
+                        b->State->FocusedSlot = i;
+                        b->State->ActiveSlotDropdown = i; // Open dropdown for this slot
+                        
+                        if (b->AudioPlugin) {
+                            BeatFXManager_SetFX(&b->AudioPlugin->BeatFX, b->State->Slots[i].FXType);
+                            BeatFXManager_SetFXOn(&b->AudioPlugin->BeatFX, b->State->Slots[i].IsOn);
+                        }
+                        
+                        Input_Consume();
+                        break;
+                    }
                 }
             }
         }
 
-        if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
-            b->State->FXDropdownOpen = false;
+        if (b->State->MidiBrowseDelta != 0) {
+            int currentIdx = (b->State->ActiveSlotDropdown >= 0) ? b->State->ActiveSlotDropdown : b->State->FocusedSlot;
+            int current = b->State->Slots[currentIdx].FXType;
+            if (b->State->MidiBrowseDelta > 0) {
+                current = (current + 1) % ALL_FX_COUNT;
+            } else if (b->State->MidiBrowseDelta < 0) {
+                current = (current - 1 + ALL_FX_COUNT) % ALL_FX_COUNT;
+            }
+            b->State->Slots[currentIdx].FXType = current;
+            if (currentIdx == b->State->FocusedSlot && b->AudioPlugin) {
+                BeatFXManager_SetFX(&b->AudioPlugin->BeatFX, current);
+            }
+            b->State->MidiBrowseDelta = 0;
+        }
+
+        if (b->State->MidiRequestEnter || b->State->MidiRequestBack || IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
+            if (b->State->ActiveSlotDropdown >= 0) {
+                b->State->ActiveSlotDropdown = -1;
+            } else {
+                b->State->FXDropdownOpen = false;
+            }
+            b->State->MidiRequestEnter = false;
+            b->State->MidiRequestBack = false;
         }
         return 0; // Block other interactions
     } else if (b->State->ChannelDropdownOpen) {
@@ -97,14 +157,30 @@ static int BeatFX_Update(Component *base) {
             }
         }
 
-        if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
+        if (b->State->MidiBrowseDelta != 0) {
+            int current = b->State->SelectedChannel;
+            if (b->State->MidiBrowseDelta > 0) {
+                current = (current + 1) % 3;
+            } else if (b->State->MidiBrowseDelta < 0) {
+                current = (current - 1 + 3) % 3;
+            }
+            b->State->SelectedChannel = current;
+            if (b->AudioPlugin) b->AudioPlugin->BeatFX.targetChannel = current;
+            b->State->MidiBrowseDelta = 0;
+        }
+
+        if (b->State->MidiRequestEnter || b->State->MidiRequestBack || IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
             b->State->ChannelDropdownOpen = false;
+            b->State->MidiRequestEnter = false;
+            b->State->MidiRequestBack = false;
         }
 
         return 0; // Block other interactions
     } else {
-        if (Touch_CheckClick(fxSelectRect, S(4))) {
-            b->State->FXDropdownOpen = true;
+        float slotH = S(26);
+        Rectangle slotRect = { x + S(4), fxSelectY, w - S(8), slotH };
+        if (Touch_CheckClick(slotRect, S(2))) {
+            b->State->FXDropdownOpen = true; // Open the Effect Rack Modal
         }
     
         bool chHovered = CheckCollisionPointRec(mouse, chRect);
@@ -132,7 +208,10 @@ static int BeatFX_Update(Component *base) {
     }
 
     if (Touch_CheckClick(b->FXButton, S(2))) {
-        b->State->IsFXOn = !b->State->IsFXOn;
+        int focus = b->State->FocusedSlot;
+        b->State->Slots[focus].IsOn = !b->State->Slots[focus].IsOn;
+        // In Option A (Single DSP), we just toggle the master DSP engine state if the focused slot changes
+        if (b->AudioPlugin) BeatFXManager_SetFXOn(&b->AudioPlugin->BeatFX, b->State->Slots[focus].IsOn);
     }
 
     // 4. Tab Switching Logic
@@ -153,27 +232,20 @@ static int BeatFX_Update(Component *base) {
     Rectangle minusRect = { x + S(4), plusMinusY, halfB, S(20) };
     Rectangle plusRect = { x + S(8) + halfB, plusMinusY, halfB, S(20) };
 
-    int zoomDelta = 0;
-    if (Touch_CheckClick(minusRect, S(4))) zoomDelta = 1;   // Zoom OUT
-    if (Touch_CheckClick(plusRect, S(4))) zoomDelta = -1;  // Zoom IN
+    int focusDelta = 0;
+    if (Touch_CheckClick(minusRect, S(4))) focusDelta = -1; // UP / LEFT
+    if (Touch_CheckClick(plusRect, S(4))) focusDelta = 1;   // DOWN / RIGHT
 
-    if (zoomDelta != 0) {
-        DeckState* decks[2] = { b->DeckA, b->DeckB };
-        for (int d = 0; d < 2; d++) {
-            DeckState* ds = decks[d];
-            int currentIndex = 0;
-            float minDiff = 9999.0f;
-            for (int i = 0; i < NUM_ZOOM_LEVELS; i++) {
-                float diff = fabsf(ds->ZoomScale - ZOOM_LEVELS[i]);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    currentIndex = i;
-                }
-            }
-            currentIndex += zoomDelta;
-            if (currentIndex < 0) currentIndex = 0;
-            if (currentIndex >= NUM_ZOOM_LEVELS) currentIndex = NUM_ZOOM_LEVELS - 1;
-            ds->ZoomScale = ZOOM_LEVELS[currentIndex];
+    if (focusDelta != 0) {
+        int next = b->State->FocusedSlot + focusDelta;
+        if (next < 0) next = 2;
+        if (next > 2) next = 0;
+        b->State->FocusedSlot = next;
+        
+        // Sync single DSP engine to the newly focused slot
+        if (b->AudioPlugin) {
+            BeatFXManager_SetFX(&b->AudioPlugin->BeatFX, b->State->Slots[next].FXType);
+            BeatFXManager_SetFXOn(&b->AudioPlugin->BeatFX, b->State->Slots[next].IsOn);
         }
     }
 
@@ -201,14 +273,29 @@ static void BeatFX_Draw(Component *base) {
     DrawCentredText("BEAT FX", faceXS, x, w, cy, S(8), ColorWhite);
     cy += S(13);
 
-    // 1. FX Name Select
-    const char* fxName = AllFXNames[b->State->SelectedFX % ALL_FX_COUNT];
-    DrawRectangle(x + S(4), cy, w - S(8), S(28), ColorBlack);
-    DrawRectangleLinesEx((Rectangle){x + S(4), cy, w - S(8), S(28)}, 1.0f, ColorWhite);
-    DrawCentredText(fxName, faceLg, x + S(4), w - S(8), cy + S(8), S(12), ColorWhite);
-    DrawTriangle((Vector2){x + w - S(14), cy + S(12)}, (Vector2){x + w - S(8), cy + S(12)}, (Vector2){x + w - S(11), cy + S(18)}, ColorWhite);
+    // 1. Focused Effect
+    float slotH = S(26);
+    Rectangle slotRect = { x + S(4), cy, w - S(8), slotH };
+    int focusIdx = b->State->FocusedSlot;
+    bool isOn = b->State->Slots[focusIdx].IsOn;
     
-    cy += S(32); // FX button(28) + gap(4)
+    Color bgCol = isOn ? (Color){0, 80, 160, 255} : ColorBlack;
+    Color borderCol = isOn ? ColorBlue : ColorDark2;
+    
+    DrawRectangleRec(slotRect, bgCol);
+    DrawRectangleLinesEx(slotRect, 1.0f, borderCol);
+    
+    const char* fxName = AllFXNames[b->State->Slots[focusIdx].FXType % ALL_FX_COUNT];
+    Color textCol = isOn ? ColorWhite : ColorWhite;
+    DrawCentredText(fxName, faceMd, slotRect.x, slotRect.width, slotRect.y + S(7), S(10), textCol);
+    
+    // Number indicator
+    char numStr[4];
+    sprintf(numStr, "%d", focusIdx + 1);
+    DrawCentredText(numStr, faceSm, slotRect.x, S(16), slotRect.y + S(8), S(9), ColorOrange);
+    
+    cy += slotH + S(12); // Reduced gap between FX slot and CH SELECT
+
 
     // 2. CH SELECT
     DrawCentredText("CH SELECT", faceXXS, x, w, cy, S(7), ColorShadow);
@@ -290,7 +377,7 @@ static void BeatFX_Draw(Component *base) {
     cy += rowH;
 
     // BEAT display
-    int selFX = b->State->SelectedFX;
+    int selFX = b->State->Slots[b->State->FocusedSlot].FXType;
     if ((selFX == 3 || selFX == 5) && b->State->IsXPadScrubbing) {
         float scrubVal = b->State->XPadScrubValue;
         if (selFX == 3) { // REVERB
@@ -325,11 +412,12 @@ static void BeatFX_Draw(Component *base) {
     b->FXButton = (Rectangle){ x + S(4), cy, btnW, btnH };
 
     bool isFxBlinking = (fmod(GetTime(), 0.5) < 0.25);
-    Color btnColor = b->State->IsFXOn ? (isFxBlinking ? (Color){0, 140, 255, 255} : (Color){0, 40, 110, 255}) : ColorDark2;
+    bool isFocusedOn = b->State->Slots[b->State->FocusedSlot].IsOn;
+    Color btnColor = isFocusedOn ? (isFxBlinking ? (Color){0, 140, 255, 255} : (Color){0, 40, 110, 255}) : ColorDark2;
     DrawRectangleRec(b->FXButton, btnColor);
     DrawRectangleLinesEx(b->FXButton, 1.0f, ColorWhite);
     
-    const char* fxBtnText = b->State->IsFXOn ? "BEAT FX ON" : "BEAT FX OFF";
+    const char* fxBtnText = isFocusedOn ? "BEAT FX ON" : "BEAT FX OFF";
     DrawCentredText(fxBtnText, faceSm, b->FXButton.x, b->FXButton.width, b->FXButton.y + S(5.0f), S(9), ColorWhite);
     
     cy += btnH + S(12);
@@ -385,26 +473,60 @@ void BeatFXPanel_DrawOverlays(BeatFXPanel *b) {
         
         Rectangle body = UI_DrawModalFrame((Rectangle){modalX, modalY, modalW, modalH}, "SELECT BEAT FX");
         
-        float cols = 3;
-        float rows = 5;
-        float pad = S(10);
-        float btnW = (modalW - pad * 4) / cols;
-        float btnH = (modalH - S(45) - pad * 6) / rows;
-        
-        for (int i = 0; i < ALL_FX_COUNT; i++) {
-            int row = i / (int)cols;
-            int col = i % (int)cols;
-            float bx = modalX + pad + col * (btnW + pad);
-            float by = modalY + S(45) + row * (btnH + pad);
-            Rectangle optRect = { bx, by, btnW, btnH };
+        if (b->State->ActiveSlotDropdown >= 0) {
+            float cols = 3;
+            float rows = 5;
+            float pad = S(10);
+            float btnW = (modalW - pad * 4) / cols;
+            float btnH = (modalH - S(45) - pad * 6) / rows;
             
-            Color bg = (b->State->SelectedFX == i) ? ColorBlue : ColorDark2;
-            if (CheckCollisionPointRec(mouse, optRect)) bg = ColorGray;
+            for (int i = 0; i < ALL_FX_COUNT; i++) {
+                int row = i / (int)cols;
+                int col = i % (int)cols;
+                float bx = modalX + pad + col * (btnW + pad);
+                float by = modalY + S(45) + row * (btnH + pad);
+                Rectangle optRect = { bx, by, btnW, btnH };
+                
+                Color bg = (b->State->Slots[b->State->ActiveSlotDropdown].FXType == i) ? ColorBlue : ColorDark2;
+                if (CheckCollisionPointRec(mouse, optRect)) bg = ColorGray;
+                
+                DrawRectangleRec(optRect, bg);
+                DrawRectangleLinesEx(optRect, 1.0f, (b->State->Slots[b->State->ActiveSlotDropdown].FXType == i) ? ColorWhite : ColorDark3);
+                DrawCentredText(AllFXNames[i], faceSm, optRect.x, optRect.width, optRect.y + (btnH - S(10)) / 2.0f, S(10), ColorWhite);
+            }
+        } else {
+            float cols = 2; // FX1, FX2
+            float rows = 3;
+            float pad = S(8);
+            float btnW = (modalW - pad * 3) / cols;
+            float btnH = (modalH - S(45) - pad * 4) / rows;
             
-            // Sharp rectangular buttons (no rounded corners)
-            DrawRectangleRec(optRect, bg);
-            DrawRectangleLinesEx(optRect, 1.0f, (b->State->SelectedFX == i) ? ColorWhite : ColorDark3);
-            DrawCentredText(AllFXNames[i], faceSm, optRect.x, optRect.width, optRect.y + (btnH - S(10)) / 2.0f, S(10), ColorWhite);
+            for (int i = 0; i < 6; i++) {
+                int col = i / 3;
+                int row = i % 3;
+                float bx = modalX + pad + col * (btnW + pad);
+                float by = modalY + S(45) + row * (btnH + pad);
+                Rectangle optRect = { bx, by, btnW, btnH };
+                
+                bool isFocused = (b->State->FocusedSlot == i);
+                bool isOn = b->State->Slots[i].IsOn;
+                
+                Color bgCol = isOn ? (Color){0, 80, 160, 255} : ColorDark2;
+                Color borderCol = isFocused ? ColorWhite : (isOn ? ColorBlue : ColorDark3);
+                if (CheckCollisionPointRec(mouse, optRect)) bgCol = ColorGray;
+                
+                DrawRectangleRec(optRect, bgCol);
+                DrawRectangleLinesEx(optRect, isFocused ? 1.5f : 1.0f, borderCol);
+                
+                const char* fxName = AllFXNames[b->State->Slots[i].FXType % ALL_FX_COUNT];
+                Color textCol = isOn ? ColorWhite : (isFocused ? ColorWhite : ColorShadow);
+                DrawCentredText(fxName, faceMd, optRect.x, optRect.width, optRect.y + (btnH - S(10)) / 2.0f, S(10), textCol);
+                
+                // Number indicator
+                char numStr[4];
+                sprintf(numStr, "%d", i + 1);
+                DrawCentredText(numStr, faceSm, optRect.x, S(16), optRect.y + (btnH - S(10)) / 2.0f + S(1), S(9), isFocused ? ColorOrange : ColorShadow);
+            }
         }
     } else if (b->State->ChannelDropdownOpen) {
         UI_DrawModalBackdrop();

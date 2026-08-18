@@ -218,10 +218,10 @@ void App_SaveSettings(App *a) {
   if (globalAudioEngine) {
     a->colorFxDeckA = globalAudioEngine->Decks[0].ColorFX;
     a->colorFxDeckB = globalAudioEngine->Decks[1].ColorFX;
-    a->fxState.SelectedFX = globalAudioEngine->BeatFX.activeFX;
+    a->fxState.Slots[a->fxState.FocusedSlot].FXType = globalAudioEngine->BeatFX.activeFX;
     a->fxState.SelectedChannel = globalAudioEngine->BeatFX.targetChannel;
     a->fxState.LevelDepth = globalAudioEngine->BeatFX.levelDepth;
-    a->fxState.IsFXOn = globalAudioEngine->BeatFX.isFxOn;
+    a->fxState.Slots[a->fxState.FocusedSlot].IsOn = globalAudioEngine->BeatFX.isFxOn;
     a->masterVolume = globalAudioEngine->MasterVolume;
   }
   Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig,
@@ -888,8 +888,8 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
       }
       
       a->fxState.SelectedChannel = deckIdx + 1;
-      a->fxState.IsFXOn = true;
-      a->fxState.SelectedFX = 1; // ECHO
+      a->fxState.Slots[a->fxState.FocusedSlot].IsOn = true;
+      a->fxState.Slots[a->fxState.FocusedSlot].FXType = 1; // ECHO
       a->fxState.LevelDepth = 0.85f;
 
       audio->ReleaseFXEchoActive = true;
@@ -1715,10 +1715,11 @@ Log_LogDeviceInfo(gpuModel);
   // Restore saved Color FX and Beat FX state into Audio Engine
   audioEngine->Decks[0].ColorFX = app->colorFxDeckA;
   audioEngine->Decks[1].ColorFX = app->colorFxDeckB;
-  BeatFXManager_SetFX(&audioEngine->BeatFX, app->fxState.SelectedFX);
+  int focus = app->fxState.FocusedSlot;
+  BeatFXManager_SetFX(&audioEngine->BeatFX, app->fxState.Slots[focus].FXType);
   audioEngine->BeatFX.targetChannel = app->fxState.SelectedChannel;
   audioEngine->BeatFX.levelDepth = app->fxState.LevelDepth;
-  audioEngine->BeatFX.isFxOn = app->fxState.IsFXOn;
+  audioEngine->BeatFX.isFxOn = app->fxState.Slots[focus].IsOn;
   audioEngine->MasterVolume = app->masterVolume; // Restore saved master volume
   app->browserState.AudioPlugin = (struct AudioEngine *)audioEngine;
   app->browserState.DeckA = (struct DeckState *)&app->deckA;
@@ -2031,14 +2032,12 @@ Log_LogDeviceInfo(gpuModel);
   CO_Register("[Channel4]", "padmode", CO_TYPE_INT, &app->padState.Mode[1], 0, 5);
 
   // --- Beat FX ---
-  CO_Register("[Master]", "beatfx_select", CO_TYPE_INT,
-              &app->fxState.SelectedFX, 0, 13);
+  // beatfx_select requires a proxy because it targets the dynamic focused slot
   CO_Register("[Master]", "beatfx_drywet", CO_TYPE_FLOAT,
               &app->fxState.LevelDepth, 0, 1.0f);
   CO_Register("[Master]", "beatfx_time", CO_TYPE_FLOAT,
               &audioEngine->BeatFX.beatMs, 0, 2000.0f);
-  CO_Register("[Master]", "beatfx_on", CO_TYPE_BOOL,
-              &app->fxState.IsFXOn, 0, 1);
+  // beatfx_on requires a proxy because it targets the dynamic focused slot
   CO_Register("[Master]", "beatfx_channel", CO_TYPE_INT,
               &app->fxState.SelectedChannel, 0, 4);
   CO_Register("[Master]", "beatfx_prev", CO_TYPE_BOOL,
@@ -2569,18 +2568,21 @@ void UpdateDrawFrame(App *app) {
 
   // Process MIDI Beat FX requests
   if (app->fxState.MidiRequestPrevFX) {
-      app->fxState.SelectedFX = (app->fxState.SelectedFX + 13) % 14;
-      BeatFXManager_SetFX(&audioEngine->BeatFX, app->fxState.SelectedFX);
+      int focus = app->fxState.FocusedSlot;
+      app->fxState.Slots[focus].FXType = (app->fxState.Slots[focus].FXType + 13) % 14;
+      BeatFXManager_SetFX(&audioEngine->BeatFX, app->fxState.Slots[focus].FXType);
       app->fxState.MidiRequestPrevFX = false;
   }
   if (app->fxState.MidiRequestNextFX) {
-      app->fxState.SelectedFX = (app->fxState.SelectedFX + 1) % 14;
-      BeatFXManager_SetFX(&audioEngine->BeatFX, app->fxState.SelectedFX);
+      int focus = app->fxState.FocusedSlot;
+      app->fxState.Slots[focus].FXType = (app->fxState.Slots[focus].FXType + 1) % 14;
+      BeatFXManager_SetFX(&audioEngine->BeatFX, app->fxState.Slots[focus].FXType);
       app->fxState.MidiRequestNextFX = false;
   }
   if (app->fxState.MidiRequestToggleFX) {
-      app->fxState.IsFXOn = !app->fxState.IsFXOn;
-      BeatFXManager_SetFXOn(&audioEngine->BeatFX, app->fxState.IsFXOn);
+      int focus = app->fxState.FocusedSlot;
+      app->fxState.Slots[focus].IsOn = !app->fxState.Slots[focus].IsOn;
+      BeatFXManager_SetFXOn(&audioEngine->BeatFX, app->fxState.Slots[focus].IsOn);
       app->fxState.MidiRequestToggleFX = false;
   }
   if (app->fxState.MidiRequestCh1) {
@@ -2651,10 +2653,11 @@ void UpdateDrawFrame(App *app) {
   float ratio = XPadRatios[padIdx];
   float fxMs = (60000.0f / masterBpm) * ratio;
 
-  audioEngine->BeatFX.activeFX = app->fxState.SelectedFX;
+  int focus = app->fxState.FocusedSlot;
+  audioEngine->BeatFX.activeFX = app->fxState.Slots[focus].FXType;
   audioEngine->BeatFX.targetChannel = app->fxState.SelectedChannel;
-  if (app->fxState.IsFXOn != audioEngine->BeatFX.isFxOn) {
-      BeatFXManager_SetFXOn(&audioEngine->BeatFX, app->fxState.IsFXOn);
+  if (app->fxState.Slots[focus].IsOn != audioEngine->BeatFX.isFxOn) {
+      BeatFXManager_SetFXOn(&audioEngine->BeatFX, app->fxState.Slots[focus].IsOn);
   }
   audioEngine->BeatFX.beatMs = fxMs;
   audioEngine->BeatFX.levelDepth = app->fxState.LevelDepth;
@@ -2665,8 +2668,8 @@ void UpdateDrawFrame(App *app) {
   for (int i = 0; i < 2; i++) {
     if (audioEngine->Decks[i].ReleaseFXType == 5 &&
         audioEngine->Decks[i].ReleaseFXTimer <= 0.05f) {
-      if (app->fxState.IsFXOn && app->fxState.SelectedChannel == i + 1) {
-        app->fxState.IsFXOn = false;
+      if (app->fxState.Slots[app->fxState.FocusedSlot].IsOn && app->fxState.SelectedChannel == i + 1) {
+        app->fxState.Slots[app->fxState.FocusedSlot].IsOn = false;
       }
     }
   }
@@ -2723,15 +2726,30 @@ void UpdateDrawFrame(App *app) {
     }
     app->browserState.MidiRequestBack = false;
   } else if (app->screen == ScreenPlayer) {
-    if (app->browserState.MidiBrowseDelta != 0) {
-      if (app->browserState.MidiBrowseDelta > 0) {
-        Waveform_AdjustZoom(&app->deckA, -1);
-        Waveform_AdjustZoom(&app->deckB, -1);
-      } else {
-        Waveform_AdjustZoom(&app->deckA, 1);
-        Waveform_AdjustZoom(&app->deckB, 1);
+    if (app->fxState.FXDropdownOpen || app->fxState.ChannelDropdownOpen) {
+      if (app->browserState.MidiBrowseDelta != 0) {
+        app->fxState.MidiBrowseDelta += app->browserState.MidiBrowseDelta;
+        app->browserState.MidiBrowseDelta = 0;
       }
-      app->browserState.MidiBrowseDelta = 0;
+      if (app->browserState.MidiRequestEnter) {
+        app->fxState.MidiRequestEnter = true;
+        app->browserState.MidiRequestEnter = false;
+      }
+      if (app->browserState.MidiRequestBack) {
+        app->fxState.MidiRequestBack = true;
+        app->browserState.MidiRequestBack = false;
+      }
+    } else {
+      if (app->browserState.MidiBrowseDelta != 0) {
+        if (app->browserState.MidiBrowseDelta > 0) {
+          Waveform_AdjustZoom(&app->deckA, -1);
+          Waveform_AdjustZoom(&app->deckB, -1);
+        } else {
+          Waveform_AdjustZoom(&app->deckA, 1);
+          Waveform_AdjustZoom(&app->deckB, 1);
+        }
+        app->browserState.MidiBrowseDelta = 0;
+      }
     }
   }
 

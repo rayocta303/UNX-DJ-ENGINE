@@ -370,10 +370,11 @@ static void Mixer_Draw(Component *base) {
   Rectangle fxSelRect = {rightX + S(10), bSelectorY, colRightW - S(20), S(26)};
   DrawRectangleRec(fxSelRect, ColorBlack);
   DrawRectangleLinesEx(fxSelRect, 1.0f, ColorWhite);
-  DrawCentredText(bfxNames[fxs->SelectedFX % 14], fSub, rightX, colRightW, bSelectorY + S(8), S(9), ColorWhite);
+  int focus = fxs->FocusedSlot;
+  DrawCentredText(bfxNames[fxs->Slots[focus].FXType % 14], fSub, rightX, colRightW, bSelectorY + S(8), S(9), ColorWhite);
   if (Input_CheckPress(fxSelRect)) {
-      fxs->SelectedFX = (fxs->SelectedFX + 1) % 14;
-      BeatFXManager_SetFX(&eng->BeatFX, fxs->SelectedFX);
+      fxs->Slots[focus].FXType = (fxs->Slots[focus].FXType + 1) % 14;
+      BeatFXManager_SetFX(&eng->BeatFX, fxs->Slots[focus].FXType);
   }
 
   float targetY = bSelectorY + S(32);
@@ -391,8 +392,9 @@ static void Mixer_Draw(Component *base) {
   HandleKnob(r->State, &fxs->LevelDepth, rightX + colRightW / 2.0f, bDepthY, S(13), 0.0f, 1.0f, false, mousePos, mDown);
 
   float bOnOffY = panelY + panelH - S(45);
-  if (DrawFXButton(fxs->IsFXOn ? "ON" : "OFF", rightX + S(15), bOnOffY, colRightW - S(30), S(30), fxs->IsFXOn)) {
-      fxs->IsFXOn = !fxs->IsFXOn;
+  if (DrawFXButton(fxs->Slots[focus].IsOn ? "ON" : "OFF", rightX + S(15), bOnOffY, colRightW - S(30), S(30), fxs->Slots[focus].IsOn)) {
+      fxs->Slots[focus].IsOn = !fxs->Slots[focus].IsOn;
+      BeatFXManager_SetFXOn(&eng->BeatFX, fxs->Slots[focus].IsOn);
   }
 }
 

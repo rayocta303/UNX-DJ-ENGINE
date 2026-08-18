@@ -239,3 +239,38 @@
 [06:10:14] [INFO] [AUDIO] [ASRC] Track Loaded: usb_test/Contents/UnknownArtist/UnknownAlbum/I'll Be Yours (Dappsss Edit).mp3 | File Rate: 44100 Hz -> Interface Rate: 48000 Hz (Ratio: 0.91875, ASRC Active: YES)
 [06:10:14] [INFO] [MAIN] Screen changed to: 0
 [06:10:15] [INFO] [MAIN] Screen changed to: 3
+
+--- SESSION START: Fri Aug 14 09:57:42 2026
+[09:57:42] [INFO] Logger initialized at: unx.log
+[09:57:42] [INFO] Platform: Windows
+[09:57:42] [INFO] [DESKTOP] InitWindow SUCCESS. Size: 1280x720
+[09:57:42] [INFO] === DEVICE INFO ===
+[09:57:42] [INFO] OS          : Windows (x64)
+[09:57:42] [INFO] Processor   : AMD Ryzen 5 5600U with Radeon Graphics         
+[09:57:42] [INFO] Arch        : x64
+[09:57:42] [INFO] CPU Cores   : 12
+[09:57:42] [INFO] Total RAM   : 7489 MB (7.31 GB)
+[09:57:42] [INFO] Free RAM    : 1073 MB (14.3%) 
+[09:57:42] [INFO] Display     : 1280x720 @ 60Hz
+[09:57:42] [INFO] GPU Model   : AMD Radeon(TM) Graphics
+[09:57:42] [INFO] === END DEVICE INFO ===
+[09:57:42] [INFO] [MAIN] Initializing Fonts...
+[09:57:42] [INFO] [WATCHDOG] Thread started.
+[09:57:42] [INFO] [FONTS] UIFonts_Init starting...
+[09:57:42] [INFO] [FONTS] Loading default (Nexa Heavy) from file: assets/fonts/nexa/Nexa-Heavy.ttf
+[09:57:42] [INFO] [FONTS] Loading bold from file: assets/fonts/nexa/Nexa-Heavy.ttf
+[09:57:42] [INFO] [FONTS] Loading time counter font from file: assets/fonts/Inter-Regular.ttf
+[09:57:42] [INFO] [FONTS] Result: Default ID=3, Bold ID=4, Time ID=5
+[09:57:42] [INFO] [FONTS] Preparing icon codepoints...
+[09:57:42] [INFO] [FONTS] Loading icon fonts from memory (optimized range)...
+[09:57:42] [INFO] [FONTS] UIFonts_Init completed.
+[09:57:42] [INFO] [MAIN] Fonts initialized.
+[09:57:42] [INFO] [MAIN] Initializing Audio Backend...
+[09:57:42] [INFO] [MAIN] Audio Backend initialized.
+[09:57:42] [INFO] [MAIN] Initializing App (Heap)...
+[09:57:42] [INFO] [MAIN] Structure Sizes - App: 1.09 MB, AudioEngine: 0.01 MB
+[09:57:42] [INFO] [APP] App_Init starting...
+[09:57:42] [INFO] [APP] Initializing Decks...
+[09:57:42] [INFO] [APP] Initializing Browser...
+[09:57:42] [INFO] [APP] App_Init completed.
+[09:57:48] [ERR ] !!! [DEADLOCK DETECTED] Main thread has not responded for 6 seconds!

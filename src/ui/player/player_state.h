@@ -150,14 +150,20 @@ typedef struct DeckState {
   int LoadedTrackIndex; // Index of loaded track in active track list
 } DeckState;
 
+typedef struct {
+  int FXType; // Index in AllFXNames
+  bool IsOn;
+} FXSlot;
+
 typedef struct BeatFXState {
-  int SelectedFX;
+  FXSlot Slots[6];
+  int FocusedSlot; // 0 to 5
   int SelectedPad;
   int SelectedChannel; // 0=Master, 1=Deck 1, 2=Deck 2
   bool ChannelDropdownOpen;
   bool FXDropdownOpen;
+  int ActiveSlotDropdown; // -1 if closed, 0-5 if a slot's dropdown is open
   bool ShowBeatFXTab; // false = STATUS, true = BEAT FX
-  bool IsFXOn;
   float LevelDepth; // Persist knob depth
   float XPadScrubValue; // -1.0 to 1.0 for Reverb LPF/HPF and Flanger Sweep
   bool IsXPadScrubbing; // True when holding the scrub line
@@ -175,5 +181,8 @@ typedef struct BeatFXState {
   bool MidiRequestBeatLeft;
   bool MidiRequestBeatRight;
   bool MidiRequestTap;
+  int MidiBrowseDelta;
+  bool MidiRequestEnter;
+  bool MidiRequestBack;
 } BeatFXState;
 

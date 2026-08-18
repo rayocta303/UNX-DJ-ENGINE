@@ -134,18 +134,18 @@ void HandleKeyboardInputs(KeyboardMapping *m, DeckState *d1, DeckState *d2,
   // Beat FX Shortcuts
   if (IsKeyPressed(m->fx1)) {
     if (fx->SelectedChannel == 1) {
-      fx->IsFXOn = !fx->IsFXOn;
+      fx->Slots[fx->FocusedSlot].IsOn = !fx->Slots[fx->FocusedSlot].IsOn;
     } else {
       fx->SelectedChannel = 1;
-      fx->IsFXOn = true;
+      fx->Slots[fx->FocusedSlot].IsOn = true;
     }
   }
   if (IsKeyPressed(m->fx2)) {
     if (fx->SelectedChannel == 2) {
-      fx->IsFXOn = !fx->IsFXOn;
+      fx->Slots[fx->FocusedSlot].IsOn = !fx->Slots[fx->FocusedSlot].IsOn;
     } else {
       fx->SelectedChannel = 2;
-      fx->IsFXOn = true;
+      fx->Slots[fx->FocusedSlot].IsOn = true;
     }
   }
 
