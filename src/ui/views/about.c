@@ -90,7 +90,7 @@ static void About_Draw(Component *base) {
   // Left Sidebar of the Card (Branding)
   float sideW = S(110);
   DrawRectangle(cardX + 1, cardY + 1, sideW, cardH - 2,
-                (Color){25, 25, 25, 255});
+                Theme.BgMain);
   DrawLine(cardX + sideW, cardY + 1, cardX + sideW, cardY + cardH - 1,
            ColorDark2);
 

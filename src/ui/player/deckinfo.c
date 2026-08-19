@@ -230,7 +230,7 @@ static void DeckInfo_Draw(Component *base) {
 
     // Platter background & outer ring
     Color jogRingColor = d->State->IsTouching ? ColorRed : (d->ID == 0 ? ColorBlue : ColorOrange);
-    DrawCircle((int)jogCX, (int)jogCY, jogR, (Color){15, 18, 24, 255});
+    DrawCircle((int)jogCX, (int)jogCY, jogR, Theme.BgMain);
     DrawCircleLines((int)jogCX, (int)jogCY, jogR, Fade(jogRingColor, 0.6f));
 
     // Load Track Chaser Glow
@@ -271,7 +271,7 @@ static void DeckInfo_Draw(Component *base) {
     
     // --- Row 1: Status Grid (Key & Bars) ---
     float statusH = S(22);
-    DrawRectangle(margin, contentY, deckInfoW - margin * 2, statusH, (Color){0,0,0,60});
+    DrawRectangle(margin, contentY, deckInfoW - margin * 2, statusH, Theme.BgOverlay);
     
     // Column 1: KEY
     UIDrawText("KEY", faceXXS, col1X + S(6), contentY + S(4), S(7), ColorShadow);

@@ -146,13 +146,13 @@ static void TopBar_Draw(Component *base) {
 
   // Segment 1: App Usage (Cyan / Blue)
   if (appFillW > S(0.5f)) {
-    Color appCol = (Color){0, 185, 240, 255}; // Bright Cyan
+    Color appCol = Theme.AccentBlue; // Bright Cyan
     DrawRectangle((int)(barX + S(1.0f)), (int)(row2Y + S(2.0f)), (int)appFillW, (int)(barH - S(2.0f)), appCol);
   }
 
   // Segment 2: Other System Usage (Orange / Amber / Red)
   if (sysFillW > S(0.5f)) {
-    Color sysCol = (totalRatio > 0.85f) ? ColorRed : ((totalRatio > 0.70f) ? ColorOrange : (Color){240, 150, 40, 255});
+    Color sysCol = (totalRatio > 0.85f) ? ColorRed : ((totalRatio > 0.70f) ? ColorOrange : Theme.AccentOrange);
     DrawRectangle((int)(barX + S(1.0f) + appFillW), (int)(row2Y + S(2.0f)), (int)sysFillW, (int)(barH - S(2.0f)), sysCol);
   }
 

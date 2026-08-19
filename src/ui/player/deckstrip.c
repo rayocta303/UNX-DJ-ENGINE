@@ -240,7 +240,7 @@ static void DeckStrip_Draw(Component *base) {
   float mx = lColX + lColW + S(4);
   float titleBgH = S(16);
   DrawRectangle(lColX + lColW, y, stripW - lColW, titleBgH,
-                (Color){0x10, 0x10, 0x10, 0xFF});
+                Theme.BgMain);
 
   Font titleFont = UIFonts_GetBoldFace(S(12.0f));
   Font iconFace = UIFonts_GetIcon(S(11.0f));
@@ -337,16 +337,16 @@ static void DeckStrip_Draw(Component *base) {
   UIDrawText("TEMPO", faceXXS, tempoX, midY, S(7), ColorShadow);
 
   const char *rangeStr = "10%";
-  Color rangeBgCol = (Color){180, 90, 0, 255}; // Dark Orange
+  Color rangeBgCol = Theme.AccentOrange; // Dark Orange
   if (d->State->TempoRange == 0) {
     rangeStr = " 6%";
-    rangeBgCol = (Color){0, 150, 60, 255}; // Dark Green
+    rangeBgCol = Theme.AccentGreen; // Dark Green
   } else if (d->State->TempoRange == 2) {
     rangeStr = "16%";
-    rangeBgCol = (Color){0, 100, 180, 255}; // Dark Blue
+    rangeBgCol = Theme.AccentBlue; // Dark Blue
   } else if (d->State->TempoRange == 3) {
     rangeStr = "WIDE";
-    rangeBgCol = (Color){180, 30, 30, 255}; // Dark Red
+    rangeBgCol = Theme.AccentRed; // Dark Red
   }
 
   float tBadgeW = 24.0f;
@@ -425,12 +425,12 @@ static void DeckStrip_Draw(Component *base) {
     float wh = S(26); // Increased height for S(4) bottom margin
 
     // Background box
-    DrawRectangle(wx, wy, ww, wh, (Color){5, 5, 5, 255});
+    DrawRectangle(wx, wy, ww, wh, Theme.BgMain);
     DrawRectangleLinesEx((Rectangle){wx, wy, ww, wh}, 1.0f, ColorDark1);
 
     // Center guide line
     DrawLine(wx, wy + wh * 0.5f, wx + ww, wy + wh * 0.5f,
-             (Color){40, 40, 40, 255});
+             Theme.BorderDefault);
 
     int type = d->State->LoadedTrack->Analysis.StaticWaveformType;
     unsigned char *data = d->State->LoadedTrack->Analysis.StaticWaveform;
@@ -710,7 +710,7 @@ static void DeckStrip_Draw(Component *base) {
           char hcChar[2] = {(char)('A' + idx), 0};
           float txtW = MeasureTextEx(faceXXS, hcChar, S(7), 1).x;
           DrawRectangleRec((Rectangle){rx + S(2), wy, txtW + S(4), S(9)},
-                           (Color){0, 0, 0, 200});
+                           Theme.BgOverlay);
           UIDrawText(hcChar, faceXXS, rx + S(4), wy + S(1), S(7), hcClr);
         }
       }

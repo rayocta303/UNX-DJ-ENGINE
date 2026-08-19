@@ -112,7 +112,7 @@ static void Credits_Draw(Component *base) {
   // Sidebar (Branding area)
   float sideW = S(100);
   DrawRectangle(cardX + 1, cardY + 1, sideW, cardH - 2,
-                (Color){25, 25, 25, 255});
+                Theme.BgMain);
   DrawLine(cardX + sideW, cardY + 1, cardX + sideW, cardY + cardH - 1,
            ColorDark2);
 

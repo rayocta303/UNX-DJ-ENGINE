@@ -1627,6 +1627,10 @@ Log_LogDeviceInfo(gpuModel);
   UIFonts_Init();
   UNX_LOG_INFO("[MAIN] Fonts initialized.");
 
+  UNX_LOG_INFO("[MAIN] Initializing Theme...");
+  Theme_InitDefaultDark();
+  UNX_LOG_INFO("[MAIN] Theme initialized.");
+
 #if defined(PLATFORM_IOS)
   extern const char *ios_get_documents_path(const char *filename);
   UNX_LOG_INFO("[MAIN] iOS Stability delay...");

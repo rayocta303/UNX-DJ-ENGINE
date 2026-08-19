@@ -51,7 +51,7 @@ static void DrawVerticalFader(float x, float y, float w, float h, float val,
   float handleW = w * 0.75f;
   float travelRange = h - handleH;
 
-  DrawRectangleRec((Rectangle){x, y, w, h}, (Color){10, 10, 10, 255});
+  DrawRectangleRec((Rectangle){x, y, w, h}, Theme.BgMain);
   DrawRectangleLinesEx((Rectangle){x, y, w, h}, 1, ColorDark1);
 
   Rectangle track = {x + w * 0.45f, y + handleH / 2.0f, w * 0.1f, travelRange};
@@ -67,8 +67,8 @@ static void DrawVerticalFader(float x, float y, float w, float h, float val,
   Rectangle handle = {x + (w - handleW) / 2.0f, hy, handleW, handleH};
 
   DrawRectangle(handle.x + S(2), handle.y + S(2), handle.width, handle.height,
-                (Color){0, 0, 0, 150});
-  DrawRectangleRec(handle, (Color){45, 45, 45, 255});
+                Theme.BgOverlay);
+  DrawRectangleRec(handle, Theme.BorderDefault);
   DrawRectangleLinesEx(handle, 1.5f, ColorWhite);
   DrawLine(handle.x + S(4), handle.y + handleH / 2.0f,
            handle.x + handleW - S(4), handle.y + handleH / 2.0f, ColorWhite);
@@ -85,9 +85,9 @@ static bool DrawFXButton(const char *label, float x, float y, float w, float h,
                          bool active) {
   bool hovered =
       CheckCollisionPointRec(Input_GetPointerPos(), (Rectangle){x, y, w, h});
-  bool pressed = Input_CheckPress((Rectangle){x, y, w, h});
+  bool pressed = Touch_CheckClick((Rectangle){x, y, w, h}, S(2.0f));
   bool isFxBlinking = (fmod(GetTime(), 0.5) < 0.25);
-  Color bg = active ? (isFxBlinking ? (Color){0, 140, 255, 255} : (Color){0, 40, 110, 255}) : (hovered ? ColorDark1 : ColorBlack);
+  Color bg = active ? (isFxBlinking ? Theme.AccentBlue : Theme.HoverActive) : (hovered ? ColorDark1 : ColorBlack);
   Color fg = active ? ColorWhite : ColorOrange;
   DrawRectangle(x, y, w, h, bg);
   DrawRectangleLines(x, y, w, h, active ? ColorWhite : ColorOrange);
@@ -163,7 +163,7 @@ static void HandleKnob(MixerState *state, float *val, float cx, float cy, float 
 }
 
 static void DrawVertVU(float vx, float vy, float vw, float vh, float level) {
-  DrawRectangle(vx, vy, vw, vh, (Color){5, 5, 5, 255});
+  DrawRectangle(vx, vy, vw, vh, Theme.BgMain);
   DrawRectangleLinesEx((Rectangle){vx, vy, vw, vh}, 1.0f, ColorDark1);
   int segs = 18;
   float segH = (vh - 2) / segs;
@@ -213,7 +213,7 @@ static void Mixer_Draw(Component *base) {
   // =========================================================================
   // COLUMN 1: SOUND COLOR FX (FAR LEFT)
   // =========================================================================
-  DrawRectangle(leftX, panelY, colFXW, panelH, (Color){20, 20, 20, 255});
+  DrawRectangle(leftX, panelY, colFXW, panelH, Theme.BgPanel);
   DrawRectangleLinesEx((Rectangle){leftX, panelY, colFXW, panelH}, 1.0f, ColorDark1);
   float fxY = panelY + S(12);
   DrawCentredText("SOUND COLOR FX", fSub, leftX, colFXW, fxY, S(9), ColorShadow);
@@ -242,7 +242,7 @@ static void Mixer_Draw(Component *base) {
   // =========================================================================
   // COLUMN 2: CORE MIXER (CENTER) - [Fader1 | EQ1 | VU | EQ2 | Fader2]
   // =========================================================================
-  DrawRectangle(centerX, panelY, colMixW, panelH, (Color){22, 22, 22, 255});
+  DrawRectangle(centerX, panelY, colMixW, panelH, Theme.BgPanelAlt);
   DrawRectangleLinesEx((Rectangle){centerX, panelY, colMixW, panelH}, 1.0f, ColorDark1);
   
   float innerPad = S(10);
@@ -274,11 +274,11 @@ static void Mixer_Draw(Component *base) {
     float cueBtnX = fcx - cueBtnSize / 2.0f;
     float cueBtnY = topY - S(2);
     DrawRectangleLinesEx((Rectangle){cueBtnX, cueBtnY, cueBtnSize, cueBtnSize}, 1.0f, d->IsCueActive ? ColorOrange : ColorShadow);
-    if (d->IsCueActive) DrawRectangleRec((Rectangle){cueBtnX + 2, cueBtnY + 2, cueBtnSize - 4, cueBtnSize - 4}, (Color){255, 150, 0, 40});
+    if (d->IsCueActive) DrawRectangleRec((Rectangle){cueBtnX + 2, cueBtnY + 2, cueBtnSize - 4, cueBtnSize - 4}, Fade(Theme.CueMarker, 0.15f));
 
     Font iconFont = UIFonts_GetIcon(S(12));
     UIDrawText("\xef\x80\xa5", iconFont, fcx - S(6), cueBtnY + S(4), S(12), d->IsCueActive ? ColorOrange : ColorShadow);
-    if (Input_CheckPress((Rectangle){cueBtnX, cueBtnY, cueBtnSize, cueBtnSize})) {
+    if (Touch_CheckClick((Rectangle){cueBtnX, cueBtnY, cueBtnSize, cueBtnSize}, S(2.0f))) {
         d->IsCueActive = !d->IsCueActive;
     }
 
@@ -305,12 +305,12 @@ static void Mixer_Draw(Component *base) {
     HandleVerticalFader(r->State, &d->Fader, fcx - fW/2, fy, fW, fH, mousePos, mDown);
     
     // Custom Fader Draw to match image
-    Color faderCol = (i == 0) ? (Color){150, 100, 255, 255} : (Color){100, 200, 255, 255};
-    DrawRectangle(fcx - 1, fy, 2, fH, (Color){10, 10, 10, 255});
+    Color faderCol = (i == 0) ? Theme.AccentBlue : Theme.AccentBlue;
+    DrawRectangle(fcx - 1, fy, 2, fH, Theme.BgMain);
     float valH = d->Fader * fH;
     DrawRectangle(fcx - 1, fy + fH - valH, 2, valH, faderCol);
     float handleY = fy + (1.0f - d->Fader) * (fH - S(10));
-    DrawRectangle(fcx - fW/2, handleY, fW, S(10), (Color){40, 40, 40, 255});
+    DrawRectangle(fcx - fW/2, handleY, fW, S(10), Theme.BorderDefault);
     DrawRectangleLines(fcx - fW/2, handleY, fW, S(10), ColorGray);
     DrawLine(fcx - fW/2 + 2, handleY + S(5), fcx + fW/2 - 2, handleY + S(5), ColorWhite);
 
@@ -337,9 +337,9 @@ static void Mixer_Draw(Component *base) {
   float cfH = S(18);
   float cfX = centerX + (colMixW - cfW) / 2.0f;
   float cfY = panelY + panelH - cfH - S(10);
-  DrawRectangleRounded((Rectangle){cfX, cfY + cfH/2 - 2, cfW, 4}, 1.0f, 4, (Color){10, 10, 10, 255});
+  DrawRectangleRounded((Rectangle){cfX, cfY + cfH/2 - 2, cfW, 4}, 1.0f, 4, Theme.BgMain);
   float hX = cfX + (eng->Crossfader + 1.0f) * 0.5f * (cfW - S(12));
-  DrawRectangleRounded((Rectangle){hX, cfY, S(12), cfH}, 0.2f, 4, (Color){50, 50, 50, 255});
+  DrawRectangleRounded((Rectangle){hX, cfY, S(12), cfH}, 0.2f, 4, Theme.BorderDefault);
   DrawLine(hX + S(6), cfY + 2, hX + S(6), cfY + cfH - 2, ColorWhite);
   
   if (mDown && CheckCollisionPointRec(mousePos, (Rectangle){cfX, cfY, cfW, cfH}) && r->State->ActiveHandle == NULL) {
@@ -356,7 +356,7 @@ static void Mixer_Draw(Component *base) {
   // COLUMN 3: BEAT FX (FAR RIGHT)
   // =========================================================================
   BeatFXState *fxs = r->State->FXState;
-  DrawRectangle(rightX, panelY, colRightW, panelH, (Color){20, 20, 20, 255});
+  DrawRectangle(rightX, panelY, colRightW, panelH, Theme.BgPanel);
   DrawRectangleLinesEx((Rectangle){rightX, panelY, colRightW, panelH}, 1.0f, ColorDark1);
   float masterKnobY = panelY + S(25);
   Mixer_DrawKnob(rightX + colRightW / 2.0f, masterKnobY, S(15), eng->MasterVolume, 0.0f, 2.0f, "MASTER", ColorRed, true);
@@ -372,7 +372,7 @@ static void Mixer_Draw(Component *base) {
   DrawRectangleLinesEx(fxSelRect, 1.0f, ColorWhite);
   int focus = fxs->FocusedSlot;
   DrawCentredText(bfxNames[fxs->Slots[focus].FXType % 14], fSub, rightX, colRightW, bSelectorY + S(8), S(9), ColorWhite);
-  if (Input_CheckPress(fxSelRect)) {
+  if (Touch_CheckClick(fxSelRect, S(2.0f))) {
       fxs->Slots[focus].FXType = (fxs->Slots[focus].FXType + 1) % 14;
       BeatFXManager_SetFX(&eng->BeatFX, fxs->Slots[focus].FXType);
   }
@@ -383,7 +383,7 @@ static void Mixer_Draw(Component *base) {
   DrawRectangleRec(chSelRect, ColorBlack);
   DrawRectangleLinesEx(chSelRect, 1.0f, ColorWhite);
   DrawCentredText(targetNames[fxs->SelectedChannel % 3], fSub, rightX, colRightW, targetY + S(8), S(9), ColorOrange);
-  if (Input_CheckPress(chSelRect)) {
+  if (Touch_CheckClick(chSelRect, S(2.0f))) {
       fxs->SelectedChannel = (fxs->SelectedChannel + 1) % 3;
   }
 

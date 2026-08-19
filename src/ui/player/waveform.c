@@ -252,7 +252,7 @@ int PWV2_Decode(unsigned char v, Color *outColor) {
 int PWV4_Decode(unsigned char *data, int64_t frame, int64_t maxFrames,
                 Color *outColor) {
   if (frame < 0 || frame >= maxFrames) {
-    *outColor = (Color){0, 0, 0, 0};
+    *outColor = BLANK;
     return 0;
   }
   uint16_t v = ((uint16_t)data[frame * 2] << 8) | data[frame * 2 + 1];
@@ -369,7 +369,7 @@ static void Waveform_Draw(Component *base) {
   // Background — Skip filling to allow global logo to show through
   // Subtle center guide — drawn once here
   DrawRectangle(wfLeft, (int)(wfY + waveCenter), (int)wfW, 1,
-                (Color){35, 35, 35, 255});
+                Theme.BgPanelAlt);
 
   if (r->State->LoadedTrack == NULL) {
     EndScissorMode();
@@ -532,7 +532,7 @@ static void Waveform_Draw(Component *base) {
     pixLo[b] = 0.0f;
     pixMi[b] = 0.0f;
     pixHi[b] = 0.0f;
-    pixCol[b] = (Color){0, 0, 0, 0};
+    pixCol[b] = BLANK;
   }
 
   // 2. Extract Data
@@ -962,7 +962,7 @@ static void Waveform_Draw(Component *base) {
         Font hcFont = UIFonts_GetBoldFace(S(12));
         float txtW = MeasureTextEx(hcFont, hcLabel, S(12), 1).x;
         DrawRectangleRec((Rectangle){bx + S(6), wfY, txtW + S(4), S(14)},
-                         (Color){0, 0, 0, 220});
+                         Theme.BgOverlay);
         UIDrawText(hcLabel, hcFont, bx + S(8), wfY + S(1), S(12), hcClr);
 
         // Bold vertical line through waveform
@@ -995,7 +995,7 @@ static void Waveform_Draw(Component *base) {
       if (bxEnd >= wfLeft && bxStart <= wfRight) {
         float drawLeft = fmaxf(bxStart, wfLeft);
         float drawRight = fminf(bxEnd, wfRight);
-        Color loopCol = (Color){255, 165, 0, 255}; // Amber DJ loop color
+        Color loopCol = Theme.CueMarker; // Amber DJ loop color
         DrawRectangleRec(
             (Rectangle){drawLeft, wfY, drawRight - drawLeft, waveH},
             Fade(loopCol, 0.25f));
@@ -1003,7 +1003,7 @@ static void Waveform_Draw(Component *base) {
         // Draw In boundary
         if (bxStart >= wfLeft && bxStart <= wfRight) {
           bool adjIn = r->State->LoopAdjustIn;
-          Color inCol = adjIn ? (Color){255, 230, 0, 255} : loopCol;
+          Color inCol = adjIn ? Theme.AccentYellow : loopCol;
           float lineThick = adjIn ? 4.0f : 2.5f;
           DrawLineEx((Vector2){bxStart, wfY}, (Vector2){bxStart, wfY + waveH},
                      lineThick, inCol);
@@ -1014,7 +1014,7 @@ static void Waveform_Draw(Component *base) {
         // Draw Out boundary
         if (bxEnd >= wfLeft && bxEnd <= wfRight) {
           bool adjOut = r->State->LoopAdjustOut;
-          Color outCol = adjOut ? (Color){255, 230, 0, 255} : loopCol;
+          Color outCol = adjOut ? Theme.AccentYellow : loopCol;
           float lineThick = adjOut ? 4.0f : 2.5f;
           DrawLineEx((Vector2){bxEnd, wfY}, (Vector2){bxEnd, wfY + waveH},
                      lineThick, outCol);
@@ -1028,11 +1028,11 @@ static void Waveform_Draw(Component *base) {
       if (r->State->LoopAdjustIn || r->State->LoopAdjustOut) {
         if (r->State->LoopAdjustIn) {
           DrawRectangleRec((Rectangle){wfLeft + 10, wfY + 6, 106, 20},
-                           Fade((Color){255, 220, 0, 255}, 0.9f));
+                           Fade(Theme.LoopRegion, 0.9f));
           DrawText("LOOP IN ADJ", (int)wfLeft + 16, (int)wfY + 10, 11, BLACK);
         } else {
           DrawRectangleRec((Rectangle){wfRight - 116, wfY + 6, 106, 20},
-                           Fade((Color){255, 220, 0, 255}, 0.9f));
+                           Fade(Theme.LoopRegion, 0.9f));
           DrawText("LOOP OUT ADJ", (int)wfRight - 110, (int)wfY + 10, 11,
                    BLACK);
         }

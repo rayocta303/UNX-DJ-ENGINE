@@ -26,6 +26,39 @@ float UI_OffsetX = 0.0f;
 float UI_OffsetY = 0.0f;
 bool UI_BoldEnabled = true;
 
+AppTheme Theme;
+
+void Theme_InitDefaultDark(void) {
+    Theme.BgMain = (Color){20, 20, 25, 255};
+    Theme.BgPanel = (Color){28, 28, 35, 255};
+    Theme.BgPanelAlt = (Color){45, 45, 55, 255};
+    Theme.BgModal = (Color){10, 10, 15, 230};
+    Theme.BgOverlay = (Color){0, 0, 0, 180};
+    
+    Theme.TextPrimary = (Color){255, 255, 255, 255};
+    Theme.TextSecondary = (Color){160, 160, 160, 255};
+    Theme.TextMuted = (Color){85, 85, 85, 255};
+    Theme.TextActive = (Color){0, 120, 255, 255};
+    
+    Theme.AccentBlue = (Color){0, 120, 255, 255};
+    Theme.AccentOrange = (Color){255, 121, 0, 255};
+    Theme.AccentRed = (Color){240, 50, 50, 255};
+    Theme.AccentGreen = (Color){0, 200, 80, 255};
+    Theme.AccentYellow = (Color){255, 200, 0, 255};
+    
+    Theme.HoverSubtle = (Color){255, 255, 255, 15};
+    Theme.HoverActive = (Color){45, 45, 55, 255};
+    Theme.SelectedItem = (Color){0, 120, 255, 255};
+    Theme.BorderDefault = (Color){85, 85, 85, 255};
+    Theme.BorderActive = (Color){255, 255, 255, 255};
+    
+    Theme.WaveformBg = (Color){20, 20, 22, 255};
+    Theme.Playhead = (Color){255, 255, 255, 255};
+    Theme.LoopRegion = (Color){255, 220, 0, 255};
+    Theme.CueMarker = (Color){255, 150, 0, 255};
+    Theme.DeckActiveBg = (Color){255, 121, 0, 45};
+}
+
 void UI_UpdateScale(void) {
     // Primary scaling anchor is height to maintain consistent vertical layout density.
     // Horizontal layout becomes responsive (waveforms stretch/contract).

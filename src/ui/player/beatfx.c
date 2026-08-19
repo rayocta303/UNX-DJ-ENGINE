@@ -313,7 +313,7 @@ static void BeatFX_Draw(Component *base) {
     int focusIdx = b->State->FocusedSlot;
     bool isOn = b->State->Slots[focusIdx].IsOn;
     
-    Color bgCol = isOn ? (Color){0, 80, 160, 255} : ColorBlack;
+    Color bgCol = isOn ? Theme.SelectedItem : ColorBlack;
     Color borderCol = isOn ? ColorBlue : ColorDark2;
     
     DrawRectangleRec(slotRect, bgCol);
@@ -356,7 +356,7 @@ static void BeatFX_Draw(Component *base) {
     for (int i = 1; i < 4; i++) {
         float lx = x + S(4);
         float ly = cy + i * rowH;
-        DrawLine(lx, ly, lx + w - S(8), ly, (Color){0x20, 0x20, 0x20, 0xFF});
+        DrawLine(lx, ly, lx + w - S(8), ly, Theme.BorderDefault);
     }
 
     // BPM & Beat FX Sync Logic
@@ -447,7 +447,7 @@ static void BeatFX_Draw(Component *base) {
 
     bool isFxBlinking = (fmod(GetTime(), 0.5) < 0.25);
     bool isFocusedOn = b->State->Slots[b->State->FocusedSlot].IsOn;
-    Color btnColor = isFocusedOn ? (isFxBlinking ? (Color){0, 140, 255, 255} : (Color){0, 40, 110, 255}) : ColorDark2;
+    Color btnColor = isFocusedOn ? (isFxBlinking ? Theme.AccentBlue : Theme.HoverActive) : ColorDark2;
     DrawRectangleRec(b->FXButton, btnColor);
     DrawRectangleLinesEx(b->FXButton, 1.0f, ColorWhite);
     
@@ -477,13 +477,13 @@ static void BeatFX_Draw(Component *base) {
     
     // STATUS Tab
     bool statusActive = !b->State->ShowBeatFXTab;
-    DrawRectangle(x + S(4), cy, tabW, S(14), statusActive ? (Color){0x33, 0x33, 0x33, 0xFF} : (Color){0x15, 0x15, 0x15, 0xFF});
+    DrawRectangle(x + S(4), cy, tabW, S(14), statusActive ? Theme.BgPanelAlt : Theme.BgMain);
     DrawRectangleLines(x + S(4), cy, tabW, S(14), ColorShadow);
     DrawCentredText("STATUS", faceXXS, x + S(4), tabW, cy + S(3.5f), S(7), statusActive ? ColorWhite : ColorShadow);
 
     // BEAT FX Tab
     bool beatFxActive = b->State->ShowBeatFXTab;
-    DrawRectangle(x + S(6) + tabW, cy, tabW, S(14), beatFxActive ? (Color){0x33, 0x33, 0x33, 0xFF} : (Color){0x15, 0x15, 0x15, 0xFF});
+    DrawRectangle(x + S(6) + tabW, cy, tabW, S(14), beatFxActive ? Theme.BgPanelAlt : Theme.BgMain);
     DrawRectangleLines(x + S(6) + tabW, cy, tabW, S(14), ColorShadow);
     DrawCentredText("BEAT FX", faceXXS, x + S(6) + tabW, tabW, cy + S(3.5f), S(7), beatFxActive ? ColorWhite : ColorShadow);
 
@@ -545,7 +545,7 @@ void BeatFXPanel_DrawOverlays(BeatFXPanel *b) {
                 bool isFocused = (b->State->FocusedSlot == i);
                 bool isOn = b->State->Slots[i].IsOn;
                 
-                Color bgCol = isOn ? (Color){0, 80, 160, 255} : ColorDark2;
+                Color bgCol = isOn ? Theme.SelectedItem : ColorDark2;
                 Color borderCol = isFocused ? ColorWhite : (isOn ? ColorBlue : ColorDark3);
                 if (CheckCollisionPointRec(mouse, optRect)) bgCol = ColorGray;
                 

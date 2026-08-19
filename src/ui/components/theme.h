@@ -46,6 +46,45 @@ extern const Color ColorGreen;
 extern const Color ColorYellow;
 extern const Color ColorPink;
 
+typedef struct AppTheme {
+    // Backgrounds
+    Color BgMain;
+    Color BgPanel;
+    Color BgPanelAlt;
+    Color BgModal;
+    Color BgOverlay;
+    
+    // Text
+    Color TextPrimary;
+    Color TextSecondary;
+    Color TextMuted;
+    Color TextActive;
+    
+    // Accents
+    Color AccentBlue;
+    Color AccentOrange;
+    Color AccentRed;
+    Color AccentGreen;
+    Color AccentYellow;
+    
+    // States
+    Color HoverSubtle;
+    Color HoverActive;
+    Color SelectedItem;
+    Color BorderDefault;
+    Color BorderActive;
+    
+    // DJ Specific Components
+    Color WaveformBg;
+    Color Playhead;
+    Color LoopRegion;
+    Color CueMarker;
+    Color DeckActiveBg;
+} AppTheme;
+
+extern AppTheme Theme;
+void Theme_InitDefaultDark(void);
+
 // Screen modes
 #define MODE_PLAYER     0
 #define MODE_BROWSER    1

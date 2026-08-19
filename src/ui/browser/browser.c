@@ -651,7 +651,7 @@ void Browser_CheckStorageConnection(BrowserState *s) {
     snprintf(toastMsg, sizeof(toastMsg), "USB DISCONNECTED: %s", devName);
 
     // 1. Alert Toast Notification (Red warning banner)
-    Toast_Show(toastMsg, 4.0f, (Color){240, 50, 50, 255});
+    Toast_Show(toastMsg, 4.0f, Theme.AccentRed);
 
     UNX_LOG_WARN("[BROWSER] Storage device disconnected unexpectedly: %s (%s). "
                  "Resetting browser state.",
@@ -1102,7 +1102,7 @@ void Browser_RefreshStorages(BrowserState *s) {
         char toastMsg[160];
         snprintf(toastMsg, sizeof(toastMsg), "USB CONNECTED: %s",
                  s->AvailableStorages[i].Name);
-        Toast_Show(toastMsg, 3.5f, (Color){40, 200, 80, 255}); // Green Toast
+        Toast_Show(toastMsg, 3.5f, Theme.AccentGreen); // Green Toast
       }
     }
 
@@ -1119,7 +1119,7 @@ void Browser_RefreshStorages(BrowserState *s) {
         char toastMsg[160];
         snprintf(toastMsg, sizeof(toastMsg), "USB DISCONNECTED: %s",
                  s_knownNames[k]);
-        Toast_Show(toastMsg, 4.0f, (Color){240, 50, 50, 255}); // Red Toast
+        Toast_Show(toastMsg, 4.0f, Theme.AccentRed); // Red Toast
       }
     }
 
@@ -1485,7 +1485,7 @@ static int Browser_Update(Component *base) {
           s->ScrollVelocity = 0;
         } else {
           Toast_Show("Bank slot empty. Drag a playlist to assign.", 2.0f,
-                     (Color){180, 130, 0, 255});
+                     Theme.AccentOrange);
         }
       }
     }
@@ -2053,7 +2053,7 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck,
       if (!IsFormatSupported(t->FilePath)) {
         UNX_LOG_WARN("[BROWSER] LOAD BLOCKED: Unsupported format %s",
                      t->FilePath);
-        Toast_Show("UNSUPPORTED TRACK FORMAT", 3.0f, (Color){240, 50, 50, 255});
+        Toast_Show("UNSUPPORTED TRACK FORMAT", 3.0f, Theme.AccentRed);
         s->ShowLoadPopup = false;
         targetDeck->IsLoading = false;
         return 0;
@@ -2282,7 +2282,7 @@ int Browser_LoadTrackAtIndex(BrowserState *s, int idx, int loadToDeck,
       if (!IsFormatSupported(t->FilePath)) {
         UNX_LOG_WARN("[BROWSER] LOAD BLOCKED: Unsupported format %s",
                      t->FilePath);
-        Toast_Show("UNSUPPORTED TRACK FORMAT", 3.0f, (Color){240, 50, 50, 255});
+        Toast_Show("UNSUPPORTED TRACK FORMAT", 3.0f, Theme.AccentRed);
         s->ShowLoadPopup = false;
         targetDeck->IsLoading = false;
         return 0;
@@ -2474,7 +2474,7 @@ int Browser_LoadNextTrack(BrowserState *s, int deckIdx) {
     nextIdx++;
   }
 
-  Toast_Show("NO SUPPORTED TRACKS FOUND", 3.0f, (Color){240, 50, 50, 255});
+  Toast_Show("NO SUPPORTED TRACKS FOUND", 3.0f, Theme.AccentRed);
   return 0;
 }
 
@@ -2495,7 +2495,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
 
   // Outer Overlay Background & Sleek Top Accent Line
   DrawRectangle((int)oskX, (int)oskY, (int)oskW, (int)oskH,
-                (Color){12, 14, 20, 252});
+                Theme.BgMain);
   DrawRectangle((int)oskX, (int)oskY, (int)oskW, (int)S(2), ColorBlue);
 
   Font faceXS = UIFonts_GetFace(S(9));
@@ -2778,22 +2778,22 @@ static void Browser_Draw(Component *base) {
     if (isHovered)
       bg = ColorDark1;
     if (isActiveNav)
-      bg = (Color){30, 30, 60, 255};
+      bg = Theme.HoverActive;
     if (isSidebarFocused)
-      bg = (Color){20, 70, 140, 255};
+      bg = Theme.SelectedItem;
     if (isBank && !isSidebarFocused)
       bg = isAssigned ? ColorDGreen : ColorDark3;
 
     if (isBank && isHovered && s->IsDragging && s->DraggingType == 1)
-      bg = (Color){255, 120, 0, 255}; // Highlight Drop Target
+      bg = Theme.AccentOrange; // Highlight Drop Target
 
     DrawRectangle(0, boxY, sidebarW, sidebarW, bg);
     if (isActiveNav)
       DrawRectangle(0, boxY, S(3), sidebarW, ColorBlue);
     if (isSidebarFocused) {
-      DrawRectangleLinesEx(boxRect, 2.0f, (Color){0, 220, 255, 255});
+      DrawRectangleLinesEx(boxRect, 2.0f, Theme.AccentBlue);
       DrawSelectionTriangle(sidebarW - S(4), boxY + (sidebarW / 2.0f),
-                            (Color){0, 220, 255, 255});
+                            Theme.AccentBlue);
     } else {
       DrawRectangleLinesEx(boxRect, 1.0f, ColorDark1);
     }
@@ -2914,7 +2914,7 @@ static void Browser_Draw(Component *base) {
 
     // Draw Table Header Bar (Row 2) - Reference Image 2
     Rectangle tableHeaderRect = {listX, listYOffset, listW, headerH};
-    DrawRectangleRec(tableHeaderRect, (Color){28, 28, 35, 255});
+    DrawRectangleRec(tableHeaderRect, Theme.BgPanel);
     DrawRectangleLinesEx(tableHeaderRect, 1.0f, ColorDark1);
 
     bool showNumCol = (s->CurrentPlaylistIdx != -1);
@@ -3118,9 +3118,9 @@ static void Browser_Draw(Component *base) {
         DrawSelectionTriangle(listX + S(2), ry + (rowH / 2.0f), ColorWhite);
       }
     } else if (isPlaying) {
-      DrawRectangle(listX, ry + 1, listW, rowH - 2, (Color){255, 121, 0, 45});
+      DrawRectangle(listX, ry + 1, listW, rowH - 2, Theme.DeckActiveBg);
     } else if (isHover) {
-      DrawRectangle(listX, ry + 1, listW, rowH - 2, (Color){45, 45, 55, 255});
+      DrawRectangle(listX, ry + 1, listW, rowH - 2, Theme.HoverActive);
     } else if (i % 2 != 0) {
       DrawRectangle(listX, ry + 1, listW, rowH - 2, ColorDark2);
     }
@@ -3218,17 +3218,17 @@ static void Browser_Draw(Component *base) {
 
       if (matchLevel == 2) {
         // Perfect Camelot Harmonic Match (Traffic Light Green)
-        DrawRectangleRec(keyBadgeRect, (Color){0, 230, 0, 255});
+        DrawRectangleRec(keyBadgeRect, Theme.AccentGreen);
         DrawCentredText(keyStr, faceXS, keyBadgeRect.x, keyBadgeRect.width,
                         keyBadgeRect.y + S(5), S(10), ColorBlack);
       } else if (matchLevel == 1) {
         // Energy Shift / Semi-compatible Match (Traffic Light Amber/Yellow)
-        DrawRectangleRec(keyBadgeRect, (Color){245, 180, 0, 255});
+        DrawRectangleRec(keyBadgeRect, Theme.AccentYellow);
         DrawCentredText(keyStr, faceXS, keyBadgeRect.x, keyBadgeRect.width,
                         keyBadgeRect.y + S(5), S(10), ColorBlack);
       } else {
         // Incompatible key or no master key loaded
-        DrawRectangleRec(keyBadgeRect, (Color){35, 35, 42, 255});
+        DrawRectangleRec(keyBadgeRect, Theme.BgPanelAlt);
         DrawRectangleLinesEx(keyBadgeRect, 1.0f, ColorDark1);
         Color keyCol = GetCamelotColor(keyStr);
         if (!isCursor) {
@@ -3280,7 +3280,7 @@ static void Browser_Draw(Component *base) {
 
     // Background Track
     DrawRectangle(sbTrackX, sbTrackY, sbTrackW, sbTrackH,
-                  (Color){20, 20, 20, 180});
+                  Theme.BgOverlay);
     DrawLine(sbTrackX, sbTrackY, sbTrackX, sbTrackY + sbTrackH, ColorDark1);
 
     // Calculate handle height and Y position
@@ -3301,7 +3301,7 @@ static void Browser_Draw(Component *base) {
     Color handleColor =
         s->IsScrollbarDragging
             ? ColorOrange
-            : (s->IsDragging ? ColorWhite : (Color){160, 160, 160, 200});
+            : (s->IsDragging ? ColorWhite : Theme.TextSecondary);
     DrawRectangleRounded(
         (Rectangle){sbTrackX + S(3), handleY, sbTrackW - S(6), handleH}, 0.5f,
         4, handleColor);

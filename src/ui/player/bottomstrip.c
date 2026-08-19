@@ -93,7 +93,7 @@ static void BottomStrip_Draw(Component *base) {
     float barY = TOP_BAR_H + WAVE_AREA_H;
     float barH = FX_BAR_H;
 
-    DrawRectangle(0, barY, SCREEN_WIDTH, barH, (Color){0x18, 0x18, 0x18, 0xFF});
+    DrawRectangle(0, barY, SCREEN_WIDTH, barH, Theme.BgMain);
     DrawLine(0, barY, SCREEN_WIDTH, barY, ColorDark1);
     DrawLine(0, barY + barH, SCREEN_WIDTH, barY + barH, ColorDark1);
 
@@ -174,7 +174,7 @@ static void BottomStrip_Draw(Component *base) {
                     }
                 }
                 
-                DrawRectangleRec(cellRect, hasCue ? Fade(cueColor, 0.35f) : (Color){20, 20, 20, 255});
+                DrawRectangleRec(cellRect, hasCue ? Fade(cueColor, 0.35f) : Theme.BgMain);
                 DrawRectangleLinesEx(cellRect, 1, hasCue ? cueColor : ColorGray);
                 
                 char idStr[4];
@@ -205,7 +205,7 @@ static void BottomStrip_Draw(Component *base) {
         int focus = b->State->FocusedSlot;
         for (int i = 0; i < FXNamesCount; i++) {
             bool active = (FXEnumMap[i] == b->State->Slots[focus].FXType);
-            Color bg = active ? (Color){0x44, 0x44, 0x44, 0xFF} : (Color){0x22, 0x22, 0x22, 0xFF};
+            Color bg = active ? Theme.HoverActive : Theme.BgPanel;
             Color border = active ? ColorPaper : ColorDark1;
             Color txtClr = active ? ColorWhite : ColorPaper;
             
@@ -217,8 +217,8 @@ static void BottomStrip_Draw(Component *base) {
 
         // Trash/Clear
         bool isFxBlinking = (fmod(GetTime(), 0.5) < 0.25);
-        Color onBgColor = isFxBlinking ? (Color){0, 140, 255, 255} : (Color){0, 40, 110, 255};
-        DrawRectangle(cx, btnY, trashW - S(2), btnH, b->State->Slots[focus].IsOn ? onBgColor : (Color){0x22, 0x22, 0x22, 0xFF});
+        Color onBgColor = isFxBlinking ? Theme.AccentBlue : Theme.HoverActive;
+        DrawRectangle(cx, btnY, trashW - S(2), btnH, b->State->Slots[focus].IsOn ? onBgColor : Theme.BgPanel);
         DrawRectangleLines(cx, btnY, trashW - S(2), btnH, b->State->Slots[focus].IsOn ? ColorWhite : ColorDark1);
         DrawCentredText(b->State->Slots[focus].IsOn ? "ON" : "OFF", faceXXS, cx, trashW - S(2), btnY + S(6.5f), S(7), ColorWhite);
 
@@ -229,14 +229,14 @@ static void BottomStrip_Draw(Component *base) {
         bool isScrubMode = (selFX2 == 3 || selFX2 == 5);
 
         if (isScrubMode) {
-            DrawRectangle(cx, btnY, padAreaW, btnH, (Color){0x1A, 0x1A, 0x1A, 0xFF});
+            DrawRectangle(cx, btnY, padAreaW, btnH, Theme.BgPanelAlt);
             DrawRectangleLines(cx, btnY, padAreaW, btnH, ColorDark1);
             float midX = cx + padAreaW / 2.0f;
             DrawLine(midX, btnY, midX, btnY + btnH, ColorDark3);
             if (b->State->IsXPadScrubbing) {
                 float valX = midX + (b->State->XPadScrubValue * (padAreaW / 2.0f));
-                if (b->State->XPadScrubValue < 0.0f) DrawRectangle(valX, btnY + 1, midX - valX, btnH - 2, (Color){0, 110, 255, 180});
-                else DrawRectangle(midX, btnY + 1, valX - midX, btnH - 2, (Color){0, 110, 255, 180});
+                if (b->State->XPadScrubValue < 0.0f) DrawRectangle(valX, btnY + 1, midX - valX, btnH - 2, Theme.SelectedItem);
+                else DrawRectangle(midX, btnY + 1, valX - midX, btnH - 2, Theme.SelectedItem);
             }
         } else {
             static const int XPadLabelsCount = 6;
@@ -244,7 +244,7 @@ static void BottomStrip_Draw(Component *base) {
             float padBtnW = padAreaW / XPadLabelsCount;
             for (int i = 0; i < XPadLabelsCount; i++) {
                 bool active = (i == b->State->SelectedPad);
-                DrawRectangle(cx, btnY, padBtnW - 1, btnH, active ? (Color){0x60, 0x60, 0x60, 0xFF} : (Color){0x22, 0x22, 0x22, 0xFF});
+                DrawRectangle(cx, btnY, padBtnW - 1, btnH, active ? Theme.HoverActive : Theme.BgPanel);
                 DrawRectangleLines(cx, btnY, padBtnW - 1, btnH, active ? ColorWhite : ColorDark1);
                 DrawCentredText(XPadLabels[i], faceSm, cx, padBtnW - 1, btnY + S(6.5f), S(8), active ? ColorWhite : ColorPaper);
                 cx += padBtnW;
