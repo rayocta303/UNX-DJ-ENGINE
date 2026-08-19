@@ -1678,15 +1678,15 @@ Log_LogDeviceInfo(gpuModel);
 
   int bufMap[] = {128, 256, 512, 1024};
   AudioBackendConfig initialAudioCfg = {
-      .DeviceIndex = app->settingsState.Items[9].Current - 1,
-      .MasterOutL = app->settingsState.Items[10].Current,
-      .MasterOutR = app->settingsState.Items[11].Current,
-      .CueOutL = app->settingsState.Items[12].Current - 1,
-      .CueOutR = app->settingsState.Items[13].Current - 1,
-      .SampleRate = (app->settingsState.Items[15].Current == 0) ? 44100 : 48000,
-      .BufferSizeFrames = bufMap[app->settingsState.Items[14].Current],
-      .PCMBitDepth = (app->settingsState.Items[16].Current == 0) ? 16 : 24,
-      .CrossfaderCurve = app->settingsState.Items[17].Current};
+      .DeviceIndex = app->settingsState.Items[10].Current - 1,
+      .MasterOutL = app->settingsState.Items[11].Current,
+      .MasterOutR = app->settingsState.Items[12].Current,
+      .CueOutL = app->settingsState.Items[13].Current - 1,
+      .CueOutR = app->settingsState.Items[14].Current - 1,
+      .SampleRate = (app->settingsState.Items[16].Current == 0) ? 44100 : 48000,
+      .BufferSizeFrames = bufMap[app->settingsState.Items[15].Current],
+      .PCMBitDepth = (app->settingsState.Items[17].Current == 0) ? 16 : 24,
+      .CrossfaderCurve = app->settingsState.Items[18].Current};
 
 #if defined(PLATFORM_IOS)
   // Force safer defaults for iOS to prevent driver instability/crashes
@@ -2032,14 +2032,37 @@ Log_LogDeviceInfo(gpuModel);
   CO_Register("[Channel4]", "padmode", CO_TYPE_INT, &app->padState.Mode[1], 0, 5);
 
   // --- Beat FX ---
-  // beatfx_select requires a proxy because it targets the dynamic focused slot
   CO_Register("[Master]", "beatfx_drywet", CO_TYPE_FLOAT,
               &app->fxState.LevelDepth, 0, 1.0f);
   CO_Register("[Master]", "beatfx_time", CO_TYPE_FLOAT,
               &audioEngine->BeatFX.beatMs, 0, 2000.0f);
-  // beatfx_on requires a proxy because it targets the dynamic focused slot
   CO_Register("[Master]", "beatfx_channel", CO_TYPE_INT,
               &app->fxState.SelectedChannel, 0, 4);
+              
+  // --- Standard Mixxx EffectRack Mappings (For Hardware Scripts) ---
+  CO_Register("[EffectRack1_EffectUnit1]", "show_focus", CO_TYPE_INT, &app->fxState.MidiShowFocus, 0, 1);
+  CO_Register("[EffectRack1_EffectUnit1]", "focused_effect", CO_TYPE_INT, &app->fxState.MidiFocusedEffectUnit1, 1, 3);
+  CO_Register("[EffectRack1_EffectUnit2]", "focused_effect", CO_TYPE_INT, &app->fxState.MidiFocusedEffectUnit2, 1, 3);
+  
+  // Mix / Meta to global LevelDepth
+  CO_Register("[EffectRack1_EffectUnit1]", "mix", CO_TYPE_FLOAT, &app->fxState.LevelDepth, 0, 1.0f);
+  CO_Register("[EffectRack1_EffectUnit2]", "mix", CO_TYPE_FLOAT, &app->fxState.LevelDepth, 0, 1.0f);
+  CO_Register("[EffectRack1_EffectUnit1_Effect1]", "meta", CO_TYPE_FLOAT, &app->fxState.LevelDepth, 0, 1.0f);
+  CO_Register("[EffectRack1_EffectUnit1_Effect2]", "meta", CO_TYPE_FLOAT, &app->fxState.LevelDepth, 0, 1.0f);
+  CO_Register("[EffectRack1_EffectUnit1_Effect3]", "meta", CO_TYPE_FLOAT, &app->fxState.LevelDepth, 0, 1.0f);
+  CO_Register("[EffectRack1_EffectUnit2_Effect1]", "meta", CO_TYPE_FLOAT, &app->fxState.LevelDepth, 0, 1.0f);
+  CO_Register("[EffectRack1_EffectUnit2_Effect2]", "meta", CO_TYPE_FLOAT, &app->fxState.LevelDepth, 0, 1.0f);
+  CO_Register("[EffectRack1_EffectUnit2_Effect3]", "meta", CO_TYPE_FLOAT, &app->fxState.LevelDepth, 0, 1.0f);
+  
+  // Enabled flags mapped directly to Slots
+  // Unit 1 (Slots 0-2)
+  CO_Register("[EffectRack1_EffectUnit1_Effect1]", "enabled", CO_TYPE_BOOL, &app->fxState.Slots[0].IsOn, 0, 1);
+  CO_Register("[EffectRack1_EffectUnit1_Effect2]", "enabled", CO_TYPE_BOOL, &app->fxState.Slots[1].IsOn, 0, 1);
+  CO_Register("[EffectRack1_EffectUnit1_Effect3]", "enabled", CO_TYPE_BOOL, &app->fxState.Slots[2].IsOn, 0, 1);
+  // Unit 2 (Slots 3-5)
+  CO_Register("[EffectRack1_EffectUnit2_Effect1]", "enabled", CO_TYPE_BOOL, &app->fxState.Slots[3].IsOn, 0, 1);
+  CO_Register("[EffectRack1_EffectUnit2_Effect2]", "enabled", CO_TYPE_BOOL, &app->fxState.Slots[4].IsOn, 0, 1);
+  CO_Register("[EffectRack1_EffectUnit2_Effect3]", "enabled", CO_TYPE_BOOL, &app->fxState.Slots[5].IsOn, 0, 1);
   CO_Register("[Master]", "beatfx_prev", CO_TYPE_BOOL,
               &app->fxState.MidiRequestPrevFX, 0, 1);
   CO_Register("[Master]", "beatfx_next", CO_TYPE_BOOL,

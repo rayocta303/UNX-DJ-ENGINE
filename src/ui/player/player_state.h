@@ -162,7 +162,17 @@ typedef struct BeatFXState {
   int SelectedChannel; // 0=Master, 1=Deck 1, 2=Deck 2
   bool ChannelDropdownOpen;
   bool FXDropdownOpen;
-  int ActiveSlotDropdown; // -1 if closed, 0-5 if a slot's dropdown is open
+  
+  // --- State variables ---
+  int ActiveSlotDropdown; // -1 if closed, 0-5 if a slot dropdown is open
+  
+  // --- Mixxx Hardware Proxy Variables ---
+  int MidiShowFocus;
+  int MidiFocusedEffectUnit1;
+  int MidiFocusedEffectUnit2;
+  int PrevMidiFocusedEffectUnit1;
+  int PrevMidiFocusedEffectUnit2;
+  
   bool ShowBeatFXTab; // false = STATUS, true = BEAT FX
   float LevelDepth; // Persist knob depth
   float XPadScrubValue; // -1.0 to 1.0 for Reverb LPF/HPF and Flanger Sweep

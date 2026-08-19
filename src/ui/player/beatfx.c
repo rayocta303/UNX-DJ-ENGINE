@@ -33,6 +33,17 @@ static int BeatFX_Update(Component *base) {
     float cy = fxSelectY + S(30); // FXSelect(26) + Spacing(4)
     cy += S(10); // Spacing after "CH SELECT" label
     
+    // 1. Sync MIDI Hardware state for Focused Effect
+    // If the Mixxx script modified the focused effect (1 to 3), sync it to our 0-5 index
+    if (b->State->MidiFocusedEffectUnit1 != b->State->PrevMidiFocusedEffectUnit1 && b->State->MidiFocusedEffectUnit1 > 0) {
+        // Hardware forced focus change (usually 1, 2, or 3)
+        // Keep it within Unit 1 for simplicity (slots 0-2) or Unit 2 (slots 3-5) depending on current bank
+        int currentBank = (b->State->FocusedSlot >= 3) ? 1 : 0;
+        b->State->FocusedSlot = currentBank * 3 + (b->State->MidiFocusedEffectUnit1 - 1);
+        if (b->State->FocusedSlot > 5) b->State->FocusedSlot = 5;
+        b->State->PrevMidiFocusedEffectUnit1 = b->State->MidiFocusedEffectUnit1;
+    }
+
     Rectangle chRect = { x + S(4), cy, w - S(8), S(20) };
     
 
@@ -91,6 +102,18 @@ static int BeatFX_Update(Component *base) {
                     float by = modalY + S(45) + row * (btnH + pad);
                     if (CheckCollisionPointRec(mouse, (Rectangle){bx, by, btnW, btnH})) {
                         b->State->FocusedSlot = i;
+                        
+                        // Sync back to MIDI
+                        int unit = (i >= 3) ? 2 : 1;
+                        int idx = (i % 3) + 1;
+                        if (unit == 1) {
+                            b->State->MidiFocusedEffectUnit1 = idx;
+                            b->State->PrevMidiFocusedEffectUnit1 = idx;
+                        } else {
+                            b->State->MidiFocusedEffectUnit2 = idx;
+                            b->State->PrevMidiFocusedEffectUnit2 = idx;
+                        }
+
                         b->State->ActiveSlotDropdown = i; // Open dropdown for this slot
                         
                         if (b->AudioPlugin) {
@@ -246,6 +269,17 @@ static int BeatFX_Update(Component *base) {
         if (b->AudioPlugin) {
             BeatFXManager_SetFX(&b->AudioPlugin->BeatFX, b->State->Slots[next].FXType);
             BeatFXManager_SetFXOn(&b->AudioPlugin->BeatFX, b->State->Slots[next].IsOn);
+        }
+
+        // Sync back to MIDI
+        int unit = (next >= 3) ? 2 : 1;
+        int idx = (next % 3) + 1;
+        if (unit == 1) {
+            b->State->MidiFocusedEffectUnit1 = idx;
+            b->State->PrevMidiFocusedEffectUnit1 = idx;
+        } else {
+            b->State->MidiFocusedEffectUnit2 = idx;
+            b->State->PrevMidiFocusedEffectUnit2 = idx;
         }
     }
 

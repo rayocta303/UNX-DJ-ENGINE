@@ -103,6 +103,16 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
         if ((sub = strstr(p, "\"q\"")) && sscanf(sub, "\"q\": %d", &ival) == 1) fx->Quantize = (bool)ival;
         if ((sub = strstr(p, "\"tab\"")) && sscanf(sub, "\"tab\": %d", &ival) == 1) fx->ShowBeatFXTab = (bool)ival;
         if ((sub = strstr(p, "\"on\"")) && sscanf(sub, "\"on\": %d", &ival) == 1) fx->Slots[0].IsOn = (bool)ival;
+        if ((sub = strstr(p, "\"focus\"")) && sscanf(sub, "\"focus\": %d", &ival) == 1) fx->FocusedSlot = ival;
+        
+        for (int i = 0; i < 6; i++) {
+            char fxKey[16];
+            char onKey[16];
+            sprintf(fxKey, "\"fx%d\":", i);
+            sprintf(onKey, "\"on%d\":", i);
+            if ((sub = strstr(p, fxKey)) && sscanf(sub + strlen(fxKey), " %d", &ival) == 1) fx->Slots[i].FXType = ival;
+            if ((sub = strstr(p, onKey)) && sscanf(sub + strlen(onKey), " %d", &ival) == 1) fx->Slots[i].IsOn = (bool)ival;
+        }
     }
 
     // Color FX
@@ -280,8 +290,12 @@ void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendCon
             wfmB.Style, wfmB.GainLow, wfmB.GainMid, wfmB.GainHigh, wfmB.VinylStartMs, wfmB.VinylStopMs, wfmB.LoadLock ? 1 : 0, wfmB.JogCalibRPM, wfmB.WaveformTouchEnabled ? 1 : 0, wfmB.QuantizeResolution);
     fprintf(f, "  \"audio\": { \"devIdx\": %d, \"mastL\": %d, \"mastR\": %d, \"cueL\": %d, \"cueR\": %d, \"sr\": %d, \"buf\": %d, \"bitdepth\": %d, \"xfader\": %d },\n",
             audio.DeviceIndex, audio.MasterOutL, audio.MasterOutR, audio.CueOutL, audio.CueOutR, audio.SampleRate, audio.BufferSizeFrames, audio.PCMBitDepth, audio.CrossfaderCurve);
-    fprintf(f, "  \"beatfx\": { \"fx\": %d, \"pad\": %d, \"ch\": %d, \"depth\": %.2f, \"q\": %d, \"tab\": %d, \"on\": %d },\n",
-            fx.Slots[fx.FocusedSlot].FXType, fx.SelectedPad, fx.SelectedChannel, fx.LevelDepth, fx.Quantize ? 1 : 0, fx.ShowBeatFXTab ? 1 : 0, fx.Slots[fx.FocusedSlot].IsOn ? 1 : 0);
+    fprintf(f, "  \"beatfx\": { \"fx\": %d, \"pad\": %d, \"ch\": %d, \"depth\": %.2f, \"q\": %d, \"tab\": %d, \"on\": %d, \"focus\": %d",
+            fx.Slots[fx.FocusedSlot].FXType, fx.SelectedPad, fx.SelectedChannel, fx.LevelDepth, fx.Quantize ? 1 : 0, fx.ShowBeatFXTab ? 1 : 0, fx.Slots[fx.FocusedSlot].IsOn ? 1 : 0, fx.FocusedSlot);
+    for (int i = 0; i < 6; i++) {
+        fprintf(f, ", \"fx%d\": %d, \"on%d\": %d", i, fx.Slots[i].FXType, i, fx.Slots[i].IsOn ? 1 : 0);
+    }
+    fprintf(f, " },\n");
     fprintf(f, "  \"colorfx\": { \"active\": %d, \"param\": %.2f, \"valA\": %.2f, \"valB\": %.2f },\n",
             (int)cfxA.activeFX, cfxA.parameter, cfxA.colorValue, cfxB.colorValue);
     fprintf(f, "  \"quantize\": { \"qA\": %d, \"qB\": %d },\n", quantizeA ? 1 : 0, quantizeB ? 1 : 0);
