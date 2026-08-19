@@ -1422,7 +1422,7 @@ static int Browser_Update(Component *base) {
   float listYOffset = TOP_BAR_H + ((s->BrowseLevel == 0) ? rowH : 0);
 
   // 1. Sidebar Clicking & Interaction
-  for (int i = 0; i < 7; i++) {
+  for (int i = 0; i < 6; i++) {
     float boxY = TOP_BAR_H + i * sidebarW;
     Rectangle boxRect = {0, boxY, sidebarW, sidebarW};
 
@@ -1438,23 +1438,22 @@ static int Browser_Update(Component *base) {
       s->ShowOSK = false;
       s->FocusArea = 0;
       s->SidebarCursorPos = i;
-      if (i < 4) {
+      if (i < 3) {
         s->ScrollOffset = 0;
         s->VisualScroll = 0;
         s->ScrollVelocity = 0;
-        if (i == 3) {
+        if (i == 2) {
           // Navigate to Drive / Source
           s->BrowseLevel = 3;
           s->CursorPos = 0;
         } else {
           // Navigate to categories
-          if (i == 2) {
+          if (i == 1) {
             s->BrowseLevel = 1; // Playlists level
             s->CursorPos = 0;
           } else {
-            // NAV-04 FIX: Both FILENAME (0) and FOLDER (1) go to tracks view
-            // consistently
-            s->BrowseLevel = 0; // Tracks
+            // Tracks
+            s->BrowseLevel = 0;
             s->CurrentPlaylistIdx = -1;
             s->CameFromBank = false;
             s->CursorPos = 0;
@@ -1467,7 +1466,7 @@ static int Browser_Update(Component *base) {
       } else {
         // Playlist Bank Jump
         // BUG-18 FIX: Show toast if bank slot is empty
-        int bankIdx = i - 4;
+        int bankIdx = i - 3;
         if (s->PlaylistBank[bankIdx].PlaylistIdx >= 0) {
           // Check if we need to switch storage
           if (s->SelectedStorage && strcmp(s->PlaylistBank[bankIdx].StoragePath,
@@ -2755,22 +2754,20 @@ static void Browser_Draw(Component *base) {
 
   // Sidebar Boxes (1:1 Squares)
   Vector2 mPos = Input_GetPointerPos();
-  for (int i = 0; i < 7; i++) {
+  for (int i = 0; i < 6; i++) {
     float boxY = TOP_BAR_H + i * sidebarW;
     Rectangle boxRect = {0, boxY, sidebarW, sidebarW};
     bool isHovered = CheckCollisionPointRec(mPos, boxRect);
-    bool isBank = (i >= 4);
-    bool isAssigned = isBank && (s->PlaylistBank[i - 4].PlaylistIdx >= 0);
+    bool isBank = (i >= 3);
+    bool isAssigned = isBank && (s->PlaylistBank[i - 3].PlaylistIdx >= 0);
 
     bool isActiveNav = false;
     if (!isBank) {
       if (i == 0 && s->BrowseLevel == 0)
         isActiveNav = true; // Tracks
-      if (i == 1 && s->BrowseLevel == 2)
-        isActiveNav = true; // Folders/Categories
-      if (i == 2 && s->BrowseLevel == 1)
+      if (i == 1 && s->BrowseLevel == 1)
         isActiveNav = true; // Playlists
-      if (i == 3 && s->BrowseLevel == 3)
+      if (i == 2 && s->BrowseLevel == 3)
         isActiveNav = true; // Source
     }
 
@@ -2802,15 +2799,14 @@ static void Browser_Draw(Component *base) {
     }
 
     if (!isBank) {
-      const char *sidIcons[] = {"\uf03a", "\uf07b", "\uf022",
-                                "\uf287"}; // Tracks, Folders, Playlist, USB
-      DrawCentredText(sidIcons[i], (i == 3) ? faceBrand : faceIcon, 0, sidebarW,
+      const char *sidIcons[] = {"\uf03a", "\uf022", "\uf287"}; // Tracks, Playlist, USB
+      DrawCentredText(sidIcons[i], (i == 2) ? faceBrand : faceIcon, 0, sidebarW,
                       boxY + S(12), S(16),
                       isActiveNav ? ColorBlue
                                   : (isHovered ? ColorWhite : ColorShadow));
     } else {
       // Playlist Bank Placeholders (1-3)
-      int bankIdx = i - 4;
+      int bankIdx = i - 3;
       if (s->PlaylistBank[bankIdx].PlaylistIdx >= 0) {
         // Show truncated name (e.g. "Techno")
         char displayName[8];
@@ -2921,33 +2917,40 @@ static void Browser_Draw(Component *base) {
     DrawRectangleRec(tableHeaderRect, (Color){28, 28, 35, 255});
     DrawRectangleLinesEx(tableHeaderRect, 1.0f, ColorDark1);
 
+    bool showNumCol = (s->CurrentPlaylistIdx != -1);
+    float titleBaseX = showNumCol ? S(46) : S(0);
+
     // Column Dividers
-    DrawLine(listX + S(46), listYOffset, listX + S(46), listYOffset + headerH,
-             ColorDark1); // NO. | TITLE
+    if (showNumCol) {
+      DrawLine(listX + S(46), listYOffset, listX + S(46), listYOffset + headerH,
+               ColorDark1); // NO. | TITLE
+    }
     DrawLine(listX + listW - S(110), listYOffset, listX + listW - S(110),
              listYOffset + headerH, ColorDark1);
     DrawLine(listX + listW - S(55), listYOffset, listX + listW - S(55),
              listYOffset + headerH, ColorDark1);
 
     // Column 1: NO.
-    UIDrawText("NO.", faceXS, listX + S(6), listYOffset + S(5), S(10),
-               (s->SortMode == 0) ? ColorWhite : ColorShadow);
-    if (s->SortMode == 0) {
-      float cx = listX + S(28);
-      float cy = listYOffset + S(8);
-      if (s->SortAscending)
-        DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)},
-                     (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
-      else
-        DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy},
-                     (Vector2){cx, cy}, ColorWhite);
+    if (showNumCol) {
+      UIDrawText("NO.", faceXS, listX + S(6), listYOffset + S(5), S(10),
+                 (s->SortMode == 0) ? ColorWhite : ColorShadow);
+      if (s->SortMode == 0) {
+        float cx = listX + S(28);
+        float cy = listYOffset + S(8);
+        if (s->SortAscending)
+          DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)},
+                       (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
+        else
+          DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy},
+                       (Vector2){cx, cy}, ColorWhite);
+      }
     }
 
     // Column 2: TITLE
-    UIDrawText("TITLE", faceXS, listX + S(52), listYOffset + S(5), S(10),
+    UIDrawText("TITLE", faceXS, listX + titleBaseX + S(6), listYOffset + S(5), S(10),
                (s->SortMode == 3) ? ColorWhite : ColorShadow);
     if (s->SortMode == 3) {
-      float cx = listX + S(82);
+      float cx = listX + titleBaseX + S(36);
       float cy = listYOffset + S(8);
       if (s->SortAscending)
         DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)},
@@ -3128,25 +3131,31 @@ static void Browser_Draw(Component *base) {
         isCursor ? ColorWhite : (isPlaying ? ColorOrange : ColorWhite);
 
     // Render Track Index Number - only for Track List (BrowseLevel 0)
+    bool showNumCol = (s->CurrentPlaylistIdx != -1);
     if (s->BrowseLevel == 0) {
-      char numBuf[16];
-      int displayNum = idx + 1;
-      if (s->DatabaseType == 0 && idx < s->ActiveTrackCount &&
-          s->TrackPointers[idx]) {
-        displayNum = s->TrackPointers[idx]->BrowserDisplayNumber;
-      } else if (s->DatabaseType == 1 && idx < s->ActiveTrackCount &&
-                 s->SeratoTrackPointers[idx]) {
-        displayNum = s->SeratoTrackPointers[idx]->BrowserDisplayNumber;
+      if (showNumCol) {
+        char numBuf[16];
+        int displayNum = idx + 1;
+        if (s->DatabaseType == 0 && idx < s->ActiveTrackCount &&
+            s->TrackPointers[idx]) {
+          displayNum = s->TrackPointers[idx]->BrowserDisplayNumber;
+        } else if (s->DatabaseType == 1 && idx < s->ActiveTrackCount &&
+                   s->SeratoTrackPointers[idx]) {
+          displayNum = s->SeratoTrackPointers[idx]->BrowserDisplayNumber;
+        }
+        sprintf(numBuf, "%d.", displayNum);
+        UIDrawText(numBuf, faceXS, listX + S(4), ry + S(9), S(10), textCol);
+        UIDrawText(isPlaying ? "\uf04b" : "\uf001", faceIcon, listX + S(32),
+                   ry + S(9), S(9), textCol);
+      } else {
+        UIDrawText(isPlaying ? "\uf04b" : "\uf001", faceIcon, listX + S(6),
+                   ry + S(9), S(9), textCol);
       }
-      sprintf(numBuf, "%d.", displayNum);
-      UIDrawText(numBuf, faceXS, listX + S(4), ry + S(9), S(10), textCol);
-      UIDrawText(isPlaying ? "\uf04b" : "\uf001", faceIcon, listX + S(32),
-                 ry + S(9), S(9), textCol);
     }
 
     float textX = listX + S(36);
     if (s->BrowseLevel == 0)
-      textX = listX + S(46);
+      textX = showNumCol ? (listX + S(46)) : (listX + S(22));
     else if (s->BrowseLevel == 1)
       textX = listX + S(30);
     else if (s->BrowseLevel == 3)
