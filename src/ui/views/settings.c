@@ -1441,7 +1441,8 @@ static void Settings_Draw(Component *base) {
     }
   }
 
-  // Draw Details Strip
+  // Draw Details Strip (Hidden per user request)
+  /*
   DrawRectangle(0, divY, SCREEN_WIDTH, S(18), ColorDark2);
   UIDrawText(detailBuf[0] != '\0' ? detailBuf : "No item selected", faceXS,
              S(15), divY + S(5), S(9.5f), ColorOrange);
@@ -1452,6 +1453,7 @@ static void Settings_Draw(Component *base) {
           filteredCount);
   UIDrawText(countStr, faceXS, SCREEN_WIDTH / 2.0f - S(24.0f), divY + S(26),
              S(9), ColorGray);
+  */
 
   // MIDI Monitor & Tip Label
   if (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) {
