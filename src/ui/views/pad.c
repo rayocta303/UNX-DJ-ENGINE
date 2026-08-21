@@ -123,7 +123,7 @@ static void Pad_Draw(Component *base) {
     return;
 
   // Background
-  DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ColorBGUtil);
+  DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Theme.BgMain);
 
   Font faceSm = UIFonts_GetFace(S(8));
   Font faceMd = UIFonts_GetFace(S(11));
@@ -140,26 +140,26 @@ static void Pad_Draw(Component *base) {
     PadMode mode = r->State->Mode[d];
 
     // Panel Background
-    DrawRectangleRec((Rectangle){panelX, panelY, panelW, panelH}, ColorDark2);
+    DrawRectangleRec((Rectangle){panelX, panelY, panelW, panelH}, Theme.BgPanel);
     DrawRectangleLinesEx((Rectangle){panelX, panelY, panelW, panelH}, 1.0f,
-                         ColorDark1);
+                         Theme.BorderDefault);
 
     // Header
-    DrawRectangle(panelX, panelY, panelW, S(24), ColorDark3);
+    DrawRectangle(panelX, panelY, panelW, S(24), Theme.BgPanelAlt);
     DrawLine(panelX, panelY + S(24), panelX + panelW, panelY + S(24),
-             ColorShadow);
+             Theme.BorderDefault);
 
     char headStr[32];
     sprintf(headStr, "DECK %d PADS", d + 1);
     DrawCentredText(headStr, faceMd, panelX + S(10), panelW - S(70), panelY + S(6), S(11),
-                    d == 0 ? ColorOrange : ColorBlue);
+                    d == 0 ? Theme.AccentOrange : Theme.AccentBlue);
 
     // SHIFT Toggle Button
     bool isShiftActive = r->State->ShiftActive[d] || IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
     Rectangle shiftBtn = { panelX + panelW - S(52), panelY + S(2), S(48), S(20) };
-    DrawRectangleRec(shiftBtn, isShiftActive ? ColorOrange : ColorDark1);
-    DrawRectangleLinesEx(shiftBtn, 1.0f, isShiftActive ? ColorWhite : ColorShadow);
-    DrawCentredText("SHIFT", faceSm, shiftBtn.x, shiftBtn.width, shiftBtn.y + S(5), S(8), isShiftActive ? ColorBlack : ColorWhite);
+    DrawRectangleRec(shiftBtn, isShiftActive ? Theme.AccentOrange : Theme.BorderDefault);
+    DrawRectangleLinesEx(shiftBtn, 1.0f, isShiftActive ? Theme.TextPrimary : Theme.BorderDefault);
+    DrawCentredText("SHIFT", faceSm, shiftBtn.x, shiftBtn.width, shiftBtn.y + S(5), S(8), isShiftActive ? Theme.BgMain : Theme.TextPrimary);
 
     // Mode Bar
     float modeBarH = S(20);
@@ -171,25 +171,25 @@ static void Pad_Draw(Component *base) {
       bool active = (mode == (PadMode)m);
       Rectangle mRect = {modeX + m * modeBtnW, modeY, modeBtnW, modeBarH};
 
-      Color modeCol = ColorWhite;
+      Color modeCol = Theme.TextPrimary;
       if (m == PAD_MODE_HOT_CUE)
-        modeCol = ColorWhite;
+        modeCol = Theme.TextPrimary;
       else if (m == PAD_MODE_BEAT_LOOP)
-        modeCol = ColorGreen;
+        modeCol = Theme.AccentGreen;
       else if (m == PAD_MODE_SLIP_LOOP)
-        modeCol = ColorYellow;
+        modeCol = Theme.AccentYellow;
       else if (m == PAD_MODE_BEAT_JUMP)
-        modeCol = ColorOrange;
+        modeCol = Theme.AccentOrange;
       else if (m == PAD_MODE_GATE_CUE)
-        modeCol = ColorBlue;
+        modeCol = Theme.AccentBlue;
       else if (m == PAD_MODE_RELEASE_FX)
-        modeCol = ColorPink;
+        modeCol = Theme.AccentRed;
 
       if (active) {
         DrawRectangleRec(mRect, Fade(modeCol, 0.4f));
         DrawRectangleLinesEx(mRect, 1.0f, modeCol);
       } else {
-        DrawRectangleLinesEx(mRect, 1.0f, ColorDark1);
+        DrawRectangleLinesEx(mRect, 1.0f, Theme.BorderDefault);
       }
 
       // Draw very small text label
@@ -197,7 +197,7 @@ static void Pad_Draw(Component *base) {
       float txtW = MeasureTextEx(faceSm, lbl, S(8), 1).x;
       DrawTextEx(faceSm, lbl,
                  (Vector2){mRect.x + (modeBtnW - txtW) / 2.0f, mRect.y + S(6)},
-                 S(8), 1, active ? ColorWhite : ColorShadow);
+                 S(8), 1, active ? Theme.TextPrimary : Theme.BorderDefault);
     }
 
     // Pad Grid
@@ -216,14 +216,14 @@ static void Pad_Draw(Component *base) {
       Rectangle rect = {px, py, padW, padH};
 
       // Determine pad color from mode
-      Color padColor = ColorDark3;
+      Color padColor = Theme.BgPanelAlt;
       bool hasData = false;
 
       if (mode == PAD_MODE_HOT_CUE) {
         if (deck && deck->LoadedTrack) {
           const Color hcPalette[8] = {
-              ColorYellow, ColorOrange, ColorPink, ColorRed,
-              ColorGreen,  ColorDGreen, ColorBlue, ColorBlue
+              Theme.AccentYellow, Theme.AccentOrange, Theme.AccentRed, Theme.AccentRed,
+              Theme.AccentGreen,  Theme.AccentGreen, Theme.AccentBlue, Theme.AccentBlue
           };
 
           for (int h = 0; h < deck->LoadedTrack->HotCuesCount; h++) {
@@ -233,7 +233,7 @@ static void Pad_Draw(Component *base) {
 
               // Active Loop blinking
               if (hc.Status == 4 && (int)(GetTime() * 4) % 2 == 0) {
-                padColor = ColorWhite;
+                padColor = Theme.TextPrimary;
               }
 
               hasData = true;
@@ -244,36 +244,36 @@ static void Pad_Draw(Component *base) {
       } else if (mode == PAD_MODE_BEAT_LOOP || mode == PAD_MODE_SLIP_LOOP) {
         bool isActive = (r->State->ActiveLoopIdx[d] == i);
         if (mode == PAD_MODE_BEAT_LOOP) {
-          padColor = ColorGreen;
+          padColor = Theme.AccentGreen;
           hasData = isActive;
         } else {
           // Slip Loop (Roll) - All pads usually dimmed, active is bright
-          padColor = ColorYellow;
+          padColor = Theme.AccentYellow;
           hasData = true; // Show all pads as available
           if (!isActive)
-            padColor = Fade(ColorYellow, 0.3f);
+            padColor = Fade(Theme.AccentYellow, 0.3f);
         }
       } else if (mode == PAD_MODE_BEAT_JUMP) {
-        padColor = ColorOrange;
+        padColor = Theme.AccentOrange;
         hasData = true;
       } else if (mode == PAD_MODE_GATE_CUE) {
         if (deck && deck->LoadedTrack) {
           for (int h = 0; h < deck->LoadedTrack->HotCuesCount; h++) {
             if (deck->LoadedTrack->HotCues[h].ID == (unsigned int)(i + 1)) {
-              padColor = ColorBlue;
+              padColor = Theme.AccentBlue;
               hasData = true;
               break;
             }
           }
         }
       } else if (mode == PAD_MODE_RELEASE_FX) {
-        padColor = ColorPink;
+        padColor = Theme.AccentRed;
         hasData = true;
       }
 
       // Draw Pad Base (Sharp Rectangle)
-      DrawRectangleRec(rect, ColorDark3); // Use theme dark base
-      DrawRectangleLinesEx(rect, 1.0f, ColorDark1);
+      DrawRectangleRec(rect, Theme.BgPanelAlt); // Use theme dark base
+      DrawRectangleLinesEx(rect, 1.0f, Theme.BorderDefault);
 
       if (hasData) {
         // Bottom Colored Accent Bar (Moved up slightly)
@@ -307,11 +307,11 @@ static void Pad_Draw(Component *base) {
 
       // Top-Left Label like XDJ hardware
       UIDrawText(lbl, faceLg, px + S(6), py + S(4), S(13),
-                 hasData ? padColor : ColorShadow);
+                 hasData ? Theme.TextPrimary : Theme.TextMuted);
 
       if (Input_IsDown() &&
           CheckCollisionPointRec(Input_GetPointerPos(), rect)) {
-        DrawRectangleRec(rect, Fade(ColorWhite, 0.3f));
+        DrawRectangleRec(rect, Fade(Theme.TextPrimary, 0.3f));
       }
     }
   }

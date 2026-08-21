@@ -38,8 +38,8 @@ static int TopBar_Update(Component *base) {
 
 static void TopBar_Draw(Component *base) {
   TopBar *t = (TopBar *)base;
-  DrawRectangle(0, 0, SCREEN_WIDTH, TOP_BAR_H, ColorDark2);
-  DrawLine(0, TOP_BAR_H, SCREEN_WIDTH, TOP_BAR_H, ColorDark1);
+  DrawRectangle(0, 0, SCREEN_WIDTH, TOP_BAR_H, Theme.BgPanel);
+  DrawLine(0, TOP_BAR_H, SCREEN_WIDTH, TOP_BAR_H, Theme.BgMain);
 
   Font faceXS = UIFonts_GetFace(S(8));
   Font faceSm = UIFonts_GetFace(S(9.5f));
@@ -53,13 +53,13 @@ static void TopBar_Draw(Component *base) {
   t->btnFullW = S(22);
 
   bool isFull = IsWindowFullscreen();
-  DrawRectangle(t->btnFullX, btnY, t->btnFullW, btnH, isFull ? ColorBlue : ColorDark1);
-  DrawRectangleLines(t->btnFullX, btnY, t->btnFullW, btnH, ColorShadow);
+  DrawRectangle(t->btnFullX, btnY, t->btnFullW, btnH, isFull ? Theme.AccentBlue : Theme.BgMain);
+  DrawRectangleLines(t->btnFullX, btnY, t->btnFullW, btnH, Theme.BorderDefault);
 
   float cx = t->btnFullX + t->btnFullW / 2.0f;
   float cy = btnY + btnH / 2.0f;
   float iconS = S(5.0f);
-  Color iconCol = ColorWhite;
+  Color iconCol = Theme.TextPrimary;
 
   if (isFull) {
     // Inward arrows / shrink icon
@@ -103,20 +103,20 @@ static void TopBar_Draw(Component *base) {
   if (cpuUsage < 0.0f) cpuUsage = 0.0f;
   if (cpuUsage > 1.0f) cpuUsage = 1.0f;
 
-  UIDrawText("CPU", faceMicro, lblX, row1Y, S(8.0f), ColorGray);
+  UIDrawText("CPU", faceMicro, lblX, row1Y, S(8.0f), Theme.TextSecondary);
 
-  DrawRectangleRounded((Rectangle){ barX, row1Y + S(1.0f), barW, barH }, 0.3f, 4, ColorDark1);
-  DrawRectangleRoundedLines((Rectangle){ barX, row1Y + S(1.0f), barW, barH }, 0.3f, 4, 1.0f, ColorShadow);
+  DrawRectangleRounded((Rectangle){ barX, row1Y + S(1.0f), barW, barH }, 0.3f, 4, Theme.BgMain);
+  DrawRectangleRoundedLines((Rectangle){ barX, row1Y + S(1.0f), barW, barH }, 0.3f, 4, 1.0f, Theme.BorderDefault);
 
   float cpuFillW = (barW - S(2.0f)) * cpuUsage;
   if (cpuFillW > S(1.0f)) {
-    Color cpuCol = (cpuUsage > 0.85f) ? ColorRed : ((cpuUsage > 0.60f) ? ColorOrange : ColorDGreen);
+    Color cpuCol = (cpuUsage > 0.85f) ? Theme.AccentRed : ((cpuUsage > 0.60f) ? Theme.AccentOrange : Theme.AccentGreen);
     DrawRectangleRounded((Rectangle){ barX + S(1.0f), row1Y + S(2.0f), cpuFillW, barH - S(2.0f) }, 0.3f, 4, cpuCol);
   }
 
   char cpuStr[16];
   snprintf(cpuStr, sizeof(cpuStr), "%d%%", (int)(cpuUsage * 100.0f));
-  UIDrawText(cpuStr, faceMicro, valX, row1Y, S(8.0f), ColorWhite);
+  UIDrawText(cpuStr, faceMicro, valX, row1Y, S(8.0f), Theme.TextPrimary);
 
   // --- Row 2: RAM (2-Segment Progress Bar: App Usage + System Usage) ---
   float ramTotalMB = (t->RAMTotal > 0.0f) ? t->RAMTotal : 4096.0f;
@@ -134,11 +134,11 @@ static void TopBar_Draw(Component *base) {
   if (sysRatio < 0.0f) sysRatio = 0.0f;
   if (totalRatio > 1.0f) totalRatio = 1.0f;
 
-  UIDrawText("RAM", faceMicro, lblX, row2Y, S(8.0f), ColorGray);
+  UIDrawText("RAM", faceMicro, lblX, row2Y, S(8.0f), Theme.TextSecondary);
 
   // Outer container
-  DrawRectangleRounded((Rectangle){ barX, row2Y + S(1.0f), barW, barH }, 0.3f, 4, ColorDark1);
-  DrawRectangleRoundedLines((Rectangle){ barX, row2Y + S(1.0f), barW, barH }, 0.3f, 4, 1.0f, ColorShadow);
+  DrawRectangleRounded((Rectangle){ barX, row2Y + S(1.0f), barW, barH }, 0.3f, 4, Theme.BgMain);
+  DrawRectangleRoundedLines((Rectangle){ barX, row2Y + S(1.0f), barW, barH }, 0.3f, 4, 1.0f, Theme.BorderDefault);
 
   float maxInnerW = barW - S(2.0f);
   float appFillW = maxInnerW * appRatio;
@@ -152,13 +152,13 @@ static void TopBar_Draw(Component *base) {
 
   // Segment 2: Other System Usage (Orange / Amber / Red)
   if (sysFillW > S(0.5f)) {
-    Color sysCol = (totalRatio > 0.85f) ? ColorRed : ((totalRatio > 0.70f) ? ColorOrange : Theme.AccentOrange);
+    Color sysCol = (totalRatio > 0.85f) ? Theme.AccentRed : ((totalRatio > 0.70f) ? Theme.AccentOrange : Theme.AccentOrange);
     DrawRectangle((int)(barX + S(1.0f) + appFillW), (int)(row2Y + S(2.0f)), (int)sysFillW, (int)(barH - S(2.0f)), sysCol);
   }
 
   char ramStr[32];
   snprintf(ramStr, sizeof(ramStr), "%dMB", (int)t->RAMUsage);
-  UIDrawText(ramStr, faceMicro, valX, row2Y, S(8.0f), ColorWhite);
+  UIDrawText(ramStr, faceMicro, valX, row2Y, S(8.0f), Theme.TextPrimary);
 
   // 3. Center Group
   float btnSpacing = S(6);
@@ -183,33 +183,33 @@ static void TopBar_Draw(Component *base) {
 
   // Draw BROWSE
   DrawRectangle(t->btnBrowseX, btnY, t->btnBrowseW, btnH,
-                t->ActiveScreen == ScreenBrowser ? ColorBlue : ColorDark1);
-  DrawRectangleLines(t->btnBrowseX, btnY, t->btnBrowseW, btnH, ColorShadow);
-  DrawCentredText("BROWSE", faceBold, t->btnBrowseX, t->btnBrowseW, textY, S(10.5f), ColorWhite);
+                t->ActiveScreen == ScreenBrowser ? Theme.AccentBlue : Theme.BgMain);
+  DrawRectangleLines(t->btnBrowseX, btnY, t->btnBrowseW, btnH, Theme.BorderDefault);
+  DrawCentredText("BROWSE", faceBold, t->btnBrowseX, t->btnBrowseW, textY, S(10.5f), Theme.TextPrimary);
 
   // Draw MIXER
   DrawRectangle(t->btnMixerX, btnY, t->btnMixerW, btnH,
-                t->ActiveScreen == ScreenMixer ? ColorBlue : ColorDark1);
-  DrawRectangleLines(t->btnMixerX, btnY, t->btnMixerW, btnH, ColorShadow);
-  DrawCentredText("MIXER", faceBold, t->btnMixerX, t->btnMixerW, textY, S(10.5f), ColorWhite);
+                t->ActiveScreen == ScreenMixer ? Theme.AccentBlue : Theme.BgMain);
+  DrawRectangleLines(t->btnMixerX, btnY, t->btnMixerW, btnH, Theme.BorderDefault);
+  DrawCentredText("MIXER", faceBold, t->btnMixerX, t->btnMixerW, textY, S(10.5f), Theme.TextPrimary);
 
   // Draw PAD
   DrawRectangle(t->btnPadX, btnY, t->btnPadW, btnH,
-                t->ActiveScreen == ScreenPad ? ColorBlue : ColorDark1);
-  DrawRectangleLines(t->btnPadX, btnY, t->btnPadW, btnH, ColorShadow);
-  DrawCentredText("PAD", faceBold, t->btnPadX, t->btnPadW, textY, S(10.5f), ColorWhite);
+                t->ActiveScreen == ScreenPad ? Theme.AccentBlue : Theme.BgMain);
+  DrawRectangleLines(t->btnPadX, btnY, t->btnPadW, btnH, Theme.BorderDefault);
+  DrawCentredText("PAD", faceBold, t->btnPadX, t->btnPadW, textY, S(10.5f), Theme.TextPrimary);
 
   // Draw INFO
   DrawRectangle(t->btnInfoX, btnY, t->btnInfoW, btnH,
-                t->ActiveScreen == ScreenInfo ? ColorBlue : ColorDark1);
-  DrawRectangleLines(t->btnInfoX, btnY, t->btnInfoW, btnH, ColorShadow);
-  DrawCentredText("INFO", faceBold, t->btnInfoX, t->btnInfoW, textY, S(10.5f), ColorWhite);
+                t->ActiveScreen == ScreenInfo ? Theme.AccentBlue : Theme.BgMain);
+  DrawRectangleLines(t->btnInfoX, btnY, t->btnInfoW, btnH, Theme.BorderDefault);
+  DrawCentredText("INFO", faceBold, t->btnInfoX, t->btnInfoW, textY, S(10.5f), Theme.TextPrimary);
 
   // Draw MENU
   DrawRectangle(t->btnSettingsX, btnY, t->btnSettingsW, btnH,
-                t->ActiveScreen == ScreenSettings ? ColorBlue : ColorDark1);
-  DrawRectangleLines(t->btnSettingsX, btnY, t->btnSettingsW, btnH, ColorShadow);
-  DrawCentredText("MENU", faceBold, t->btnSettingsX, t->btnSettingsW, textY, S(10.5f), ColorWhite);
+                t->ActiveScreen == ScreenSettings ? Theme.AccentBlue : Theme.BgMain);
+  DrawRectangleLines(t->btnSettingsX, btnY, t->btnSettingsW, btnH, Theme.BorderDefault);
+  DrawCentredText("MENU", faceBold, t->btnSettingsX, t->btnSettingsW, textY, S(10.5f), Theme.TextPrimary);
 
   // 3. Right Status & Battery
   float batW = S(22);
@@ -221,11 +221,11 @@ static void TopBar_Draw(Component *base) {
   sprintf(batPctStr, "%d%%", (int)(t->BatteryLevel * 100));
   float tw = MeasureTextEx(faceSm, batPctStr, S(9.5f), 1.0f).x;
   float pctX = batX - tw - S(5);
-  UIDrawText(batPctStr, faceSm, pctX, (TOP_BAR_H - S(9.5f)) / 2.0f, S(9.5f), ColorWhite);
+  UIDrawText(batPctStr, faceSm, pctX, (TOP_BAR_H - S(9.5f)) / 2.0f, S(9.5f), Theme.TextPrimary);
 
-  DrawRectangle(batX, batY, batW, batH, ColorDark3);
-  DrawRectangleLines(batX, batY, batW, batH, ColorShadow);
-  DrawRectangle(batX + batW, batY + S(3.0f), S(2.0f), S(5.0f), ColorShadow);
+  DrawRectangle(batX, batY, batW, batH, Theme.BgPanelAlt);
+  DrawRectangleLines(batX, batY, batW, batH, Theme.BorderDefault);
+  DrawRectangle(batX + batW, batY + S(3.0f), S(2.0f), S(5.0f), Theme.BorderDefault);
 
   if (t->BatteryLevel > 0) {
     float gap = 1.5f;
@@ -234,11 +234,11 @@ static void TopBar_Draw(Component *base) {
     float totalSegW = batW - (gap * 2);
     float segW = (totalSegW - ((segments - 1) * segGap)) / segments;
 
-    Color fillColor = ColorDGreen;
+    Color fillColor = Theme.AccentGreen;
     if (t->BatteryLevel < 0.25f)
-      fillColor = ColorRed;
+      fillColor = Theme.AccentRed;
     else if (t->BatteryLevel < 0.5f)
-      fillColor = ColorOrange;
+      fillColor = Theme.AccentOrange;
 
     for (int i = 0; i < segments; i++) {
       if (t->BatteryLevel >= (float)(i + 1) / segments - 0.05f) {

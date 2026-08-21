@@ -29,7 +29,7 @@ static int Player_Update(Component *base) {
 static void Player_Draw(Component *base) {
   PlayerRenderer *p = (PlayerRenderer *)base;
 
-  DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ColorBlack);
+  DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Theme.BgMain);
 
 #if !defined(PLATFORM_IOS)
   // Draw shared background logo behind waveforms (disabled on iOS for VRAM safety)

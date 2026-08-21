@@ -93,6 +93,8 @@ typedef struct {
     bool OSKShiftActive;
     int OSKMode;          // 0 = QWERTY Letters, 1 = Numbers & Symbols
 
+    bool IsRelatedKeyMode;
+
     // Sort functionality
     int SortMode;         // 0 = Default, 1 = BPM, 2 = Key, 3 = Title
     bool SortAscending;   // true = ASC, false = DESC

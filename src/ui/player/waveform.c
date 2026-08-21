@@ -444,7 +444,7 @@ static void Waveform_Draw(Component *base) {
   Color BL_LOW = {16, 105, 238, 255};   // Teensy col_blue
   Color BL_MID = {16, 190, 82, 255};    // Teensy col_green
   Color BL_HIGH = {246, 251, 246, 255}; // Teensy col_white
-  Color colorHigh = BL_HIGH;
+  Color colorHigh = (Theme.BgMain.r > 200) ? Theme.TextPrimary : BL_HIGH;
 
   int wfType = r->State->LoadedTrack->Analysis
                    .WaveformType; // track data format (1, 2, or 3)
@@ -472,9 +472,9 @@ static void Waveform_Draw(Component *base) {
     char val = r->State->LoadedTrack->Analysis.StaticWaveform[i];
 
             float h = (float)val / 255.0f * dsH;
-            Color c = ColorBlue;
+            Color c = Theme.AccentBlue;
             if (r->State->LoadedTrack->Analysis.StaticWaveformType == 2) c =
-    ColorRed; // Placeholder for Color else if
+    Theme.AccentRed; // Placeholder for Color else if
     (r->State->LoadedTrack->Analysis.StaticWaveformType == 3) c = (Color){ 100,
     200, 255, 255 };
 
@@ -484,7 +484,7 @@ static void Waveform_Draw(Component *base) {
         // Current position marker on deckstrip
         float playPos = (float)((double)r->State->PositionMs /
     (double)r->State->TrackLengthMs) * wfW; DrawRectangle(wfLeft + playPos - 1,
-    dsY, 2, dsH, ColorWhite);
+    dsY, 2, dsH, Theme.TextPrimary);
     }
   */
 
@@ -875,9 +875,9 @@ static void Waveform_Draw(Component *base) {
         bool isLastBeat =
             (i == r->State->LoadedTrack->Analysis.BeatGridCount - 1);
 
-        Color capColor = isBar ? Fade(ColorRed, 0.85f) : Fade(colorHigh, 0.55f);
+        Color capColor = isBar ? Fade(Theme.AccentRed, 0.85f) : Fade(colorHigh, 0.55f);
         if (isLastBeat)
-          capColor = ColorRed;
+          capColor = Theme.AccentRed;
 
         DrawRectangleV((Vector2){bx - 1.0f, wfY}, (Vector2){3.0f, S(7)},
                        capColor);
@@ -885,10 +885,10 @@ static void Waveform_Draw(Component *base) {
                        (Vector2){3.0f, S(7)}, capColor);
 
         Color lineColor =
-            isBar ? Fade(ColorRed, 0.20f) : Fade(colorHigh, 0.12f);
+            isBar ? Fade(Theme.AccentRed, 0.20f) : Fade(colorHigh, 0.12f);
         if (isLastBeat) {
           DrawRectangleV((Vector2){bx - 1.0f, wfY + S(7)},
-                         (Vector2){3.0f, waveH - S(14)}, Fade(ColorRed, 0.8f));
+                         (Vector2){3.0f, waveH - S(14)}, Fade(Theme.AccentRed, 0.8f));
         } else {
           DrawRectangleV((Vector2){bx, wfY + S(7)},
                          (Vector2){1.0f, waveH - S(14)}, lineColor);
@@ -907,10 +907,10 @@ static void Waveform_Draw(Component *base) {
       // Orange triangle at the bottom pointing up
       DrawTriangle((Vector2){bx - S(6), wfY + waveH},
                    (Vector2){bx + S(6), wfY + waveH},
-                   (Vector2){bx, wfY + waveH - S(8)}, ColorOrange);
+                   (Vector2){bx, wfY + waveH - S(8)}, Theme.AccentOrange);
       // Vertical white line
       DrawLineEx((Vector2){bx, wfY}, (Vector2){bx, wfY + waveH}, 1.5f,
-                 ColorWhite);
+                 Theme.TextPrimary);
     }
   }
 
@@ -925,10 +925,10 @@ static void Waveform_Draw(Component *base) {
       if (bx >= wfLeft - S(2) && bx <= wfRight + S(2)) {
         // Vertical orange line
         DrawLineEx((Vector2){bx, wfY}, (Vector2){bx, wfY + waveH}, 1.0f,
-                   ColorOrange);
+                   Theme.AccentOrange);
         // Small marker at bottom
         DrawRectangleV((Vector2){bx - 1.0f, wfY + waveH - S(5)},
-                       (Vector2){3.0f, S(5)}, ColorOrange);
+                       (Vector2){3.0f, S(5)}, Theme.AccentOrange);
       }
     }
   }
@@ -1045,13 +1045,13 @@ static void Waveform_Draw(Component *base) {
 
         if (bxLive >= wfLeft && bxLive <= wfRight) {
           DrawLineEx((Vector2){bxLive, wfY}, (Vector2){bxLive, wfY + waveH},
-                     2.5f, ColorRed);
+                     2.5f, Theme.AccentRed);
           DrawTriangle((Vector2){bxLive - S(4), wfY},
                        (Vector2){bxLive + S(4), wfY},
-                       (Vector2){bxLive, wfY + S(6)}, ColorRed);
+                       (Vector2){bxLive, wfY + S(6)}, Theme.AccentRed);
           DrawTriangle((Vector2){bxLive - S(4), wfY + waveH},
                        (Vector2){bxLive + S(4), wfY + waveH},
-                       (Vector2){bxLive, wfY + waveH - S(6)}, ColorRed);
+                       (Vector2){bxLive, wfY + waveH - S(6)}, Theme.AccentRed);
         }
       }
     }
@@ -1070,11 +1070,11 @@ static void Waveform_Draw(Component *base) {
       if (bxSlip >= wfLeft && bxSlip <= wfRight) {
         // Draw a dimmed/ghost playhead line
         DrawLineEx((Vector2){bxSlip, wfY}, (Vector2){bxSlip, wfY + waveH}, 1.0f,
-                   Fade(ColorWhite, 0.4f));
+                   Fade(Theme.TextPrimary, 0.4f));
         // Tiny arrow at top
         DrawTriangle((Vector2){bxSlip - S(3), wfY},
                      (Vector2){bxSlip + S(3), wfY},
-                     (Vector2){bxSlip, wfY + S(5)}, Fade(ColorWhite, 0.6f));
+                     (Vector2){bxSlip, wfY + S(5)}, Fade(Theme.TextPrimary, 0.6f));
       }
     }
   }
@@ -1093,7 +1093,7 @@ static void Waveform_Draw(Component *base) {
 
   if (r->ID == 0) {
     DrawLineEx((Vector2){wfLeft, wfY + waveH - 1},
-               (Vector2){wfLeft + wfW, wfY + waveH - 1}, 1.0f, ColorDark1);
+               (Vector2){wfLeft + wfW, wfY + waveH - 1}, 1.0f, Theme.BgMain);
   }
 
   EndScissorMode();
@@ -1128,11 +1128,11 @@ static void Waveform_Draw(Component *base) {
       float bx = pmX + i * (blockW + blockSpacing);
 
       // Draw empty box outline
-      DrawRectangleLines(bx, pmY, blockW, pmH, ColorShadow);
+      DrawRectangleLines(bx, pmY, blockW, pmH, Theme.BorderDefault);
 
       // Fill the box if it's the current beat
       if (i == myDisplayBeat) {
-        Color c = r->State->IsMaster ? ColorOrange : ColorWhite;
+        Color c = r->State->IsMaster ? Theme.AccentOrange : Theme.TextPrimary;
         DrawRectangle(bx, pmY, blockW, pmH, c);
       }
     }
@@ -1161,12 +1161,12 @@ static void Waveform_Draw(Component *base) {
       for (int i = 0; i < 4; i++) {
         float bx = pmX + i * (blockW + blockSpacing);
 
-        DrawRectangleLines(bx, otherY, blockW, otherH, ColorShadow);
+        DrawRectangleLines(bx, otherY, blockW, otherH, Theme.BorderDefault);
 
         if (i == otherDisplayBeat) {
           // Dim the other deck's color slightly unless it's the master
           Color c =
-              r->OtherDeck->IsMaster ? ColorOrange : Fade(ColorWhite, 0.6f);
+              r->OtherDeck->IsMaster ? Theme.AccentOrange : Fade(Theme.TextPrimary, 0.6f);
           DrawRectangle(bx, otherY, blockW, otherH, c);
         }
       }
@@ -1177,12 +1177,12 @@ static void Waveform_Draw(Component *base) {
   if (r->State->IsLoading) {
     float pulse = (sinf(GetTime() * 10.0f) * 0.5f + 0.5f); // 0.0 to 1.0
     DrawRectangle(wfLeft, wfY, wfRight - wfLeft, waveH,
-                  Fade(ColorOrange, 0.1f + pulse * 0.2f));
+                  Fade(Theme.AccentOrange, 0.1f + pulse * 0.2f));
 
     Font faceBPM = UIFonts_GetFace(S(20));
     DrawCentredText("LOADING TRACK...", faceBPM, wfLeft, wfW,
                     wfY + waveCenter - S(10), S(20),
-                    Fade(ColorWhite, 0.6f + pulse * 0.4f));
+                    Fade(Theme.TextPrimary, 0.6f + pulse * 0.4f));
   }
 }
 

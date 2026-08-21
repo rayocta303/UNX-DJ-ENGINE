@@ -97,7 +97,7 @@ static void Credits_Draw(Component *base) {
   float startY = TOP_BAR_H;
 
   // Dark background for the whole view area
-  DrawRectangle(0, startY, SCREEN_WIDTH, viewH, ColorBGUtil);
+  DrawRectangle(0, startY, SCREEN_WIDTH, viewH, Theme.BgMain);
 
   float cardW = S(420);
   float cardH = viewH - S(20);
@@ -105,23 +105,23 @@ static void Credits_Draw(Component *base) {
   float cardY = startY + S(10);
 
   // Card BG (Matching About layout style)
-  DrawRectangle(cardX, cardY, cardW, cardH, ColorDark1);
+  DrawRectangle(cardX, cardY, cardW, cardH, Theme.BgMain);
   DrawRectangleLinesEx((Rectangle){cardX, cardY, cardW, cardH}, 1.0f,
-                       ColorGray);
+                       Theme.TextSecondary);
 
   // Sidebar (Branding area)
   float sideW = S(100);
   DrawRectangle(cardX + 1, cardY + 1, sideW, cardH - 2,
                 Theme.BgMain);
   DrawLine(cardX + sideW, cardY + 1, cardX + sideW, cardY + cardH - 1,
-           ColorDark2);
+           Theme.BgPanel);
 
   UIDrawText("\uf091", UIFonts_GetIcon(S(36)), cardX + sideW / 2 - S(18),
-             cardY + S(30), S(36), ColorShadow);
+             cardY + S(30), S(36), Theme.BorderDefault);
   DrawCentredText("SUPPORTERS", UIFonts_GetFace(S(8)), cardX, sideW,
-                  cardY + S(75), S(8), ColorGray);
+                  cardY + S(75), S(8), Theme.TextSecondary);
   DrawCentredText("HALL OF FAME", UIFonts_GetFace(S(7)), cardX, sideW,
-                  cardY + S(85), S(7), ColorShadow);
+                  cardY + S(85), S(7), Theme.BorderDefault);
 
   // Right Side: Scrollable List
   float contentX = cardX + sideW + S(15);
@@ -138,17 +138,17 @@ static void Credits_Draw(Component *base) {
   float rowH = S(16);
 
   // --- SECTION: GITHUB CONTRIBUTORS ---
-  UIDrawText("GITHUB CONTRIBUTORS", faceXS, contentX, ly, S(8), ColorOrange);
+  UIDrawText("GITHUB CONTRIBUTORS", faceXS, contentX, ly, S(8), Theme.AccentOrange);
   ly += S(14);
   UIDrawText("@rayocta303 - Hanif Bagus Saputra", faceSm, contentX + S(10), ly,
-             S(10), ColorWhite);
+             S(10), Theme.TextPrimary);
   ly += rowH;
   UIDrawText("@miifanboy - Eren Erver", faceSm, contentX + S(10), ly, S(10),
-             ColorWhite);
+             Theme.TextPrimary);
   ly += rowH + S(15);
 
   // --- SECTION: INSPIRATION & SUPPORT ---
-  UIDrawText("INSPIRATION & SUPPORT", faceXS, contentX, ly, S(8), ColorOrange);
+  UIDrawText("INSPIRATION & SUPPORT", faceXS, contentX, ly, S(8), Theme.AccentOrange);
   ly += S(14);
   const char *supporters[] = {
       "@takeoutbox.dj",          "@alyxxcould",
@@ -158,13 +158,13 @@ static void Credits_Draw(Component *base) {
       "@dj_equipment_development"};
   int supCount = 9;
   for (int i = 0; i < supCount; i++) {
-    UIDrawText(supporters[i], faceSm, contentX + S(10), ly, S(10), ColorWhite);
+    UIDrawText(supporters[i], faceSm, contentX + S(10), ly, S(10), Theme.TextPrimary);
     ly += rowH;
   }
   ly += S(15);
 
   // --- SECTION: SPECIAL THANKS ---
-  UIDrawText("SPECIAL THANKS", faceXS, contentX, ly, S(8), ColorBlue);
+  UIDrawText("SPECIAL THANKS", faceXS, contentX, ly, S(8), Theme.AccentBlue);
   ly += S(14);
   const char *thanks[] = {
       "Deep Symmetry", "Mixxx Community",
@@ -173,7 +173,7 @@ static void Credits_Draw(Component *base) {
       "All beta testers"};
   int thanksCount = 7;
   for (int i = 0; i < thanksCount; i++) {
-    UIDrawText(thanks[i], faceSm, contentX + S(10), ly, S(10), ColorWhite);
+    UIDrawText(thanks[i], faceSm, contentX + S(10), ly, S(10), Theme.TextPrimary);
     ly += rowH;
   }
 
@@ -191,7 +191,7 @@ static void Credits_Draw(Component *base) {
     float sbH = (contentH / (maxScroll + contentH)) * contentH;
     float sbY =
         contentY + (r->State->ScrollPhysics.VisualScroll / maxScroll) * (contentH - sbH);
-    DrawRectangleRounded((Rectangle){sbX, sbY, sbW, sbH}, 1.0f, 4, ColorOrange);
+    DrawRectangleRounded((Rectangle){sbX, sbY, sbW, sbH}, 1.0f, 4, Theme.AccentOrange);
   }
 
   // Draw Touch-Friendly CLOSE Button
@@ -200,9 +200,9 @@ static void Credits_Draw(Component *base) {
   float btnX = cardX + (cardW - btnW) / 2.0f;
   float btnY = cardY + cardH - btnH - S(10);
   
-  DrawRectangleRounded((Rectangle){btnX, btnY, btnW, btnH}, 0.2f, 4, ColorDark2);
-  DrawRectangleRoundedLines((Rectangle){btnX, btnY, btnW, btnH}, 0.2f, 4, 1.5f, ColorGray);
-  DrawCentredText("CLOSE", faceSm, btnX, btnW, btnY + (btnH - S(10)) / 2.0f, S(10), ColorWhite);
+  DrawRectangleRounded((Rectangle){btnX, btnY, btnW, btnH}, 0.2f, 4, Theme.BgPanel);
+  DrawRectangleRoundedLines((Rectangle){btnX, btnY, btnW, btnH}, 0.2f, 4, 1.5f, Theme.TextSecondary);
+  DrawCentredText("CLOSE", faceSm, btnX, btnW, btnY + (btnH - S(10)) / 2.0f, S(10), Theme.TextPrimary);
 }
 
 void CreditsRenderer_Init(CreditsRenderer *r, CreditsState *state) {

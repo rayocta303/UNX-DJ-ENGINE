@@ -94,11 +94,11 @@ static void BottomStrip_Draw(Component *base) {
     float barH = FX_BAR_H;
 
     DrawRectangle(0, barY, SCREEN_WIDTH, barH, Theme.BgMain);
-    DrawLine(0, barY, SCREEN_WIDTH, barY, ColorDark1);
-    DrawLine(0, barY + barH, SCREEN_WIDTH, barY + barH, ColorDark1);
+    DrawLine(0, barY, SCREEN_WIDTH, barY, Theme.BgMain);
+    DrawLine(0, barY + barH, SCREEN_WIDTH, barY + barH, Theme.BgMain);
 
     float halfW = SCREEN_WIDTH / 2.0f;
-    DrawLine(halfW, barY + S(1), halfW, barY + barH - S(1), ColorDark1);
+    DrawLine(halfW, barY + S(1), halfW, barY + barH - S(1), Theme.BgMain);
 
     Font faceXXS = UIFonts_GetFace(S(7));
     Font faceSm = UIFonts_GetFace(S(9));
@@ -112,7 +112,7 @@ static void BottomStrip_Draw(Component *base) {
             DeckState *ds = decks[d];
             float dx = d * deckW;
             
-            DrawCentredText(d == 0 ? "DECK 1 HOT CUE" : "DECK 2 HOT CUE", faceXXS, dx, deckW, barY + S(2.5f), S(7), ColorShadow);
+            DrawCentredText(d == 0 ? "DECK 1 HOT CUE" : "DECK 2 HOT CUE", faceXXS, dx, deckW, barY + S(2.5f), S(7), Theme.BorderDefault);
             
             float gridY = barY + S(11);
             float cellW = (deckW - S(8)) / 4.0f;
@@ -128,7 +128,7 @@ static void BottomStrip_Draw(Component *base) {
                 
                 bool hasCue = false;
                 char timeStr[16] = "";
-                Color cueColor = ColorDark1;
+                Color cueColor = Theme.BgMain;
                 
                 if (ds && ds->LoadedTrack) {
                     static const Color hcPalette[8] = {
@@ -167,7 +167,7 @@ static void BottomStrip_Draw(Component *base) {
                             
                             // Active Loop or Approaching blinking
                             if ((hc.Status == 4 || isApproaching) && (int)(GetTime() * 4) % 2 == 0) {
-                                cueColor = ColorWhite;
+                                cueColor = Theme.TextPrimary;
                             }
                             break;
                         }
@@ -175,21 +175,21 @@ static void BottomStrip_Draw(Component *base) {
                 }
                 
                 DrawRectangleRec(cellRect, hasCue ? Fade(cueColor, 0.35f) : Theme.BgMain);
-                DrawRectangleLinesEx(cellRect, 1, hasCue ? cueColor : ColorGray);
+                DrawRectangleLinesEx(cellRect, 1, hasCue ? cueColor : Theme.TextSecondary);
                 
                 char idStr[4];
                 sprintf(idStr, "%c", 'A' + i);
-                UIDrawText(idStr, faceXXS, cx + S(3), cy + S(3), S(7), hasCue ? ColorWhite : ColorShadow);
+                UIDrawText(idStr, faceXXS, cx + S(3), cy + S(3), S(7), hasCue ? Theme.TextPrimary : Theme.BorderDefault);
                 
                 if (hasCue) {
-                    UIDrawText(timeStr, faceXXS, cx + S(12), cy + S(3.5f), S(7), ColorWhite);
+                    UIDrawText(timeStr, faceXXS, cx + S(12), cy + S(3.5f), S(7), Theme.TextPrimary);
                 }
             }
         }
     } else {
         // --- BEAT FX MODE ---
-        DrawCentredText("BEAT FX SELECT", faceXXS, 0, halfW, barY + S(2.5f), S(7), ColorShadow);
-        DrawCentredText("X-PAD", faceXXS, halfW, halfW, barY + S(2.5f), S(7), ColorShadow);
+        DrawCentredText("BEAT FX SELECT", faceXXS, 0, halfW, barY + S(2.5f), S(7), Theme.BorderDefault);
+        DrawCentredText("X-PAD", faceXXS, halfW, halfW, barY + S(2.5f), S(7), Theme.BorderDefault);
 
         float btnY = barY + S(13);
         float btnH = S(23);
@@ -205,9 +205,9 @@ static void BottomStrip_Draw(Component *base) {
         int focus = b->State->FocusedSlot;
         for (int i = 0; i < FXNamesCount; i++) {
             bool active = (FXEnumMap[i] == b->State->Slots[focus].FXType);
-            Color bg = active ? Theme.HoverActive : Theme.BgPanel;
-            Color border = active ? ColorPaper : ColorDark1;
-            Color txtClr = active ? ColorWhite : ColorPaper;
+            Color bg = active ? Theme.BgPanelAlt : Theme.BgPanel;
+            Color border = active ? Theme.TextPrimary : Theme.BorderDefault;
+            Color txtClr = active ? Theme.TextPrimary : Theme.TextSecondary;
             
             DrawRectangle(cx, btnY, fxBtnW, btnH, bg);
             DrawRectangleLines(cx, btnY, fxBtnW, btnH, border);
@@ -217,10 +217,10 @@ static void BottomStrip_Draw(Component *base) {
 
         // Trash/Clear
         bool isFxBlinking = (fmod(GetTime(), 0.5) < 0.25);
-        Color onBgColor = isFxBlinking ? Theme.AccentBlue : Theme.HoverActive;
+        Color onBgColor = isFxBlinking ? Theme.AccentBlue : Theme.BgPanelAlt;
         DrawRectangle(cx, btnY, trashW - S(2), btnH, b->State->Slots[focus].IsOn ? onBgColor : Theme.BgPanel);
-        DrawRectangleLines(cx, btnY, trashW - S(2), btnH, b->State->Slots[focus].IsOn ? ColorWhite : ColorDark1);
-        DrawCentredText(b->State->Slots[focus].IsOn ? "ON" : "OFF", faceXXS, cx, trashW - S(2), btnY + S(6.5f), S(7), ColorWhite);
+        DrawRectangleLines(cx, btnY, trashW - S(2), btnH, b->State->Slots[focus].IsOn ? Theme.TextPrimary : Theme.BorderDefault);
+        DrawCentredText(b->State->Slots[focus].IsOn ? "ON" : "OFF", faceXXS, cx, trashW - S(2), btnY + S(6.5f), S(7), b->State->Slots[focus].IsOn ? Theme.TextPrimary : Theme.TextSecondary);
 
         // X-PAD
         cx = halfW + S(2);
@@ -230,9 +230,9 @@ static void BottomStrip_Draw(Component *base) {
 
         if (isScrubMode) {
             DrawRectangle(cx, btnY, padAreaW, btnH, Theme.BgPanelAlt);
-            DrawRectangleLines(cx, btnY, padAreaW, btnH, ColorDark1);
+            DrawRectangleLines(cx, btnY, padAreaW, btnH, Theme.BgMain);
             float midX = cx + padAreaW / 2.0f;
-            DrawLine(midX, btnY, midX, btnY + btnH, ColorDark3);
+            DrawLine(midX, btnY, midX, btnY + btnH, Theme.BgPanelAlt);
             if (b->State->IsXPadScrubbing) {
                 float valX = midX + (b->State->XPadScrubValue * (padAreaW / 2.0f));
                 if (b->State->XPadScrubValue < 0.0f) DrawRectangle(valX, btnY + 1, midX - valX, btnH - 2, Theme.SelectedItem);
@@ -244,9 +244,9 @@ static void BottomStrip_Draw(Component *base) {
             float padBtnW = padAreaW / XPadLabelsCount;
             for (int i = 0; i < XPadLabelsCount; i++) {
                 bool active = (i == b->State->SelectedPad);
-                DrawRectangle(cx, btnY, padBtnW - 1, btnH, active ? Theme.HoverActive : Theme.BgPanel);
-                DrawRectangleLines(cx, btnY, padBtnW - 1, btnH, active ? ColorWhite : ColorDark1);
-                DrawCentredText(XPadLabels[i], faceSm, cx, padBtnW - 1, btnY + S(6.5f), S(8), active ? ColorWhite : ColorPaper);
+                DrawRectangle(cx, btnY, padBtnW - 1, btnH, active ? Theme.BgPanelAlt : Theme.BgPanel);
+                DrawRectangleLines(cx, btnY, padBtnW - 1, btnH, active ? Theme.TextPrimary : Theme.BorderDefault);
+                DrawCentredText(XPadLabels[i], faceSm, cx, padBtnW - 1, btnY + S(6.5f), S(8), active ? Theme.TextPrimary : Theme.TextSecondary);
                 cx += padBtnW;
             }
         }

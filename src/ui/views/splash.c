@@ -15,7 +15,7 @@ static int Splash_Update(Component *base) {
 
 static void Splash_Draw(Component *base) {
   SplashRenderer *s = (SplashRenderer *)base;
-  DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ColorBlack);
+  DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Theme.BgMain);
 
   Texture2D *tex = &s->Logo;
 
@@ -37,7 +37,7 @@ static void Splash_Draw(Component *base) {
   char devInfo[128];
   sprintf(devInfo, "Developed by %s", APP_INSTAGRAM);
   DrawCentredText(devInfo, face, 0, SCREEN_WIDTH, SCREEN_HEIGHT - S(60), S(14),
-                  ColorWhite);
+                  Theme.TextPrimary);
 
   // Loading Progress Bar
   if (s->StartTime > 0) {
@@ -47,7 +47,7 @@ static void Splash_Draw(Component *base) {
     float barY = SCREEN_HEIGHT - S(100.0f);
 
     DrawRectangleRounded((Rectangle){barX, barY, barW, barH}, 1.0f, 4,
-                         ColorDark2);
+                         Theme.BgPanel);
 
     float progress = (float)(GetTime() - s->StartTime) / 1.5f; // Target 1.5s
     if (progress < 0)
@@ -59,7 +59,7 @@ static void Splash_Draw(Component *base) {
                          4, ColorBlue);
 
     float pulse = (float)GetTime() * 4.0f;
-    Color textClr = ColorWhite;
+    Color textClr = Theme.TextPrimary;
     textClr.a = (unsigned char)(150 + 105 * sinf(pulse));
 
     UIDrawText("LOADING " APP_NAME "...", UIFonts_GetFace(S(7.5f)), barX,

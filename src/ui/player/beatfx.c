@@ -294,8 +294,8 @@ static void BeatFX_Draw(Component *base) {
     float w = BEAT_FX_W;
     float h = WAVE_AREA_H;
 
-    DrawRectangle(x, y, w, h, ColorDark2);
-    DrawLine(x, y, x, y + h, ColorDark1);
+    DrawRectangle(x, y, w, h, Theme.BgPanel);
+    DrawLine(x, y, x, y + h, Theme.BorderDefault);
 
     Font faceXXS = UIFonts_GetFace(S(7));
     Font faceXS = UIFonts_GetFace(S(8));
@@ -304,7 +304,7 @@ static void BeatFX_Draw(Component *base) {
     Font faceLg = UIFonts_GetFace(S(12));
 
     float cy = y + S(4);
-    DrawCentredText("BEAT FX", faceXS, x, w, cy, S(8), ColorWhite);
+    DrawCentredText("BEAT FX", faceXS, x, w, cy, S(8), Theme.TextPrimary);
     cy += S(13);
 
     // 1. Focused Effect
@@ -313,44 +313,44 @@ static void BeatFX_Draw(Component *base) {
     int focusIdx = b->State->FocusedSlot;
     bool isOn = b->State->Slots[focusIdx].IsOn;
     
-    Color bgCol = isOn ? Theme.SelectedItem : ColorBlack;
-    Color borderCol = isOn ? ColorBlue : ColorDark2;
+    Color bgCol = isOn ? Theme.SelectedItem : Theme.BgMain;
+    Color borderCol = isOn ? Theme.AccentBlue : Theme.BgPanel;
     
     DrawRectangleRec(slotRect, bgCol);
     DrawRectangleLinesEx(slotRect, 1.0f, borderCol);
     
     const char* fxName = AllFXNames[b->State->Slots[focusIdx].FXType % ALL_FX_COUNT];
-    Color textCol = isOn ? ColorWhite : ColorWhite;
+    Color textCol = isOn ? Theme.TextPrimary : Theme.TextPrimary;
     DrawCentredText(fxName, faceMd, slotRect.x, slotRect.width, slotRect.y + S(7), S(10), textCol);
     
     // Number indicator
     char numStr[4];
     sprintf(numStr, "%d", focusIdx + 1);
-    DrawCentredText(numStr, faceSm, slotRect.x, S(16), slotRect.y + S(8), S(9), ColorOrange);
+    DrawCentredText(numStr, faceSm, slotRect.x, S(16), slotRect.y + S(8), S(9), Theme.AccentOrange);
     
     cy += slotH + S(12); // Reduced gap between FX slot and CH SELECT
 
 
     // 2. CH SELECT
-    DrawCentredText("CH SELECT", faceXXS, x, w, cy, S(7), ColorShadow);
+    DrawCentredText("CH SELECT", faceXXS, x, w, cy, S(7), Theme.BorderDefault);
     cy += S(10);
     
     const char* chName = "MASTER";
     if (b->State->SelectedChannel == 1) chName = "DECK 1";
     if (b->State->SelectedChannel == 2) chName = "DECK 2";
     
-    DrawRectangle(x + S(4), cy, w - S(8), S(22), ColorDark3);
-    DrawRectangleLines(x + S(4), cy, w - S(8), S(22), ColorDark1);
-    DrawCentredText(chName, faceSm, x + S(4), w - S(8), cy + S(6.5f), S(9), ColorWhite);
-    DrawTriangle((Vector2){x + w - S(12), cy + S(9)}, (Vector2){x + w - S(6), cy + S(9)}, (Vector2){x + w - S(9), cy + S(15)}, ColorWhite);
+    DrawRectangle(x + S(4), cy, w - S(8), S(22), Theme.BgPanelAlt);
+    DrawRectangleLines(x + S(4), cy, w - S(8), S(22), Theme.BorderDefault);
+    DrawCentredText(chName, faceSm, x + S(4), w - S(8), cy + S(6.5f), S(9), Theme.TextPrimary);
+    DrawTriangle((Vector2){x + w - S(12), cy + S(9)}, (Vector2){x + w - S(6), cy + S(9)}, (Vector2){x + w - S(9), cy + S(15)}, Theme.TextPrimary);
     
     cy += S(28); // CH button(22) + gap(6)
 
 
     // 3. Black parameter container
     float containerH = S(56);
-    DrawRectangle(x + S(4), cy, w - S(8), containerH, ColorBlack);
-    DrawRectangleLines(x + S(4), cy, w - S(8), containerH, ColorDark1);
+    DrawRectangle(x + S(4), cy, w - S(8), containerH, Theme.BgMain);
+    DrawRectangleLines(x + S(4), cy, w - S(8), containerH, Theme.BorderDefault);
 
     float rowH = containerH / 4.0f;
     for (int i = 1; i < 4; i++) {
@@ -399,15 +399,15 @@ static void BeatFX_Draw(Component *base) {
     // Draw Calculated BPM
     char bpmStr[16] = "--.-";
     if (masterBpm > 0.0f) sprintf(bpmStr, "%.1f", fxBpm);
-    UIDrawText(bpmStr, faceMd, x + S(8), cy + S(2), S(10), ColorWhite);
-    UIDrawText("BPM", faceXXS, x + w - S(26), cy + S(4), S(7), ColorShadow);
+    UIDrawText(bpmStr, faceMd, x + S(8), cy + S(2), S(10), Theme.TextPrimary);
+    UIDrawText("BPM", faceXXS, x + w - S(26), cy + S(4), S(7), Theme.BorderDefault);
     cy += rowH;
 
     // msec display
     char msStr[16] = "---";
     if (masterBpm > 0.0f) sprintf(msStr, "%.0f", fxMs);
-    UIDrawText(msStr, faceSm, x + S(8), cy + S(2), S(9), ColorWhite);
-    UIDrawText("msec", faceXXS, x + w - S(26), cy + S(3), S(7), ColorShadow);
+    UIDrawText(msStr, faceSm, x + S(8), cy + S(2), S(9), Theme.TextPrimary);
+    UIDrawText("msec", faceXXS, x + w - S(26), cy + S(3), S(7), Theme.BorderDefault);
     cy += rowH;
 
     // BEAT display
@@ -416,27 +416,27 @@ static void BeatFX_Draw(Component *base) {
         float scrubVal = b->State->XPadScrubValue;
         if (selFX == 3) { // REVERB
             if (scrubVal < -0.05f) {
-                UIDrawText("LPF", faceSm, x + S(8), cy + S(2), S(9), ColorOrange);
+                UIDrawText("LPF", faceSm, x + S(8), cy + S(2), S(9), Theme.AccentOrange);
             } else if (scrubVal > 0.05f) {
-                UIDrawText("HPF", faceSm, x + S(8), cy + S(2), S(9), ColorOrange);
+                UIDrawText("HPF", faceSm, x + S(8), cy + S(2), S(9), Theme.AccentOrange);
             } else {
-                UIDrawText("OFF", faceSm, x + S(8), cy + S(2), S(9), ColorWhite);
+                UIDrawText("OFF", faceSm, x + S(8), cy + S(2), S(9), Theme.TextPrimary);
             }
-            UIDrawText("FILTER", faceXXS, x + w - S(32), cy + S(3), S(7), ColorWhite);
+            UIDrawText("FILTER", faceXXS, x + w - S(32), cy + S(3), S(7), Theme.TextPrimary);
         } else { // FLANGER
             char ptStr[16];
             sprintf(ptStr, "%+.0f%%", scrubVal * 100.0f); 
-            UIDrawText(ptStr, faceSm, x + S(8), cy + S(2), S(9), ColorOrange);
-            UIDrawText("PITCH", faceXXS, x + w - S(30), cy + S(3), S(7), ColorWhite);
+            UIDrawText(ptStr, faceSm, x + S(8), cy + S(2), S(9), Theme.AccentOrange);
+            UIDrawText("PITCH", faceXXS, x + w - S(30), cy + S(3), S(7), Theme.TextPrimary);
         }
     } else {
-        UIDrawText(XPadLabels[padIdx], faceSm, x + S(8), cy + S(2), S(9), ColorWhite);
-        UIDrawText("BEAT", faceXXS, x + w - S(26), cy + S(3), S(7), ColorShadow);
+        UIDrawText(XPadLabels[padIdx], faceSm, x + S(8), cy + S(2), S(9), Theme.TextPrimary);
+        UIDrawText("BEAT", faceXXS, x + w - S(26), cy + S(3), S(7), Theme.BorderDefault);
     }
     cy += rowH;
 
     // QUANTIZE
-    DrawCentredText("QUANTIZE", faceXXS, x + S(4), w - S(8), cy + S(3), S(7), b->State->Quantize ? ColorRed : ColorShadow);
+    DrawCentredText("QUANTIZE", faceXXS, x + S(4), w - S(8), cy + S(3), S(7), b->State->Quantize ? Theme.AccentRed : Theme.BorderDefault);
     cy += rowH + S(12);
 
     // 3.5 FX ON / OFF Toggle
@@ -447,28 +447,28 @@ static void BeatFX_Draw(Component *base) {
 
     bool isFxBlinking = (fmod(GetTime(), 0.5) < 0.25);
     bool isFocusedOn = b->State->Slots[b->State->FocusedSlot].IsOn;
-    Color btnColor = isFocusedOn ? (isFxBlinking ? Theme.AccentBlue : Theme.HoverActive) : ColorDark2;
+    Color btnColor = isFocusedOn ? (isFxBlinking ? Theme.AccentBlue : Theme.HoverActive) : Theme.BgPanel;
     DrawRectangleRec(b->FXButton, btnColor);
-    DrawRectangleLinesEx(b->FXButton, 1.0f, ColorWhite);
+    DrawRectangleLinesEx(b->FXButton, 1.0f, Theme.TextPrimary);
     
     const char* fxBtnText = isFocusedOn ? "BEAT FX ON" : "BEAT FX OFF";
-    DrawCentredText(fxBtnText, faceSm, b->FXButton.x, b->FXButton.width, b->FXButton.y + S(5.0f), S(9), ColorWhite);
+    DrawCentredText(fxBtnText, faceSm, b->FXButton.x, b->FXButton.width, b->FXButton.y + S(5.0f), S(9), Theme.TextPrimary);
     
     cy += btnH + S(12);
 
     // 4b. +/- BUTTONS (Restored without ZOOM/GRID label)
     float halfB = (w - S(12)) / 2;
     Rectangle minusRect = { x + S(4), cy, halfB, S(20) };
-    Color minusColor = (Input_IsDown() && CheckCollisionPointRec(Input_GetPointerPos(), minusRect)) ? ColorGray : ColorDark2;
+    Color minusColor = (Input_IsDown() && CheckCollisionPointRec(Input_GetPointerPos(), minusRect)) ? Theme.TextSecondary : Theme.BgPanel;
     DrawRectangleRec(minusRect, minusColor);
-    DrawRectangleLinesEx(minusRect, 1.0f, ColorShadow);
-    DrawCentredText("-", faceSm, x + S(4), halfB, cy + S(5.5f), S(9), ColorWhite);
+    DrawRectangleLinesEx(minusRect, 1.0f, Theme.BorderDefault);
+    DrawCentredText("-", faceSm, x + S(4), halfB, cy + S(5.5f), S(9), Theme.TextPrimary);
 
     Rectangle plusRect = { x + S(8) + halfB, cy, halfB, S(20) };
-    Color plusColor = (Input_IsDown() && CheckCollisionPointRec(Input_GetPointerPos(), plusRect)) ? ColorGray : ColorDark2;
+    Color plusColor = (Input_IsDown() && CheckCollisionPointRec(Input_GetPointerPos(), plusRect)) ? Theme.TextSecondary : Theme.BgPanel;
     DrawRectangleRec(plusRect, plusColor);
-    DrawRectangleLinesEx(plusRect, 1.0f, ColorShadow);
-    DrawCentredText("+", faceSm, x + S(8) + halfB, halfB, cy + S(5.5f), S(9), ColorWhite);
+    DrawRectangleLinesEx(plusRect, 1.0f, Theme.BorderDefault);
+    DrawCentredText("+", faceSm, x + S(8) + halfB, halfB, cy + S(5.5f), S(9), Theme.TextPrimary);
 
     cy = y + h - S(18); // Bottom alignment
 
@@ -478,14 +478,14 @@ static void BeatFX_Draw(Component *base) {
     // STATUS Tab
     bool statusActive = !b->State->ShowBeatFXTab;
     DrawRectangle(x + S(4), cy, tabW, S(14), statusActive ? Theme.BgPanelAlt : Theme.BgMain);
-    DrawRectangleLines(x + S(4), cy, tabW, S(14), ColorShadow);
-    DrawCentredText("STATUS", faceXXS, x + S(4), tabW, cy + S(3.5f), S(7), statusActive ? ColorWhite : ColorShadow);
+    DrawRectangleLines(x + S(4), cy, tabW, S(14), Theme.BorderDefault);
+    DrawCentredText("STATUS", faceXXS, x + S(4), tabW, cy + S(3.5f), S(7), statusActive ? Theme.TextPrimary : Theme.BorderDefault);
 
     // BEAT FX Tab
     bool beatFxActive = b->State->ShowBeatFXTab;
     DrawRectangle(x + S(6) + tabW, cy, tabW, S(14), beatFxActive ? Theme.BgPanelAlt : Theme.BgMain);
-    DrawRectangleLines(x + S(6) + tabW, cy, tabW, S(14), ColorShadow);
-    DrawCentredText("BEAT FX", faceXXS, x + S(6) + tabW, tabW, cy + S(3.5f), S(7), beatFxActive ? ColorWhite : ColorShadow);
+    DrawRectangleLines(x + S(6) + tabW, cy, tabW, S(14), Theme.BorderDefault);
+    DrawCentredText("BEAT FX", faceXXS, x + S(6) + tabW, tabW, cy + S(3.5f), S(7), beatFxActive ? Theme.TextPrimary : Theme.BorderDefault);
 
 }
 
@@ -521,12 +521,12 @@ void BeatFXPanel_DrawOverlays(BeatFXPanel *b) {
                 float by = modalY + S(45) + row * (btnH + pad);
                 Rectangle optRect = { bx, by, btnW, btnH };
                 
-                Color bg = (b->State->Slots[b->State->ActiveSlotDropdown].FXType == i) ? ColorBlue : ColorDark2;
-                if (CheckCollisionPointRec(mouse, optRect)) bg = ColorGray;
+                Color bg = (b->State->Slots[b->State->ActiveSlotDropdown].FXType == i) ? Theme.AccentBlue : Theme.BgPanel;
+                if (CheckCollisionPointRec(mouse, optRect)) bg = Theme.TextSecondary;
                 
                 DrawRectangleRec(optRect, bg);
-                DrawRectangleLinesEx(optRect, 1.0f, (b->State->Slots[b->State->ActiveSlotDropdown].FXType == i) ? ColorWhite : ColorDark3);
-                DrawCentredText(AllFXNames[i], faceSm, optRect.x, optRect.width, optRect.y + (btnH - S(10)) / 2.0f, S(10), ColorWhite);
+                DrawRectangleLinesEx(optRect, 1.0f, (b->State->Slots[b->State->ActiveSlotDropdown].FXType == i) ? Theme.TextPrimary : Theme.BgPanelAlt);
+                DrawCentredText(AllFXNames[i], faceSm, optRect.x, optRect.width, optRect.y + (btnH - S(10)) / 2.0f, S(10), Theme.TextPrimary);
             }
         } else {
             float cols = 2; // FX1, FX2
@@ -545,21 +545,21 @@ void BeatFXPanel_DrawOverlays(BeatFXPanel *b) {
                 bool isFocused = (b->State->FocusedSlot == i);
                 bool isOn = b->State->Slots[i].IsOn;
                 
-                Color bgCol = isOn ? Theme.SelectedItem : ColorDark2;
-                Color borderCol = isFocused ? ColorWhite : (isOn ? ColorBlue : ColorDark3);
-                if (CheckCollisionPointRec(mouse, optRect)) bgCol = ColorGray;
+                Color bgCol = isOn ? Theme.SelectedItem : Theme.BgPanel;
+                Color borderCol = isFocused ? Theme.TextPrimary : (isOn ? Theme.AccentBlue : Theme.BgPanelAlt);
+                if (CheckCollisionPointRec(mouse, optRect)) bgCol = Theme.TextSecondary;
                 
                 DrawRectangleRec(optRect, bgCol);
                 DrawRectangleLinesEx(optRect, isFocused ? 1.5f : 1.0f, borderCol);
                 
                 const char* fxName = AllFXNames[b->State->Slots[i].FXType % ALL_FX_COUNT];
-                Color textCol = isOn ? ColorWhite : (isFocused ? ColorWhite : ColorShadow);
+                Color textCol = isOn ? Theme.TextPrimary : (isFocused ? Theme.TextPrimary : Theme.BorderDefault);
                 DrawCentredText(fxName, faceMd, optRect.x, optRect.width, optRect.y + (btnH - S(10)) / 2.0f, S(10), textCol);
                 
                 // Number indicator
                 char numStr[4];
                 sprintf(numStr, "%d", i + 1);
-                DrawCentredText(numStr, faceSm, optRect.x, S(16), optRect.y + (btnH - S(10)) / 2.0f + S(1), S(9), isFocused ? ColorOrange : ColorShadow);
+                DrawCentredText(numStr, faceSm, optRect.x, S(16), optRect.y + (btnH - S(10)) / 2.0f + S(1), S(9), isFocused ? Theme.AccentOrange : Theme.BorderDefault);
             }
         }
     } else if (b->State->ChannelDropdownOpen) {
@@ -582,13 +582,13 @@ void BeatFXPanel_DrawOverlays(BeatFXPanel *b) {
             float by = modalY + S(45) + i * (btnH + pad);
             Rectangle optRect = { bx, by, btnW, btnH };
             
-            Color bg = (b->State->SelectedChannel == i) ? ColorBlue : ColorDark2;
-            if (CheckCollisionPointRec(mouse, optRect)) bg = ColorGray;
+            Color bg = (b->State->SelectedChannel == i) ? Theme.AccentBlue : Theme.BgPanel;
+            if (CheckCollisionPointRec(mouse, optRect)) bg = Theme.TextSecondary;
             
             // Sharp rectangular buttons
             DrawRectangleRec(optRect, bg);
-            DrawRectangleLinesEx(optRect, 1.0f, (b->State->SelectedChannel == i) ? ColorWhite : ColorDark3);
-            DrawCentredText(chNames[i], faceMd, optRect.x, optRect.width, optRect.y + (btnH - S(12)) / 2.0f, S(12), ColorWhite);
+            DrawRectangleLinesEx(optRect, 1.0f, (b->State->SelectedChannel == i) ? Theme.TextPrimary : Theme.BgPanelAlt);
+            DrawCentredText(chNames[i], faceMd, optRect.x, optRect.width, optRect.y + (btnH - S(12)) / 2.0f, S(12), Theme.TextPrimary);
         }
     }
 }

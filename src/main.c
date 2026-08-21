@@ -134,6 +134,7 @@ typedef struct {
   bool showPowerActionConfirm;
   int pendingPowerAction; // 1 = Reboot OS, 2 = Hibernate OS, 3 = Shutdown OS
   float masterVolume; // Persisted master output level (0.0 - 1.0)
+  int themeMode; // 0 = Dark, 1 = Light
   AudioBackendConfig activeAudioConfig;
 
   bool MidiRequestSettings;
@@ -227,7 +228,7 @@ void App_SaveSettings(App *a) {
   Settings_Save(a->deckA.Waveform, a->deckB.Waveform, a->activeAudioConfig,
                 a->fxState, a->colorFxDeckA, a->colorFxDeckB,
                 a->activeControllerPath, a->deckA.QuantizeEnabled,
-                a->deckB.QuantizeEnabled, a->masterVolume);
+                a->deckB.QuantizeEnabled, a->masterVolume, a->themeMode, a->deckA.PlayMode);
 }
 
 void OnSettingsClose(void *ctx) {
@@ -450,6 +451,14 @@ void OnSettingsValueChanged(void *ctx, int idx) {
       // Save immediately when preset changes
       App_SaveSettings(a);
     }
+  } else if (strcmp(item->Label, "UI THEME") == 0) {
+    a->themeMode = item->Current;
+    if (a->themeMode == 1) {
+        Theme_InitDefaultLight();
+    } else {
+        Theme_InitDefaultDark();
+    }
+    App_SaveSettings(a);
   }
 }
 
@@ -1004,7 +1013,16 @@ void App_Init(App *a) {
   Settings_Load(&a->deckA.Waveform, &a->deckB.Waveform, &a->activeAudioConfig,
                 &a->fxState, &a->colorFxDeckA, &a->colorFxDeckB,
                 a->activeControllerPath, &a->deckA.QuantizeEnabled,
-                &a->deckB.QuantizeEnabled, &a->masterVolume);
+                &a->deckB.QuantizeEnabled, &a->masterVolume, &a->themeMode, &a->deckA.PlayMode);
+
+  a->deckB.PlayMode = a->deckA.PlayMode; // Sync deck B
+  a->settingsState.Items[0].Current = a->deckA.PlayMode; // Sync UI state
+
+  if (a->themeMode == 1) {
+      Theme_InitDefaultLight();
+  } else {
+      Theme_InitDefaultDark();
+  }
   if (a->activeControllerPath[0] != '\0') {
     MIDI_RefreshMapping(a->activeControllerPath);
   }
@@ -1199,6 +1217,15 @@ void App_Init(App *a) {
   a->settingsState.Items[qIdx].OptionsCount = 4;
   a->settingsState.Items[qIdx].Current = a->deckA.Waveform.QuantizeResolution;
   a->settingsState.Items[qIdx].Category = SETTING_CAT_DECK;
+
+  int themeIdx = sysCount++;
+  strcpy(a->settingsState.Items[themeIdx].Label, "UI THEME");
+  a->settingsState.Items[themeIdx].Type = SETTING_TYPE_LIST;
+  strcpy(a->settingsState.Items[themeIdx].Options[0], "DARK");
+  strcpy(a->settingsState.Items[themeIdx].Options[1], "LIGHT");
+  a->settingsState.Items[themeIdx].OptionsCount = 2;
+  a->settingsState.Items[themeIdx].Current = a->themeMode;
+  a->settingsState.Items[themeIdx].Category = SETTING_CAT_VIEW;
 
   a->midiSettingsStartIdx = sysCount;
   PopulateMidiSettings(a);
@@ -3707,7 +3734,7 @@ void UpdateDrawFrame(App *app) {
     return;
 
   BeginDrawing();
-  ClearBackground(BLACK);
+  ClearBackground(Theme.BgMain);
 
   // Apply global offset for all UI drawing
   rlPushMatrix();

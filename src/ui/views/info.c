@@ -56,7 +56,7 @@ static void Info_Draw(Component *base) {
     return;
 
   // Background
-  DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ColorBlack);
+  DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Theme.BgMain);
 
   Font faceXXS = UIFonts_GetFace(S(7));
   Font faceMd = UIFonts_GetFace(S(10));
@@ -82,15 +82,15 @@ static void Info_Draw(Component *base) {
     bool hasArtwork = (tex && tex->id != 0);
 
     // Panel Background
-    DrawRectangleRec((Rectangle){panelX, panelY, panelW, panelH}, ColorDark2);
+    DrawRectangleRec((Rectangle){panelX, panelY, panelW, panelH}, Theme.BgPanel);
     DrawRectangleLinesEx((Rectangle){panelX, panelY, panelW, panelH}, 1.0f,
-                         ColorDark1);
+                         Theme.BorderDefault);
 
     // Deck Indicator
     DrawRectangle(panelX, panelY, S(38), S(12),
-                  i == 0 ? ColorOrange : ColorBlue);
+                  i == 0 ? Theme.AccentOrange : Theme.AccentBlue);
     DrawCentredText(i == 0 ? "DECK 1" : "DECK 2", faceXXS, panelX, S(38),
-                    panelY + S(2.5f), S(7), ColorBlack);
+                    panelY + S(2.5f), S(7), Theme.BgMain);
 
     float contentX = panelX + S(12);
     float artSize = S(70);
@@ -100,14 +100,14 @@ static void Info_Draw(Component *base) {
     if (hasArtwork) {
       Rectangle src = {0, 0, (float)tex->width, (float)tex->height};
       Rectangle dest = {contentX, artY, artSize, artSize};
-      DrawTexturePro(*tex, src, dest, (Vector2){0, 0}, 0, ColorWhite);
-      DrawRectangleLinesEx(dest, 1, ColorShadow);
+      DrawTexturePro(*tex, src, dest, (Vector2){0, 0}, 0, Theme.TextPrimary);
+      DrawRectangleLinesEx(dest, 1, Theme.BorderDefault);
     } else {
-      DrawRectangle(contentX, artY, artSize, artSize, ColorDark3);
+      DrawRectangle(contentX, artY, artSize, artSize, Theme.BgPanelAlt);
       DrawRectangleLinesEx((Rectangle){contentX, artY, artSize, artSize}, 1,
-                           ColorShadow);
+                           Theme.BorderDefault);
       DrawCentredText("\uf001", iconLg, contentX, artSize, artY + S(25), S(20),
-                      ColorShadow);
+                      Theme.BorderDefault);
     }
 
     // Title & Artist Area
@@ -124,14 +124,14 @@ static void Info_Draw(Component *base) {
 
     if (trk->Title[0] == '\0') {
       UIDrawText("NO TRACK LOADED", faceXL, infoX, textY + S(8), S(18),
-                 ColorShadow);
+                 Theme.BorderDefault);
     } else {
       float titleW = panelW - (infoX - panelX) - S(10);
       Rectangle titleRect = { infoX, textY, titleW, S(20) };
       Rectangle artistRect = { infoX, textY + S(22), titleW, S(16) };
 
-      UIDrawScrollingText(trk->Title, faceXL, titleRect, S(18), ColorWhite, infoTimer[i]);
-      UIDrawScrollingText(trk->Artist[0] ? trk->Artist : "Unknown Artist", faceLg, artistRect, S(14), ColorOrange, infoTimer[i]);
+      UIDrawScrollingText(trk->Title, faceXL, titleRect, S(18), Theme.TextPrimary, infoTimer[i]);
+      UIDrawScrollingText(trk->Artist[0] ? trk->Artist : "Unknown Artist", faceLg, artistRect, S(14), Theme.AccentOrange, infoTimer[i]);
 
       // Metadata Grid
       float gridY = panelY + S(64);
@@ -140,106 +140,106 @@ static void Info_Draw(Component *base) {
 
       // Column 1
       float c1X = infoX;
-      UIDrawText("\uf017", iconSm, c1X, gridY + S(2), S(10), ColorShadow);
-      UIDrawText("BPM", faceXXS, c1X + S(15), gridY, S(7), ColorShadow);
+      UIDrawText("\uf017", iconSm, c1X, gridY + S(2), S(10), Theme.BorderDefault);
+      UIDrawText("BPM", faceXXS, c1X + S(15), gridY, S(7), Theme.BorderDefault);
       char bpmStr[16];
       sprintf(bpmStr, "%.1f", trk->BPM);
-      UIDrawText(bpmStr, faceMd, c1X + S(15), gridY + S(8), S(10), ColorWhite);
+      UIDrawText(bpmStr, faceMd, c1X + S(15), gridY + S(8), S(10), Theme.TextPrimary);
 
       UIDrawText("\uf084", iconSm, c1X, gridY + rowStep + S(2), S(10),
-                 ColorShadow);
+                 Theme.BorderDefault);
       UIDrawText("KEY", faceXXS, c1X + S(15), gridY + rowStep, S(7),
-                 ColorShadow);
+                 Theme.BorderDefault);
       UIDrawText(trk->Key[0] ? trk->Key : "---", faceMd, c1X + S(15),
-                 gridY + rowStep + S(8), S(10), ColorOrange);
+                 gridY + rowStep + S(8), S(10), Theme.AccentOrange);
 
       UIDrawText("\uf2f2", iconSm, c1X, gridY + rowStep * 2 + S(2), S(10),
-                 ColorShadow);
+                 Theme.BorderDefault);
       UIDrawText("DURATION", faceXXS, c1X + S(15), gridY + rowStep * 2, S(7),
-                 ColorShadow);
+                 Theme.BorderDefault);
       char durStr[16];
       sprintf(durStr, "%02d:%02d", trk->Duration / 60, trk->Duration % 60);
       UIDrawText(durStr, faceMd, c1X + S(15), gridY + rowStep * 2 + S(8), S(10),
-                 ColorWhite);
+                 Theme.TextPrimary);
 
       // Column 2
       float c2X = infoX + colW;
-      UIDrawText("\uf51f", iconSm, c2X, gridY + S(2), S(10), ColorShadow);
-      UIDrawText("ALBUM", faceXXS, c2X + S(15), gridY, S(7), ColorShadow);
+      UIDrawText("\uf51f", iconSm, c2X, gridY + S(2), S(10), Theme.BorderDefault);
+      UIDrawText("ALBUM", faceXXS, c2X + S(15), gridY, S(7), Theme.BorderDefault);
       Rectangle albumRect = { c2X + S(15), gridY + S(8), colW - S(20), S(12) };
-      UIDrawScrollingText(trk->Album[0] ? trk->Album : "---", faceMd, albumRect, S(10), ColorWhite, infoTimer[i]);
+      UIDrawScrollingText(trk->Album[0] ? trk->Album : "---", faceMd, albumRect, S(10), Theme.TextPrimary, infoTimer[i]);
 
       UIDrawText("\uf133", iconSm, c2X, gridY + rowStep + S(2), S(10),
-                 ColorShadow);
+                 Theme.BorderDefault);
       UIDrawText("YEAR", faceXXS, c2X + S(15), gridY + rowStep, S(7),
-                 ColorShadow);
+                 Theme.BorderDefault);
       char yrStr[8];
       if (trk->Year > 0)
         sprintf(yrStr, "%d", trk->Year);
       else
         strcpy(yrStr, "---");
       UIDrawText(yrStr, faceMd, c2X + S(15), gridY + rowStep + S(8), S(10),
-                 ColorWhite);
+                 Theme.TextPrimary);
 
       UIDrawText("\uf02c", iconSm, c2X, gridY + rowStep * 2 + S(2), S(10),
-                 ColorShadow);
+                 Theme.BorderDefault);
       UIDrawText("GENRE", faceXXS, c2X + S(15), gridY + rowStep * 2, S(7),
-                 ColorShadow);
+                 Theme.BorderDefault);
       Rectangle genreRect = { c2X + S(15), gridY + rowStep * 2 + S(8), colW - S(20), S(12) };
-      UIDrawScrollingText(trk->Genre[0] ? trk->Genre : "---", faceMd, genreRect, S(10), ColorWhite, infoTimer[i]);
+      UIDrawScrollingText(trk->Genre[0] ? trk->Genre : "---", faceMd, genreRect, S(10), Theme.TextPrimary, infoTimer[i]);
 
       // Column 3
       float c3X = infoX + colW * 2;
-      UIDrawText("\uf001", iconSm, c3X, gridY + S(2), S(10), ColorShadow);
-      UIDrawText("LABEL", faceXXS, c3X + S(15), gridY, S(7), ColorShadow);
+      UIDrawText("\uf001", iconSm, c3X, gridY + S(2), S(10), Theme.BorderDefault);
+      UIDrawText("LABEL", faceXXS, c3X + S(15), gridY, S(7), Theme.BorderDefault);
       Rectangle labelRect = { c3X + S(15), gridY + S(8), colW - S(20), S(12) };
-      UIDrawScrollingText(trk->Label[0] ? trk->Label : "---", faceMd, labelRect, S(10), ColorWhite, infoTimer[i]);
+      UIDrawScrollingText(trk->Label[0] ? trk->Label : "---", faceMd, labelRect, S(10), Theme.TextPrimary, infoTimer[i]);
 
       UIDrawText("\uf005", iconSm, c3X, gridY + rowStep + S(2), S(10),
-                 ColorShadow);
+                 Theme.BorderDefault);
       UIDrawText("RATING", faceXXS, c3X + S(15), gridY + rowStep, S(7),
-                 ColorShadow);
+                 Theme.BorderDefault);
       if (trk->Rating > 0) {
         for (int s = 0; s < 5; s++) {
           UIDrawText("\uf005", iconSm, c3X + S(15) + s * S(10),
                      gridY + rowStep + S(8), S(8),
-                     (s < trk->Rating) ? ColorOrange : ColorShadow);
+                     (s < trk->Rating) ? Theme.AccentOrange : Theme.BorderDefault);
         }
       } else {
         UIDrawText("---", faceMd, c3X + S(15), gridY + rowStep + S(8), S(10),
-                   ColorShadow);
+                   Theme.BorderDefault);
       }
 
       UIDrawText("\uf287", iconBrand, c3X, gridY + rowStep * 2 + S(2), S(10),
-                 ColorShadow);
+                 Theme.BorderDefault);
       UIDrawText("SOURCE", faceXXS, c3X + S(15), gridY + rowStep * 2, S(7),
-                 ColorShadow);
+                 Theme.BorderDefault);
       UIDrawText(trk->Source[0] ? trk->Source : "---", faceMd, c3X + S(15),
-                 gridY + rowStep * 2 + S(8), S(10), ColorBlue);
+                 gridY + rowStep * 2 + S(8), S(10), Theme.AccentBlue);
 
       // Row 4
       if (trk->Remixer[0]) {
-        UIDrawText("\uf001", iconSm, c1X, gridY + rowStep * 3 + S(2), S(10), ColorShadow);
-        UIDrawText("REMIXER", faceXXS, c1X + S(15), gridY + rowStep * 3, S(7), ColorShadow);
+        UIDrawText("\uf001", iconSm, c1X, gridY + rowStep * 3 + S(2), S(10), Theme.BorderDefault);
+        UIDrawText("REMIXER", faceXXS, c1X + S(15), gridY + rowStep * 3, S(7), Theme.BorderDefault);
         Rectangle remixRect = { c1X + S(15), gridY + rowStep * 3 + S(8), colW - S(20), S(12) };
-        UIDrawScrollingText(trk->Remixer, faceMd, remixRect, S(10), ColorWhite, infoTimer[i]);
+        UIDrawScrollingText(trk->Remixer, faceMd, remixRect, S(10), Theme.TextPrimary, infoTimer[i]);
       }
       if (trk->MixName[0]) {
-        UIDrawText("\uf001", iconSm, c2X, gridY + rowStep * 3 + S(2), S(10), ColorShadow);
-        UIDrawText("MIX", faceXXS, c2X + S(15), gridY + rowStep * 3, S(7), ColorShadow);
+        UIDrawText("\uf001", iconSm, c2X, gridY + rowStep * 3 + S(2), S(10), Theme.BorderDefault);
+        UIDrawText("MIX", faceXXS, c2X + S(15), gridY + rowStep * 3, S(7), Theme.BorderDefault);
         Rectangle mixRect = { c2X + S(15), gridY + rowStep * 3 + S(8), colW - S(20), S(12) };
-        UIDrawScrollingText(trk->MixName, faceMd, mixRect, S(10), ColorWhite, infoTimer[i]);
+        UIDrawScrollingText(trk->MixName, faceMd, mixRect, S(10), Theme.TextPrimary, infoTimer[i]);
       }
 
       // Comment
       if (trk->Comment[0]) {
         float commY = panelY + panelH - S(15);
         DrawRectangle(infoX, commY, panelW - (infoX - panelX) - S(10), S(14),
-                      ColorDark1);
+                      Theme.BorderDefault);
         UIDrawText("COMMENT:", faceXXS, infoX + S(5), commY + S(3.5f), S(7),
-                   ColorShadow);
+                   Theme.BorderDefault);
         Rectangle commRect = { infoX + S(50), commY + S(3.5f), panelW - (infoX - panelX) - S(60), S(12) };
-        UIDrawScrollingText(trk->Comment, faceXXS, commRect, S(7), ColorWhite, infoTimer[i]);
+        UIDrawScrollingText(trk->Comment, faceXXS, commRect, S(7), Theme.TextPrimary, infoTimer[i]);
       }
 
       // Path
@@ -248,14 +248,14 @@ static void Info_Draw(Component *base) {
         truncateStr(trk->FilePath, tPath, 150);
         float pathY = trk->Comment[0] ? (panelY + panelH - S(22)) : (panelY + panelH - S(8));
         UIDrawText(tPath, faceXXS, panelX + S(10), pathY, S(6),
-                   Fade(ColorShadow, 0.4f));
+                   Fade(Theme.BorderDefault, 0.4f));
       }
     }
 
     // DEBUG: Artwork Path (Always show if present)
     // if (trk->ArtworkPath[0]) {
     //   UIDrawText(trk->ArtworkPath, faceXXS, panelX + S(10), panelY + panelH -
-    //   S(16), S(6), ColorRed);
+    //   S(16), S(6), Theme.AccentRed);
     // }
   }
 }

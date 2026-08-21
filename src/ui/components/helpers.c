@@ -11,30 +11,30 @@
 #endif
 
 void DrawTopBar(int remainMin, int remainSec, int clockMin, int clockSec, bool showInfo) {
-    DrawRectangle(0, 0, SCREEN_WIDTH, TOP_BAR_H, ColorDark2);
-    DrawLine(0, TOP_BAR_H, SCREEN_WIDTH, TOP_BAR_H, ColorDark1);
+    DrawRectangle(0, 0, SCREEN_WIDTH, TOP_BAR_H, Theme.BgPanel);
+    DrawLine(0, TOP_BAR_H, SCREEN_WIDTH, TOP_BAR_H, Theme.BorderDefault);
 
     Font faceXS = UIFonts_GetFace(S(8));
     Font faceSm = UIFonts_GetFace(S(9));
 
     // Remain label
-    UIDrawText("REMAIN", faceXS, 4, 3, S(8), ColorShadow);
+    UIDrawText("REMAIN", faceXS, 4, 3, S(8), Theme.TextMuted);
 
     // Remain time value
     char remainStr[32];
     sprintf(remainStr, "%02d:%02d:00", remainMin, remainSec);
-    UIDrawText(remainStr, faceSm, 36, 2, S(9), ColorPaper);
+    UIDrawText(remainStr, faceSm, 36, 2, S(9), Theme.TextPrimary);
 
     // Clock
     char clockStr[32];
     sprintf(clockStr, "%02d:%02d:00", clockMin, clockSec);
-    UIDrawText(clockStr, faceSm, 330, 2, S(9), ColorPaper);
+    UIDrawText(clockStr, faceSm, 330, 2, S(9), Theme.TextPrimary);
 
     // INFO button
-    Color infoBg = showInfo ? ColorGray : ColorDark1;
+    Color infoBg = showInfo ? Theme.TextSecondary : Theme.BorderDefault;
     DrawRectangle(440, 1, 38, 15, infoBg);
-    DrawRectangleLines(440, 1, 38, 15, ColorShadow);
-    UIDrawText("INFO", faceXS, 449, 2, S(8), ColorPaper);
+    DrawRectangleLines(440, 1, 38, 15, Theme.TextMuted);
+    UIDrawText("INFO", faceXS, 449, 2, S(8), Theme.TextPrimary);
 }
 
 void DrawSelectionTriangleEx(float x, float y, float size, int direction, Color col) {
@@ -64,8 +64,8 @@ void DrawScrollbar(float x, float y, float w, float h, int totalItems, int curre
     // Scale currentPos (offset) to the track
     float thumbY = h * (float)currentPos / (float)totalItems;
     
-    DrawRectangle(x, y, w, h, ColorDark1);
-    DrawRectangle(x, y + thumbY, w, thumbH, ColorWhite);
+    DrawRectangle(x, y, w, h, Theme.BorderDefault);
+    DrawRectangle(x, y + thumbY, w, thumbH, Theme.TextPrimary);
 }
 
 void DrawBadge(float x, float y, float w, float h, Color bg, Color textClr, const char* label) {
@@ -117,8 +117,8 @@ void UIDrawKnob(float x, float y, float radius, float value, float min, float ma
     if (normalized > 1) normalized = 1;
 
     // 1. Background Track (Groove) - Thicker and more distinct
-    DrawRing((Vector2){x, y}, radius + S(1), radius + S(4.5f), 135, 405, 32, ColorDark1);
-    DrawRing((Vector2){x, y}, radius + S(1.5f), radius + S(4.0f), 135, 405, 32, ColorBlack);
+    DrawRing((Vector2){x, y}, radius + S(1), radius + S(4.5f), 135, 405, 32, Theme.BorderDefault);
+    DrawRing((Vector2){x, y}, radius + S(1.5f), radius + S(4.0f), 135, 405, 32, Theme.BgMain);
 
     // 2. Progress Arc
     float startAngle, endAngle;
@@ -149,7 +149,7 @@ void UIDrawKnob(float x, float y, float radius, float value, float min, float ma
     DrawRing((Vector2){x, y}, radius + S(2.5f), radius + S(3.0f), startAngle, endAngle, 36, Fade(WHITE, 0.3f));
 
     // 3. Knob Body (3D look)
-    DrawCircleGradient((int)x, (int)y, radius, ColorDark2, ColorDark3);
+    DrawCircleGradient((int)x, (int)y, radius, Theme.BgPanel, Theme.BgPanelAlt);
     DrawCircleLines((int)x, (int)y, radius, Fade(WHITE, 0.1f));
     DrawRing((Vector2){x, y}, radius - S(1.5f), radius, 0, 360, 32, Fade(WHITE, 0.05f));
 
@@ -164,14 +164,14 @@ void UIDrawKnob(float x, float y, float radius, float value, float min, float ma
         x + cosf(angleRad) * (radius - S(0.5f)),
         y + sinf(angleRad) * (radius - S(0.5f))
     };
-    DrawLineEx(needleStart, needleEnd, S(4.5f), ColorWhite);
+    DrawLineEx(needleStart, needleEnd, S(4.5f), Theme.TextPrimary);
     // Indicator cap
-    DrawCircleV(needleEnd, S(1.8f), ColorWhite);
+    DrawCircleV(needleEnd, S(1.8f), Theme.TextPrimary);
 
     // 5. Label text (Adjusted position and color to match premium UI)
     if (unit && unit[0] != '\0') {
         Font face = UIFonts_GetFace(S(9));
-        DrawCentredText(unit, face, x - radius * 2.0f, radius * 4.0f, y + radius + S(12), S(9), Fade(ColorWhite, 0.7f));
+        DrawCentredText(unit, face, x - radius * 2.0f, radius * 4.0f, y + radius + S(12), S(9), Fade(Theme.TextPrimary, 0.7f));
     }
 }
 
@@ -320,14 +320,14 @@ void GetDynamicKey(const char* originalKey, float tempoPercent, bool isMasterTem
 }
 
 Color GetCamelotColor(const char* keyStr) {
-    if (!keyStr || keyStr[0] == '\0') return ColorShadow;
+    if (!keyStr || keyStr[0] == '\0') return Theme.TextMuted;
     
     int num = 0;
     char letter = 0;
     if (sscanf(keyStr, "%dA", &num) == 1) letter = 'A';
     else if (sscanf(keyStr, "%dB", &num) == 1) letter = 'B';
     
-    if (num < 1 || num > 12) return ColorBlue; // Default fallback
+    if (num < 1 || num > 12) return Theme.AccentBlue; // Default fallback
 
     // Colors derived from Camelot wheel palette
     Color colors[12] = {
@@ -366,13 +366,13 @@ void UI_DrawModalBackdrop(void) {
 
 Rectangle UI_DrawModalFrame(Rectangle modalRect, const char* title) {
     // Sharp non-rounded modal window frame
-    DrawRectangleRec(modalRect, ColorDark1);
-    DrawRectangleLinesEx(modalRect, 2.0f, ColorOrange);
+    DrawRectangleRec(modalRect, Theme.BorderDefault);
+    DrawRectangleLinesEx(modalRect, 2.0f, Theme.AccentOrange);
     
     if (title && title[0] != '\0') {
         Font faceLg = UIFonts_GetFace(S(12));
-        DrawCentredText(title, faceLg, modalRect.x, modalRect.width, modalRect.y + S(12), S(12), ColorWhite);
-        DrawLine(modalRect.x + S(10), modalRect.y + S(36), modalRect.x + modalRect.width - S(10), modalRect.y + S(36), ColorDark2);
+        DrawCentredText(title, faceLg, modalRect.x, modalRect.width, modalRect.y + S(12), S(12), Theme.TextPrimary);
+        DrawLine(modalRect.x + S(10), modalRect.y + S(36), modalRect.x + modalRect.width - S(10), modalRect.y + S(36), Theme.BgPanel);
         
         // Return the body rectangle (area below the title)
         return (Rectangle){ 
@@ -401,5 +401,33 @@ bool UI_UpdateModal(Rectangle modalRect) {
         Input_Consume();
     }
     
+    return false;
+}
+bool IsKeyCompatible(const char* key1, const char* key2) {
+    if (!key1 || !key2 || key1[0] == '\0' || key2[0] == '\0') return false;
+
+    int n1 = 0, n2 = 0;
+    char l1 = 0, l2 = 0;
+
+    if (sscanf(key1, "%dA", &n1) == 1) l1 = 'A';
+    else if (sscanf(key1, "%dB", &n1) == 1) l1 = 'B';
+
+    if (sscanf(key2, "%dA", &n2) == 1) l2 = 'A';
+    else if (sscanf(key2, "%dB", &n2) == 1) l2 = 'B';
+
+    if (l1 == 0 || l2 == 0 || n1 < 1 || n1 > 12 || n2 < 1 || n2 > 12) return false;
+
+    // Same Key
+    if (n1 == n2 && l1 == l2) return true;
+    
+    // Relative Key
+    if (n1 == n2 && l1 != l2) return true;
+
+    // Adjacent Key
+    if (l1 == l2) {
+        if (n1 == (n2 % 12) + 1) return true;
+        if (n1 == (n2 - 2 + 12) % 12 + 1) return true;
+    }
+
     return false;
 }

@@ -1115,7 +1115,7 @@ static void Settings_Draw(Component *base) {
     return;
 
   float viewH = SCREEN_HEIGHT - DECK_STR_H;
-  DrawRectangle(0, 0, SCREEN_WIDTH, viewH, ColorBGUtil);
+  DrawRectangle(0, 0, SCREEN_WIDTH, viewH, Theme.BgMain);
 
   Font faceXS = UIFonts_GetFace(S(9));
   Font faceSm = UIFonts_GetFace(S(11));
@@ -1130,7 +1130,7 @@ static void Settings_Draw(Component *base) {
       (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) ? S(38.0f) : S(32.0f);
 
   // Draw Tabs with state-of-the-art visual style
-  DrawRectangle(0, TOP_BAR_H, SCREEN_WIDTH, tabH, ColorDark3);
+  DrawRectangle(0, TOP_BAR_H, SCREEN_WIDTH, tabH, Theme.BgPanelAlt);
   const char *tabs[] = {"DECK",   "AUDIO",       "VIEW",
                         "SYSTEM", "CONTROLLERS", "JOG"};
   float tabW = SCREEN_WIDTH / (float)SETTING_CAT_COUNT;
@@ -1142,29 +1142,29 @@ static void Settings_Draw(Component *base) {
           isTabFocused ? Fade(Theme.AccentOrange, 0.3f) : Fade(Theme.AccentOrange, 0.15f);
       DrawRectangleRec(tRect, fillClr);
       DrawCentredText(tabs[i], faceSm, i * tabW, tabW, TOP_BAR_H + S(8), S(11),
-                      ColorOrange);
-      DrawRectangle(i * tabW, TOP_BAR_H + tabH - S(3), tabW, S(3), ColorOrange);
+                      Theme.AccentOrange);
+      DrawRectangle(i * tabW, TOP_BAR_H + tabH - S(3), tabW, S(3), Theme.AccentOrange);
       if (isTabFocused) {
         DrawRectangleLinesEx((Rectangle){i * tabW + S(2), TOP_BAR_H + S(2),
                                          tabW - S(4), tabH - S(4)},
-                             S(1.5f), ColorOrange);
+                             S(1.5f), Theme.AccentOrange);
       }
     } else {
       Vector2 mouse = Input_GetPointerPos();
       if (CheckCollisionPointRec(mouse, tRect)) {
         DrawRectangleRec(tRect, Theme.HoverSubtle);
         DrawCentredText(tabs[i], faceSm, i * tabW, tabW, TOP_BAR_H + S(8),
-                        S(11), ColorWhite);
+                        S(11), Theme.TextPrimary);
       } else {
         DrawCentredText(tabs[i], faceSm, i * tabW, tabW, TOP_BAR_H + S(8),
-                        S(11), ColorGray);
+                        S(11), Theme.TextSecondary);
       }
     }
     if (i > 0)
       DrawLine(i * tabW, TOP_BAR_H + S(4), i * tabW, TOP_BAR_H + tabH - S(4),
-               ColorGray);
+               Theme.TextSecondary);
   }
-  DrawLine(0, TOP_BAR_H + tabH, SCREEN_WIDTH, TOP_BAR_H + tabH, ColorOrange);
+  DrawLine(0, TOP_BAR_H + tabH, SCREEN_WIDTH, TOP_BAR_H + tabH, Theme.AccentOrange);
 
   float listY = TOP_BAR_H + tabH;
 
@@ -1220,16 +1220,16 @@ static void Settings_Draw(Component *base) {
           0.15f, 4, Fade(Theme.AccentYellow, 0.35f));
       DrawRectangleRoundedLines(
           (Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)},
-          0.15f, 4, 2.0f, ColorYellow);
-      DrawCircle(S(14), ry + (rowH / 2.0f), S(3.5f), ColorYellow);
+          0.15f, 4, 2.0f, Theme.AccentYellow);
+      DrawCircle(S(14), ry + (rowH / 2.0f), S(3.5f), Theme.AccentYellow);
     } else if (selected) {
       DrawRectangleRounded(
           (Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)},
           0.15f, 4, Theme.DeckActiveBg);
       DrawRectangleRoundedLines(
           (Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)},
-          0.15f, 4, 1.0f, ColorOrange);
-      DrawCircle(S(14), ry + (rowH / 2.0f), S(3.5f), ColorOrange);
+          0.15f, 4, 1.0f, Theme.AccentOrange);
+      DrawCircle(S(14), ry + (rowH / 2.0f), S(3.5f), Theme.AccentOrange);
     } else if (isHover) {
       DrawRectangleRounded(
           (Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)},
@@ -1237,7 +1237,7 @@ static void Settings_Draw(Component *base) {
     } else if (idx_f % 2 == 0) {
       DrawRectangleRounded(
           (Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)},
-          0.15f, 4, ColorDark1);
+          0.15f, 4, Theme.BorderDefault);
     } else {
       DrawRectangleRounded(
           (Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)},
@@ -1248,7 +1248,7 @@ static void Settings_Draw(Component *base) {
     // bugs)
     float labelLimit = valueX - S(10);
     UIDrawTextTruncated(item->Label, faceMd, labelX + S(12),
-                        ry + (rowH / 2.0f) - S(7), S(13), ColorWhite,
+                        ry + (rowH / 2.0f) - S(7), S(13), Theme.TextPrimary,
                         labelLimit - (labelX + S(12)));
 
     if (item->Type == SETTING_TYPE_LIST) {
@@ -1261,26 +1261,26 @@ static void Settings_Draw(Component *base) {
 
       if (selected && item->OptionsCount > 1) {
         DrawSelectionTriangleEx(valueX + S(10), ry + (rowH / 2.0f), S(7), 1,
-                                ColorOrange);
+                                Theme.AccentOrange);
         DrawSelectionTriangleEx(valueX + valueWidth - S(10), ry + (rowH / 2.0f),
-                                S(7), 0, ColorOrange);
+                                S(7), 0, Theme.AccentOrange);
       }
 
       if (item->Category == SETTING_CAT_CONTROLLERS) {
         // Highlight the preset selection row more prominently
-        DrawRectangle(valueX, ry + S(4), valueWidth, rowH - S(8), ColorDark2);
+        DrawRectangle(valueX, ry + S(4), valueWidth, rowH - S(8), Theme.BgPanel);
         DrawCentredText(valStr, faceMd, valueX, valueWidth,
-                        ry + (rowH / 2.0f) - S(7), S(12), ColorOrange);
+                        ry + (rowH / 2.0f) - S(7), S(12), Theme.AccentOrange);
       } else {
         // DrawCentredText internally uses UIDrawTextTruncated, so we don't need
         // scissor mode
         DrawCentredText(valStr, faceMd, innerValX, innerValW,
-                        ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
+                        ry + (rowH / 2.0f) - S(7), S(13), Theme.AccentOrange);
       }
 
     } else if (item->Type == SETTING_TYPE_KNOB) {
       UIDrawKnob(valueX + valueWidth - S(95), ry + (rowH / 2.0f), S(9),
-                 item->Value, item->Min, item->Max, NULL, ColorOrange, false);
+                 item->Value, item->Min, item->Max, NULL, Theme.AccentOrange, false);
 
       char valBuf[32];
       if (item->Value == (int)item->Value)
@@ -1300,10 +1300,10 @@ static void Settings_Draw(Component *base) {
                                                                    : item->Unit;
         sprintf(fullBuf, "%s %s", valBuf, uStr);
         UIDrawText(fullBuf, faceMd, valueX + valueWidth - S(80),
-                   ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
+                   ry + (rowH / 2.0f) - S(7), S(13), Theme.AccentOrange);
       } else {
         UIDrawText(valBuf, faceMd, valueX + valueWidth - S(80),
-                   ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
+                   ry + (rowH / 2.0f) - S(7), S(13), Theme.AccentOrange);
       }
     } else if (item->Type == SETTING_TYPE_ACTION) {
       if (item->Category == SETTING_CAT_CONTROLLERS) {
@@ -1311,9 +1311,9 @@ static void Settings_Draw(Component *base) {
         if (idx >= MIDI_MAPPING_START_IDX) { // Mapping entries
           // Column Dividers
           DrawLine(SCREEN_WIDTH - S(160), ry + S(2), SCREEN_WIDTH - S(160),
-                   ry + rowH - S(2), ColorGray);
+                   ry + rowH - S(2), Theme.TextSecondary);
           DrawLine(SCREEN_WIDTH - S(75), ry + S(2), SCREEN_WIDTH - S(75),
-                   ry + rowH - S(2), ColorGray);
+                   ry + rowH - S(2), Theme.TextSecondary);
 
           bool isLearning =
               (r->State->IsLearningMidi && r->State->LearningItemIdx == idx);
@@ -1334,22 +1334,22 @@ static void Settings_Draw(Component *base) {
             // Channel:Msg as a "badge"
             Rectangle badgeRect = {SCREEN_WIDTH - S(160) + S(10),
                                    ry + (rowH - S(20)) / 2.0f, S(65), S(20)};
-            DrawRectangleRounded(badgeRect, 0.4f, 4, ColorDark2);
-            DrawRectangleRoundedLines(badgeRect, 0.4f, 4, 1.0f, ColorGray);
+            DrawRectangleRounded(badgeRect, 0.4f, 4, Theme.BgPanel);
+            DrawRectangleRoundedLines(badgeRect, 0.4f, 4, 1.0f, Theme.TextSecondary);
             DrawCentredText(item->Unit, faceSm, badgeRect.x, badgeRect.width,
-                            ry + (rowH / 2.0f) - S(6), S(10), ColorOrange);
+                            ry + (rowH / 2.0f) - S(6), S(10), Theme.AccentOrange);
 
             // Type Badge
-            Color typeColor = ColorGray;
+            Color typeColor = Theme.TextSecondary;
             const char *typeIcon = "";
             if (strcmp(item->Options[0], "SCRIPT") == 0) {
-              typeColor = ColorBlue;
+              typeColor = Theme.AccentBlue;
               typeIcon = "\uf121";
             } else if (strcmp(item->Options[0], "REL") == 0) {
-              typeColor = ColorOrange;
+              typeColor = Theme.AccentOrange;
               typeIcon = "\uf01e";
             } else if (strcmp(item->Options[0], "14BIT") == 0) {
-              typeColor = ColorDGreen;
+              typeColor = Theme.AccentGreen;
               typeIcon = "\uf0c9";
             }
 
@@ -1362,15 +1362,15 @@ static void Settings_Draw(Component *base) {
 
         } else { // Preset Selection Actions (CREATE/SAVE)
           UIDrawText(item->Unit, faceMd, valueX + valueWidth - S(90),
-                     ry + (rowH / 2.0f) - S(7), S(13), ColorOrange);
+                     ry + (rowH / 2.0f) - S(7), S(13), Theme.AccentOrange);
           UIDrawText("\uf35a", faceIcon, valueX + valueWidth - S(25),
-                     ry + (rowH / 2.0f) - S(6), S(12), ColorGray);
+                     ry + (rowH / 2.0f) - S(6), S(12), Theme.TextSecondary);
         }
       } else if (strcmp(item->Label, "ABOUT") != 0 &&
                  strcmp(item->Label, "CREDITS") != 0 &&
                  strcmp(item->Label, "EXIT APPLICATION") != 0) {
         UIDrawText("\uf2f5", faceIcon, valueX + valueWidth - S(35),
-                   ry + (rowH / 2.0f) - S(6), S(12), ColorOrange);
+                   ry + (rowH / 2.0f) - S(6), S(12), Theme.AccentOrange);
       }
     }
   }
@@ -1384,23 +1384,23 @@ static void Settings_Draw(Component *base) {
   if (r->State->SelectedTab == SETTING_CAT_CONTROLLERS) {
     uint8_t s, m;
     Rectangle monRect = {S(115), divY + S(24), S(135), S(16)};
-    DrawRectangleRounded(monRect, 0.2f, 4, ColorBlack);
-    DrawRectangleRoundedLines(monRect, 0.2f, 4, 1.0f, ColorDark2);
+    DrawRectangleRounded(monRect, 0.2f, 4, Theme.BgMain);
+    DrawRectangleRoundedLines(monRect, 0.2f, 4, 1.0f, Theme.BgPanel);
 
     if (MIDI_PeekLastMessage(&s, &m)) {
       char monBuf[64];
       snprintf(monBuf, 64, "MIDI: 0x%02X : 0x%02X", s, m);
       UIDrawText(monBuf, faceXS, monRect.x + S(18), divY + S(27), S(9),
-                 ColorDGreen);
-      DrawCircle(monRect.x + S(10), divY + S(32), S(3), ColorDGreen);
+                 Theme.AccentGreen);
+      DrawCircle(monRect.x + S(10), divY + S(32), S(3), Theme.AccentGreen);
     } else {
       UIDrawText("MIDI IDLE", faceXS, monRect.x + S(18), divY + S(27), S(9),
-                 ColorDark2);
-      DrawCircle(monRect.x + S(10), divY + S(32), S(3), ColorDark2);
+                 Theme.BgPanel);
+      DrawCircle(monRect.x + S(10), divY + S(32), S(3), Theme.BgPanel);
     }
 
     UIDrawText("Hardware Auto-Mapping Active", faceXS, S(265), divY + S(27),
-               S(9), ColorGray);
+               S(9), Theme.TextSecondary);
   }
 
   if (r->State->IsDropdownOpen) {
@@ -1416,29 +1416,29 @@ static void Settings_Draw(Component *base) {
     Rectangle dropRect = {dropdownX, dropdownY, dropdownW, dropdownH};
     BeginScissorMode((int)dropRect.x, (int)dropRect.y, (int)dropRect.width,
                      (int)dropRect.height);
-    DrawRectangleRec(dropRect, ColorBGUtil);
+    DrawRectangleRec(dropRect, Theme.BgMain);
     float cy = dropdownY - r->State->DropdownScroll;
     for (int i = 0; i < item->OptionsCount; i++) {
       Rectangle opRect = {dropdownX, cy, dropdownW, opHeight};
       if (cy + opHeight > dropdownY && cy < dropdownY + dropdownH) {
         if (item->Current == i)
-          DrawRectangleRec(opRect, ColorGray);
+          DrawRectangleRec(opRect, Theme.TextSecondary);
         else
-          DrawRectangleRec(opRect, ColorDark1);
-        DrawRectangleLinesEx(opRect, 1, ColorShadow);
+          DrawRectangleRec(opRect, Theme.BorderDefault);
+        DrawRectangleLinesEx(opRect, 1, Theme.BorderDefault);
         UIDrawTextTruncated(
             item->Options[i], faceMd, dropdownX + S(20), cy + S(12), S(15),
-            (item->Current == i) ? ColorOrange : ColorWhite, dropdownW - S(40));
+            (item->Current == i) ? Theme.AccentOrange : Theme.TextPrimary, dropdownW - S(40));
       }
       cy += opHeight;
     }
     EndScissorMode();
-    DrawRectangleLinesEx(dropRect, 2, ColorOrange);
+    DrawRectangleLinesEx(dropRect, 2, Theme.AccentOrange);
     if (contentH > dropdownH) {
       float sbY = dropdownY + (r->State->DropdownScroll / contentH) * dropdownH;
       float sbH = (dropdownH / contentH) * dropdownH;
       DrawRectangle((int)(dropdownX + dropdownW - S(4)), (int)sbY, (int)S(4),
-                    (int)sbH, ColorOrange);
+                    (int)sbH, Theme.AccentOrange);
     }
   }
 
@@ -1453,20 +1453,20 @@ static void Settings_Draw(Component *base) {
                           cardW, cardH};
 
     // Sharp non-rounded modal window frame
-    DrawRectangleRec(cardRect, ColorBGUtil);
-    DrawRectangleLinesEx(cardRect, 2.0f, ColorOrange);
+    DrawRectangleRec(cardRect, Theme.BgMain);
+    DrawRectangleLinesEx(cardRect, 2.0f, Theme.AccentOrange);
 
     // Bouncing MIDI connection icon
     float bounce = sinf(GetTime() * 8.0f) * S(4.0f);
     UIDrawText("\uf121", UIFonts_GetIcon(S(28)),
                cardRect.x + cardW / 2.0f - S(14), cardRect.y + S(20) + bounce,
-               S(28), ColorOrange);
+               S(28), Theme.AccentOrange);
 
     // Texts
     DrawCentredText("MIDI LEARN ACTIVE", faceMd, cardRect.x, cardRect.width,
-                    cardRect.y + S(65), S(14), ColorWhite);
+                    cardRect.y + S(65), S(14), Theme.TextPrimary);
     DrawCentredText("Move a knob, fader, or press a pad...", faceSm, cardRect.x,
-                    cardRect.width, cardRect.y + S(95), S(11), ColorGray);
+                    cardRect.width, cardRect.y + S(95), S(11), Theme.TextSecondary);
 
     // Bouncing signal pulse status
     float alpha = (sinf(GetTime() * 10.0f) * 0.3f + 0.7f);
@@ -1475,7 +1475,7 @@ static void Settings_Draw(Component *base) {
                     cardRect.width, cardRect.y + S(125), S(10), pulseColor);
 
     DrawCentredText("Press [ESC] to cancel", faceXS, cardRect.x, cardRect.width,
-                    cardRect.y + S(150), S(9), ColorGray);
+                    cardRect.y + S(150), S(9), Theme.TextSecondary);
   }
 
   if (r->State->IsMappingListOpen) {
@@ -1489,14 +1489,14 @@ static void Settings_Draw(Component *base) {
     }
 
     // Draw Window Backdrop
-    DrawRectangle(0, 0, SCREEN_WIDTH, viewH, ColorBGUtil);
+    DrawRectangle(0, 0, SCREEN_WIDTH, viewH, Theme.BgMain);
 
     // Draw Window Title
-    DrawRectangle(0, TOP_BAR_H, SCREEN_WIDTH, S(28.0f), ColorDark3);
+    DrawRectangle(0, TOP_BAR_H, SCREEN_WIDTH, S(28.0f), Theme.BgPanelAlt);
     UIDrawText("EDIT PRESET MAPPINGS", faceSm, S(20), TOP_BAR_H + S(8), S(11),
-               ColorOrange);
+               Theme.AccentOrange);
     DrawLine(0, TOP_BAR_H + S(28.0f), SCREEN_WIDTH, TOP_BAR_H + S(28.0f),
-             ColorOrange);
+             Theme.AccentOrange);
 
     float listY = TOP_BAR_H + S(28.0f);
     float rowH = S(32.0f);
@@ -1510,11 +1510,11 @@ static void Settings_Draw(Component *base) {
       float cx = SCREEN_WIDTH / 2.0f;
       float cy = listY + (divY - listY) / 2.0f;
       UIDrawText("\uf05a", UIFonts_GetIcon(S(30)), cx - S(15), cy - S(35),
-                 S(30), ColorGray);
+                 S(30), Theme.TextSecondary);
       DrawCentredText("NO MAPPING DATA LOADED", faceSm, 0, SCREEN_WIDTH,
-                      cy - S(2), S(12), ColorGray);
+                      cy - S(2), S(12), Theme.TextSecondary);
       DrawCentredText("Select a Preset from the Controllers tab first.", faceXS,
-                      0, SCREEN_WIDTH, cy + S(14), S(10), ColorGray);
+                      0, SCREEN_WIDTH, cy + S(14), S(10), Theme.TextSecondary);
     }
 
     for (int i = 0; i < visibleRows; i++) {
@@ -1533,12 +1533,12 @@ static void Settings_Draw(Component *base) {
             0.15f, 4, Theme.DeckActiveBg);
         DrawRectangleRoundedLines(
             (Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)},
-            0.15f, 4, 1.0f, ColorOrange);
-        DrawCircle(S(14), ry + (rowH / 2.0f), S(3.5f), ColorOrange);
+            0.15f, 4, 1.0f, Theme.AccentOrange);
+        DrawCircle(S(14), ry + (rowH / 2.0f), S(3.5f), Theme.AccentOrange);
       } else if (idx_f % 2 == 0) {
         DrawRectangleRounded(
             (Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)},
-            0.15f, 4, ColorDark1);
+            0.15f, 4, Theme.BorderDefault);
       } else {
         DrawRectangleRounded(
             (Rectangle){S(5), ry + S(2), SCREEN_WIDTH - S(10), rowH - S(4)},
@@ -1547,27 +1547,27 @@ static void Settings_Draw(Component *base) {
 
       // Label
       UIDrawText(item->Label, faceMd, S(32), ry + (rowH / 2.0f) - S(7), S(13),
-                 ColorWhite);
+                 Theme.TextPrimary);
 
       // Mapped Address Badge
       Rectangle badgeRect = {SCREEN_WIDTH - S(160) + S(10),
                              ry + (rowH - S(20)) / 2.0f, S(65), S(20)};
-      DrawRectangleRounded(badgeRect, 0.4f, 4, ColorDark2);
-      DrawRectangleRoundedLines(badgeRect, 0.4f, 4, 1.0f, ColorGray);
+      DrawRectangleRounded(badgeRect, 0.4f, 4, Theme.BgPanel);
+      DrawRectangleRoundedLines(badgeRect, 0.4f, 4, 1.0f, Theme.TextSecondary);
       DrawCentredText(item->Unit, faceSm, badgeRect.x, badgeRect.width,
-                      ry + (rowH / 2.0f) - S(6), S(10), ColorOrange);
+                      ry + (rowH / 2.0f) - S(6), S(10), Theme.AccentOrange);
 
       // Type Badge
-      Color typeColor = ColorGray;
+      Color typeColor = Theme.TextSecondary;
       const char *typeIcon = "";
       if (strcmp(item->Options[0], "SCRIPT") == 0) {
-        typeColor = ColorBlue;
+        typeColor = Theme.AccentBlue;
         typeIcon = "\uf121";
       } else if (strcmp(item->Options[0], "REL") == 0) {
-        typeColor = ColorOrange;
+        typeColor = Theme.AccentOrange;
         typeIcon = "\uf01e";
       } else if (strcmp(item->Options[0], "14BIT") == 0) {
-        typeColor = ColorDGreen;
+        typeColor = Theme.AccentGreen;
         typeIcon = "\uf0c9";
       }
 
@@ -1583,8 +1583,8 @@ static void Settings_Draw(Component *base) {
                   r->State->MappingListScroll, visibleRows);
 
     // Bottom Background & Details Banner
-    DrawRectangle(0, divY, SCREEN_WIDTH, bottomH, ColorDark1);
-    DrawLine(0, divY, SCREEN_WIDTH, divY, ColorGray);
+    DrawRectangle(0, divY, SCREEN_WIDTH, bottomH, Theme.BorderDefault);
+    DrawLine(0, divY, SCREEN_WIDTH, divY, Theme.TextSecondary);
 
     // Details Banner for currently selected sub-item
     SettingItem *selectedItem = NULL;
@@ -1604,41 +1604,41 @@ static void Settings_Draw(Component *base) {
                selectedItem->Label, mapAddress, mapType);
     }
 
-    DrawRectangle(0, divY, SCREEN_WIDTH, S(18), ColorDark2);
+    DrawRectangle(0, divY, SCREEN_WIDTH, S(18), Theme.BgPanel);
     UIDrawText(detailBuf[0] != '\0' ? detailBuf : "No target selected", faceXS,
-               S(15), divY + S(5), S(9.5f), ColorOrange);
-    DrawLine(0, divY + S(18), SCREEN_WIDTH, divY + S(18), ColorGray);
+               S(15), divY + S(5), S(9.5f), Theme.AccentOrange);
+    DrawLine(0, divY + S(18), SCREEN_WIDTH, divY + S(18), Theme.TextSecondary);
 
     // BACK Button
     Rectangle backRect = {S(15), divY + S(23), S(90), S(18)};
-    DrawRectangleRounded(backRect, 0.5f, 4, ColorBlue);
-    DrawRectangleRoundedLines(backRect, 0.5f, 4, 1.0f, ColorWhite);
+    DrawRectangleRounded(backRect, 0.5f, 4, Theme.AccentBlue);
+    DrawRectangleRoundedLines(backRect, 0.5f, 4, 1.0f, Theme.TextPrimary);
     DrawCentredText("BACK", faceSm, backRect.x, backRect.width, divY + S(26),
-                    S(11), ColorWhite);
+                    S(11), Theme.TextPrimary);
 
     // CREATE NEW Action Button
     Rectangle createRect = {SCREEN_WIDTH - S(250), divY + S(23), S(110), S(18)};
-    DrawRectangleRounded(createRect, 0.5f, 4, ColorDark2);
-    DrawRectangleRoundedLines(createRect, 0.5f, 4, 1.0f, ColorGray);
+    DrawRectangleRounded(createRect, 0.5f, 4, Theme.BgPanel);
+    DrawRectangleRoundedLines(createRect, 0.5f, 4, 1.0f, Theme.TextSecondary);
     DrawCentredText("CREATE NEW TEMPLATE", faceXS, createRect.x,
-                    createRect.width, divY + S(27), S(8.5f), ColorOrange);
+                    createRect.width, divY + S(27), S(8.5f), Theme.AccentOrange);
 
     // SAVE AS CUSTOM Action Button
     Rectangle saveRect = {SCREEN_WIDTH - S(130), divY + S(23), S(115), S(18)};
-    DrawRectangleRounded(saveRect, 0.5f, 4, ColorDark2);
-    DrawRectangleRoundedLines(saveRect, 0.5f, 4, 1.0f, ColorGray);
+    DrawRectangleRounded(saveRect, 0.5f, 4, Theme.BgPanel);
+    DrawRectangleRoundedLines(saveRect, 0.5f, 4, 1.0f, Theme.TextSecondary);
     DrawCentredText("SAVE AS CUSTOM XML", faceXS, saveRect.x, saveRect.width,
-                    divY + S(27), S(8.5f), ColorOrange);
+                    divY + S(27), S(8.5f), Theme.AccentOrange);
 
     // Item count string in sub-window
     char countStr[32];
     sprintf(countStr, "%d / %d", sIdx + 1, mapCount);
     UIDrawText(countStr, faceXS, SCREEN_WIDTH / 2.0f - S(80.0f), divY + S(26),
-               S(9), ColorGray);
+               S(9), Theme.TextSecondary);
 
     // Tip label in sub-window
     UIDrawText("Tip: Click any target row to edit mapping.", faceXS,
-               SCREEN_WIDTH / 2.0f - S(25.0f), divY + S(26), S(9), ColorGray);
+               SCREEN_WIDTH / 2.0f - S(25.0f), divY + S(26), S(9), Theme.TextSecondary);
 
     // Still draw Edit Modal and MIDI Learn dialog on top if active!
     if (r->State->IsEditMappingOpen) {
@@ -1665,38 +1665,38 @@ static void Settings_Draw(Component *base) {
     snprintf(typeBuf, sizeof(typeBuf), "Action Type: %s", item->Options[0]);
 
     UIDrawText(nameBuf, faceSm, cardRect.x + S(20), cardRect.y + S(36),
-               S(10.5f), ColorWhite);
+               S(10.5f), Theme.TextPrimary);
     UIDrawText(addrBuf, faceSm, cardRect.x + S(20), cardRect.y + S(54),
-               S(10.5f), ColorWhite);
+               S(10.5f), Theme.TextPrimary);
     UIDrawText(typeBuf, faceSm, cardRect.x + S(20), cardRect.y + S(72),
-               S(10.5f), ColorWhite);
+               S(10.5f), Theme.TextPrimary);
 
     // 2x2 Larger Sharp Buttons Grid
     float btnW = S(150.0f), btnH = S(28.0f);
     
     Rectangle btn1 = {cardRect.x + S(15), cardRect.y + S(110), btnW, btnH};
     bool btn1Hover = CheckCollisionPointRec(Input_GetPointerPos(), btn1) || r->State->ModalCursorPos == 0;
-    DrawRectangleRec(btn1, btn1Hover ? ColorBlue : ColorDark2);
-    DrawRectangleLinesEx(btn1, 1.0f, btn1Hover ? ColorWhite : ColorShadow);
-    DrawCentredText("START MIDI LEARN", faceXS, btn1.x, btn1.width, btn1.y + S(9), S(9.5f), ColorWhite);
+    DrawRectangleRec(btn1, btn1Hover ? Theme.AccentBlue : Theme.BgPanel);
+    DrawRectangleLinesEx(btn1, 1.0f, btn1Hover ? Theme.TextPrimary : Theme.BorderDefault);
+    DrawCentredText("START MIDI LEARN", faceXS, btn1.x, btn1.width, btn1.y + S(9), S(9.5f), Theme.TextPrimary);
 
     Rectangle btn2 = {cardRect.x + S(175), cardRect.y + S(110), btnW, btnH};
     bool btn2Hover = CheckCollisionPointRec(Input_GetPointerPos(), btn2) || r->State->ModalCursorPos == 1;
-    DrawRectangleRec(btn2, btn2Hover ? ColorDark2 : ColorDark1);
-    DrawRectangleLinesEx(btn2, 1.0f, btn2Hover ? ColorOrange : ColorShadow);
-    DrawCentredText("CYCLE TYPE", faceXS, btn2.x, btn2.width, btn2.y + S(9), S(9.5f), ColorOrange);
+    DrawRectangleRec(btn2, btn2Hover ? Theme.BgPanel : Theme.BorderDefault);
+    DrawRectangleLinesEx(btn2, 1.0f, btn2Hover ? Theme.AccentOrange : Theme.BorderDefault);
+    DrawCentredText("CYCLE TYPE", faceXS, btn2.x, btn2.width, btn2.y + S(9), S(9.5f), Theme.AccentOrange);
 
     Rectangle btn3 = {cardRect.x + S(15), cardRect.y + S(150), btnW, btnH};
     bool btn3Hover = CheckCollisionPointRec(Input_GetPointerPos(), btn3) || r->State->ModalCursorPos == 2;
     DrawRectangleRec(btn3, btn3Hover ? Theme.AccentRed : Fade(Theme.AccentRed, 0.3f));
-    DrawRectangleLinesEx(btn3, 1.0f, btn3Hover ? ColorRed : ColorShadow);
-    DrawCentredText("CLEAR / RESET", faceXS, btn3.x, btn3.width, btn3.y + S(9), S(9.5f), ColorWhite);
+    DrawRectangleLinesEx(btn3, 1.0f, btn3Hover ? Theme.AccentRed : Theme.BorderDefault);
+    DrawCentredText("CLEAR / RESET", faceXS, btn3.x, btn3.width, btn3.y + S(9), S(9.5f), Theme.TextPrimary);
 
     Rectangle btn4 = {cardRect.x + S(175), cardRect.y + S(150), btnW, btnH};
     bool btn4Hover = CheckCollisionPointRec(Input_GetPointerPos(), btn4) || r->State->ModalCursorPos == 3;
-    DrawRectangleRec(btn4, btn4Hover ? ColorDGreen : Fade(Theme.AccentGreen, 0.3f));
-    DrawRectangleLinesEx(btn4, 1.0f, btn4Hover ? ColorWhite : ColorShadow);
-    DrawCentredText("SAVE & CLOSE", faceXS, btn4.x, btn4.width, btn4.y + S(9), S(9.5f), ColorWhite);
+    DrawRectangleRec(btn4, btn4Hover ? Theme.AccentGreen : Fade(Theme.AccentGreen, 0.3f));
+    DrawRectangleLinesEx(btn4, 1.0f, btn4Hover ? Theme.TextPrimary : Theme.BorderDefault);
+    DrawCentredText("SAVE & CLOSE", faceXS, btn4.x, btn4.width, btn4.y + S(9), S(9.5f), Theme.TextPrimary);
     
     bool enterPressed = r->State->MidiRequestEnter;
     if (Input_CheckPress(btn1) || (enterPressed && r->State->ModalCursorPos == 0)) {
@@ -1757,23 +1757,23 @@ static void Settings_Draw(Component *base) {
 
     Rectangle modalRect = {modalX, modalY, modalW, modalH};
     // Sharp non-rounded modal window frame
-    DrawRectangleRec(modalRect, ColorDark1);
-    DrawRectangleLinesEx(modalRect, 2.0f, ColorOrange);
+    DrawRectangleRec(modalRect, Theme.BorderDefault);
+    DrawRectangleLinesEx(modalRect, 2.0f, Theme.AccentOrange);
 
     // Header
-    DrawRectangle(modalX, modalY, modalW, S(30.0f), ColorDark2);
+    DrawRectangle(modalX, modalY, modalW, S(30.0f), Theme.BgPanel);
     UIDrawText("\uf085", faceIconSm, modalX + S(12.0f), modalY + S(8.0f), S(14),
-               ColorOrange);
+               Theme.AccentOrange);
     UIDrawText("SYSTEM USAGE & SPECIFICATIONS", faceSm, modalX + S(34.0f),
-               modalY + S(8.0f), S(11), ColorOrange);
+               modalY + S(8.0f), S(11), Theme.AccentOrange);
     DrawLine(modalX, modalY + S(30.0f), modalX + modalW, modalY + S(30.0f),
-             ColorOrange);
+             Theme.AccentOrange);
 
     // Close Button 'X'
     Rectangle closeBtn = {modalX + modalW - S(32.0f), modalY + S(3.0f), S(28.0f), S(24.0f)};
     bool closeHover = CheckCollisionPointRec(Input_GetPointerPos(), closeBtn) || r->State->ModalCursorPos == 0;
-    DrawRectangleRec(closeBtn, closeHover ? ColorRed : BLANK);
-    UIDrawText("\uf00d", faceIconSm, closeBtn.x + S(8.0f), closeBtn.y + S(5.0f), S(14), closeHover ? ColorWhite : ColorGray);
+    DrawRectangleRec(closeBtn, closeHover ? Theme.AccentRed : BLANK);
+    UIDrawText("\uf00d", faceIconSm, closeBtn.x + S(8.0f), closeBtn.y + S(5.0f), S(14), closeHover ? Theme.TextPrimary : Theme.TextSecondary);
     
     if (Input_CheckPress(closeBtn) || (r->State->MidiRequestEnter && r->State->ModalCursorPos == 0)) {
         r->State->IsSystemInfoOpen = false;
@@ -1789,25 +1789,25 @@ static void Settings_Draw(Component *base) {
 
     float row1Y = modalY + S(36.0f);
     UIDrawText("CPU Load:", faceSm, modalX + S(16.0f), row1Y, S(11),
-               ColorWhite);
+               Theme.TextPrimary);
 
     float cpuBarX = modalX + S(98.0f);
     float cpuBarW = S(190.0f);
     float cpuBarH = S(11.0f);
-    DrawRectangle(cpuBarX, row1Y + S(1.0f), cpuBarW, cpuBarH, ColorDark2);
-    DrawRectangleLinesEx((Rectangle){cpuBarX, row1Y + S(1.0f), cpuBarW, cpuBarH}, 1.0f, ColorShadow);
+    DrawRectangle(cpuBarX, row1Y + S(1.0f), cpuBarW, cpuBarH, Theme.BgPanel);
+    DrawRectangleLinesEx((Rectangle){cpuBarX, row1Y + S(1.0f), cpuBarW, cpuBarH}, 1.0f, Theme.BorderDefault);
 
     float cpuFill = (cpuBarW - S(2.0f)) * cpuUsage;
     if (cpuFill > S(1.0f)) {
       Color cpuCol = (cpuUsage > 0.85f)
-                         ? ColorRed
-                         : ((cpuUsage > 0.60f) ? ColorOrange : ColorDGreen);
+                         ? Theme.AccentRed
+                         : ((cpuUsage > 0.60f) ? Theme.AccentOrange : Theme.AccentGreen);
       DrawRectangle(cpuBarX + S(1.0f), row1Y + S(2.0f), cpuFill, cpuBarH - S(2.0f), cpuCol);
     }
     char cpuBuf[32];
     snprintf(cpuBuf, sizeof(cpuBuf), "%d%%", (int)(cpuUsage * 100.0f));
     UIDrawText(cpuBuf, faceSm, cpuBarX + cpuBarW + S(6.0f), row1Y, S(11),
-               ColorOrange);
+               Theme.AccentOrange);
 
     // 2. CPU Specs
     float row2Y = modalY + S(54.0f);
@@ -1815,8 +1815,8 @@ static void Settings_Draw(Component *base) {
     int cores = r->State->CPUCores > 0 ? r->State->CPUCores : 4;
     float ghz = r->State->CPUMhz > 0 ? (r->State->CPUMhz > 10.0f ? r->State->CPUMhz / 1000.0f : r->State->CPUMhz) : 2.0f;
     snprintf(cpuSpecText, sizeof(cpuSpecText), "Processor: %d Cores @ %.2f GHz", cores, ghz);
-    UIDrawText("\uf2db", faceIconSm, modalX + S(16.0f), row2Y, S(11), ColorOrange);
-    UIDrawText(cpuSpecText, faceSm, modalX + S(34.0f), row2Y, S(10.5f), ColorWhite);
+    UIDrawText("\uf2db", faceIconSm, modalX + S(16.0f), row2Y, S(11), Theme.AccentOrange);
+    UIDrawText(cpuSpecText, faceSm, modalX + S(34.0f), row2Y, S(10.5f), Theme.TextPrimary);
 
     // 3. RAM Memory (Global System RAM)
     float ramUsed = r->State->RAMUsageMB;
@@ -1830,30 +1830,30 @@ static void Settings_Draw(Component *base) {
       ramRatio = 1.0f;
 
     float row3Y = modalY + S(72.0f);
-    UIDrawText("RAM (Global):", faceSm, modalX + S(16.0f), row3Y, S(11), ColorWhite);
+    UIDrawText("RAM (Global):", faceSm, modalX + S(16.0f), row3Y, S(11), Theme.TextPrimary);
 
     float ramBarX = modalX + S(98.0f);
     float ramBarW = S(190.0f);
     float ramBarH = S(11.0f);
-    DrawRectangle(ramBarX, row3Y + S(1.0f), ramBarW, ramBarH, ColorDark2);
-    DrawRectangleLinesEx((Rectangle){ramBarX, row3Y + S(1.0f), ramBarW, ramBarH}, 1.0f, ColorShadow);
+    DrawRectangle(ramBarX, row3Y + S(1.0f), ramBarW, ramBarH, Theme.BgPanel);
+    DrawRectangleLinesEx((Rectangle){ramBarX, row3Y + S(1.0f), ramBarW, ramBarH}, 1.0f, Theme.BorderDefault);
 
     float ramFill = (ramBarW - S(2.0f)) * ramRatio;
     if (ramFill > S(1.0f)) {
-      Color ramCol = (ramRatio > 0.85f) ? ColorRed : ColorOrange;
+      Color ramCol = (ramRatio > 0.85f) ? Theme.AccentRed : Theme.AccentOrange;
       DrawRectangle(ramBarX + S(1.0f), row3Y + S(2.0f), ramFill, ramBarH - S(2.0f), ramCol);
     }
     char ramPct[32];
     snprintf(ramPct, sizeof(ramPct), "%d%%", (int)(ramRatio * 100.0f));
     UIDrawText(ramPct, faceSm, ramBarX + ramBarW + S(6.0f), row3Y, S(11),
-               ColorOrange);
+               Theme.AccentOrange);
 
     char ramText[128];
     snprintf(ramText, sizeof(ramText),
              "Used: %d MB   Free: %d MB   Total: %d MB", (int)ramUsed,
              (int)ramFree, (int)ramTotal);
     UIDrawText(ramText, faceXS, modalX + S(16.0f), row3Y + S(15.0f), S(9.5f),
-               ColorGray);
+               Theme.TextSecondary);
 
     // 4. RAM (App Only)
     float row4Y = modalY + S(106.0f);
@@ -1861,9 +1861,9 @@ static void Settings_Draw(Component *base) {
     snprintf(appRamText, sizeof(appRamText),
              "App Memory Usage: %d MB (Process)", (int)r->State->RAMAppMB);
     UIDrawText("\uf538", faceIconSm, modalX + S(16.0f), row4Y, S(11),
-               ColorOrange);
+               Theme.AccentOrange);
     UIDrawText(appRamText, faceSm, modalX + S(34.0f), row4Y, S(10.5f),
-               ColorWhite);
+               Theme.TextPrimary);
 
     // 5. Audio Engine Metrics
     float row5Y = modalY + S(126.0f);
@@ -1875,9 +1875,9 @@ static void Settings_Draw(Component *base) {
              "Audio Engine: %d Hz  |  Buffer: %d frames (%.1f ms)",
              sr, buf, lat);
     UIDrawText("\uf028", faceIconSm, modalX + S(16.0f), row5Y, S(11),
-               ColorBlue);
+               Theme.AccentBlue);
     UIDrawText(audioText, faceSm, modalX + S(34.0f), row5Y, S(10.5f),
-               ColorWhite);
+               Theme.TextPrimary);
 
     // 6. Platform Specifications
     float row6Y = modalY + S(146.0f);
@@ -1886,17 +1886,17 @@ static void Settings_Draw(Component *base) {
              r->State->OSPlatformStr[0] != '\0' ? r->State->OSPlatformStr
                                                 : "Embedded Linux");
     UIDrawText("\uf108", faceIconSm, modalX + S(16.0f), row6Y, S(11),
-               ColorDGreen);
+               Theme.AccentGreen);
     UIDrawText(specText, faceSm, modalX + S(34.0f), row6Y, S(10.5f),
-               ColorWhite);
+               Theme.TextPrimary);
 
     // Larger Sharp OK / Close Button
     Rectangle okBtn = {modalX + (modalW - S(120.0f)) / 2.0f,
                        modalY + modalH - S(36.0f), S(120.0f), S(28.0f)};
-    DrawRectangleRec(okBtn, ColorDark2);
-    DrawRectangleLinesEx(okBtn, 1.5f, ColorOrange);
+    DrawRectangleRec(okBtn, Theme.BgPanel);
+    DrawRectangleLinesEx(okBtn, 1.5f, Theme.AccentOrange);
     DrawCentredText("CLOSE", faceSm, okBtn.x, okBtn.width, okBtn.y + S(8.0f),
-                    S(11), ColorWhite);
+                    S(11), Theme.TextPrimary);
   }
 
   // Render Slider Modal Popup
@@ -1912,12 +1912,12 @@ static void Settings_Draw(Component *base) {
     float modalY = (viewH - modalH) / 2.0f;
 
     Rectangle modalRect = {modalX, modalY, modalW, modalH};
-    DrawRectangleRec(modalRect, ColorDark1);
-    DrawRectangleLinesEx(modalRect, 2.0f, ColorOrange);
+    DrawRectangleRec(modalRect, Theme.BorderDefault);
+    DrawRectangleLinesEx(modalRect, 2.0f, Theme.AccentOrange);
 
     // Header
-    DrawRectangle(modalX, modalY, modalW, S(30.0f), ColorDark2);
-    DrawCentredText(item->Label, faceMd, modalX, modalW, modalY + S(8.0f), S(12), ColorOrange);
+    DrawRectangle(modalX, modalY, modalW, S(30.0f), Theme.BgPanel);
+    DrawCentredText(item->Label, faceMd, modalX, modalW, modalY + S(8.0f), S(12), Theme.AccentOrange);
 
     // Slider UI
     float sliderW = modalW - S(60);
@@ -1925,18 +1925,18 @@ static void Settings_Draw(Component *base) {
     float sliderY = modalY + S(75);
     
     // Draw track
-    DrawRectangle(sliderX, sliderY, sliderW, S(12), ColorDark3);
-    DrawRectangleLines(sliderX, sliderY, sliderW, S(12), ColorShadow);
+    DrawRectangle(sliderX, sliderY, sliderW, S(12), Theme.BgPanelAlt);
+    DrawRectangleLines(sliderX, sliderY, sliderW, S(12), Theme.BorderDefault);
 
     // Draw value fill
     float pct = (item->Value - item->Min) / (item->Max - item->Min);
     if (pct < 0) pct = 0; if (pct > 1) pct = 1;
     float fillW = pct * sliderW;
-    DrawRectangle(sliderX, sliderY, fillW, S(12), ColorOrange);
+    DrawRectangle(sliderX, sliderY, fillW, S(12), Theme.AccentOrange);
 
     // Draw handle
     float hX = sliderX + fillW - S(6);
-    DrawRectangle(hX, sliderY - S(8), S(12), S(28), ColorWhite);
+    DrawRectangle(hX, sliderY - S(8), S(12), S(28), Theme.TextPrimary);
 
     // Draw value text
     char valBuf[64];
@@ -1947,17 +1947,17 @@ static void Settings_Draw(Component *base) {
     if (item->Unit[0] != '\0') {
       char fBuf[128];
       sprintf(fBuf, "%s %s", valBuf, item->Unit);
-      DrawCentredText(fBuf, faceSm, modalX, modalW, modalY + S(45), S(12), ColorWhite);
+      DrawCentredText(fBuf, faceSm, modalX, modalW, modalY + S(45), S(12), Theme.TextPrimary);
     } else {
-      DrawCentredText(valBuf, faceSm, modalX, modalW, modalY + S(45), S(12), ColorWhite);
+      DrawCentredText(valBuf, faceSm, modalX, modalW, modalY + S(45), S(12), Theme.TextPrimary);
     }
 
     // OK Button
     Rectangle okBtn = {modalX + (modalW - S(120))/2.0f, modalY + modalH - S(44), S(120), S(32)};
     bool okHover = CheckCollisionPointRec(Input_GetPointerPos(), okBtn) || r->State->ModalCursorPos == 1;
-    DrawRectangleRec(okBtn, okHover ? ColorDark2 : ColorDark1);
-    DrawRectangleLinesEx(okBtn, 1.5f, okHover ? ColorOrange : ColorShadow);
-    DrawCentredText("APPLY", faceSm, okBtn.x, okBtn.width, okBtn.y + S(10), S(11), okHover ? ColorWhite : ColorGray);
+    DrawRectangleRec(okBtn, okHover ? Theme.BgPanel : Theme.BorderDefault);
+    DrawRectangleLinesEx(okBtn, 1.5f, okHover ? Theme.AccentOrange : Theme.BorderDefault);
+    DrawCentredText("APPLY", faceSm, okBtn.x, okBtn.width, okBtn.y + S(10), S(11), okHover ? Theme.TextPrimary : Theme.TextSecondary);
     
     if (Input_CheckPress(okBtn) || (r->State->MidiRequestEnter && r->State->ModalCursorPos == 1)) {
         r->State->IsSliderModalOpen = false;
@@ -1977,30 +1977,30 @@ static void Settings_Draw(Component *base) {
     float modalY = (viewH - modalH) / 2.0f;
 
     Rectangle modalRect = {modalX, modalY, modalW, modalH};
-    DrawRectangleRec(modalRect, ColorDark1);
-    DrawRectangleLinesEx(modalRect, 2.0f, ColorRed);
+    DrawRectangleRec(modalRect, Theme.BorderDefault);
+    DrawRectangleLinesEx(modalRect, 2.0f, Theme.AccentRed);
 
     // Header
     DrawRectangle(modalX, modalY, modalW, S(30.0f), Theme.AccentRed);
-    DrawCentredText("CONFIRMATION", faceMd, modalX, modalW, modalY + S(8.0f), S(12), ColorWhite);
+    DrawCentredText("CONFIRMATION", faceMd, modalX, modalW, modalY + S(8.0f), S(12), Theme.TextPrimary);
 
     // Message
     // Split message into two lines if needed
-    DrawCentredText("Are you sure you want to load", faceSm, modalX, modalW, modalY + S(55), S(10), ColorWhite);
-    DrawCentredText("default jogwheel settings?", faceSm, modalX, modalW, modalY + S(75), S(10), ColorWhite);
+    DrawCentredText("Are you sure you want to load", faceSm, modalX, modalW, modalY + S(55), S(10), Theme.TextPrimary);
+    DrawCentredText("default jogwheel settings?", faceSm, modalX, modalW, modalY + S(75), S(10), Theme.TextPrimary);
 
     // Cancel / OK Buttons
     Rectangle cancelBtn = {modalX + S(20), modalY + modalH - S(44), S(130), S(32)};
     bool cancelHover = CheckCollisionPointRec(Input_GetPointerPos(), cancelBtn) || r->State->ModalCursorPos == 0;
-    DrawRectangleRec(cancelBtn, cancelHover ? ColorDark2 : ColorDark1);
-    DrawRectangleLinesEx(cancelBtn, 1.5f, ColorShadow);
-    DrawCentredText("CANCEL", faceSm, cancelBtn.x, cancelBtn.width, cancelBtn.y + S(10), S(11), ColorWhite);
+    DrawRectangleRec(cancelBtn, cancelHover ? Theme.BgPanel : Theme.BorderDefault);
+    DrawRectangleLinesEx(cancelBtn, 1.5f, Theme.BorderDefault);
+    DrawCentredText("CANCEL", faceSm, cancelBtn.x, cancelBtn.width, cancelBtn.y + S(10), S(11), Theme.TextPrimary);
 
     Rectangle okBtn = {modalX + modalW - S(150), modalY + modalH - S(44), S(130), S(32)};
     bool okHover = CheckCollisionPointRec(Input_GetPointerPos(), okBtn) || r->State->ModalCursorPos == 1;
     DrawRectangleRec(okBtn, okHover ? Theme.AccentRed : Fade(Theme.AccentRed, 0.3f));
-    DrawRectangleLinesEx(okBtn, 1.5f, okHover ? ColorRed : ColorShadow);
-    DrawCentredText("OK", faceSm, okBtn.x, okBtn.width, okBtn.y + S(10), S(11), ColorWhite);
+    DrawRectangleLinesEx(okBtn, 1.5f, okHover ? Theme.AccentRed : Theme.BorderDefault);
+    DrawCentredText("OK", faceSm, okBtn.x, okBtn.width, okBtn.y + S(10), S(11), Theme.TextPrimary);
     
     if (Input_CheckPress(cancelBtn) || (r->State->MidiRequestEnter && r->State->ModalCursorPos == 0)) {
         r->State->IsConfirmPopupOpen = false;

@@ -484,6 +484,33 @@ static void Browser_UpdateActiveTracks(BrowserState *s) {
     }
   }
 
+  // Apply Related Key filter
+  if (s->IsRelatedKeyMode) {
+    int filteredCount = 0;
+    struct DeckState *masterDeck = NULL;
+    if (s->DeckA && s->DeckA->IsMaster) masterDeck = s->DeckA;
+    else if (s->DeckB && s->DeckB->IsMaster) masterDeck = s->DeckB;
+
+    const char* masterKey = (masterDeck && masterDeck->LoadedTrack) ? masterDeck->TrackKey : NULL;
+
+    if (s->DatabaseType == 0 && s->TrackPointers) { // Rekordbox
+      for (int i = 0; i < s->ActiveTrackCount; i++) {
+        RBTrack *t = s->TrackPointers[i];
+        if (t && IsKeyCompatible(t->Key, masterKey)) {
+          s->TrackPointers[filteredCount++] = t;
+        }
+      }
+    } else if (s->DatabaseType == 1 && s->SeratoTrackPointers) { // Serato
+      for (int i = 0; i < s->ActiveTrackCount; i++) {
+        SeratoTrack *t = s->SeratoTrackPointers[i];
+        if (t && IsKeyCompatible(t->Key, masterKey)) {
+          s->SeratoTrackPointers[filteredCount++] = t;
+        }
+      }
+    }
+    s->ActiveTrackCount = filteredCount;
+  }
+
   // Apply search filter
   if (s->IsSearching && s->SearchQuery[0] != '\0') {
     int filteredCount = 0;
@@ -1422,7 +1449,7 @@ static int Browser_Update(Component *base) {
   float listYOffset = TOP_BAR_H + ((s->BrowseLevel == 0) ? rowH : 0);
 
   // 1. Sidebar Clicking & Interaction
-  for (int i = 0; i < 6; i++) {
+  for (int i = 0; i < 7; i++) {
     float boxY = TOP_BAR_H + i * sidebarW;
     Rectangle boxRect = {0, boxY, sidebarW, sidebarW};
 
@@ -1438,35 +1465,46 @@ static int Browser_Update(Component *base) {
       s->ShowOSK = false;
       s->FocusArea = 0;
       s->SidebarCursorPos = i;
-      if (i < 3) {
+      if (i < 4) {
         s->ScrollOffset = 0;
         s->VisualScroll = 0;
         s->ScrollVelocity = 0;
-        if (i == 2) {
+        if (i == 3) {
           // Navigate to Drive / Source
           s->BrowseLevel = 3;
           s->CursorPos = 0;
-        } else {
+          s->IsRelatedKeyMode = false;
+        } else if (i == 2) {
           // Navigate to categories
-          if (i == 1) {
-            s->BrowseLevel = 1; // Playlists level
-            s->CursorPos = 0;
-          } else {
-            // Tracks
-            s->BrowseLevel = 0;
-            s->CurrentPlaylistIdx = -1;
-            s->CameFromBank = false;
-            s->CursorPos = 0;
-            // BUG-06 FIX: Reset SortMode when switching category from sidebar
-            s->SortMode = 0;
-            s->SortAscending = true;
-            Browser_UpdateActiveTracks(s);
-          }
+          s->BrowseLevel = 1; // Playlists level
+          s->CursorPos = 0;
+          s->IsRelatedKeyMode = false;
+        } else if (i == 1) {
+          // Related Key
+          s->BrowseLevel = 0;
+          s->IsRelatedKeyMode = true;
+          s->CurrentPlaylistIdx = -1;
+          s->CameFromBank = false;
+          s->CursorPos = 0;
+          s->SortMode = 0;
+          s->SortAscending = true;
+          Browser_UpdateActiveTracks(s);
+        } else {
+          // Tracks
+          s->BrowseLevel = 0;
+          s->IsRelatedKeyMode = false;
+          s->CurrentPlaylistIdx = -1;
+          s->CameFromBank = false;
+          s->CursorPos = 0;
+          // BUG-06 FIX: Reset SortMode when switching category from sidebar
+          s->SortMode = 0;
+          s->SortAscending = true;
+          Browser_UpdateActiveTracks(s);
         }
       } else {
         // Playlist Bank Jump
         // BUG-18 FIX: Show toast if bank slot is empty
-        int bankIdx = i - 3;
+        int bankIdx = i - 4;
         if (s->PlaylistBank[bankIdx].PlaylistIdx >= 0) {
           // Check if we need to switch storage
           if (s->SelectedStorage && strcmp(s->PlaylistBank[bankIdx].StoragePath,
@@ -1544,7 +1582,7 @@ static int Browser_Update(Component *base) {
   }
 
   // Dynamic totalVisible and maxScroll adjustment for OSK
-  float viewH = SCREEN_HEIGHT - DECK_STR_H - S(6.0f);
+  float viewH = SCREEN_HEIGHT - DECK_STR_H;
   listYOffset = TOP_BAR_H + ((s->BrowseLevel == 0) ? (rowH + S(24.0f)) : 0);
   float listAreaH = viewH - listYOffset;
   float oskH = S(172);
@@ -1734,7 +1772,7 @@ static int Browser_Update(Component *base) {
       Rectangle itemRect = {sidebarW, ry, listW - S(28), rowH};
 
       // Visually within the list clip area
-      if (ry < listYOffset - S(10) || ry > SCREEN_HEIGHT - DECK_STR_H - S(5))
+      if (ry < listYOffset - S(10) || ry > SCREEN_HEIGHT - DECK_STR_H + S(20))
         continue;
 
       if (Input_CheckPress(itemRect)) {
@@ -2496,7 +2534,7 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   // Outer Overlay Background & Sleek Top Accent Line
   DrawRectangle((int)oskX, (int)oskY, (int)oskW, (int)oskH,
                 Theme.BgMain);
-  DrawRectangle((int)oskX, (int)oskY, (int)oskW, (int)S(2), ColorBlue);
+  DrawRectangle((int)oskX, (int)oskY, (int)oskW, (int)S(2), Theme.AccentBlue);
 
   Font faceXS = UIFonts_GetFace(S(9));
   Font faceSm = UIFonts_GetFace(S(12));
@@ -2528,12 +2566,12 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
 
     Rectangle kRect = {oskX + padX + i * (kw1 + gap), startY, kw1, keyH};
     bool isHover = CheckCollisionPointRec(mPos, kRect);
-    DrawRectangleRec(kRect, isHover ? ColorBlue : ColorDark2);
-    DrawRectangleLinesEx(kRect, 1.0f, isHover ? ColorWhite : ColorDark1);
+    DrawRectangleRec(kRect, isHover ? Theme.AccentBlue : Theme.BgPanel);
+    DrawRectangleLinesEx(kRect, 1.0f, isHover ? Theme.TextPrimary : Theme.BorderDefault);
 
     char label[2] = {ch, '\0'};
     DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14),
-                    ColorWhite);
+                    Theme.TextPrimary);
 
     if (canPressOSK && Input_IsPressed() && isHover) {
       lastOskKeyPressTime = now;
@@ -2564,12 +2602,12 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
     Rectangle kRect = {oskX + padX + offset2 + i * (kw2 + gap), startY2, kw2,
                        keyH};
     bool isHover = CheckCollisionPointRec(mPos, kRect);
-    DrawRectangleRec(kRect, isHover ? ColorBlue : ColorDark2);
-    DrawRectangleLinesEx(kRect, 1.0f, isHover ? ColorWhite : ColorDark1);
+    DrawRectangleRec(kRect, isHover ? Theme.AccentBlue : Theme.BgPanel);
+    DrawRectangleLinesEx(kRect, 1.0f, isHover ? Theme.TextPrimary : Theme.BorderDefault);
 
     char label[2] = {ch, '\0'};
     DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14),
-                    ColorWhite);
+                    Theme.TextPrimary);
 
     if (canPressOSK && Input_IsPressed() && isHover) {
       lastOskKeyPressTime = now;
@@ -2597,12 +2635,12 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   Rectangle shiftRect = {oskX + padX, startY3, kwShift, keyH};
   bool hoverShift = CheckCollisionPointRec(mPos, shiftRect);
   Color shiftBg =
-      s->OSKShiftActive ? ColorOrange : (hoverShift ? ColorBlue : ColorDark2);
+      s->OSKShiftActive ? Theme.AccentOrange : (hoverShift ? Theme.AccentBlue : Theme.BgPanel);
   DrawRectangleRec(shiftRect, shiftBg);
   DrawRectangleLinesEx(shiftRect, 1.0f,
-                       s->OSKShiftActive ? ColorWhite : ColorDark1);
+                       s->OSKShiftActive ? Theme.TextPrimary : Theme.BorderDefault);
   DrawCentredText("SHIFT", faceXS, shiftRect.x, shiftRect.width,
-                  shiftRect.y + S(12), S(10), ColorWhite);
+                  shiftRect.y + S(12), S(10), Theme.TextPrimary);
 
   if (canPressOSK && Input_IsPressed() && hoverShift) {
     lastOskKeyPressTime = now;
@@ -2618,12 +2656,12 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
     Rectangle kRect = {oskX + padX + kwShift + gap + i * (kw3 + gap), startY3,
                        kw3, keyH};
     bool isHover = CheckCollisionPointRec(mPos, kRect);
-    DrawRectangleRec(kRect, isHover ? ColorBlue : ColorDark2);
-    DrawRectangleLinesEx(kRect, 1.0f, isHover ? ColorWhite : ColorDark1);
+    DrawRectangleRec(kRect, isHover ? Theme.AccentBlue : Theme.BgPanel);
+    DrawRectangleLinesEx(kRect, 1.0f, isHover ? Theme.TextPrimary : Theme.BorderDefault);
 
     char label[2] = {ch, '\0'};
     DrawCentredText(label, faceMd, kRect.x, kRect.width, kRect.y + S(9), S(14),
-                    ColorWhite);
+                    Theme.TextPrimary);
 
     if (canPressOSK && Input_IsPressed() && isHover) {
       lastOskKeyPressTime = now;
@@ -2641,10 +2679,10 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   // BKSP KEY
   Rectangle bkspRect = {oskX + padX + availW - kwBksp, startY3, kwBksp, keyH};
   bool hoverBksp = CheckCollisionPointRec(mPos, bkspRect);
-  DrawRectangleRec(bkspRect, hoverBksp ? ColorRed : ColorDark2);
-  DrawRectangleLinesEx(bkspRect, 1.0f, hoverBksp ? ColorWhite : ColorDark1);
+  DrawRectangleRec(bkspRect, hoverBksp ? Theme.AccentRed : Theme.BgPanel);
+  DrawRectangleLinesEx(bkspRect, 1.0f, hoverBksp ? Theme.TextPrimary : Theme.BorderDefault);
   DrawCentredText("BKSP", faceXS, bkspRect.x, bkspRect.width,
-                  bkspRect.y + S(12), S(10), ColorWhite);
+                  bkspRect.y + S(12), S(10), Theme.TextPrimary);
 
   if (canPressOSK && Input_IsPressed() && hoverBksp) {
     lastOskKeyPressTime = now;
@@ -2667,10 +2705,10 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   // MODE KEY (?123 / ABC)
   Rectangle modeRect = {oskX + padX, startY4, kwMode, keyH};
   bool hoverMode = CheckCollisionPointRec(mPos, modeRect);
-  DrawRectangleRec(modeRect, hoverMode ? ColorBlue : ColorDark2);
-  DrawRectangleLinesEx(modeRect, 1.0f, ColorDark1);
+  DrawRectangleRec(modeRect, hoverMode ? Theme.AccentBlue : Theme.BgPanel);
+  DrawRectangleLinesEx(modeRect, 1.0f, Theme.BorderDefault);
   DrawCentredText((s->OSKMode == 0) ? "?123" : "ABC", faceSm, modeRect.x,
-                  modeRect.width, modeRect.y + S(11), S(12), ColorOrange);
+                  modeRect.width, modeRect.y + S(11), S(12), Theme.AccentOrange);
 
   if (canPressOSK && Input_IsPressed() && hoverMode) {
     lastOskKeyPressTime = now;
@@ -2680,10 +2718,10 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   // SPACE BAR
   Rectangle spaceRect = {oskX + padX + kwMode + gap, startY4, kwSpace, keyH};
   bool hoverSpace = CheckCollisionPointRec(mPos, spaceRect);
-  DrawRectangleRec(spaceRect, hoverSpace ? ColorBlue : ColorDark2);
-  DrawRectangleLinesEx(spaceRect, 1.0f, ColorDark1);
+  DrawRectangleRec(spaceRect, hoverSpace ? Theme.AccentBlue : Theme.BgPanel);
+  DrawRectangleLinesEx(spaceRect, 1.0f, Theme.BorderDefault);
   DrawCentredText("SPACE", faceXS, spaceRect.x, spaceRect.width,
-                  spaceRect.y + S(12), S(10), ColorShadow);
+                  spaceRect.y + S(12), S(10), Theme.BorderDefault);
 
   if (canPressOSK && Input_IsPressed() && hoverSpace) {
     lastOskKeyPressTime = now;
@@ -2700,10 +2738,10 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   // CLEAR KEY
   Rectangle clearRect = {spaceRect.x + kwSpace + gap, startY4, kwClear, keyH};
   bool hoverClear = CheckCollisionPointRec(mPos, clearRect);
-  DrawRectangleRec(clearRect, hoverClear ? ColorRed : ColorDark2);
-  DrawRectangleLinesEx(clearRect, 1.0f, ColorDark1);
+  DrawRectangleRec(clearRect, hoverClear ? Theme.AccentRed : Theme.BgPanel);
+  DrawRectangleLinesEx(clearRect, 1.0f, Theme.BorderDefault);
   DrawCentredText("CLEAR", faceXS, clearRect.x, clearRect.width,
-                  clearRect.y + S(12), S(10), ColorWhite);
+                  clearRect.y + S(12), S(10), Theme.TextPrimary);
 
   if (canPressOSK && Input_IsPressed() && hoverClear) {
     lastOskKeyPressTime = now;
@@ -2716,10 +2754,10 @@ static void Browser_DrawOSK(BrowserState *s, Vector2 mPos) {
   // HIDE KEY
   Rectangle hideBtnRect = {clearRect.x + kwClear + gap, startY4, kwHide, keyH};
   bool hoverHide = CheckCollisionPointRec(mPos, hideBtnRect);
-  DrawRectangleRec(hideBtnRect, hoverHide ? ColorOrange : ColorBlue);
-  DrawRectangleLinesEx(hideBtnRect, 1.0f, ColorWhite);
+  DrawRectangleRec(hideBtnRect, hoverHide ? Theme.AccentOrange : Theme.AccentBlue);
+  DrawRectangleLinesEx(hideBtnRect, 1.0f, Theme.TextPrimary);
   DrawCentredText("HIDE", faceSm, hideBtnRect.x, hideBtnRect.width,
-                  hideBtnRect.y + S(11), S(12), ColorWhite);
+                  hideBtnRect.y + S(11), S(12), Theme.TextPrimary);
 
   if (canPressOSK && Input_IsPressed() && hoverHide) {
     lastOskKeyPressTime = now;
@@ -2735,13 +2773,13 @@ static void Browser_Draw(Component *base) {
   if (!s->IsActive)
     return;
 
-  float viewH = SCREEN_HEIGHT - DECK_STR_H - S(6.0f);
-  DrawRectangle(0, 0, SCREEN_WIDTH, viewH, ColorBlack);
+  float viewH = SCREEN_HEIGHT - DECK_STR_H;
+  DrawRectangle(0, 0, SCREEN_WIDTH, viewH, Theme.BgMain);
 
   // Sidebar
   float sidebarW = S(40);
-  DrawRectangle(0, TOP_BAR_H, sidebarW, viewH - TOP_BAR_H, ColorDark2);
-  DrawLine(sidebarW, TOP_BAR_H, sidebarW, viewH, ColorDark1);
+  DrawRectangle(0, TOP_BAR_H, sidebarW, viewH - TOP_BAR_H, Theme.BgPanel);
+  DrawLine(sidebarW, TOP_BAR_H, sidebarW, viewH, Theme.BorderDefault);
 
   Font faceXS = UIFonts_GetFace(S(10));
   Font faceSm = UIFonts_GetFace(S(13));
@@ -2754,84 +2792,86 @@ static void Browser_Draw(Component *base) {
 
   // Sidebar Boxes (1:1 Squares)
   Vector2 mPos = Input_GetPointerPos();
-  for (int i = 0; i < 6; i++) {
+  for (int i = 0; i < 7; i++) {
     float boxY = TOP_BAR_H + i * sidebarW;
     Rectangle boxRect = {0, boxY, sidebarW, sidebarW};
     bool isHovered = CheckCollisionPointRec(mPos, boxRect);
-    bool isBank = (i >= 3);
-    bool isAssigned = isBank && (s->PlaylistBank[i - 3].PlaylistIdx >= 0);
+    bool isBank = (i >= 4);
+    bool isAssigned = isBank && (s->PlaylistBank[i - 4].PlaylistIdx >= 0);
 
     bool isActiveNav = false;
     if (!isBank) {
-      if (i == 0 && s->BrowseLevel == 0)
+      if (i == 0 && s->BrowseLevel == 0 && !s->IsRelatedKeyMode)
         isActiveNav = true; // Tracks
-      if (i == 1 && s->BrowseLevel == 1)
+      if (i == 1 && s->BrowseLevel == 0 && s->IsRelatedKeyMode)
+        isActiveNav = true; // Related Key
+      if (i == 2 && s->BrowseLevel == 1)
         isActiveNav = true; // Playlists
-      if (i == 2 && s->BrowseLevel == 3)
+      if (i == 3 && s->BrowseLevel == 3)
         isActiveNav = true; // Source
     }
 
     bool isSidebarFocused = (s->FocusArea == 1 && s->SidebarCursorPos == i);
 
     // Background
-    Color bg = ColorDark2;
+    Color bg = Theme.BgPanel;
     if (isHovered)
-      bg = ColorDark1;
+      bg = Theme.BgPanelAlt;
     if (isActiveNav)
       bg = Theme.HoverActive;
     if (isSidebarFocused)
       bg = Theme.SelectedItem;
     if (isBank && !isSidebarFocused)
-      bg = isAssigned ? ColorDGreen : ColorDark3;
+      bg = isAssigned ? Theme.AccentGreen : Theme.BgMain;
 
     if (isBank && isHovered && s->IsDragging && s->DraggingType == 1)
       bg = Theme.AccentOrange; // Highlight Drop Target
 
     DrawRectangle(0, boxY, sidebarW, sidebarW, bg);
     if (isActiveNav)
-      DrawRectangle(0, boxY, S(3), sidebarW, ColorBlue);
+      DrawRectangle(0, boxY, S(3), sidebarW, Theme.AccentBlue);
     if (isSidebarFocused) {
       DrawRectangleLinesEx(boxRect, 2.0f, Theme.AccentBlue);
       DrawSelectionTriangle(sidebarW - S(4), boxY + (sidebarW / 2.0f),
                             Theme.AccentBlue);
     } else {
-      DrawRectangleLinesEx(boxRect, 1.0f, ColorDark1);
+      DrawRectangleLinesEx(boxRect, 1.0f, Theme.BorderDefault);
     }
 
     if (!isBank) {
-      const char *sidIcons[] = {"\uf03a", "\uf022", "\uf287"}; // Tracks, Playlist, USB
-      DrawCentredText(sidIcons[i], (i == 2) ? faceBrand : faceIcon, 0, sidebarW,
+      const char *sidIcons[] = {"\uf03a", "\uf001", "\uf022", "\uf287"}; // Tracks, Related Key, Playlist, USB
+      DrawCentredText(sidIcons[i], (i == 3) ? faceBrand : faceIcon, 0, sidebarW,
                       boxY + S(12), S(16),
-                      isActiveNav ? ColorBlue
-                                  : (isHovered ? ColorWhite : ColorShadow));
+                      isActiveNav ? Theme.AccentBlue
+                                  : (isHovered ? Theme.TextPrimary : Theme.BorderDefault));
     } else {
       // Playlist Bank Placeholders (1-3)
-      int bankIdx = i - 3;
+      int bankIdx = i - 4;
       if (s->PlaylistBank[bankIdx].PlaylistIdx >= 0) {
         // Show truncated name (e.g. "Techno")
         char displayName[8];
         strncpy(displayName, s->PlaylistBank[bankIdx].Name, 7);
         displayName[7] = '\0';
         DrawCentredText(displayName, faceXS, 0, sidebarW, boxY + S(15), S(9),
-                        ColorWhite);
+                        Theme.TextPrimary);
       } else {
         char bankNum[4];
         sprintf(bankNum, "P%d", bankIdx + 1);
         DrawCentredText("\uf02e", faceIcon, 0, sidebarW, boxY + S(8), S(14),
-                        ColorShadow);
+                        Theme.BorderDefault);
         DrawCentredText(bankNum, faceXS, 0, sidebarW, boxY + S(24), S(10),
-                        ColorShadow);
+                        Theme.BorderDefault);
       }
     }
   }
 
   // Header Color & Text
-  Color headerClr = ColorBlue;
+  Color headerClr = Theme.AccentBlue;
   const char *titleText = "TRACKS";
   char countText[32] = "";
 
   if (s->BrowseLevel == 1) {
-    headerClr = ColorDGreen;
+    headerClr = Theme.AccentGreen;
     titleText = "PLAYLIST";
     int totalPl = 0;
     if (s->DatabaseType == 0)
@@ -2840,11 +2880,11 @@ static void Browser_Draw(Component *base) {
       totalPl = s->SeratoDB ? s->SeratoDB->PlaylistCount : 0;
     sprintf(countText, "TOTAL %d", totalPl);
   } else if (s->BrowseLevel == 2) {
-    headerClr = ColorOrange;
+    headerClr = Theme.AccentOrange;
     titleText = "BROWSE";
   } else if (s->BrowseLevel == 3) {
     Browser_RefreshStorages(s); // Refresh on Source screen
-    headerClr = ColorBlue;
+    headerClr = Theme.AccentBlue;
     titleText = "SOURCE";
     sprintf(countText, "TOTAL %d", s->StorageCount);
   } else {
@@ -2879,9 +2919,9 @@ static void Browser_Draw(Component *base) {
                                oskButtonW, rowH};
 
     // Draw Search Input
-    DrawRectangleRec(searchBoxRect, s->IsSearching ? ColorDark1 : ColorDark2);
+    DrawRectangleRec(searchBoxRect, s->IsSearching ? Theme.BorderDefault : Theme.BgPanel);
     DrawRectangleLinesEx(searchBoxRect, 1.0f,
-                         s->IsSearching ? ColorBlue : ColorDark1);
+                         s->IsSearching ? Theme.AccentBlue : Theme.BorderDefault);
 
     char displayQuery[128];
     if (strlen(s->SearchQuery) > 0) {
@@ -2896,26 +2936,26 @@ static void Browser_Draw(Component *base) {
     }
     UIDrawText("\uf002", faceIcon, searchBoxRect.x + S(8),
                searchBoxRect.y + S(8), S(12),
-               s->IsSearching ? ColorWhite : ColorShadow);
+               s->IsSearching ? Theme.TextPrimary : Theme.BorderDefault);
     UIDrawText(displayQuery, faceXS, searchBoxRect.x + S(30),
                searchBoxRect.y + S(9), S(10),
-               s->IsSearching ? ColorWhite : ColorShadow);
+               s->IsSearching ? Theme.TextPrimary : Theme.BorderDefault);
 
     // Draw OSK Button (Keyboard Icon)
     bool isOskHover = CheckCollisionPointRec(mPos, oskButtonRect);
-    Color oskBg = (s->ShowOSK || isOskHover) ? ColorBlue : ColorDark2;
+    Color oskBg = (s->ShowOSK || isOskHover) ? Theme.AccentBlue : Theme.BgPanel;
     DrawRectangleRec(oskButtonRect, oskBg);
     DrawRectangleLinesEx(oskButtonRect, 1.0f,
-                         s->ShowOSK ? ColorWhite : ColorDark1);
+                         s->ShowOSK ? Theme.TextPrimary : Theme.BorderDefault);
     UIDrawText("\uf11c", faceIcon, oskButtonRect.x + S(11),
-               oskButtonRect.y + S(8), S(12), ColorWhite);
+               oskButtonRect.y + S(8), S(12), Theme.TextPrimary);
 
     listYOffset += rowH;
 
     // Draw Table Header Bar (Row 2) - Reference Image 2
     Rectangle tableHeaderRect = {listX, listYOffset, listW, headerH};
     DrawRectangleRec(tableHeaderRect, Theme.BgPanel);
-    DrawRectangleLinesEx(tableHeaderRect, 1.0f, ColorDark1);
+    DrawRectangleLinesEx(tableHeaderRect, 1.0f, Theme.BorderDefault);
 
     bool showNumCol = (s->CurrentPlaylistIdx != -1);
     float titleBaseX = showNumCol ? S(46) : S(0);
@@ -2923,71 +2963,71 @@ static void Browser_Draw(Component *base) {
     // Column Dividers
     if (showNumCol) {
       DrawLine(listX + S(46), listYOffset, listX + S(46), listYOffset + headerH,
-               ColorDark1); // NO. | TITLE
+               Theme.BorderDefault); // NO. | TITLE
     }
     DrawLine(listX + listW - S(110), listYOffset, listX + listW - S(110),
-             listYOffset + headerH, ColorDark1);
+             listYOffset + headerH, Theme.BorderDefault);
     DrawLine(listX + listW - S(55), listYOffset, listX + listW - S(55),
-             listYOffset + headerH, ColorDark1);
+             listYOffset + headerH, Theme.BorderDefault);
 
     // Column 1: NO.
     if (showNumCol) {
       UIDrawText("NO.", faceXS, listX + S(6), listYOffset + S(5), S(10),
-                 (s->SortMode == 0) ? ColorWhite : ColorShadow);
+                 (s->SortMode == 0) ? Theme.TextPrimary : Theme.BorderDefault);
       if (s->SortMode == 0) {
         float cx = listX + S(28);
         float cy = listYOffset + S(8);
         if (s->SortAscending)
           DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)},
-                       (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
+                       (Vector2){cx + S(6), cy + S(4)}, Theme.TextPrimary);
         else
           DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy},
-                       (Vector2){cx, cy}, ColorWhite);
+                       (Vector2){cx, cy}, Theme.TextPrimary);
       }
     }
 
     // Column 2: TITLE
     UIDrawText("TITLE", faceXS, listX + titleBaseX + S(6), listYOffset + S(5), S(10),
-               (s->SortMode == 3) ? ColorWhite : ColorShadow);
+               (s->SortMode == 3) ? Theme.TextPrimary : Theme.BorderDefault);
     if (s->SortMode == 3) {
       float cx = listX + titleBaseX + S(36);
       float cy = listYOffset + S(8);
       if (s->SortAscending)
         DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)},
-                     (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
+                     (Vector2){cx + S(6), cy + S(4)}, Theme.TextPrimary);
       else
         DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy},
-                     (Vector2){cx, cy}, ColorWhite);
+                     (Vector2){cx, cy}, Theme.TextPrimary);
     }
 
     // Column 3: BPM
     DrawCentredText("BPM", faceXS, listX + listW - S(110), S(55),
                     listYOffset + S(5), S(10),
-                    (s->SortMode == 1) ? ColorWhite : ColorShadow);
+                    (s->SortMode == 1) ? Theme.TextPrimary : Theme.BorderDefault);
     if (s->SortMode == 1) {
       float cx = listX + listW - S(110) + S(42);
       float cy = listYOffset + S(8);
       if (s->SortAscending)
         DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)},
-                     (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
+                     (Vector2){cx + S(6), cy + S(4)}, Theme.TextPrimary);
       else
         DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy},
-                     (Vector2){cx, cy}, ColorWhite);
+                     (Vector2){cx, cy}, Theme.TextPrimary);
     }
 
     // Column 4: KEY
     DrawCentredText("KEY", faceXS, listX + listW - S(55), S(55),
                     listYOffset + S(5), S(10),
-                    (s->SortMode == 2) ? ColorWhite : ColorShadow);
+                    (s->SortMode == 2) ? Theme.TextPrimary : Theme.BorderDefault);
     if (s->SortMode == 2) {
       float cx = listX + listW - S(55) + S(42);
       float cy = listYOffset + S(8);
       if (s->SortAscending)
         DrawTriangle((Vector2){cx + S(3), cy}, (Vector2){cx, cy + S(4)},
-                     (Vector2){cx + S(6), cy + S(4)}, ColorWhite);
+                     (Vector2){cx + S(6), cy + S(4)}, Theme.TextPrimary);
       else
         DrawTriangle((Vector2){cx + S(3), cy + S(4)}, (Vector2){cx + S(6), cy},
-                     (Vector2){cx, cy}, ColorWhite);
+                     (Vector2){cx, cy}, Theme.TextPrimary);
     }
 
     listYOffset += headerH;
@@ -3113,22 +3153,22 @@ static void Browser_Draw(Component *base) {
     }
 
     if (isCursor) {
-      DrawRectangle(listX, ry + 1, listW, rowH - 2, ColorBlue);
+      DrawRectangle(listX, ry + 1, listW, rowH - 2, Theme.AccentBlue);
       if (s->BrowseLevel > 0 && !s->IsTagList) {
-        DrawSelectionTriangle(listX + S(2), ry + (rowH / 2.0f), ColorWhite);
+        DrawSelectionTriangle(listX + S(2), ry + (rowH / 2.0f), Theme.TextPrimary);
       }
     } else if (isPlaying) {
       DrawRectangle(listX, ry + 1, listW, rowH - 2, Theme.DeckActiveBg);
     } else if (isHover) {
       DrawRectangle(listX, ry + 1, listW, rowH - 2, Theme.HoverActive);
     } else if (i % 2 != 0) {
-      DrawRectangle(listX, ry + 1, listW, rowH - 2, ColorDark2);
+      DrawRectangle(listX, ry + 1, listW, rowH - 2, Theme.BgPanel);
     }
 
     Color textCol =
-        isCursor ? ColorWhite : (isPlaying ? ColorOrange : ColorShadow);
+        isCursor ? Theme.TextPrimary : (isPlaying ? Theme.AccentOrange : Theme.BorderDefault);
     Color titleCol =
-        isCursor ? ColorWhite : (isPlaying ? ColorOrange : ColorWhite);
+        isCursor ? Theme.TextPrimary : (isPlaying ? Theme.AccentOrange : Theme.TextPrimary);
 
     // Render Track Index Number - only for Track List (BrowseLevel 0)
     bool showNumCol = (s->CurrentPlaylistIdx != -1);
@@ -3220,16 +3260,16 @@ static void Browser_Draw(Component *base) {
         // Perfect Camelot Harmonic Match (Traffic Light Green)
         DrawRectangleRec(keyBadgeRect, Theme.AccentGreen);
         DrawCentredText(keyStr, faceXS, keyBadgeRect.x, keyBadgeRect.width,
-                        keyBadgeRect.y + S(5), S(10), ColorBlack);
+                        keyBadgeRect.y + S(5), S(10), Theme.BgMain);
       } else if (matchLevel == 1) {
         // Energy Shift / Semi-compatible Match (Traffic Light Amber/Yellow)
         DrawRectangleRec(keyBadgeRect, Theme.AccentYellow);
         DrawCentredText(keyStr, faceXS, keyBadgeRect.x, keyBadgeRect.width,
-                        keyBadgeRect.y + S(5), S(10), ColorBlack);
+                        keyBadgeRect.y + S(5), S(10), Theme.BgMain);
       } else {
         // Incompatible key or no master key loaded
         DrawRectangleRec(keyBadgeRect, Theme.BgPanelAlt);
-        DrawRectangleLinesEx(keyBadgeRect, 1.0f, ColorDark1);
+        DrawRectangleLinesEx(keyBadgeRect, 1.0f, Theme.BorderDefault);
         Color keyCol = GetCamelotColor(keyStr);
         if (!isCursor) {
              // Dim it slightly if not focused
@@ -3253,7 +3293,7 @@ static void Browser_Draw(Component *base) {
         iconFont = faceIcon;
       }
 
-      UIDrawText(icon, iconFont, listX + S(11), ry + S(7), S(12), ColorWhite);
+      UIDrawText(icon, iconFont, listX + S(11), ry + S(7), S(12), Theme.TextPrimary);
     }
   }
   EndScissorMode();
@@ -3281,7 +3321,7 @@ static void Browser_Draw(Component *base) {
     // Background Track
     DrawRectangle(sbTrackX, sbTrackY, sbTrackW, sbTrackH,
                   Theme.BgOverlay);
-    DrawLine(sbTrackX, sbTrackY, sbTrackX, sbTrackY + sbTrackH, ColorDark1);
+    DrawLine(sbTrackX, sbTrackY, sbTrackX, sbTrackY + sbTrackH, Theme.BorderDefault);
 
     // Calculate handle height and Y position
     float maxScroll = (maxItems - totalVisible) * rowH;
@@ -3300,8 +3340,8 @@ static void Browser_Draw(Component *base) {
 
     Color handleColor =
         s->IsScrollbarDragging
-            ? ColorOrange
-            : (s->IsDragging ? ColorWhite : Theme.TextSecondary);
+            ? Theme.AccentOrange
+            : (s->IsDragging ? Theme.TextPrimary : Theme.TextSecondary);
     DrawRectangleRounded(
         (Rectangle){sbTrackX + S(3), handleY, sbTrackW - S(6), handleH}, 0.5f,
         4, handleColor);
@@ -3310,19 +3350,19 @@ static void Browser_Draw(Component *base) {
   // Load Deck Popup Modal
   if (s->ShowLoadPopup) {
     float viewH = SCREEN_HEIGHT - DECK_STR_H;
-    DrawRectangle(0, 0, SCREEN_WIDTH, viewH, Fade(ColorBlack, 0.8f));
+    DrawRectangle(0, 0, SCREEN_WIDTH, viewH, Fade(Theme.BgMain, 0.8f));
     float pw = S(240);
     float ph = S(120);
     float px = (SCREEN_WIDTH - pw) / 2.0f;
     float py = (viewH - ph) / 2.0f;
 
     // Background
-    DrawRectangle(px, py, pw, ph, ColorBGUtil);
-    DrawRectangleLinesEx((Rectangle){px, py, pw, ph}, 1.0f, ColorGray);
+    DrawRectangle(px, py, pw, ph, Theme.BgMain);
+    DrawRectangleLinesEx((Rectangle){px, py, pw, ph}, 1.0f, Theme.TextSecondary);
 
     // Title
     DrawCentredText("LOAD TRACK TO...", faceMd, px, pw, py + S(15), S(15),
-                    ColorWhite);
+                    Theme.TextPrimary);
     const char *trackName = "Unknown";
     if (s->PopupTrackIdx >= 0 && s->PopupTrackIdx < s->ActiveTrackCount) {
       if (s->DatabaseType == 0) {
@@ -3333,7 +3373,7 @@ static void Browser_Draw(Component *base) {
           trackName = s->SeratoTrackPointers[s->PopupTrackIdx]->Title;
       }
     }
-    DrawCentredText(trackName, faceXS, px, pw, py + S(35), S(10), ColorShadow);
+    DrawCentredText(trackName, faceXS, px, pw, py + S(35), S(10), Theme.BorderDefault);
 
     // Buttons Deck A & Deck B
     Rectangle deckARect = {px, py + ph / 2.0f, pw / 2.0f, ph / 2.0f};
@@ -3343,16 +3383,16 @@ static void Browser_Draw(Component *base) {
     bool hoverA = CheckCollisionPointRec(mPos, deckARect);
     bool hoverB = CheckCollisionPointRec(mPos, deckBRect);
 
-    DrawRectangleRec(deckARect, hoverA ? ColorOrange : ColorDark1);
-    DrawRectangleLinesEx(deckARect, 1.0f, ColorShadow);
+    DrawRectangleRec(deckARect, hoverA ? Theme.AccentOrange : Theme.BorderDefault);
+    DrawRectangleLinesEx(deckARect, 1.0f, Theme.BorderDefault);
     DrawCentredText("DECK 1", faceMd, px, pw / 2.0f, py + ph / 2.0f + S(20),
-                    S(15), hoverA ? ColorBlack : ColorOrange);
+                    S(15), hoverA ? Theme.BgMain : Theme.AccentOrange);
 
-    DrawRectangleRec(deckBRect, hoverB ? ColorBlue : ColorDark2);
-    DrawRectangleLinesEx(deckBRect, 1.0f, ColorShadow);
+    DrawRectangleRec(deckBRect, hoverB ? Theme.AccentBlue : Theme.BgPanel);
+    DrawRectangleLinesEx(deckBRect, 1.0f, Theme.BorderDefault);
     DrawCentredText("DECK 2", faceMd, px + pw / 2.0f, pw / 2.0f,
                     py + ph / 2.0f + S(20), S(15),
-                    hoverB ? ColorBlack : ColorBlue);
+                    hoverB ? Theme.BgMain : Theme.AccentBlue);
   }
 
   // Drag and Drop Visual (Only for Playlists)
@@ -3367,9 +3407,9 @@ static void Browser_Draw(Component *base) {
     }
 
     float dw = S(120), dh = S(22);
-    DrawRectangle(mPos.x + 10, mPos.y + 10, dw, dh, Fade(ColorDark3, 0.8f));
-    DrawRectangleLines(mPos.x + 10, mPos.y + 10, dw, dh, ColorBlue);
-    UIDrawText(dragName, faceXS, mPos.x + 15, mPos.y + 15, S(10), ColorWhite);
+    DrawRectangle(mPos.x + 10, mPos.y + 10, dw, dh, Fade(Theme.BgPanelAlt, 0.8f));
+    DrawRectangleLines(mPos.x + 10, mPos.y + 10, dw, dh, Theme.AccentBlue);
+    UIDrawText(dragName, faceXS, mPos.x + 15, mPos.y + 15, S(10), Theme.TextPrimary);
   }
 
   // Overlay Dropdown Menu
@@ -3381,8 +3421,8 @@ static void Browser_Draw(Component *base) {
 
     Rectangle dropdownRect = {sidebarW + listW - sortButtonW, TOP_BAR_H + rowH,
                               sortButtonW, rowH * 5};
-    DrawRectangleRec(dropdownRect, ColorDark2);
-    DrawRectangleLinesEx(dropdownRect, 1.0f, ColorShadow);
+    DrawRectangleRec(dropdownRect, Theme.BgPanel);
+    DrawRectangleLinesEx(dropdownRect, 1.0f, Theme.BorderDefault);
 
     const char *sortLabelsList[] = {"Default", "BPM", "Key", "Title", "Rating"};
     for (int i = 0; i < 5; i++) { // Loop to 5
@@ -3391,12 +3431,12 @@ static void Browser_Draw(Component *base) {
       bool hover = CheckCollisionPointRec(mPos, itemRect);
 
       if (hover)
-        DrawRectangleRec(itemRect, ColorDark1);
+        DrawRectangleRec(itemRect, Theme.BorderDefault);
       if (s->SortMode == i)
-        DrawRectangle(itemRect.x, itemRect.y, S(3), itemRect.height, ColorBlue);
+        DrawRectangle(itemRect.x, itemRect.y, S(3), itemRect.height, Theme.AccentBlue);
 
       UIDrawText(sortLabelsList[i], faceXS, itemRect.x + S(10),
-                 itemRect.y + S(9), S(10), hover ? ColorWhite : ColorShadow);
+                 itemRect.y + S(9), S(10), hover ? Theme.TextPrimary : Theme.BorderDefault);
     }
   }
 

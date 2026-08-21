@@ -84,6 +84,7 @@ typedef struct AppTheme {
 
 extern AppTheme Theme;
 void Theme_InitDefaultDark(void);
+void Theme_InitDefaultLight(void);
 
 // Screen modes
 #define MODE_PLAYER     0

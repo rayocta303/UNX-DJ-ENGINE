@@ -52,15 +52,15 @@ static void DrawVerticalFader(float x, float y, float w, float h, float val,
   float travelRange = h - handleH;
 
   DrawRectangleRec((Rectangle){x, y, w, h}, Theme.BgMain);
-  DrawRectangleLinesEx((Rectangle){x, y, w, h}, 1, ColorDark1);
+  DrawRectangleLinesEx((Rectangle){x, y, w, h}, 1, Theme.BorderDefault);
 
   Rectangle track = {x + w * 0.45f, y + handleH / 2.0f, w * 0.1f, travelRange};
-  DrawRectangleRec(track, ColorBlack);
+  DrawRectangleRec(track, Theme.BgMain);
 
   for (int i = 0; i <= 10; i++) {
     float ty = (y + handleH / 2.0f) + (i / 10.0f) * travelRange;
     float tw = (i % 5 == 0) ? w * 0.25f : w * 0.12f;
-    DrawLine(x + w * 0.5f - tw, ty, x + w * 0.5f + tw, ty, ColorDark2);
+    DrawLine(x + w * 0.5f - tw, ty, x + w * 0.5f + tw, ty, Theme.BgPanel);
   }
 
   float hy = (y + handleH / 2.0f) + (1.0f - val) * travelRange - handleH / 2.0f;
@@ -69,14 +69,14 @@ static void DrawVerticalFader(float x, float y, float w, float h, float val,
   DrawRectangle(handle.x + S(2), handle.y + S(2), handle.width, handle.height,
                 Theme.BgOverlay);
   DrawRectangleRec(handle, Theme.BorderDefault);
-  DrawRectangleLinesEx(handle, 1.5f, ColorWhite);
+  DrawRectangleLinesEx(handle, 1.5f, Theme.TextPrimary);
   DrawLine(handle.x + S(4), handle.y + handleH / 2.0f,
-           handle.x + handleW - S(4), handle.y + handleH / 2.0f, ColorWhite);
+           handle.x + handleW - S(4), handle.y + handleH / 2.0f, Theme.TextPrimary);
 
   if (cueActive) {
     DrawRectangleRec((Rectangle){handle.x + S(2), handle.y + S(2),
                                  handleW - S(4), handleH - S(4)},
-                     Fade(ColorOrange, 0.4f));
+                     Fade(Theme.AccentOrange, 0.4f));
   }
 }
 */
@@ -87,10 +87,10 @@ static bool DrawFXButton(const char *label, float x, float y, float w, float h,
       CheckCollisionPointRec(Input_GetPointerPos(), (Rectangle){x, y, w, h});
   bool pressed = Touch_CheckClick((Rectangle){x, y, w, h}, S(2.0f));
   bool isFxBlinking = (fmod(GetTime(), 0.5) < 0.25);
-  Color bg = active ? (isFxBlinking ? Theme.AccentBlue : Theme.HoverActive) : (hovered ? ColorDark1 : ColorBlack);
-  Color fg = active ? ColorWhite : ColorOrange;
+  Color bg = active ? (isFxBlinking ? Theme.AccentBlue : Theme.HoverActive) : (hovered ? Theme.BorderDefault : Theme.BgMain);
+  Color fg = active ? Theme.TextPrimary : Theme.AccentOrange;
   DrawRectangle(x, y, w, h, bg);
-  DrawRectangleLines(x, y, w, h, active ? ColorWhite : ColorOrange);
+  DrawRectangleLines(x, y, w, h, active ? Theme.TextPrimary : Theme.AccentOrange);
   int fontSize = (h > S(18)) ? S(9.5f) : S(8);
   Font f = UIFonts_GetFace(fontSize);
   DrawCentredText(label, f, x, w, y + (h - fontSize) / 2.0f, fontSize, fg);
@@ -164,12 +164,12 @@ static void HandleKnob(MixerState *state, float *val, float cx, float cy, float 
 
 static void DrawVertVU(float vx, float vy, float vw, float vh, float level) {
   DrawRectangle(vx, vy, vw, vh, Theme.BgMain);
-  DrawRectangleLinesEx((Rectangle){vx, vy, vw, vh}, 1.0f, ColorDark1);
+  DrawRectangleLinesEx((Rectangle){vx, vy, vw, vh}, 1.0f, Theme.BorderDefault);
   int segs = 18;
   float segH = (vh - 2) / segs;
   for (int i = 0; i < segs; i++) {
     float th = (float)(i + 1) / segs;
-    Color c = (i < 12) ? ColorDGreen : (i < 16 ? ColorOrange : ColorRed);
+    Color c = (i < 12) ? Theme.AccentGreen : (i < 16 ? Theme.AccentOrange : Theme.AccentRed);
     if (level < th)
       c = Fade(c, 0.12f);
     DrawRectangle(vx + 2, vy + vh - (i + 1) * segH - 1, vw - 4, segH - 1, c);
@@ -186,14 +186,14 @@ static void Mixer_Draw(Component *base) {
   bool mDown = Input_IsDown();
 
   float viewH = SCREEN_HEIGHT - DECK_STR_H;
-  DrawRectangle(0, 0, SCREEN_WIDTH, viewH, ColorBGUtil);
+  DrawRectangle(0, 0, SCREEN_WIDTH, viewH, Theme.BgMain);
 
   // Clear handle if mouse released
   if (!mDown) r->State->ActiveHandle = NULL;
 
-  DrawRectangle(0, 0, SCREEN_WIDTH, TOP_BAR_H, ColorDark1);
-  DrawLine(0, TOP_BAR_H, SCREEN_WIDTH, TOP_BAR_H, ColorShadow);
-  UIDrawText("MIXER", UIFonts_GetFace(S(12)), S(15), S(5), S(12), ColorWhite);
+  DrawRectangle(0, 0, SCREEN_WIDTH, TOP_BAR_H, Theme.BorderDefault);
+  DrawLine(0, TOP_BAR_H, SCREEN_WIDTH, TOP_BAR_H, Theme.BorderDefault);
+  UIDrawText("MIXER", UIFonts_GetFace(S(12)), S(15), S(5), S(12), Theme.TextPrimary);
 
   // --- LAYOUT CONSTANTS ---
   float colFXW = S(124);
@@ -214,9 +214,9 @@ static void Mixer_Draw(Component *base) {
   // COLUMN 1: SOUND COLOR FX (FAR LEFT)
   // =========================================================================
   DrawRectangle(leftX, panelY, colFXW, panelH, Theme.BgPanel);
-  DrawRectangleLinesEx((Rectangle){leftX, panelY, colFXW, panelH}, 1.0f, ColorDark1);
+  DrawRectangleLinesEx((Rectangle){leftX, panelY, colFXW, panelH}, 1.0f, Theme.BorderDefault);
   float fxY = panelY + S(12);
-  DrawCentredText("SOUND COLOR FX", fSub, leftX, colFXW, fxY, S(9), ColorShadow);
+  DrawCentredText("SOUND COLOR FX", fSub, leftX, colFXW, fxY, S(9), Theme.BorderDefault);
   
   float cfy = fxY + S(14);
   char *cfxNames[] = {"SPACE", "DUB ECHO", "SWEEP", "NOISE", "FILTER", "JET"};
@@ -235,7 +235,7 @@ static void Mixer_Draw(Component *base) {
   }
 
   float paramY = panelY + panelH - S(50);
-  Mixer_DrawKnob(leftX + colFXW/2, paramY, S(12), eng->Decks[0].ColorFX.parameter, 0.0f, 1.0f, "PARAM", ColorShadow, true);
+  Mixer_DrawKnob(leftX + colFXW/2, paramY, S(12), eng->Decks[0].ColorFX.parameter, 0.0f, 1.0f, "PARAM", Theme.BorderDefault, true);
   HandleKnob(r->State, &eng->Decks[0].ColorFX.parameter, leftX + colFXW/2, paramY, S(12), 0.0f, 1.0f, true, mousePos, mDown);
   eng->Decks[1].ColorFX.parameter = eng->Decks[0].ColorFX.parameter;
 
@@ -243,7 +243,7 @@ static void Mixer_Draw(Component *base) {
   // COLUMN 2: CORE MIXER (CENTER) - [Fader1 | EQ1 | VU | EQ2 | Fader2]
   // =========================================================================
   DrawRectangle(centerX, panelY, colMixW, panelH, Theme.BgPanelAlt);
-  DrawRectangleLinesEx((Rectangle){centerX, panelY, colMixW, panelH}, 1.0f, ColorDark1);
+  DrawRectangleLinesEx((Rectangle){centerX, panelY, colMixW, panelH}, 1.0f, Theme.BorderDefault);
   
   float innerPad = S(10);
   float mixerInnerW = colMixW - (innerPad * 2);
@@ -273,30 +273,30 @@ static void Mixer_Draw(Component *base) {
     float cueBtnSize = S(20);
     float cueBtnX = fcx - cueBtnSize / 2.0f;
     float cueBtnY = topY - S(2);
-    DrawRectangleLinesEx((Rectangle){cueBtnX, cueBtnY, cueBtnSize, cueBtnSize}, 1.0f, d->IsCueActive ? ColorOrange : ColorShadow);
+    DrawRectangleLinesEx((Rectangle){cueBtnX, cueBtnY, cueBtnSize, cueBtnSize}, 1.0f, d->IsCueActive ? Theme.AccentOrange : Theme.BorderDefault);
     if (d->IsCueActive) DrawRectangleRec((Rectangle){cueBtnX + 2, cueBtnY + 2, cueBtnSize - 4, cueBtnSize - 4}, Fade(Theme.CueMarker, 0.15f));
 
     Font iconFont = UIFonts_GetIcon(S(12));
-    UIDrawText("\xef\x80\xa5", iconFont, fcx - S(6), cueBtnY + S(4), S(12), d->IsCueActive ? ColorOrange : ColorShadow);
+    UIDrawText("\xef\x80\xa5", iconFont, fcx - S(6), cueBtnY + S(4), S(12), d->IsCueActive ? Theme.AccentOrange : Theme.BorderDefault);
     if (Touch_CheckClick((Rectangle){cueBtnX, cueBtnY, cueBtnSize, cueBtnSize}, S(2.0f))) {
         d->IsCueActive = !d->IsCueActive;
     }
 
     // Channel Label
-    UIDrawText(i == 0 ? "CH1" : "CH2", fTiny, ecx - S(10), topY + S(2), S(9), ColorWhite);
+    UIDrawText(i == 0 ? "CH1" : "CH2", fTiny, ecx - S(10), topY + S(2), S(9), Theme.TextPrimary);
 
     // --- EQ STACK (Inner) ---
     float ky = panelY + S(38); // Lowered slightly
-    Mixer_DrawKnob(ecx, ky, kR, d->Trim, 0.0f, 1.0f, "TRIM", ColorWhite, true);
+    Mixer_DrawKnob(ecx, ky, kR, d->Trim, 0.0f, 1.0f, "TRIM", Theme.TextPrimary, true);
     HandleKnob(r->State, &d->Trim, ecx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
     ky += kStep;
-    Mixer_DrawKnob(ecx, ky, kR, d->EqHigh, 0.0f, 1.0f, "HI", ColorWhite, true);
+    Mixer_DrawKnob(ecx, ky, kR, d->EqHigh, 0.0f, 1.0f, "HI", Theme.TextPrimary, true);
     HandleKnob(r->State, &d->EqHigh, ecx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
     ky += kStep;
-    Mixer_DrawKnob(ecx, ky, kR, d->EqMid, 0.0f, 1.0f, "MID", ColorWhite, true);
+    Mixer_DrawKnob(ecx, ky, kR, d->EqMid, 0.0f, 1.0f, "MID", Theme.TextPrimary, true);
     HandleKnob(r->State, &d->EqMid, ecx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
     ky += kStep;
-    Mixer_DrawKnob(ecx, ky, kR, d->EqLow, 0.0f, 1.0f, "LOW", ColorWhite, true);
+    Mixer_DrawKnob(ecx, ky, kR, d->EqLow, 0.0f, 1.0f, "LOW", Theme.TextPrimary, true);
     HandleKnob(r->State, &d->EqLow, ecx, ky, kR, 0.0f, 1.0f, true, mousePos, mDown);
 
     // --- FADER (Outer) ---
@@ -311,8 +311,8 @@ static void Mixer_Draw(Component *base) {
     DrawRectangle(fcx - 1, fy + fH - valH, 2, valH, faderCol);
     float handleY = fy + (1.0f - d->Fader) * (fH - S(10));
     DrawRectangle(fcx - fW/2, handleY, fW, S(10), Theme.BorderDefault);
-    DrawRectangleLines(fcx - fW/2, handleY, fW, S(10), ColorGray);
-    DrawLine(fcx - fW/2 + 2, handleY + S(5), fcx + fW/2 - 2, handleY + S(5), ColorWhite);
+    DrawRectangleLines(fcx - fW/2, handleY, fW, S(10), Theme.TextSecondary);
+    DrawLine(fcx - fW/2 + 2, handleY + S(5), fcx + fW/2 - 2, handleY + S(5), Theme.TextPrimary);
 
     // --- CHANNEL VU ---
     float cvuX = (i == 0) ? (fcx + fW/2 + S(6)) : (fcx - fW/2 - S(10)); // Increased spacing
@@ -322,7 +322,7 @@ static void Mixer_Draw(Component *base) {
 
     // --- CFX (COLOR) KNOB (Below Fader) ---
     float colorY = fy + fH + S(22);
-    Mixer_DrawKnob(fcx, colorY, S(12), d->ColorFX.colorValue, -1.0f, 1.0f, "COLOR", ColorOrange, true);
+    Mixer_DrawKnob(fcx, colorY, S(12), d->ColorFX.colorValue, -1.0f, 1.0f, "COLOR", Theme.AccentOrange, true);
     HandleKnob(r->State, &d->ColorFX.colorValue, fcx, colorY, S(12), -1.0f, 1.0f, true, mousePos, mDown);
   }
 
@@ -340,7 +340,7 @@ static void Mixer_Draw(Component *base) {
   DrawRectangleRounded((Rectangle){cfX, cfY + cfH/2 - 2, cfW, 4}, 1.0f, 4, Theme.BgMain);
   float hX = cfX + (eng->Crossfader + 1.0f) * 0.5f * (cfW - S(12));
   DrawRectangleRounded((Rectangle){hX, cfY, S(12), cfH}, 0.2f, 4, Theme.BorderDefault);
-  DrawLine(hX + S(6), cfY + 2, hX + S(6), cfY + cfH - 2, ColorWhite);
+  DrawLine(hX + S(6), cfY + 2, hX + S(6), cfY + cfH - 2, Theme.TextPrimary);
   
   if (mDown && CheckCollisionPointRec(mousePos, (Rectangle){cfX, cfY, cfW, cfH}) && r->State->ActiveHandle == NULL) {
       r->State->ActiveHandle = &eng->Crossfader;
@@ -357,21 +357,21 @@ static void Mixer_Draw(Component *base) {
   // =========================================================================
   BeatFXState *fxs = r->State->FXState;
   DrawRectangle(rightX, panelY, colRightW, panelH, Theme.BgPanel);
-  DrawRectangleLinesEx((Rectangle){rightX, panelY, colRightW, panelH}, 1.0f, ColorDark1);
+  DrawRectangleLinesEx((Rectangle){rightX, panelY, colRightW, panelH}, 1.0f, Theme.BorderDefault);
   float masterKnobY = panelY + S(25);
-  Mixer_DrawKnob(rightX + colRightW / 2.0f, masterKnobY, S(15), eng->MasterVolume, 0.0f, 2.0f, "MASTER", ColorRed, true);
+  Mixer_DrawKnob(rightX + colRightW / 2.0f, masterKnobY, S(15), eng->MasterVolume, 0.0f, 2.0f, "MASTER", Theme.AccentRed, true);
   HandleKnob(r->State, &eng->MasterVolume, rightX + colRightW / 2.0f, masterKnobY, S(15), 0.0f, 2.0f, true, mousePos, mDown);
 
   float bfxY = masterKnobY + S(40);
-  DrawCentredText("BEAT FX", fSub, rightX, colRightW, bfxY, S(9), ColorShadow);
+  DrawCentredText("BEAT FX", fSub, rightX, colRightW, bfxY, S(9), Theme.BorderDefault);
   
   const char *bfxNames[] = {"DELAY", "ECHO", "P-PONG", "SPIRAL", "REVERB", "TRANS", "FILTER", "FLANGER", "PHASER", "PITCH", "SLIPROLL", "ROLL", "BRAKE", "HELIX"};
   float bSelectorY = bfxY + S(15);
   Rectangle fxSelRect = {rightX + S(10), bSelectorY, colRightW - S(20), S(26)};
-  DrawRectangleRec(fxSelRect, ColorBlack);
-  DrawRectangleLinesEx(fxSelRect, 1.0f, ColorWhite);
+  DrawRectangleRec(fxSelRect, Theme.BgMain);
+  DrawRectangleLinesEx(fxSelRect, 1.0f, Theme.TextPrimary);
   int focus = fxs->FocusedSlot;
-  DrawCentredText(bfxNames[fxs->Slots[focus].FXType % 14], fSub, rightX, colRightW, bSelectorY + S(8), S(9), ColorWhite);
+  DrawCentredText(bfxNames[fxs->Slots[focus].FXType % 14], fSub, rightX, colRightW, bSelectorY + S(8), S(9), Theme.TextPrimary);
   if (Touch_CheckClick(fxSelRect, S(2.0f))) {
       fxs->Slots[focus].FXType = (fxs->Slots[focus].FXType + 1) % 14;
       BeatFXManager_SetFX(&eng->BeatFX, fxs->Slots[focus].FXType);
@@ -380,15 +380,15 @@ static void Mixer_Draw(Component *base) {
   float targetY = bSelectorY + S(32);
   const char *targetNames[] = {"MASTER", "CH 1", "CH 2"};
   Rectangle chSelRect = {rightX + S(10), targetY, colRightW - S(20), S(26)};
-  DrawRectangleRec(chSelRect, ColorBlack);
-  DrawRectangleLinesEx(chSelRect, 1.0f, ColorWhite);
-  DrawCentredText(targetNames[fxs->SelectedChannel % 3], fSub, rightX, colRightW, targetY + S(8), S(9), ColorOrange);
+  DrawRectangleRec(chSelRect, Theme.BgMain);
+  DrawRectangleLinesEx(chSelRect, 1.0f, Theme.TextPrimary);
+  DrawCentredText(targetNames[fxs->SelectedChannel % 3], fSub, rightX, colRightW, targetY + S(8), S(9), Theme.AccentOrange);
   if (Touch_CheckClick(chSelRect, S(2.0f))) {
       fxs->SelectedChannel = (fxs->SelectedChannel + 1) % 3;
   }
 
   float bDepthY = panelY + panelH - S(100);
-  Mixer_DrawKnob(rightX + colRightW / 2.0f, bDepthY, S(13), fxs->LevelDepth, 0.0f, 1.0f, "DEPTH", ColorOrange, false);
+  Mixer_DrawKnob(rightX + colRightW / 2.0f, bDepthY, S(13), fxs->LevelDepth, 0.0f, 1.0f, "DEPTH", Theme.AccentOrange, false);
   HandleKnob(r->State, &fxs->LevelDepth, rightX + colRightW / 2.0f, bDepthY, S(13), 0.0f, 1.0f, false, mousePos, mDown);
 
   float bOnOffY = panelY + panelH - S(45);

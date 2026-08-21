@@ -21,51 +21,51 @@ static void drawLeftBadgeColumn(DeckStrip *d, float x, float y, float h) {
 
   // 1. DECK Header
   float headH = 21;
-  Color headColor = ColorBGUtil;
+  Color headColor = Theme.BgMain;
   if (d->State->IsLoading && ((int)(GetTime() * 4.0f) % 2 == 0)) {
-    headColor = ColorOrange;
+    headColor = Theme.AccentOrange;
   }
 
-  DrawRectangle(lColX, y, lColW, h, ColorDark3);
+  DrawRectangle(lColX, y, lColW, h, Theme.BgPanelAlt);
 
   DrawRectangle(lColX, y, lColW, S(headH), headColor);
-  DrawRectangle(lColX, y + S(headH) - S(1), lColW, S(1), ColorShadow);
+  DrawRectangle(lColX, y + S(headH) - S(1), lColW, S(1), Theme.BorderDefault);
 
-  DrawCentredText("DECK", faceXXS, lColX, lColW, y + S(2), S(7), ColorPaper);
+  DrawCentredText("DECK", faceXXS, lColX, lColW, y + S(2), S(7), Theme.TextPrimary);
 
   float badgeY = y + S(9);
-  DrawCentredText("((   ))", faceSm, lColX, lColW, badgeY, S(9), ColorRed);
+  DrawCentredText("((   ))", faceSm, lColX, lColW, badgeY, S(9), Theme.AccentRed);
 
   char idStr[16];
   sprintf(idStr, "%d", d->ID + 1);
-  DrawCentredText(idStr, faceSm, lColX, lColW, badgeY, S(9), ColorWhite);
+  DrawCentredText(idStr, faceSm, lColX, lColW, badgeY, S(9), Theme.TextPrimary);
 
   // 2. TRACK Section
   float trackY = 24;
   DrawCentredText("TRACK", faceXXS, lColX, lColW, y + S(trackY), S(7),
-                  ColorShadow);
+                  Theme.BorderDefault);
 
   char trackStr[16] = "---";
   if (d->State->LoadedTrack != NULL) {
     sprintf(trackStr, "%02d", d->State->TrackNumber);
   }
   DrawCentredText(trackStr, faceLg, lColX, lColW, y + S(trackY + 5), S(18),
-                  ColorWhite);
+                  Theme.TextPrimary);
 
   // 3. PLAY MODE (SINGLE / CONTINUE)
   float singleY = 52;
   const char *playModeStr = (d->State->PlayMode == 0) ? "CONTINUE" : "SINGLE";
-  Color playModeColor = (d->State->PlayMode == 0) ? ColorOrange : ColorShadow;
+  Color playModeColor = (d->State->PlayMode == 0) ? Theme.AccentOrange : Theme.BorderDefault;
   DrawCentredText(playModeStr, faceXXS, lColX, lColW, y + S(singleY), S(7),
                   playModeColor);
 
   // 4. QUANTIZE
   float quantizeY = 68;
-  Color quantizeColor = ColorShadow;
+  Color quantizeColor = Theme.BorderDefault;
   const char *quantizeStr = "OFF";
 
   if (d->State->QuantizeEnabled) {
-    quantizeColor = ColorRed;
+    quantizeColor = Theme.AccentRed;
     quantizeStr = "1";
   }
 
@@ -74,7 +74,7 @@ static void drawLeftBadgeColumn(DeckStrip *d, float x, float y, float h) {
   DrawCentredText(quantizeStr, faceMd, lColX, lColW, y + S(quantizeY + 8.5f),
                   S(11), quantizeColor);
 
-  DrawLine(lColX + lColW, y, lColX + lColW, y + h, ColorDark1);
+  DrawLine(lColX + lColW, y, lColX + lColW, y + h, Theme.BorderDefault);
 }
 
 static int DeckStrip_Update(Component *base) {
@@ -220,10 +220,10 @@ static void DeckStrip_Draw(Component *base) {
   float x = d->ID * stripW;
   float y = TOP_BAR_H + WAVE_AREA_H + FX_BAR_H;
 
-  DrawRectangle(x, y, stripW, DECK_STR_H, ColorBlack);
-  DrawLine(x, y, x + stripW, y, ColorGray);
+  DrawRectangle(x, y, stripW, DECK_STR_H, Theme.BgMain);
+  DrawLine(x, y, x + stripW, y, Theme.BorderDefault);
   if (d->ID == 0)
-    DrawLine(stripW, y, stripW, y + DECK_STR_H, ColorGray);
+    DrawLine(stripW, y, stripW, y + DECK_STR_H, Theme.BorderDefault);
 
   // 1. LEFT Badge
   drawLeftBadgeColumn(d, x, y, DECK_STR_H);
@@ -250,7 +250,7 @@ static void DeckStrip_Draw(Component *base) {
     strncpy(title, d->State->TrackTitle, sizeof(title) - 1);
 
     UIDrawText("\xef\x80\x81", iconFace, mx, y + S(2.5f), S(11),
-               ColorWhite); // f001 music note
+               Theme.TextPrimary); // f001 music note
     float maxW = stripW - (mx - x) - S(20);
     Rectangle titleRect = {mx + S(15), y + S(1.5f), maxW, S(16)};
     static float autoTimer[2] = {0, 0};
@@ -261,10 +261,10 @@ static void DeckStrip_Draw(Component *base) {
     }
     autoTimer[d->ID] += GetFrameTime();
 
-    UIDrawScrollingText(title, titleFont, titleRect, S(12.0f), ColorWhite,
+    UIDrawScrollingText(title, titleFont, titleRect, S(12.0f), Theme.TextPrimary,
                         autoTimer[d->ID]);
   } else {
-    UIDrawText(title, titleFont, mx, y + S(1.5f), S(12.0f), ColorWhite);
+    UIDrawText(title, titleFont, mx, y + S(1.5f), S(12.0f), Theme.TextPrimary);
   }
 
   float midY = y + titleBgH + S(4);
@@ -273,17 +273,17 @@ static void DeckStrip_Draw(Component *base) {
   float badgeH = S(12);
 
   bool vinylOn = d->State->VinylModeEnabled;
-  Color jogClr = vinylOn ? ColorBlue : ColorRed;
+  Color jogClr = vinylOn ? Theme.AccentBlue : Theme.AccentRed;
   const char *jogStr = vinylOn ? "VINYL" : "CDJ";
   DrawRectangleLines(badgeX, midY + S(1), badgeW, badgeH, jogClr);
   DrawCentredText(jogStr, faceXXS, badgeX, badgeW, midY + S(3.0f), S(7),
                   jogClr);
 
-  DrawRectangleLines(badgeX, midY + S(15), badgeW, badgeH, ColorShadow);
+  DrawRectangleLines(badgeX, midY + S(15), badgeW, badgeH, Theme.BorderDefault);
   DrawCentredText("AUTO CUE", faceXXS, badgeX, badgeW, midY + S(17.0f), S(7),
-                  ColorPaper);
+                  Theme.TextPrimary);
 
-  Color mtClr = d->State->MasterTempo ? ColorRed : ColorShadow;
+  Color mtClr = d->State->MasterTempo ? Theme.AccentRed : Theme.BorderDefault;
   DrawRectangleLines(badgeX, midY + S(29), badgeW, badgeH, mtClr);
   DrawCentredText("MT", faceXXS, badgeX, badgeW, midY + S(31.0f), S(7), mtClr);
 
@@ -292,11 +292,11 @@ static void DeckStrip_Draw(Component *base) {
   // REMAIN / TIME Indicators
   Font elFace = (d->State->TimeMode == 0) ? UIFonts_GetBoldFace(S(7)) : faceXXS;
   Font rmFace = (d->State->TimeMode == 1) ? UIFonts_GetBoldFace(S(7)) : faceXXS;
-  Color elClr = (d->State->TimeMode == 0) ? ColorWhite : ColorShadow;
-  Color rmClr = (d->State->TimeMode == 1) ? ColorWhite : ColorShadow;
+  Color elClr = (d->State->TimeMode == 0) ? Theme.TextPrimary : Theme.BorderDefault;
+  Color rmClr = (d->State->TimeMode == 1) ? Theme.TextPrimary : Theme.BorderDefault;
 
   UIDrawText("TIME", elFace, timeX + S(50), midY, S(7), elClr);
-  UIDrawText("/", faceXXS, timeX + S(43), midY, S(7), ColorShadow);
+  UIDrawText("/", faceXXS, timeX + S(43), midY, S(7), Theme.BorderDefault);
   UIDrawText("REMAIN", rmFace, timeX + S(7), midY, S(7), rmClr);
 
   long long displayMs = d->State->PositionMs;
@@ -322,19 +322,19 @@ static void DeckStrip_Draw(Component *base) {
   Font faceTimeSub = UIFonts_GetTimeFace(S(13));
 
   float timeValY = midY + S(9);
-  UIDrawText(timeStr, faceTime, timeX, timeValY, S(18), ColorWhite);
+  UIDrawText(timeStr, faceTime, timeX, timeValY, S(18), Theme.TextPrimary);
 
   float wM = MeasureTextEx(faceTime, timeStr, S(18), 1).x;
   char subStr[8];
   sprintf(subStr, ".%03d", subSec);
   UIDrawText(subStr, faceTimeSub, timeX + wM + S(2), timeValY + S(4), S(13),
-             ColorPaper);
+             Theme.TextPrimary);
 
   float bpmBoxW = S(56);
   float bpmX = x + stripW - bpmBoxW - S(4);
   float tempoX = bpmX - S(64);
 
-  UIDrawText("TEMPO", faceXXS, tempoX, midY, S(7), ColorShadow);
+  UIDrawText("TEMPO", faceXXS, tempoX, midY, S(7), Theme.BorderDefault);
 
   const char *rangeStr = "10%";
   Color rangeBgCol = Theme.AccentOrange; // Dark Orange
@@ -353,7 +353,7 @@ static void DeckStrip_Draw(Component *base) {
   float tBadgeY = midY - S(0.5f);
   DrawRectangle(tempoX + S(32), tBadgeY, S(tBadgeW), S(9), rangeBgCol);
   DrawCentredText(rangeStr, faceXXSBold, tempoX + S(32), S(tBadgeW),
-                  tBadgeY + S(0.5f), S(7), ColorWhite);
+                  tBadgeY + S(0.5f), S(7), Theme.TextPrimary);
 
   char tempoStr[32];
   sprintf(tempoStr, "%+.2f%%", d->State->TempoPercent);
@@ -362,19 +362,19 @@ static void DeckStrip_Draw(Component *base) {
 
   float wT = MeasureTextEx(faceMdBold, tempoStr, S(11), 1).x;
   float valX = (tempoX + S(32) + S(tBadgeW)) - wT;
-  UIDrawText(tempoStr, faceMdBold, valX, midY + S(11), S(11), ColorPaper);
+  UIDrawText(tempoStr, faceMdBold, valX, midY + S(11), S(11), Theme.TextPrimary);
 
   float bpmBoxH = S(28);
   float bpmBoxY = midY;
-  DrawRectangleLines(bpmX, bpmBoxY, bpmBoxW, bpmBoxH, ColorOrange);
-  UIDrawText("BPM", faceXXS, bpmX + S(2), bpmBoxY + S(0.5f), S(7), ColorShadow);
+  DrawRectangleLines(bpmX, bpmBoxY, bpmBoxW, bpmBoxH, Theme.AccentOrange);
+  UIDrawText("BPM", faceXXS, bpmX + S(2), bpmBoxY + S(0.5f), S(7), Theme.BorderDefault);
 
   if (d->State->IsMaster) {
     float masterW = S(36);
     float masterX = bpmX + bpmBoxW - masterW - S(1);
-    DrawRectangle(masterX, bpmBoxY + S(1), masterW, S(8), ColorOrange);
+    DrawRectangle(masterX, bpmBoxY + S(1), masterW, S(8), Theme.AccentOrange);
     DrawCentredText("MASTER", faceXXS, masterX, masterW, bpmBoxY + S(0.5f),
-                    S(7), ColorBlack);
+                    S(7), Theme.BgMain);
   }
 
   char bpmMain[16] = "--";
@@ -395,21 +395,21 @@ static void DeckStrip_Draw(Component *base) {
   float combinedX = bpmX + (bpmBoxW - (wBmain + wBdec)) / 2;
   float bpmValY = bpmBoxY + S(8);
 
-  UIDrawText(bpmMain, faceBPM, combinedX, bpmValY, S(20), ColorOrange);
+  UIDrawText(bpmMain, faceBPM, combinedX, bpmValY, S(20), Theme.AccentOrange);
   UIDrawText(bpmDec, faceMd, combinedX + wBmain, bpmValY + S(3.5f), S(11),
-             ColorOrange);
+             Theme.AccentOrange);
 
   // Sync Button
   float syncY = bpmBoxY + bpmBoxH + S(2);
   float syncH = S(12);
 
-  Color syncColor = ColorShadow;
+  Color syncColor = Theme.BorderDefault;
   const char *syncText = "SYNC";
   if (d->State->SyncMode == 1) {
-    syncColor = ColorWhite;
+    syncColor = Theme.TextPrimary;
     syncText = "BPM";
   } else if (d->State->SyncMode == 2) {
-    syncColor = ColorBlue;
+    syncColor = Theme.AccentBlue;
     syncText = "BEAT";
   }
 
@@ -426,7 +426,7 @@ static void DeckStrip_Draw(Component *base) {
 
     // Background box
     DrawRectangle(wx, wy, ww, wh, Theme.BgMain);
-    DrawRectangleLinesEx((Rectangle){wx, wy, ww, wh}, 1.0f, ColorDark1);
+    DrawRectangleLinesEx((Rectangle){wx, wy, ww, wh}, 1.0f, Theme.BorderDefault);
 
     // Center guide line
     DrawLine(wx, wy + wh * 0.5f, wx + ww, wy + wh * 0.5f,
@@ -499,7 +499,7 @@ static void DeckStrip_Draw(Component *base) {
         bool played = (r0 < playedRatio);
 
         float rL = 0, rM = 0, rH = 0;
-        Color col = ColorBlue;
+        Color col = Theme.AccentBlue;
         float halfH = wh * 0.5f;
 
         // 1. DATA EXTRACTION & NORMALIZATION based on renderType (PWV2, PWV4,
@@ -644,7 +644,7 @@ static void DeckStrip_Draw(Component *base) {
               else
                 finalCol = BL_HIGH;
             } else
-              finalCol = ColorBlue;
+              finalCol = Theme.AccentBlue;
           } else {
             if (style == WAVEFORM_STYLE_RGB) {
               finalCol.r =
@@ -654,7 +654,7 @@ static void DeckStrip_Draw(Component *base) {
               finalCol.b =
                   (unsigned char)fminf(255.0f, (float)col.b * eqHighMult);
             } else
-              finalCol = ColorBlue;
+              finalCol = Theme.AccentBlue;
           }
 
           if (hVal > halfH)
@@ -675,7 +675,7 @@ static void DeckStrip_Draw(Component *base) {
       rlEnd();
     } else {
       UIDrawText("WAVEFORM NOT LOADED", faceXXS, wx + S(10), wy + S(6), S(8),
-                 ColorShadow);
+                 Theme.BorderDefault);
     }
 
     // Cue Markers Rendering (Hot Cues & Memory Cues)
@@ -721,7 +721,7 @@ static void DeckStrip_Draw(Component *base) {
         if (ratio >= 0.0f && ratio <= 1.0f) {
           float rx = wx + ratio * ww;
           DrawLineEx((Vector2){rx, wy}, (Vector2){rx, wy + wh}, 1.0f,
-                     ColorOrange);
+                     Theme.AccentOrange);
         }
       }
 
@@ -731,10 +731,10 @@ static void DeckStrip_Draw(Component *base) {
         if (ratio >= 0.0f && ratio <= 1.0f) {
           float rx = wx + ratio * ww;
           DrawLineEx((Vector2){rx, wy}, (Vector2){rx, wy + wh}, 1.5f,
-                     ColorWhite);
+                     Theme.TextPrimary);
           DrawTriangle((Vector2){rx - S(4), wy + wh},
                        (Vector2){rx + S(4), wy + wh},
-                       (Vector2){rx, wy + wh - S(6)}, ColorOrange);
+                       (Vector2){rx, wy + wh - S(6)}, Theme.AccentOrange);
         }
       }
 
@@ -745,13 +745,13 @@ static void DeckStrip_Draw(Component *base) {
       if (ratio > 1)
         ratio = 1;
       float px = wx + ratio * ww;
-      DrawRectangle(px - 1, wy, 2, wh, ColorRed);
+      DrawRectangle(px - 1, wy, 2, wh, Theme.AccentRed);
     }
 
     // --- LOADING OVERLAY ---
     if (d->State->IsLoading) {
       float pulse = (sinf(GetTime() * 10.0f) * 0.5f + 0.5f);
-      DrawRectangle(wx, wy, ww, wh, Fade(ColorOrange, 0.1f + pulse * 0.3f));
+      DrawRectangle(wx, wy, ww, wh, Fade(Theme.AccentOrange, 0.1f + pulse * 0.3f));
     }
   }
 
@@ -759,11 +759,11 @@ static void DeckStrip_Draw(Component *base) {
   if (d->State->IsLoading) {
     float pulse = (sinf(GetTime() * 10.0f) * 0.5f + 0.5f);
     DrawRectangle(x, y, stripW, DECK_STR_H,
-                  Fade(ColorOrange, 0.1f + pulse * 0.2f));
+                  Fade(Theme.AccentOrange, 0.1f + pulse * 0.2f));
   }
 
   // Draw Bottom Borders
-  DrawLine(x, y + DECK_STR_H - 1, x + stripW, y + DECK_STR_H - 1, ColorDark1);
+  DrawLine(x, y + DECK_STR_H - 1, x + stripW, y + DECK_STR_H - 1, Theme.BorderDefault);
 }
 
 void DeckStrip_Init(DeckStrip *d, int id, DeckState *state) {

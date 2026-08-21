@@ -32,7 +32,7 @@ static void EnsureControllersExist(const char* baseDir) {
     }
 }
 
-static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB, bool *quantizeA, bool *quantizeB, float *masterVolume) {
+static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB, bool *quantizeA, bool *quantizeB, float *masterVolume, int *themeMode, int *playMode) {
     if (!json) return;
     
     const char* p = json;
@@ -143,9 +143,23 @@ static void LoadFromJSON(const char* json, WaveformSettings *wfmA, WaveformSetti
             *masterVolume = val;
         }
     }
+
+    // Theme Mode
+    if ((p = strstr(json, "\"theme_mode\""))) {
+        if (sscanf(p, "\"theme_mode\": %d", &ival) == 1 && themeMode) {
+            *themeMode = ival;
+        }
+    }
+
+    // Play Mode
+    if ((p = strstr(json, "\"play_mode\""))) {
+        if (sscanf(p, "\"play_mode\": %d", &ival) == 1 && playMode) {
+            *playMode = ival;
+        }
+    }
 }
 
-void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB, char *controllerPath, bool *quantizeA, bool *quantizeB, float *masterVolume) {
+void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendConfig *audio, BeatFXState *fx, ColorFXManager *cfxA, ColorFXManager *cfxB, char *controllerPath, bool *quantizeA, bool *quantizeB, float *masterVolume, int *themeMode, int *playMode) {
     // Defaults
     controllerPath[0] = '\0';
     wfmA->Style = WAVEFORM_STYLE_RGB;
@@ -176,6 +190,8 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     if (quantizeA) *quantizeA = true;
     if (quantizeB) *quantizeB = true;
     if (masterVolume) *masterVolume = 1.0f;
+    if (themeMode) *themeMode = 0; // Default to Dark Theme
+    if (playMode) *playMode = 0; // Default to CONTINUE
 
     if (cfxA) ColorFXManager_Init(cfxA);
     if (cfxB) ColorFXManager_Init(cfxB);
@@ -219,7 +235,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
 
     if (!f) {
         EnsureControllersExist("."); // Fallback to current dir if nothing else
-        Settings_Save(*wfmA, *wfmB, *audio, *fx, *cfxA, *cfxB, controllerPath, quantizeA ? *quantizeA : true, quantizeB ? *quantizeB : true, masterVolume ? *masterVolume : 1.0f);
+        Settings_Save(*wfmA, *wfmB, *audio, *fx, *cfxA, *cfxB, controllerPath, quantizeA ? *quantizeA : true, quantizeB ? *quantizeB : true, masterVolume ? *masterVolume : 1.0f, themeMode ? *themeMode : 0, playMode ? *playMode : 0);
         return;
     }
 
@@ -231,7 +247,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     if (buf) {
         fread(buf, 1, size, f);
         buf[size] = '\0';
-        LoadFromJSON(buf, wfmA, wfmB, audio, fx, cfxA, cfxB, quantizeA, quantizeB, masterVolume);
+        LoadFromJSON(buf, wfmA, wfmB, audio, fx, cfxA, cfxB, quantizeA, quantizeB, masterVolume, themeMode, playMode);
         
         // Extract controller path manually to avoid changing too many signatures
         const char *p;
@@ -253,7 +269,7 @@ void Settings_Load(WaveformSettings *wfmA, WaveformSettings *wfmB, AudioBackendC
     fclose(f);
 }
 
-void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendConfig audio, BeatFXState fx, ColorFXManager cfxA, ColorFXManager cfxB, const char *controllerPath, bool quantizeA, bool quantizeB, float masterVolume) {
+void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendConfig audio, BeatFXState fx, ColorFXManager cfxA, ColorFXManager cfxB, const char *controllerPath, bool quantizeA, bool quantizeB, float masterVolume, int themeMode, int playMode) {
     char path[512];
 
 #if defined(__ANDROID__)
@@ -300,6 +316,8 @@ void Settings_Save(WaveformSettings wfmA, WaveformSettings wfmB, AudioBackendCon
             (int)cfxA.activeFX, cfxA.parameter, cfxA.colorValue, cfxB.colorValue);
     fprintf(f, "  \"quantize\": { \"qA\": %d, \"qB\": %d },\n", quantizeA ? 1 : 0, quantizeB ? 1 : 0);
     fprintf(f, "  \"master\": { \"vol\": %.3f },\n", masterVolume);
+    fprintf(f, "  \"theme_mode\": %d,\n", themeMode);
+    fprintf(f, "  \"play_mode\": %d,\n", playMode);
     fprintf(f, "  \"controllers\": { \"path\": \"%s\" }\n", controllerPath ? controllerPath : "");
     fprintf(f, "}\n");
 

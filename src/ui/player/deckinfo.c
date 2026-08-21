@@ -202,11 +202,11 @@ static void DeckInfo_Draw(Component *base) {
     float y = TOP_BAR_H + (d->ID * deckInfoH);
     float margin = S(4.0f);
 
-    DrawRectangle(0, y, deckInfoW, deckInfoH, ColorDark2);
+    DrawRectangle(0, y, deckInfoW, deckInfoH, Theme.BgPanel);
     
     float headerH = S(14.0f);
-    DrawRectangle(0, y, deckInfoW, headerH, ColorShadow);
-    DrawRectangle(0, y + headerH - S(1.0f), deckInfoW, S(1.0f), d->ID == 0 ? ColorBlue : ColorOrange);
+    DrawRectangle(0, y, deckInfoW, headerH, Theme.BorderDefault);
+    DrawRectangle(0, y + headerH - S(1.0f), deckInfoW, S(1.0f), d->ID == 0 ? Theme.AccentBlue : Theme.AccentOrange);
 
     Font faceXXS = UIFonts_GetFace(S(7));
     Font faceSm = UIFonts_GetFace(S(10));
@@ -214,7 +214,7 @@ static void DeckInfo_Draw(Component *base) {
 
     char deckLabel[32];
     sprintf(deckLabel, "DECK %d", d->ID + 1);
-    UIDrawText(deckLabel, faceSm, margin, y + S(2.5f), S(10), ColorWhite);
+    UIDrawText(deckLabel, faceSm, margin, y + S(2.5f), S(10), Theme.TextPrimary);
 
     // Eject Button
     float ejectW = S(12);
@@ -229,22 +229,22 @@ static void DeckInfo_Draw(Component *base) {
     float jogR = S(5.5f);
 
     // Platter background & outer ring
-    Color jogRingColor = d->State->IsTouching ? ColorRed : (d->ID == 0 ? ColorBlue : ColorOrange);
+    Color jogRingColor = d->State->IsTouching ? Theme.AccentRed : (d->ID == 0 ? Theme.AccentBlue : Theme.AccentOrange);
     DrawCircle((int)jogCX, (int)jogCY, jogR, Theme.BgMain);
     DrawCircleLines((int)jogCX, (int)jogCY, jogR, Fade(jogRingColor, 0.6f));
 
     // Load Track Chaser Glow
     if (d->State->LoadAnimTimer > 0.0f) {
         float chaserAngle = d->State->JogPointerAngle;
-        DrawCircleSectorLines((Vector2){jogCX, jogCY}, jogR + S(1.5f), chaserAngle - 60.0f, chaserAngle, 8, ColorBlue);
-        DrawCircleSectorLines((Vector2){jogCX, jogCY}, jogR + S(1.0f), chaserAngle - 30.0f, chaserAngle, 8, ColorWhite);
+        DrawCircleSectorLines((Vector2){jogCX, jogCY}, jogR + S(1.5f), chaserAngle - 60.0f, chaserAngle, 8, Theme.AccentBlue);
+        DrawCircleSectorLines((Vector2){jogCX, jogCY}, jogR + S(1.0f), chaserAngle - 30.0f, chaserAngle, 8, Theme.TextPrimary);
     }
 
     // Rotating Pointer Needle
     float pRad = (d->State->JogPointerAngle - 90.0f) * (3.14159265f / 180.0f);
     Vector2 pStart = { jogCX + cosf(pRad) * S(1.5f), jogCY + sinf(pRad) * S(1.5f) };
     Vector2 pEnd = { jogCX + cosf(pRad) * (jogR - S(0.5f)), jogCY + sinf(pRad) * (jogR - S(0.5f)) };
-    Color ptrColor = d->State->IsTouching ? ColorRed : (d->State->LoadAnimTimer > 0.0f ? ColorWhite : (d->State->IsPlaying ? ColorGreen : ColorWhite));
+    Color ptrColor = d->State->IsTouching ? Theme.AccentRed : (d->State->LoadAnimTimer > 0.0f ? Theme.TextPrimary : (d->State->IsPlaying ? Theme.AccentGreen : Theme.TextPrimary));
     DrawLineEx(pStart, pEnd, S(1.2f), ptrColor);
 
     bool isEjectLocked = d->State->Waveform.LoadLock && d->State->IsPlaying;
@@ -254,14 +254,14 @@ static void DeckInfo_Draw(Component *base) {
         bool isConfirming = (GetTime() - d->lastEjectTapTime < 2.0);
         
         // Button Background
-        DrawRectangleRounded(ejectRect, 0.4f, 6, isConfirming ? ColorRed : (hoverEject ? ColorRed : Fade(ColorBlack, 0.4f)));
-        DrawRectangleLinesEx(ejectRect, S(0.6f), isConfirming ? ColorWhite : (hoverEject ? ColorWhite : ColorShadow));
+        DrawRectangleRounded(ejectRect, 0.4f, 6, isConfirming ? Theme.AccentRed : (hoverEject ? Theme.AccentRed : Fade(Theme.BgMain, 0.4f)));
+        DrawRectangleLinesEx(ejectRect, S(0.6f), isConfirming ? Theme.TextPrimary : (hoverEject ? Theme.TextPrimary : Theme.BorderDefault));
         
         // Icon (Eject)
         if (isConfirming) {
-            UIDrawText("SURE?", faceXXS, ejectRect.x + S(1), ejectRect.y + S(2.5f), S(7), ColorWhite);
+            UIDrawText("SURE?", faceXXS, ejectRect.x + S(1), ejectRect.y + S(2.5f), S(7), Theme.TextPrimary);
         } else {
-            UIDrawText("\uf052", faceIcon, ejectRect.x + (ejectW - S(7))/2.0f, ejectRect.y + S(2.5f), S(7), ColorWhite);
+            UIDrawText("\uf052", faceIcon, ejectRect.x + (ejectW - S(7))/2.0f, ejectRect.y + S(2.5f), S(7), Theme.TextPrimary);
         }
     }
 
@@ -274,7 +274,7 @@ static void DeckInfo_Draw(Component *base) {
     DrawRectangle(margin, contentY, deckInfoW - margin * 2, statusH, Theme.BgOverlay);
     
     // Column 1: KEY
-    UIDrawText("KEY", faceXXS, col1X + S(6), contentY + S(4), S(7), ColorShadow);
+    UIDrawText("KEY", faceXXS, col1X + S(6), contentY + S(4), S(7), Theme.BorderDefault);
     char keyStr[32] = "---";
     if (d->State->LoadedTrack) {
         GetDynamicKey(d->State->TrackKey, d->State->TempoPercent, d->State->MasterTempo, keyStr);
@@ -283,7 +283,7 @@ static void DeckInfo_Draw(Component *base) {
     UIDrawText(keyStr, faceSm, col1X + S(6), contentY + S(11), S(10), keyCol);
 
     // Column 2: BAR
-    UIDrawText("BAR", faceXXS, col2X + S(2), contentY + S(4), S(7), ColorShadow);
+    UIDrawText("BAR", faceXXS, col2X + S(2), contentY + S(4), S(7), Theme.BorderDefault);
     char barsVal[32] = "01.1";
     if (d->State->LoadedTrack) {
         long long posMs = d->State->PositionMs;
@@ -299,7 +299,7 @@ static void DeckInfo_Draw(Component *base) {
             sprintf(barsVal, "%02d.%d", currentBar, currentBeat);
         }
     }
-    UIDrawText(barsVal, faceSm, col2X + S(2), contentY + S(11), S(10), d->ID == 0 ? ColorOrange : ColorWhite);
+    UIDrawText(barsVal, faceSm, col2X + S(2), contentY + S(11), S(10), d->ID == 0 ? Theme.AccentOrange : Theme.TextPrimary);
 
     // --- Row 2: Utility Buttons (2 Rows x 2 Columns Grid) - COMMENTED OUT ---
     /*
@@ -311,11 +311,11 @@ static void DeckInfo_Draw(Component *base) {
 
     // 1. Master (Top-Left)
     Rectangle msRect = { margin, utilY, utilW, utilH };
-    DrawRectangleRec(msRect, d->State->IsMaster ? Fade(ColorOrange, 0.3f) : ColorDark1);
-    DrawRectangleLinesEx(msRect, S(1), d->State->IsMaster ? ColorOrange : ColorShadow);
+    DrawRectangleRec(msRect, d->State->IsMaster ? Fade(Theme.AccentOrange, 0.3f) : Theme.BorderDefault);
+    DrawRectangleLinesEx(msRect, S(1), d->State->IsMaster ? Theme.AccentOrange : Theme.BorderDefault);
     const char *msLbl = "MASTER";
     Vector2 msSz = MeasureTextEx(faceSm, msLbl, S(9), 1);
-    UIDrawText(msLbl, faceSm, msRect.x + (utilW - msSz.x)/2.0f, msRect.y + (utilH - S(9))/2.0f, S(9), d->State->IsMaster ? ColorOrange : ColorShadow);
+    UIDrawText(msLbl, faceSm, msRect.x + (utilW - msSz.x)/2.0f, msRect.y + (utilH - S(9))/2.0f, S(9), d->State->IsMaster ? Theme.AccentOrange : Theme.BorderDefault);
 
     // 2. Sync (Top-Right)
     Rectangle syRect = { margin + utilW + utilGap, utilY, utilW, utilH };
@@ -323,32 +323,32 @@ static void DeckInfo_Draw(Component *base) {
     bool isBeatSync = d->State->SyncMode == 2;
     bool blink = (d->State->IsPhaseDrifted && ((int)(GetTime() * 4) % 2 == 0));
     
-    Color syncColor = isBeatSync ? ColorBlue : ColorWhite;
-    if (blink) syncColor = ColorOrange;
+    Color syncColor = isBeatSync ? Theme.AccentBlue : Theme.TextPrimary;
+    if (blink) syncColor = Theme.AccentOrange;
 
-    DrawRectangleRec(syRect, syncActive ? Fade(syncColor, 0.3f) : ColorDark1);
-    DrawRectangleLinesEx(syRect, S(1), syncActive ? syncColor : ColorShadow);
+    DrawRectangleRec(syRect, syncActive ? Fade(syncColor, 0.3f) : Theme.BorderDefault);
+    DrawRectangleLinesEx(syRect, S(1), syncActive ? syncColor : Theme.BorderDefault);
     const char *syncLbl = (d->State->SyncMode == 2) ? "BEAT" : ((d->State->SyncMode == 1) ? "BPM" : "SYNC");
     Vector2 syncSz = MeasureTextEx(faceSm, syncLbl, S(9), 1);
-    UIDrawText(syncLbl, faceSm, syRect.x + (utilW - syncSz.x)/2.0f, syRect.y + (utilH - S(9))/2.0f, S(9), syncActive ? ColorWhite : ColorShadow);
+    UIDrawText(syncLbl, faceSm, syRect.x + (utilW - syncSz.x)/2.0f, syRect.y + (utilH - S(9))/2.0f, S(9), syncActive ? Theme.TextPrimary : Theme.BorderDefault);
 
     // 3. MT (Bottom-Left)
     Rectangle mtRect = { margin, utilY2, utilW, utilH };
-    DrawRectangleRec(mtRect, d->State->MasterTempo ? Fade(ColorRed, 0.3f) : ColorDark1);
-    DrawRectangleLinesEx(mtRect, S(1), d->State->MasterTempo ? ColorRed : ColorShadow);
+    DrawRectangleRec(mtRect, d->State->MasterTempo ? Fade(Theme.AccentRed, 0.3f) : Theme.BorderDefault);
+    DrawRectangleLinesEx(mtRect, S(1), d->State->MasterTempo ? Theme.AccentRed : Theme.BorderDefault);
     const char *mtLbl = d->State->MasterTempo ? "MT (ON)" : "MT (OFF)";
     Vector2 mtSz = MeasureTextEx(faceSm, mtLbl, S(9), 1);
-    UIDrawText(mtLbl, faceSm, mtRect.x + (utilW - mtSz.x)/2.0f, mtRect.y + (utilH - S(9))/2.0f, S(9), d->State->MasterTempo ? ColorWhite : ColorShadow);
+    UIDrawText(mtLbl, faceSm, mtRect.x + (utilW - mtSz.x)/2.0f, mtRect.y + (utilH - S(9))/2.0f, S(9), d->State->MasterTempo ? Theme.TextPrimary : Theme.BorderDefault);
 
     // 4. Vinyl / CDJ Mode (Bottom-Right)
     Rectangle viRect = { margin + utilW + utilGap, utilY2, utilW, utilH };
     bool vinylOn = d->State->VinylModeEnabled;
-    Color viColor = vinylOn ? ColorBlue : ColorRed;
+    Color viColor = vinylOn ? Theme.AccentBlue : Theme.AccentRed;
     DrawRectangleRec(viRect, Fade(viColor, 0.3f));
     DrawRectangleLinesEx(viRect, S(1), viColor);
     const char *viLbl = vinylOn ? "VINYL" : "CDJ";
     Vector2 viSz = MeasureTextEx(faceSm, viLbl, S(9), 1);
-    UIDrawText(viLbl, faceSm, viRect.x + (utilW - viSz.x)/2.0f, viRect.y + (utilH - S(9))/2.0f, S(9), ColorWhite);
+    UIDrawText(viLbl, faceSm, viRect.x + (utilW - viSz.x)/2.0f, viRect.y + (utilH - S(9))/2.0f, S(9), Theme.TextPrimary);
     */
 
     // --- Row 3: Main Controls (Cue, Play) COMMENTED OUT ---
@@ -361,19 +361,19 @@ static void DeckInfo_Draw(Component *base) {
     Rectangle cueRect = { margin, btnY, btnW, btnH };
     bool hoverCue = CheckCollisionPointRec(Input_GetPointerPos(), cueRect);
     bool isCueing = d->State->IsCueActive;
-    DrawRectangleRec(cueRect, isCueing ? Fade(ColorCue, 0.4f) : ColorDark1);
-    DrawRectangleLinesEx(cueRect, S(1), isCueing ? ColorCue : ColorShadow);
-    if (hoverCue) DrawRectangleLinesEx(cueRect, S(1.5f), ColorWhite);
-    UIDrawText("CUE", faceXS, cueRect.x + (btnW - S(18))/2.0f, cueRect.y + S(9), S(8.5f), isCueing ? ColorWhite : ColorShadow);
+    DrawRectangleRec(cueRect, isCueing ? Fade(Theme.CueMarker, 0.4f) : Theme.BorderDefault);
+    DrawRectangleLinesEx(cueRect, S(1), isCueing ? Theme.CueMarker : Theme.BorderDefault);
+    if (hoverCue) DrawRectangleLinesEx(cueRect, S(1.5f), Theme.TextPrimary);
+    UIDrawText("CUE", faceXS, cueRect.x + (btnW - S(18))/2.0f, cueRect.y + S(9), S(8.5f), isCueing ? Theme.TextPrimary : Theme.BorderDefault);
 
     // Play/Pause
     Rectangle playRect = { margin + btnW + S(6), btnY, btnW, btnH };
     bool hoverPlay = CheckCollisionPointRec(Input_GetPointerPos(), playRect);
     bool isPlaying = d->State->IsPlaying;
-    DrawRectangleRec(playRect, isPlaying ? Fade(ColorGreen, 0.4f) : ColorDark1);
-    DrawRectangleLinesEx(playRect, S(1), isPlaying ? ColorGreen : ColorShadow);
-    if (hoverPlay) DrawRectangleLinesEx(playRect, S(1.5f), ColorWhite);
-    UIDrawText(isPlaying ? "\uf04c" : "\uf04b", faceIcon, playRect.x + (btnW - S(10))/2.0f, playRect.y + S(8), S(11), isPlaying ? ColorWhite : ColorShadow);
+    DrawRectangleRec(playRect, isPlaying ? Fade(Theme.AccentGreen, 0.4f) : Theme.BorderDefault);
+    DrawRectangleLinesEx(playRect, S(1), isPlaying ? Theme.AccentGreen : Theme.BorderDefault);
+    if (hoverPlay) DrawRectangleLinesEx(playRect, S(1.5f), Theme.TextPrimary);
+    UIDrawText(isPlaying ? "\uf04c" : "\uf04b", faceIcon, playRect.x + (btnW - S(10))/2.0f, playRect.y + S(8), S(11), isPlaying ? Theme.TextPrimary : Theme.BorderDefault);
     */
 }
 
