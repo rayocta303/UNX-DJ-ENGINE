@@ -873,7 +873,7 @@ void OnPadPress(void *ctx, int deckIdx, int padIdx) {
         break;
       }
     }
-  } else if (mode == PAD_MODE_RELEASE_FX) {
+  } else if (mode == PAD_MODE_PAD_FX) {
     if (padIdx == 0)
       DeckAudio_TriggerReleaseFX(audio, 1); // Brake S
     else if (padIdx == 1)
@@ -921,7 +921,7 @@ void OnPadRelease(void *ctx, int deckIdx, int padIdx) {
     a->padState.ActiveLoopIdx[deckIdx] = -1;
   } else if (mode == PAD_MODE_GATE_CUE) {
     DeckAudio_InstantStop(audio);
-  } else if (mode == PAD_MODE_RELEASE_FX) {
+  } else if (mode == PAD_MODE_PAD_FX) {
     if (padIdx >= 4 && padIdx <= 6) {
       audio->ReleaseFXEchoActive = false;
     }

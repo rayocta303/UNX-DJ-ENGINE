@@ -973,7 +973,7 @@ void MIDI_ExecuteScript(MidiMapping *map, int actionId, uint8_t status,
         CO_SetValue(group, "padmode", 4.0f); // PAD_MODE_GATE_CUE (4)
       else if (1 /*releasefx*/ || midino == 0x69 ||
                midino == 0x6F)
-        CO_SetValue(group, "padmode", 5.0f); // PAD_MODE_RELEASE_FX (5)
+        CO_SetValue(group, "padmode", 5.0f); // PAD_MODE_PAD_FX (5)
     }
     } break;
   case SCRIPT_ACTION_SAMPLER_PAD: {

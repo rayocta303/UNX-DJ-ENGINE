@@ -9,7 +9,8 @@ typedef enum {
     PAD_MODE_SLIP_LOOP,
     PAD_MODE_BEAT_JUMP,
     PAD_MODE_GATE_CUE,
-    PAD_MODE_RELEASE_FX,
+    PAD_MODE_PAD_FX,
+    PAD_MODE_SAMPLER,
     PAD_MODE_COUNT
 } PadMode;
 

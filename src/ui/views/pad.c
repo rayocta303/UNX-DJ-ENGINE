@@ -6,8 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static const char *PAD_MODE_LABELS[] = {"HOT CUE",   "BEAT LOOP", "SLIP LOOP",
-                                        "BEAT JUMP", "GATE CUE",  "RELEASE FX"};
+
 
 static int Pad_Update(Component *base) {
   PadRenderer *r = (PadRenderer *)base;
@@ -44,16 +43,25 @@ static int Pad_Update(Component *base) {
     }
 
     // Mode selection hits (Touch Utility)
-    float modeBtnW = (panelW - S(20)) / 6.0f;
+    float modeBtnW = (panelW - S(20)) / 5.0f;
     float modeX = panelX + S(10);
     float modeY = panelY + S(28);
 
-    for (int m = 0; m < PAD_MODE_COUNT; m++) {
+    bool isShiftActive = r->State->ShiftActive[d] || IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+
+    for (int m = 0; m < 5; m++) {
       Rectangle mRect = {modeX + m * modeBtnW, modeY, modeBtnW, modeBarH};
       if (Touch_CheckClick(mRect, S(4.0f))) {
-        r->State->Mode[d] = (PadMode)m;
+        PadMode newMode;
+        if (m == 0) newMode = isShiftActive ? PAD_MODE_GATE_CUE : PAD_MODE_HOT_CUE;
+        else if (m == 1) newMode = isShiftActive ? PAD_MODE_SLIP_LOOP : PAD_MODE_BEAT_LOOP;
+        else if (m == 2) newMode = PAD_MODE_BEAT_JUMP;
+        else if (m == 3) newMode = PAD_MODE_PAD_FX;
+        else newMode = PAD_MODE_SAMPLER;
+
+        r->State->Mode[d] = newMode;
         if (r->OnModeChange)
-          r->OnModeChange(r->callbackCtx, d, (PadMode)m);
+          r->OnModeChange(r->callbackCtx, d, newMode);
         return 1;
       }
     }
@@ -163,27 +171,35 @@ static void Pad_Draw(Component *base) {
 
     // Mode Bar
     float modeBarH = S(20);
-    float modeBtnW = (panelW - S(20)) / 6.0f;
+    float modeBtnW = (panelW - S(20)) / 5.0f;
     float modeX = panelX + S(10);
     float modeY = panelY + S(28);
 
-    for (int m = 0; m < PAD_MODE_COUNT; m++) {
-      bool active = (mode == (PadMode)m);
+    for (int m = 0; m < 5; m++) {
+      PadMode btnModePrimary;
+      PadMode btnModeSecondary;
+      if (m == 0) { btnModePrimary = PAD_MODE_HOT_CUE; btnModeSecondary = PAD_MODE_GATE_CUE; }
+      else if (m == 1) { btnModePrimary = PAD_MODE_BEAT_LOOP; btnModeSecondary = PAD_MODE_SLIP_LOOP; }
+      else if (m == 2) { btnModePrimary = PAD_MODE_BEAT_JUMP; btnModeSecondary = PAD_MODE_BEAT_JUMP; }
+      else if (m == 3) { btnModePrimary = PAD_MODE_PAD_FX; btnModeSecondary = PAD_MODE_PAD_FX; }
+      else { btnModePrimary = PAD_MODE_SAMPLER; btnModeSecondary = PAD_MODE_SAMPLER; }
+      
+      bool isPrimaryActive = (mode == btnModePrimary);
+      bool isSecondaryActive = (mode == btnModeSecondary);
+      bool active = isPrimaryActive || isSecondaryActive;
+
       Rectangle mRect = {modeX + m * modeBtnW, modeY, modeBtnW, modeBarH};
 
       Color modeCol = Theme.TextPrimary;
-      if (m == PAD_MODE_HOT_CUE)
-        modeCol = Theme.TextPrimary;
-      else if (m == PAD_MODE_BEAT_LOOP)
-        modeCol = Theme.AccentGreen;
-      else if (m == PAD_MODE_SLIP_LOOP)
-        modeCol = Theme.AccentYellow;
-      else if (m == PAD_MODE_BEAT_JUMP)
-        modeCol = Theme.AccentOrange;
-      else if (m == PAD_MODE_GATE_CUE)
-        modeCol = Theme.AccentBlue;
-      else if (m == PAD_MODE_RELEASE_FX)
-        modeCol = Theme.AccentRed;
+      if (active) {
+         if (mode == PAD_MODE_HOT_CUE) modeCol = Theme.TextPrimary;
+         else if (mode == PAD_MODE_BEAT_LOOP) modeCol = Theme.AccentGreen;
+         else if (mode == PAD_MODE_SLIP_LOOP) modeCol = Theme.AccentYellow;
+         else if (mode == PAD_MODE_GATE_CUE) modeCol = Theme.AccentBlue;
+         else if (mode == PAD_MODE_BEAT_JUMP) modeCol = Theme.AccentOrange;
+         else if (mode == PAD_MODE_PAD_FX) modeCol = Theme.AccentRed;
+         else if (mode == PAD_MODE_SAMPLER) modeCol = Theme.AccentOrange;
+      }
 
       if (active) {
         DrawRectangleRec(mRect, Fade(modeCol, 0.4f));
@@ -192,8 +208,21 @@ static void Pad_Draw(Component *base) {
         DrawRectangleLinesEx(mRect, 1.0f, Theme.BorderDefault);
       }
 
-      // Draw very small text label
-      const char *lbl = PAD_MODE_LABELS[m];
+      const char *lbl = "";
+      if (isShiftActive) {
+          if (m == 0) lbl = "GATE CUE";
+          else if (m == 1) lbl = "SLIP LOOP";
+          else if (m == 2) lbl = "BEAT JUMP";
+          else if (m == 3) lbl = "FX";
+          else lbl = "SAMPLER";
+      } else {
+          if (m == 0) lbl = isSecondaryActive ? "GATE CUE" : "HOT CUE";
+          else if (m == 1) lbl = isSecondaryActive ? "SLIP LOOP" : "BEAT LOOP";
+          else if (m == 2) lbl = "BEAT JUMP";
+          else if (m == 3) lbl = "FX";
+          else lbl = "SAMPLER";
+      }
+
       float txtW = MeasureTextEx(faceSm, lbl, S(8), 1).x;
       DrawTextEx(faceSm, lbl,
                  (Vector2){mRect.x + (modeBtnW - txtW) / 2.0f, mRect.y + S(6)},
@@ -266,8 +295,11 @@ static void Pad_Draw(Component *base) {
             }
           }
         }
-      } else if (mode == PAD_MODE_RELEASE_FX) {
+      } else if (mode == PAD_MODE_PAD_FX) {
         padColor = Theme.AccentRed;
+        hasData = true;
+      } else if (mode == PAD_MODE_SAMPLER) {
+        padColor = Theme.AccentOrange;
         hasData = true;
       }
 
@@ -296,10 +328,12 @@ static void Pad_Draw(Component *base) {
         static const char *jumps[] = {"<< 4", "<< 8", "<< 16", "<< 32",
                                       "4 >>", "8 >>", "16 >>", "32 >>"};
         strcpy(lbl, jumps[i]);
-      } else if (mode == PAD_MODE_RELEASE_FX) {
+      } else if (mode == PAD_MODE_PAD_FX) {
         static const char *rfx[] = {"BRAKE S",  "BRAKE L", "SPIN S", "SPIN L",
                                     "ECHO 1/2", "ECHO 1",  "ECHO 2", "MUTE"};
         strcpy(lbl, rfx[i]);
+      } else if (mode == PAD_MODE_SAMPLER) {
+        sprintf(lbl, "SMPL %d", i + 1);
       } else {
         lbl[0] = 'A' + i;
         lbl[1] = '\0';

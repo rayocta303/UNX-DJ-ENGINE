@@ -87,7 +87,7 @@ static int DeckStrip_Update(Component *base) {
   float lColW = S(40);
   float bpmBoxW = S(56);
   float bpmX = x + stripW - bpmBoxW - S(4);
-  float tempoX = bpmX - S(64);
+  float tempoX = bpmX - S(86);
 
   float mx = x + lColW + S(4);
   float mtX = mx;
@@ -127,7 +127,7 @@ static int DeckStrip_Update(Component *base) {
   if (Touch_CheckClick((Rectangle){tx, midY, S(80), S(28)}, S(2.0f))) {
     d->State->TimeMode = (d->State->TimeMode + 1) % 2;
   }
-  if (Touch_CheckClick((Rectangle){tempoX, midY, S(64), S(28)}, S(2.0f))) {
+  if (Touch_CheckClick((Rectangle){tempoX, midY, S(86), S(28)}, S(2.0f))) {
     d->State->TempoRange = (d->State->TempoRange + 1) % 4;
   }
 
@@ -231,7 +231,6 @@ static void DeckStrip_Draw(Component *base) {
   Font faceXXS = UIFonts_GetFace(S(7));
   Font faceXXSBold = UIFonts_GetBoldFace(S(7));
   Font faceMd = UIFonts_GetFace(S(11));
-  Font faceMdBold = UIFonts_GetBoldFace(S(11));
   Font faceBPM = UIFonts_GetFace(S(20));
 
   float lColW = S(40);
@@ -332,9 +331,9 @@ static void DeckStrip_Draw(Component *base) {
 
   float bpmBoxW = S(56);
   float bpmX = x + stripW - bpmBoxW - S(4);
-  float tempoX = bpmX - S(64);
+  float tempoX = bpmX - S(86);
 
-  UIDrawText("TEMPO", faceXXS, tempoX, midY, S(7), Theme.BorderDefault);
+  UIDrawText("TEMPO RANGE", faceXXS, tempoX, midY, S(7), Theme.BorderDefault);
 
   const char *rangeStr = "10%";
   Color rangeBgCol = Theme.AccentOrange; // Dark Orange
@@ -351,8 +350,9 @@ static void DeckStrip_Draw(Component *base) {
 
   float tBadgeW = 24.0f;
   float tBadgeY = midY - S(0.5f);
-  DrawRectangle(tempoX + S(32), tBadgeY, S(tBadgeW), S(9), rangeBgCol);
-  DrawCentredText(rangeStr, faceXXSBold, tempoX + S(32), S(tBadgeW),
+  float tempoBadgeX = bpmX - S(8) - S(tBadgeW);
+  DrawRectangle(tempoBadgeX, tBadgeY, S(tBadgeW), S(9), rangeBgCol);
+  DrawCentredText(rangeStr, faceXXSBold, tempoBadgeX, S(tBadgeW),
                   tBadgeY + S(0.5f), S(7), Theme.TextPrimary);
 
   char tempoStr[32];
@@ -360,9 +360,9 @@ static void DeckStrip_Draw(Component *base) {
   if (d->State->TempoPercent == 0.0f)
     sprintf(tempoStr, " 0.00%%");
 
-  float wT = MeasureTextEx(faceMdBold, tempoStr, S(11), 1).x;
-  float valX = (tempoX + S(32) + S(tBadgeW)) - wT;
-  UIDrawText(tempoStr, faceMdBold, valX, midY + S(11), S(11), Theme.TextPrimary);
+  float wT = MeasureTextEx(faceTime, tempoStr, S(18), 1).x;
+  float valX = (bpmX - S(8)) - wT;
+  UIDrawText(tempoStr, faceTime, valX, midY + S(9), S(18), Theme.TextPrimary);
 
   float bpmBoxH = S(28);
   float bpmBoxY = midY;
